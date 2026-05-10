@@ -25,7 +25,7 @@ public class EventoController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Evento> findById(@PathVariable Long id) {
+    public ResponseEntity<Evento> findById(@PathVariable Integer id) {
         return eventoService.findById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());

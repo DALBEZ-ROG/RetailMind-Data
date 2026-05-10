@@ -8,10 +8,13 @@ import { MatTableModule } from '@angular/material/table';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { HttpEventType } from '@angular/common/http';
 
 import { EtlService } from '../../core/services/etl.service';
 import { EtlResponse, EstadoTabla, CargaHistorial } from '../../core/models/etl.model';
+import { ConfirmDialogComponent } from './confirm-dialog.component';
 
 type OperationState = 'idle' | 'running' | 'success' | 'error';
 
@@ -27,7 +30,9 @@ type OperationState = 'idle' | 'running' | 'success' | 'error';
     MatTableModule,
     MatChipsModule,
     MatDividerModule,
-    MatSnackBarModule
+    MatSnackBarModule,
+    MatTooltipModule,
+    MatDialogModule
   ],
   templateUrl: './admin-etl.component.html',
   styleUrl: './admin-etl.component.scss'
@@ -55,7 +60,8 @@ export class AdminEtlComponent implements OnInit {
 
   constructor(
     private etlService: EtlService,
-    private snackBar:   MatSnackBar
+    private snackBar:   MatSnackBar,
+    private dialog:     MatDialog
   ) {}
 
   ngOnInit(): void {
@@ -141,18 +147,30 @@ export class AdminEtlComponent implements OnInit {
   }
 
   ejecutarCompleto(): void {
-    this.startOperation();
-    this.appendConsole('=== INICIANDO PROCESO COMPLETO ===');
-    this.appendConsole('Paso 1: Carga a staging...');
-    this.etlService.ejecutarCompleto().subscribe({
-      next: res => {
-        this.handleResponse(res, 'Proceso completo');
-        if (res.success) {
-          this.refreshEstadoTablas();
-          this.refreshHistorial();
-        }
-      },
-      error: err => this.handleError(err.message)
+    const dialogRef = this.dialog.open(ConfirmDialogComponent, {
+      width: '420px',
+      data: {
+        title: 'Confirmar ejecucion ETL',
+        message: 'Esta accion cargara los datos del CSV a la base de datos. Desea continuar?'
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(confirmed => {
+      if (confirmed) {
+        this.startOperation();
+        this.appendConsole('=== INICIANDO PROCESO COMPLETO ===');
+        this.appendConsole('Paso 1: Carga a staging...');
+        this.etlService.ejecutarCompleto().subscribe({
+          next: res => {
+            this.handleResponse(res, 'Proceso completo');
+            if (res.success) {
+              this.refreshEstadoTablas();
+              this.refreshHistorial();
+            }
+          },
+          error: err => this.handleError(err.message)
+        });
+      }
     });
   }
 

@@ -43,7 +43,7 @@ def create_tables():
         conn.commit()
         cur.close()
         conn.close()
-        print("Tablas creadas (o ya existentes) correctamente ✓")
+        print("Tablas creadas (o ya existentes) correctamente OK")
     except Exception as e:
         print(f"[ERROR] Fallo al ejecutar el DDL:\n  {e}")
         sys.exit(1)

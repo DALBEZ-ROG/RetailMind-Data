@@ -67,7 +67,7 @@ def verify_load():
     if empty:
         print(f"[ADVERTENCIA] Las siguientes tablas están vacías: {', '.join(empty)}")
     else:
-        print("Todas las tablas contienen datos ✓")
+        print("Todas las tablas contienen datos OK")
 
 
 if __name__ == "__main__":

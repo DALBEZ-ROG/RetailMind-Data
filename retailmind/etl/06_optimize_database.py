@@ -61,12 +61,12 @@ def optimize_database():
                     # Extraer nombre del indice para el log
                     parts = stmt.split()
                     idx_name = parts[4] if len(parts) > 4 else "?"
-                    print(f"  Indice creado/verificado: {idx_name} \u2713")
+                    print(f"  Indice creado/verificado: {idx_name} OK")
                     created += 1
                 elif upper.startswith("CREATE TABLE"):
                     parts = stmt.split()
                     tbl_name = parts[5] if len(parts) > 5 else "?"
-                    print(f"  Tabla creada/verificada: {tbl_name} \u2713")
+                    print(f"  Tabla creada/verificada: {tbl_name} OK")
             except Exception as stmt_err:
                 print(f"  [ADVERTENCIA] Sentencia omitida: {stmt_err}")
                 skipped += 1
@@ -75,7 +75,7 @@ def optimize_database():
         print()
         print(f"  Operaciones exitosas : {created}")
         print(f"  Advertencias         : {skipped}")
-        print("\nOptimizacion completada \u2713")
+        print("\nOptimizacion completada OK")
 
     except Exception as e:
         conn.rollback()

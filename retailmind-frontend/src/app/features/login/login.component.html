@@ -1,0 +1,51 @@
+<div class="login-wrapper">
+  <mat-card class="login-card" [class.shake]="shakeCard">
+    <div class="login-header">
+      <mat-icon class="login-logo">analytics</mat-icon>
+      <h1 class="login-title">RetailMind Analytics</h1>
+      <p class="login-subtitle">Inicia sesion para continuar</p>
+    </div>
+
+    <mat-card-content>
+      <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" class="login-form">
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Usuario</mat-label>
+          <input matInput formControlName="username" placeholder="Ingresa tu usuario" autocomplete="username">
+          <mat-icon matPrefix>person</mat-icon>
+          <mat-error *ngIf="f['username'].hasError('required')">El usuario es requerido</mat-error>
+          <mat-error *ngIf="f['username'].hasError('minlength')">Minimo 3 caracteres</mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Contrasena</mat-label>
+          <input matInput formControlName="password"
+                 [type]="hidePassword ? 'password' : 'text'"
+                 placeholder="Ingresa tu contrasena"
+                 autocomplete="current-password">
+          <mat-icon matPrefix>lock</mat-icon>
+          <button mat-icon-button matSuffix type="button"
+                  (click)="hidePassword = !hidePassword"
+                  [attr.aria-label]="hidePassword ? 'Mostrar' : 'Ocultar'">
+            <mat-icon>{{ hidePassword ? 'visibility_off' : 'visibility' }}</mat-icon>
+          </button>
+          <mat-error *ngIf="f['password'].hasError('required')">La contrasena es requerida</mat-error>
+          <mat-error *ngIf="f['password'].hasError('minlength')">Minimo 6 caracteres</mat-error>
+        </mat-form-field>
+
+        <button mat-raised-button color="primary" type="submit"
+                class="login-btn full-width"
+                [disabled]="loading || loginForm.invalid">
+          <mat-spinner *ngIf="loading" diameter="20" class="btn-spinner"></mat-spinner>
+          <span *ngIf="!loading">INICIAR SESION</span>
+        </button>
+
+      </form>
+    </mat-card-content>
+
+    <mat-card-footer class="login-footer">
+      <p>Usuario por defecto: <strong>admin</strong> / <strong>admin123</strong></p>
+      <p class="version-text">RetailMind Analytics v1.0 &copy; 2024</p>
+    </mat-card-footer>
+  </mat-card>
+</div>

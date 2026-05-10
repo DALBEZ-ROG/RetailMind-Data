@@ -39,21 +39,27 @@
       <div class="action-buttons">
         <button mat-stroked-button color="primary"
                 [disabled]="isRunning || !selectedFile"
-                (click)="uploadCsv()">
+                (click)="uploadCsv()"
+                matTooltip="Seleccionar archivo CSV con 100,000 registros"
+                matTooltipShowDelay="500">
           <mat-icon>save_alt</mat-icon>
           Subir CSV
         </button>
 
         <button mat-stroked-button color="accent"
-                [disabled]="isRunning"
-                (click)="cargarStaging()">
+                [disabled]="isRunning || !selectedFile"
+                (click)="cargarStaging()"
+                matTooltip="Carga el CSV a la tabla dataset_temporal"
+                matTooltipShowDelay="500">
           <mat-icon>storage</mat-icon>
           Cargar a Staging
         </button>
 
         <button mat-stroked-button color="accent"
-                [disabled]="isRunning"
-                (click)="ejecutarEtl()">
+                [disabled]="isRunning || !selectedFile"
+                (click)="ejecutarEtl()"
+                matTooltip="Distribuye los datos a las 10 tablas normalizadas"
+                matTooltipShowDelay="500">
           <mat-icon>play_arrow</mat-icon>
           ETL Incremental
         </button>
@@ -61,7 +67,9 @@
         <button mat-raised-button color="primary"
                 class="btn-ejecutar-todo"
                 [disabled]="isRunning || !selectedFile"
-                (click)="ejecutarCompleto()">
+                (click)="ejecutarCompleto()"
+                matTooltip="Ejecuta todos los pasos en secuencia"
+                matTooltipShowDelay="500">
           <mat-icon>rocket_launch</mat-icon>
           EJECUTAR TODO
         </button>

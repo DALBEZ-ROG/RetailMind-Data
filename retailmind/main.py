@@ -55,5 +55,5 @@ if __name__ == "__main__":
 
     elapsed = time.time() - start
     print(f"\n{'=' * 55}")
-    print(f"  Pipeline completado en {elapsed:.2f} segundos ✓")
+    print(f"  Pipeline completado en {elapsed:.2f} segundos OK")
     print(f"{'=' * 55}\n")

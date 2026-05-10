@@ -1,0 +1,47 @@
+.status-indicator {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  z-index: 9999;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+
+  &.status-up {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+
+    .status-dot {
+      background-color: #4caf50;
+    }
+  }
+
+  &.status-down {
+    background-color: #ffebee;
+    color: #c62828;
+
+    .status-dot {
+      background-color: #f44336;
+      animation: pulse 1.5s infinite;
+    }
+  }
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}

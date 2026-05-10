@@ -1,51 +1,76 @@
-<mat-toolbar color="primary" class="app-toolbar">
-  <button mat-icon-button (click)="sidenavOpened = !sidenavOpened" aria-label="Toggle menu">
-    <mat-icon>menu</mat-icon>
-  </button>
-  <span class="toolbar-title">{{ title }}</span>
-</mat-toolbar>
+<ng-container *ngIf="isLoginPage; else mainLayout">
+  <router-outlet />
+</ng-container>
 
-<mat-sidenav-container class="sidenav-container">
-  <mat-sidenav
-    mode="side"
-    [opened]="sidenavOpened"
-    class="sidenav">
+<ng-template #mainLayout>
+  <mat-toolbar color="primary" class="app-toolbar">
+    <button mat-icon-button (click)="sidenavOpened = !sidenavOpened" aria-label="Toggle menu">
+      <mat-icon>menu</mat-icon>
+    </button>
+    <span class="toolbar-title">{{ title }}</span>
 
-    <mat-nav-list>
-      <a mat-list-item
-         routerLink="/dashboard"
-         routerLinkActive="active-link"
-         [routerLinkActiveOptions]="{ exact: true }">
-        <mat-icon matListItemIcon>dashboard</mat-icon>
-        <span matListItemTitle>Dashboard</span>
-      </a>
+    <span class="toolbar-spacer"></span>
 
-      <a mat-list-item
-         routerLink="/sesiones"
-         routerLinkActive="active-link">
-        <mat-icon matListItemIcon>timeline</mat-icon>
-        <span matListItemTitle>Sesiones</span>
-      </a>
+    <ng-container *ngIf="currentUser">
+      <mat-chip class="role-chip"
+                [class.role-admin]="isAdmin"
+                [class.role-viewer]="!isAdmin">
+        {{ currentUser.rol }}
+      </mat-chip>
 
-      <a mat-list-item
-         routerLink="/conversiones"
-         routerLinkActive="active-link">
-        <mat-icon matListItemIcon>trending_up</mat-icon>
-        <span matListItemTitle>Conversiones</span>
-      </a>
+      <button mat-button [matMenuTriggerFor]="userMenu" class="user-btn">
+        <mat-icon>account_circle</mat-icon>
+        <span class="user-name">{{ currentUser.nombre }}</span>
+      </button>
+      <mat-menu #userMenu="matMenu">
+        <button mat-menu-item disabled>
+          <mat-icon>person</mat-icon>
+          <span>{{ currentUser.username }}</span>
+        </button>
+        <mat-divider></mat-divider>
+        <button mat-menu-item (click)="logout()" matTooltip="Cerrar sesion" matTooltipShowDelay="500">
+          <mat-icon>logout</mat-icon>
+          <span>Cerrar sesion</span>
+        </button>
+      </mat-menu>
+    </ng-container>
+  </mat-toolbar>
 
-      <mat-divider></mat-divider>
+  <!-- Breadcrumb -->
+  <div class="breadcrumb-bar">
+    <span class="breadcrumb-text">RetailMind &gt; {{ breadcrumb }}</span>
+  </div>
 
-      <a mat-list-item
-         routerLink="/admin-etl"
-         routerLinkActive="active-link">
-        <mat-icon matListItemIcon>settings</mat-icon>
-        <span matListItemTitle>Administracion ETL</span>
-      </a>
-    </mat-nav-list>
-  </mat-sidenav>
+  <mat-sidenav-container class="sidenav-container">
+    <mat-sidenav mode="side" [opened]="sidenavOpened" class="sidenav">
+      <mat-nav-list>
+        <a mat-list-item routerLink="/dashboard" routerLinkActive="active-link"
+           [routerLinkActiveOptions]="{ exact: true }">
+          <mat-icon matListItemIcon>dashboard</mat-icon>
+          <span matListItemTitle>Dashboard</span>
+        </a>
+        <a mat-list-item routerLink="/sesiones" routerLinkActive="active-link">
+          <mat-icon matListItemIcon>timeline</mat-icon>
+          <span matListItemTitle>Sesiones</span>
+        </a>
+        <a mat-list-item routerLink="/conversiones" routerLinkActive="active-link">
+          <mat-icon matListItemIcon>trending_up</mat-icon>
+          <span matListItemTitle>Conversiones</span>
+        </a>
+        <ng-container *ngIf="isAdmin">
+          <mat-divider></mat-divider>
+          <a mat-list-item routerLink="/admin-etl" routerLinkActive="active-link">
+            <mat-icon matListItemIcon>settings</mat-icon>
+            <span matListItemTitle>Administracion ETL</span>
+          </a>
+        </ng-container>
+      </mat-nav-list>
+    </mat-sidenav>
 
-  <mat-sidenav-content class="sidenav-content">
-    <router-outlet />
-  </mat-sidenav-content>
-</mat-sidenav-container>
+    <mat-sidenav-content class="sidenav-content">
+      <router-outlet />
+    </mat-sidenav-content>
+  </mat-sidenav-container>
+</ng-template>
+
+<app-server-status></app-server-status>

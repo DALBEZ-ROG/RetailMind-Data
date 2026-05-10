@@ -1,19 +1,18 @@
 package com.retailmind.service;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.stream.Collectors;
-
+import com.retailmind.dto.TasaSemanaDTO;
+import com.retailmind.entity.Conversion;
+import com.retailmind.repository.ConversionRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.retailmind.dto.TasaSemanaDTO;
-import com.retailmind.entity.Conversion;
-import com.retailmind.repository.ConversionRepository;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional(readOnly = true)
@@ -29,7 +28,7 @@ public class ConversionService {
         return conversionRepository.findAll(pageable);
     }
 
-    public Optional<Conversion> findById(Long id) {
+    public Optional<Conversion> findById(Integer id) {
         return conversionRepository.findById(id);
     }
 

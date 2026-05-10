@@ -78,7 +78,7 @@ def load_csv_to_staging():
             total += len(batch)
 
         conn.commit()
-        print(f"  {total:,} registros insertados en dataset_temporal. \u2713")
+        print(f"  {total:,} registros insertados en dataset_temporal. OK")
 
     except Exception as e:
         conn.rollback()

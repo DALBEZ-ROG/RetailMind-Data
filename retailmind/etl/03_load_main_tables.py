@@ -21,7 +21,7 @@ def _insert_batch(cur, sql, rows, table_name):
         batch = rows[i : i + BATCH_SIZE]
         cur.executemany(sql, batch)
         total += len(batch)
-    print(f"Cargando tabla {table_name}... [{total} registros insertados] ✓")
+    print(f"Cargando tabla {table_name}... [{total} registros insertados] OK")
 
 
 def load_main_tables():
@@ -194,7 +194,7 @@ def load_main_tables():
         )
 
         conn.commit()
-        print("\nTablas principales cargadas exitosamente ✓")
+        print("\nTablas principales cargadas exitosamente OK")
 
     except Exception as e:
         conn.rollback()

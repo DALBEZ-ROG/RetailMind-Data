@@ -23,7 +23,7 @@ public class EventoService {
         return eventoRepository.findAll(pageable);
     }
 
-    public Optional<Evento> findById(Long id) {
+    public Optional<Evento> findById(Integer id) {
         return eventoRepository.findById(id);
     }
 

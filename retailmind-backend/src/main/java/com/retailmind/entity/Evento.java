@@ -20,7 +20,7 @@ public class Evento {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "evento_id")
-    private Long eventoId;
+    private Integer eventoId;
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "session_id")
@@ -44,8 +44,8 @@ public class Evento {
 
     public Evento() {}
 
-    public Long getEventoId() { return eventoId; }
-    public void setEventoId(Long eventoId) { this.eventoId = eventoId; }
+    public Integer getEventoId() { return eventoId; }
+    public void setEventoId(Integer eventoId) { this.eventoId = eventoId; }
 
     public Sesion getSesion() { return sesion; }
     public void setSesion(Sesion sesion) { this.sesion = sesion; }

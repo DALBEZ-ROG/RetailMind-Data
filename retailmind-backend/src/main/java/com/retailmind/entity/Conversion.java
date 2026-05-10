@@ -22,7 +22,7 @@ public class Conversion {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "conversion_id")
-    private Long conversionId;
+    private Integer conversionId;
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "session_id")
@@ -41,8 +41,8 @@ public class Conversion {
 
     public Conversion() {}
 
-    public Long getConversionId() { return conversionId; }
-    public void setConversionId(Long conversionId) { this.conversionId = conversionId; }
+    public Integer getConversionId() { return conversionId; }
+    public void setConversionId(Integer conversionId) { this.conversionId = conversionId; }
 
     public Sesion getSesion() { return sesion; }
     public void setSesion(Sesion sesion) { this.sesion = sesion; }

@@ -7,12 +7,16 @@ import {
   ElementRef
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
 import { MatCardModule } from '@angular/material/card';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTableModule } from '@angular/material/table';
 import { MatPaginatorModule, MatPaginator, PageEvent } from '@angular/material/paginator';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatButtonModule } from '@angular/material/button';
+import { MatChipsModule } from '@angular/material/chips';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import {
   Chart,
   BarController, BarElement,
@@ -26,8 +30,9 @@ import { DashboardService } from '../../core/services/dashboard.service';
 import { SesionService }    from '../../core/services/sesion.service';
 import { DashboardResumen } from '../../core/models/dashboard.model';
 import { Sesion }           from '../../core/models/sesion.model';
+import { environment }      from '../../../environments/environment';
 
-// Registrar solo los componentes de Chart.js que usamos
+// Registrar componentes de Chart.js
 Chart.register(
   BarController, BarElement,
   DoughnutController, ArcElement,
@@ -41,6 +46,7 @@ interface KpiCard {
   value: string;
   icon: string;
   color: string;
+  tooltip: string;
 }
 
 @Component({
@@ -53,7 +59,10 @@ interface KpiCard {
     MatIconModule,
     MatTableModule,
     MatPaginatorModule,
-    MatSnackBarModule
+    MatSnackBarModule,
+    MatButtonModule,
+    MatChipsModule,
+    MatTooltipModule
   ],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss'
@@ -69,6 +78,23 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   resumen!:       DashboardResumen;
   kpiCards:       KpiCard[] = [];
 
+  // Rendimiento
+  responseTimeMs:    number | null = null;
+  lastUpdated:       Date | null   = null;
+  refreshingViews    = false;
+  hasError           = false;
+
+  get currentUser(): string {
+    const user = this.dashboardService as any;
+    // Get from auth service via localStorage
+    const raw = localStorage.getItem('rm_user');
+    if (raw) {
+      const u = JSON.parse(raw);
+      return u.nombre || u.username;
+    }
+    return '';
+  }
+
   // Tabla de sesiones recientes
   sesiones:       Sesion[] = [];
   totalSesiones   = 0;
@@ -81,7 +107,6 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   private donutChart?: Chart;
   private lineChart?:  Chart;
 
-  // Paleta Material Indigo / Pink
   private readonly COLORS = [
     '#3f51b5', '#e91e63', '#00bcd4', '#ff9800',
     '#4caf50', '#9c27b0', '#f44336', '#2196f3'
@@ -90,7 +115,8 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   constructor(
     private dashboardService: DashboardService,
     private sesionService:    SesionService,
-    private snackBar:         MatSnackBar
+    private snackBar:         MatSnackBar,
+    private http:             HttpClient
   ) {}
 
   ngOnInit(): void {
@@ -98,9 +124,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.loadSesiones(0, this.pageSize);
   }
 
-  ngAfterViewInit(): void {
-    // Los graficos se crean despues de que los datos lleguen (en buildCharts)
-  }
+  ngAfterViewInit(): void {}
 
   ngOnDestroy(): void {
     this.barChart?.destroy();
@@ -112,16 +136,22 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   loadDashboard(): void {
     this.loading = true;
+    this.hasError = false;
+    const start = Date.now();
+
     this.dashboardService.getResumen().subscribe({
       next: data => {
-        this.resumen = data;
+        this.responseTimeMs = Date.now() - start;
+        this.lastUpdated    = new Date();
+        this.resumen        = data;
         this.buildKpiCards(data);
         this.loading = false;
-        // Esperar un tick para que el DOM renderice los canvas
         setTimeout(() => this.buildCharts(data), 0);
       },
       error: () => {
+        this.responseTimeMs = Date.now() - start;
         this.loading = false;
+        this.hasError = true;
         this.snackBar.open(
           'Error al cargar el dashboard. Verifica que el backend este corriendo.',
           'Cerrar',
@@ -148,15 +178,39 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.loadSesiones(event.pageIndex, event.pageSize);
   }
 
+  // ── Refrescar vistas materializadas ────────────────────────────────────────
+
+  refrescarVistas(): void {
+    this.refreshingViews = true;
+    this.http.post<{success: boolean; mensaje: string; duracionMs: number}>(
+      `${environment.apiUrl}/api/dashboard/refrescar-vistas`, {}
+    ).subscribe({
+      next: res => {
+        this.refreshingViews = false;
+        this.snackBar.open(
+          res.mensaje + ` (${res.duracionMs}ms)`,
+          'OK',
+          { duration: 4000 }
+        );
+        // Recargar dashboard con datos frescos
+        this.loadDashboard();
+      },
+      error: () => {
+        this.refreshingViews = false;
+        this.snackBar.open('Error al refrescar vistas.', 'Cerrar', { duration: 3000 });
+      }
+    });
+  }
+
   // ── KPI Cards ──────────────────────────────────────────────────────────────
 
   private buildKpiCards(d: DashboardResumen): void {
     this.kpiCards = [
-      { title: 'Total Sesiones',     value: d.totalSesiones.toLocaleString(),     icon: 'timeline',      color: '#3f51b5' },
-      { title: 'Total Usuarios',     value: d.totalUsuarios.toLocaleString(),     icon: 'people',        color: '#00bcd4' },
-      { title: 'Conversiones',       value: d.totalConversiones.toLocaleString(), icon: 'trending_up',   color: '#4caf50' },
-      { title: 'Tasa Conversion',    value: d.tasaConversion.toFixed(2) + '%',    icon: 'percent',       color: '#ff9800' },
-      { title: 'Abandonos',          value: d.totalAbandonos.toLocaleString(),    icon: 'trending_down', color: '#f44336' }
+      { title: 'Total Sesiones',     value: d.totalSesiones.toLocaleString(),     icon: 'timeline',      color: '#3f51b5', tooltip: 'Total de sesiones registradas en el sistema' },
+      { title: 'Total Usuarios',     value: d.totalUsuarios.toLocaleString(),     icon: 'people',        color: '#00bcd4', tooltip: 'Usuarios unicos que han interactuado' },
+      { title: 'Conversiones',       value: d.totalConversiones.toLocaleString(), icon: 'trending_up',   color: '#4caf50', tooltip: 'Sesiones que resultaron en una compra' },
+      { title: 'Tasa Conversion',    value: d.tasaConversion.toFixed(2) + '%',    icon: 'percent',       color: '#ff9800', tooltip: 'Porcentaje de sesiones que convirtieron' },
+      { title: 'Abandonos',          value: d.totalAbandonos.toLocaleString(),    icon: 'trending_down', color: '#f44336', tooltip: 'Sesiones sin conversion con drop_off=true' }
     ];
   }
 
@@ -215,9 +269,6 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!this.lineCanvas?.nativeElement) return;
     this.lineChart?.destroy();
 
-    // Datos de tasa por semana se cargan desde el endpoint de conversiones
-    // Para el dashboard usamos los datos ya disponibles en resumen
-    // Si se necesita detalle por semana, llamar /api/conversiones/tasa-por-semana
     this.lineChart = new Chart(this.lineCanvas.nativeElement, {
       type: 'line',
       data: {

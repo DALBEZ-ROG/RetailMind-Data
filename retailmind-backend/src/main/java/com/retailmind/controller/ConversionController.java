@@ -1,20 +1,16 @@
 package com.retailmind.controller;
 
-import java.util.List;
-import java.util.Map;
-
+import com.retailmind.dto.TasaSemanaDTO;
+import com.retailmind.entity.Conversion;
+import com.retailmind.service.ConversionService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
-import com.retailmind.dto.TasaSemanaDTO;
-import com.retailmind.entity.Conversion;
-import com.retailmind.service.ConversionService;
+import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/conversiones")
@@ -33,19 +29,17 @@ public class ConversionController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Conversion> findById(@PathVariable Long id) {
+    public ResponseEntity<Conversion> findById(@PathVariable Integer id) {
         return conversionService.findById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    /** GET /api/conversiones/resumen */
     @GetMapping("/resumen")
     public ResponseEntity<Map<String, Long>> getResumen() {
         return ResponseEntity.ok(conversionService.getResumen());
     }
 
-    /** GET /api/conversiones/tasa-por-semana */
     @GetMapping("/tasa-por-semana")
     public ResponseEntity<List<TasaSemanaDTO>> tasaPorSemana() {
         return ResponseEntity.ok(conversionService.getTasaPorSemana());

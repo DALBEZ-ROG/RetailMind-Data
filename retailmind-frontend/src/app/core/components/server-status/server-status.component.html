@@ -1,0 +1,8 @@
+<div class="status-indicator"
+     [class.status-up]="isUp"
+     [class.status-down]="!isUp"
+     [matTooltip]="tooltipText"
+     matTooltipPosition="above">
+  <span class="status-dot"></span>
+  <span class="status-text">{{ isUp ? 'Sistema operativo' : 'Sin conexion con el servidor' }}</span>
+</div>
