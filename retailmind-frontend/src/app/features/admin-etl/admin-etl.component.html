@@ -1,0 +1,179 @@
+<div class="page-container">
+  <h1 class="page-title">Administracion ETL</h1>
+
+  <!-- ── SECCION 1: Carga de datos ──────────────────────────────────────── -->
+  <mat-card class="section-card">
+    <mat-card-header>
+      <mat-icon mat-card-avatar>upload_file</mat-icon>
+      <mat-card-title>Carga de Datos</mat-card-title>
+      <mat-card-subtitle>Sube un CSV con 100,000 registros y ejecuta el pipeline ETL</mat-card-subtitle>
+    </mat-card-header>
+
+    <mat-card-content>
+
+      <!-- Drag & Drop -->
+      <div class="drop-zone"
+           [class.drop-zone--active]="isDragOver"
+           [class.drop-zone--selected]="selectedFile"
+           (dragover)="onDragOver($event)"
+           (dragleave)="onDragLeave()"
+           (drop)="onDrop($event)"
+           (click)="fileInput.click()">
+        <mat-icon class="drop-icon">{{ selectedFile ? 'check_circle' : 'cloud_upload' }}</mat-icon>
+        <p class="drop-text">
+          {{ selectedFile ? selectedFile.name : 'Arrastra tu CSV aqui o haz clic para seleccionar' }}
+        </p>
+        <p class="drop-hint" *ngIf="!selectedFile">Formato: .csv | Maximo: 50 MB</p>
+        <input #fileInput type="file" accept=".csv" hidden (change)="onFileSelected($event)">
+      </div>
+
+      <!-- Barra de progreso -->
+      <mat-progress-bar
+        *ngIf="isRunning || uploadProgress > 0"
+        [mode]="isRunning ? 'indeterminate' : 'determinate'"
+        [value]="uploadProgress"
+        class="progress-bar">
+      </mat-progress-bar>
+
+      <!-- Botones de accion -->
+      <div class="action-buttons">
+        <button mat-stroked-button color="primary"
+                [disabled]="isRunning || !selectedFile"
+                (click)="uploadCsv()">
+          <mat-icon>save_alt</mat-icon>
+          Subir CSV
+        </button>
+
+        <button mat-stroked-button color="accent"
+                [disabled]="isRunning"
+                (click)="cargarStaging()">
+          <mat-icon>storage</mat-icon>
+          Cargar a Staging
+        </button>
+
+        <button mat-stroked-button color="accent"
+                [disabled]="isRunning"
+                (click)="ejecutarEtl()">
+          <mat-icon>play_arrow</mat-icon>
+          ETL Incremental
+        </button>
+
+        <button mat-raised-button color="primary"
+                class="btn-ejecutar-todo"
+                [disabled]="isRunning || !selectedFile"
+                (click)="ejecutarCompleto()">
+          <mat-icon>rocket_launch</mat-icon>
+          EJECUTAR TODO
+        </button>
+      </div>
+
+    </mat-card-content>
+  </mat-card>
+
+  <!-- ── SECCION 2: Consola de output ───────────────────────────────────── -->
+  <mat-card class="section-card">
+    <mat-card-header>
+      <mat-icon mat-card-avatar>terminal</mat-icon>
+      <mat-card-title>Consola de Output</mat-card-title>
+      <mat-card-subtitle *ngIf="lastResponse">
+        <span class="status-badge"
+              [class.status-badge--ok]="lastResponse.success"
+              [class.status-badge--error]="!lastResponse.success">
+          <mat-icon>{{ lastResponse.success ? 'check_circle' : 'error' }}</mat-icon>
+          {{ lastResponse.success ? 'Exito' : 'Error' }} — {{ lastResponse.duracionSegundos }}s
+        </span>
+      </mat-card-subtitle>
+    </mat-card-header>
+
+    <mat-card-content>
+      <pre class="console-output"
+           [class.console-output--success]="operationState === 'success'"
+           [class.console-output--error]="operationState === 'error'">{{ consoleOutput || 'Esperando ejecucion...' }}</pre>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- ── SECCION 3: Estado de tablas ────────────────────────────────────── -->
+  <mat-card class="section-card">
+    <mat-card-header>
+      <mat-icon mat-card-avatar>table_chart</mat-icon>
+      <mat-card-title>Estado de Tablas</mat-card-title>
+    </mat-card-header>
+
+    <mat-card-content>
+      <div class="section-actions">
+        <button mat-stroked-button (click)="refreshEstadoTablas()" [disabled]="loadingTablas">
+          <mat-icon>refresh</mat-icon>
+          Actualizar
+        </button>
+      </div>
+
+      <table mat-table [dataSource]="estadoTablas" class="full-width">
+        <ng-container matColumnDef="tabla">
+          <th mat-header-cell *matHeaderCellDef>Tabla</th>
+          <td mat-cell *matCellDef="let row">
+            <code>{{ row.tabla }}</code>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="totalRegistros">
+          <th mat-header-cell *matHeaderCellDef>Total Registros</th>
+          <td mat-cell *matCellDef="let row">
+            <span [class.count-zero]="row.totalRegistros === 0">
+              {{ row.totalRegistros | number }}
+            </span>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="tablaCols"></tr>
+        <tr mat-row *matRowDef="let row; columns: tablaCols;"></tr>
+      </table>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- ── SECCION 4: Historial de cargas ─────────────────────────────────── -->
+  <mat-card class="section-card">
+    <mat-card-header>
+      <mat-icon mat-card-avatar>history</mat-icon>
+      <mat-card-title>Historial de Cargas</mat-card-title>
+    </mat-card-header>
+
+    <mat-card-content>
+      <div *ngIf="historial.length === 0 && !loadingHistorial" class="empty-state">
+        <mat-icon>inbox</mat-icon>
+        <p>Sin cargas registradas aun.</p>
+      </div>
+
+      <table mat-table [dataSource]="historial" class="full-width"
+             *ngIf="historial.length > 0">
+
+        <ng-container matColumnDef="semana">
+          <th mat-header-cell *matHeaderCellDef>Semana</th>
+          <td mat-cell *matCellDef="let row">
+            <mat-chip class="chip-semana">Semana {{ row.semana }}</mat-chip>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="fechaCarga">
+          <th mat-header-cell *matHeaderCellDef>Fecha de Carga</th>
+          <td mat-cell *matCellDef="let row">{{ row.fechaCarga | date:'dd/MM/yyyy HH:mm' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="registrosProcesados">
+          <th mat-header-cell *matHeaderCellDef>Procesados</th>
+          <td mat-cell *matCellDef="let row">{{ row.registrosProcesados | number }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="registrosNuevos">
+          <th mat-header-cell *matHeaderCellDef>Nuevos</th>
+          <td mat-cell *matCellDef="let row">
+            <span class="nuevos-badge">+{{ row.registrosNuevos | number }}</span>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="historialCols"></tr>
+        <tr mat-row *matRowDef="let row; columns: historialCols;"></tr>
+      </table>
+    </mat-card-content>
+  </mat-card>
+
+</div>

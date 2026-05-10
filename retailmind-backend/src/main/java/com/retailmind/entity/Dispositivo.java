@@ -1,13 +1,9 @@
 package com.retailmind.entity;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
-import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "dispositivos")
-@Getter @Setter @NoArgsConstructor
 public class Dispositivo {
 
     @Id
@@ -17,4 +13,12 @@ public class Dispositivo {
 
     @Column(name = "device_type_name", nullable = false, unique = true, length = 100)
     private String deviceTypeName;
+
+    public Dispositivo() {}
+
+    public Integer getDeviceTypeId() { return deviceTypeId; }
+    public void setDeviceTypeId(Integer deviceTypeId) { this.deviceTypeId = deviceTypeId; }
+
+    public String getDeviceTypeName() { return deviceTypeName; }
+    public void setDeviceTypeName(String deviceTypeName) { this.deviceTypeName = deviceTypeName; }
 }

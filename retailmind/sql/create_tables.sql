@@ -1,5 +1,5 @@
 -- ============================================================
--- RetailMind Analytics S.A. — DDL Tablas Normalizadas
+-- RetailMind Analytics S.A. -- DDL Tablas Normalizadas
 -- ============================================================
 
 -- 1. regiones
@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS dispositivos (
 
 -- 3. canales
 CREATE TABLE IF NOT EXISTS canales (
-    channel_id  SERIAL PRIMARY KEY,
+    channel_id   SERIAL PRIMARY KEY,
     channel_name VARCHAR(100) NOT NULL UNIQUE,
     description  TEXT
 );

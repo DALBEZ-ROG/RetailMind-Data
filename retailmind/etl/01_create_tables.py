@@ -21,8 +21,17 @@ def create_tables():
     print("=" * 55)
 
     try:
-        with open(SQL_PATH, "r", encoding="utf-8") as f:
-            ddl = f.read()
+        # Intenta utf-8 primero; si falla, usa latin-1 (cubre cp1252/Windows)
+        for enc in ("utf-8", "utf-8-sig", "latin-1"):
+            try:
+                with open(SQL_PATH, "r", encoding=enc) as f:
+                    ddl = f.read()
+                break
+            except UnicodeDecodeError:
+                continue
+        else:
+            print(f"[ERROR] No se pudo leer el archivo DDL con ninguna codificación conocida.")
+            sys.exit(1)
     except FileNotFoundError:
         print(f"[ERROR] No se encontró el archivo DDL en: {SQL_PATH}")
         sys.exit(1)

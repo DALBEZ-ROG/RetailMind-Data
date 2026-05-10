@@ -1,13 +1,9 @@
 package com.retailmind.entity;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
-import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "fuentes_trafico")
-@Getter @Setter @NoArgsConstructor
 public class FuenteTrafico {
 
     @Id
@@ -20,4 +16,15 @@ public class FuenteTrafico {
 
     @Column(name = "type", length = 50)
     private String type;
+
+    public FuenteTrafico() {}
+
+    public Integer getSourceId() { return sourceId; }
+    public void setSourceId(Integer sourceId) { this.sourceId = sourceId; }
+
+    public String getSourceName() { return sourceName; }
+    public void setSourceName(String sourceName) { this.sourceName = sourceName; }
+
+    public String getType() { return type; }
+    public void setType(String type) { this.type = type; }
 }

@@ -1,13 +1,9 @@
 package com.retailmind.entity;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
-import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "regiones")
-@Getter @Setter @NoArgsConstructor
 public class Region {
 
     @Id
@@ -20,4 +16,15 @@ public class Region {
 
     @Column(name = "country", length = 100)
     private String country;
+
+    public Region() {}
+
+    public Integer getRegionId() { return regionId; }
+    public void setRegionId(Integer regionId) { this.regionId = regionId; }
+
+    public String getRegionName() { return regionName; }
+    public void setRegionName(String regionName) { this.regionName = regionName; }
+
+    public String getCountry() { return country; }
+    public void setCountry(String country) { this.country = country; }
 }
