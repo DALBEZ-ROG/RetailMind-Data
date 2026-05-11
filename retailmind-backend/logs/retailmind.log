@@ -27,3 +27,136 @@
 2026-05-10 12:59:18 [INFO] o.s.o.j.LocalContainerEntityManagerFactoryBean - Closing JPA EntityManagerFactory for persistence unit 'default'
 2026-05-10 12:59:18 [INFO] com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown initiated...
 2026-05-10 12:59:18 [INFO] com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown completed.
+2026-05-10 16:05:31 [INFO] c.retailmind.RetailmindApplication - Starting RetailmindApplication using Java 25.0.3 with PID 20264 (C:\Users\ASUS\Documents\UTEQ\6 SEMESTRE\Construccion de software\1M6DatosCS\retailmind-backend\target\classes started by ASUS in C:\Users\ASUS\Documents\UTEQ\6 SEMESTRE\Construccion de software\1M6DatosCS\retailmind-backend)
+2026-05-10 16:05:31 [INFO] c.retailmind.RetailmindApplication - No active profile set, falling back to 1 default profile: "default"
+2026-05-10 16:05:31 [INFO] o.s.d.r.c.RepositoryConfigurationDelegate - Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-05-10 16:05:31 [INFO] o.s.d.r.c.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 51 ms. Found 14 JPA repository interfaces.
+2026-05-10 16:05:32 [INFO] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 8080 (http)
+2026-05-10 16:05:32 [INFO] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-05-10 16:05:32 [INFO] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.20]
+2026-05-10 16:05:32 [INFO] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-05-10 16:05:32 [INFO] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 834 ms
+2026-05-10 16:05:32 [INFO] com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Starting...
+2026-05-10 16:05:32 [INFO] com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@3fcee3d9
+2026-05-10 16:05:32 [INFO] com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Start completed.
+2026-05-10 16:05:32 [INFO] o.h.jpa.internal.util.LogHelper - HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-05-10 16:05:32 [INFO] org.hibernate.Version - HHH000412: Hibernate ORM core version 6.4.4.Final
+2026-05-10 16:05:32 [INFO] o.h.c.i.RegionFactoryInitiator - HHH000026: Second-level cache disabled
+2026-05-10 16:05:32 [INFO] o.s.o.j.p.SpringPersistenceUnitInfo - No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-05-10 16:05:32 [WARN] org.hibernate.orm.deprecation - HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2026-05-10 16:05:33 [INFO] o.h.e.t.j.p.i.JtaPlatformInitiator - HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-05-10 16:05:33 [INFO] o.s.o.j.LocalContainerEntityManagerFactoryBean - Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-05-10 16:05:33 [INFO] o.s.d.j.r.query.QueryEnhancerFactory - Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-05-10 16:05:34 [INFO] o.s.s.web.DefaultSecurityFilterChain - Will secure any request with [org.springframework.security.web.session.DisableEncodeUrlFilter@1de78f97, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@36b6ce5d, org.springframework.security.web.context.SecurityContextHolderFilter@5e9f4f76, org.springframework.security.web.header.HeaderWriterFilter@68a0a4ae, org.springframework.web.filter.CorsFilter@1a4eb392, org.springframework.security.web.authentication.logout.LogoutFilter@428943a4, com.retailmind.security.JwtAuthenticationFilter@68fc636a, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@a6e0e5f, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@15d6f0e1, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@52f1f54, org.springframework.security.web.session.SessionManagementFilter@1b60c196, org.springframework.security.web.access.ExceptionTranslationFilter@54c3bae, org.springframework.security.web.access.intercept.AuthorizationFilter@4dbcc8ce]
+2026-05-10 16:05:34 [INFO] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 8080 (http) with context path ''
+2026-05-10 16:05:34 [INFO] c.retailmind.RetailmindApplication - Started RetailmindApplication in 3.176 seconds (process running for 3.395)
+2026-05-10 16:08:11 [INFO] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-05-10 16:08:11 [INFO] o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-05-10 16:08:11 [INFO] o.s.web.servlet.DispatcherServlet - Completed initialization in 1 ms
+2026-05-10 16:38:16 [INFO] com.retailmind.service.EtlService - Iniciando subida de CSV: semana_02_synthetic.csv
+2026-05-10 16:38:16 [INFO] com.retailmind.service.EtlService - CSV guardado exitosamente: C:\Users\ASUS\Documents\UTEQ\6 SEMESTRE\Construccion de software\1M6DatosCS\retailmind\dataset_upload.csv (13190 KB)
+2026-05-10 16:38:26 [INFO] com.retailmind.service.EtlService - Iniciando proceso ETL completo
+2026-05-10 16:38:26 [INFO] com.retailmind.service.EtlService - Ejecutando carga a staging (load_csv_staging.py)
+2026-05-10 16:38:35 [INFO] com.retailmind.service.EtlService - Carga a dataset_temporal completado exitosamente (9s)
+2026-05-10 16:38:35 [INFO] com.retailmind.service.EtlService - Ejecutando ETL incremental (05_load_incremental.py)
+2026-05-10 16:39:21 [INFO] com.retailmind.service.EtlService - ETL Incremental completado exitosamente (46s)
+2026-05-10 16:39:21 [INFO] com.retailmind.service.EtlService - Proceso completo finalizado: EXITO (55s)
+2026-05-10 16:59:12 [INFO] o.s.o.j.LocalContainerEntityManagerFactoryBean - Closing JPA EntityManagerFactory for persistence unit 'default'
+2026-05-10 16:59:12 [INFO] com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown initiated...
+2026-05-10 16:59:12 [INFO] com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown completed.
+2026-05-10 16:59:37 [INFO] c.retailmind.RetailmindApplication - Starting RetailmindApplication using Java 25.0.3 with PID 13208 (C:\Users\ASUS\Documents\UTEQ\6 SEMESTRE\Construccion de software\1M6DatosCS\retailmind-backend\target\classes started by ASUS in C:\Users\ASUS\Documents\UTEQ\6 SEMESTRE\Construccion de software\1M6DatosCS\retailmind-backend)
+2026-05-10 16:59:37 [INFO] c.retailmind.RetailmindApplication - No active profile set, falling back to 1 default profile: "default"
+2026-05-10 16:59:37 [INFO] o.s.d.r.c.RepositoryConfigurationDelegate - Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-05-10 16:59:37 [INFO] o.s.d.r.c.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 41 ms. Found 14 JPA repository interfaces.
+2026-05-10 16:59:37 [INFO] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 8080 (http)
+2026-05-10 16:59:37 [INFO] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-05-10 16:59:37 [INFO] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.20]
+2026-05-10 16:59:37 [INFO] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-05-10 16:59:37 [INFO] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 764 ms
+2026-05-10 16:59:37 [INFO] com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Starting...
+2026-05-10 16:59:38 [INFO] com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@4faf104
+2026-05-10 16:59:38 [INFO] com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Start completed.
+2026-05-10 16:59:38 [INFO] o.h.jpa.internal.util.LogHelper - HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-05-10 16:59:38 [INFO] org.hibernate.Version - HHH000412: Hibernate ORM core version 6.4.4.Final
+2026-05-10 16:59:38 [INFO] o.h.c.i.RegionFactoryInitiator - HHH000026: Second-level cache disabled
+2026-05-10 16:59:38 [INFO] o.s.o.j.p.SpringPersistenceUnitInfo - No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-05-10 16:59:38 [WARN] org.hibernate.orm.deprecation - HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2026-05-10 16:59:38 [INFO] o.h.e.t.j.p.i.JtaPlatformInitiator - HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-05-10 16:59:38 [INFO] o.s.o.j.LocalContainerEntityManagerFactoryBean - Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-05-10 16:59:39 [INFO] o.s.d.j.r.query.QueryEnhancerFactory - Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-05-10 16:59:39 [INFO] o.s.s.web.DefaultSecurityFilterChain - Will secure any request with [org.springframework.security.web.session.DisableEncodeUrlFilter@3644d305, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@3fc261b7, org.springframework.security.web.context.SecurityContextHolderFilter@58965e17, org.springframework.security.web.header.HeaderWriterFilter@2c84d6c4, org.springframework.web.filter.CorsFilter@11101f62, org.springframework.security.web.authentication.logout.LogoutFilter@2dc4b58a, com.retailmind.security.JwtAuthenticationFilter@23ee92df, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@4644b1c6, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@13b666b4, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@3fd64d6b, org.springframework.security.web.session.SessionManagementFilter@3116e9d2, org.springframework.security.web.access.ExceptionTranslationFilter@376ba8e3, org.springframework.security.web.access.intercept.AuthorizationFilter@2495a351]
+2026-05-10 16:59:39 [INFO] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 8080 (http) with context path ''
+2026-05-10 16:59:39 [INFO] c.retailmind.RetailmindApplication - Started RetailmindApplication in 2.915 seconds (process running for 3.103)
+2026-05-10 16:59:44 [INFO] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-05-10 16:59:44 [INFO] o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-05-10 16:59:44 [INFO] o.s.web.servlet.DispatcherServlet - Completed initialization in 0 ms
+2026-05-10 17:14:55 [INFO] com.retailmind.service.EtlService - Iniciando subida de CSV: semana_03_synthetic.csv
+2026-05-10 17:14:55 [INFO] com.retailmind.service.EtlService - CSV guardado exitosamente: C:\Users\ASUS\Documents\UTEQ\6 SEMESTRE\Construccion de software\1M6DatosCS\retailmind\dataset_upload.csv (13188 KB)
+2026-05-10 17:15:06 [INFO] com.retailmind.service.EtlService - Iniciando proceso ETL completo
+2026-05-10 17:15:06 [INFO] com.retailmind.service.EtlService - Ejecutando carga a staging (load_csv_staging.py)
+2026-05-10 17:15:14 [INFO] com.retailmind.service.EtlService - Carga a dataset_temporal completado exitosamente (8s)
+2026-05-10 17:15:14 [INFO] com.retailmind.service.EtlService - Ejecutando ETL incremental (05_load_incremental.py)
+2026-05-10 17:16:03 [INFO] com.retailmind.service.EtlService - ETL Incremental completado exitosamente (49s)
+2026-05-10 17:16:03 [INFO] com.retailmind.service.EtlService - Proceso completo finalizado: EXITO (57s)
+2026-05-10 17:26:38 [INFO] o.s.o.j.LocalContainerEntityManagerFactoryBean - Closing JPA EntityManagerFactory for persistence unit 'default'
+2026-05-10 17:26:38 [INFO] com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown initiated...
+2026-05-10 17:26:38 [INFO] com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown completed.
+2026-05-10 17:27:02 [INFO] c.retailmind.RetailmindApplication - Starting RetailmindApplication using Java 25.0.3 with PID 44452 (C:\Users\ASUS\Documents\UTEQ\6 SEMESTRE\Construccion de software\1M6DatosCS\retailmind-backend\target\classes started by ASUS in C:\Users\ASUS\Documents\UTEQ\6 SEMESTRE\Construccion de software\1M6DatosCS\retailmind-backend)
+2026-05-10 17:27:02 [INFO] c.retailmind.RetailmindApplication - No active profile set, falling back to 1 default profile: "default"
+2026-05-10 17:27:02 [INFO] o.s.d.r.c.RepositoryConfigurationDelegate - Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-05-10 17:27:03 [INFO] o.s.d.r.c.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 38 ms. Found 14 JPA repository interfaces.
+2026-05-10 17:27:03 [INFO] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 8080 (http)
+2026-05-10 17:27:03 [INFO] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-05-10 17:27:03 [INFO] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.20]
+2026-05-10 17:27:03 [INFO] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-05-10 17:27:03 [INFO] o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 616 ms
+2026-05-10 17:27:03 [INFO] com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Starting...
+2026-05-10 17:27:03 [INFO] com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@74024f3
+2026-05-10 17:27:03 [INFO] com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Start completed.
+2026-05-10 17:27:03 [INFO] o.h.jpa.internal.util.LogHelper - HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-05-10 17:27:03 [INFO] org.hibernate.Version - HHH000412: Hibernate ORM core version 6.4.4.Final
+2026-05-10 17:27:03 [INFO] o.h.c.i.RegionFactoryInitiator - HHH000026: Second-level cache disabled
+2026-05-10 17:27:03 [INFO] o.s.o.j.p.SpringPersistenceUnitInfo - No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-05-10 17:27:03 [WARN] org.hibernate.orm.deprecation - HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2026-05-10 17:27:04 [INFO] o.h.e.t.j.p.i.JtaPlatformInitiator - HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-05-10 17:27:04 [INFO] o.s.o.j.LocalContainerEntityManagerFactoryBean - Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-05-10 17:27:04 [INFO] o.s.d.j.r.query.QueryEnhancerFactory - Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-05-10 17:27:04 [INFO] o.s.s.web.DefaultSecurityFilterChain - Will secure any request with [org.springframework.security.web.session.DisableEncodeUrlFilter@45dc4d1a, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@4dbcc8ce, org.springframework.security.web.context.SecurityContextHolderFilter@1638fa8b, org.springframework.security.web.header.HeaderWriterFilter@4628344c, org.springframework.web.filter.CorsFilter@60a98fa6, org.springframework.security.web.authentication.logout.LogoutFilter@2b5a659f, com.retailmind.security.JwtAuthenticationFilter@1a712f12, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@1c7aa676, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@fa200ab, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@3af4b14e, org.springframework.security.web.session.SessionManagementFilter@bb0dcb6, org.springframework.security.web.access.ExceptionTranslationFilter@4fddd42b, org.springframework.security.web.access.intercept.AuthorizationFilter@2dc4b58a]
+2026-05-10 17:27:04 [INFO] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 8080 (http) with context path ''
+2026-05-10 17:27:04 [INFO] c.retailmind.RetailmindApplication - Started RetailmindApplication in 2.392 seconds (process running for 2.557)
+2026-05-10 17:27:11 [INFO] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-05-10 17:27:11 [INFO] o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-05-10 17:27:11 [INFO] o.s.web.servlet.DispatcherServlet - Completed initialization in 1 ms
+2026-05-10 17:27:28 [INFO] com.retailmind.service.EtlService - Iniciando subida de CSV: semana_04_synthetic.csv
+2026-05-10 17:27:28 [INFO] com.retailmind.service.EtlService - CSV guardado exitosamente: C:\Users\ASUS\Documents\UTEQ\6 SEMESTRE\Construccion de software\1M6DatosCS\retailmind\dataset_upload.csv (13188 KB)
+2026-05-10 17:27:33 [INFO] com.retailmind.service.EtlService - Iniciando proceso ETL completo
+2026-05-10 17:27:33 [INFO] com.retailmind.service.EtlService - Ejecutando carga a staging (load_csv_staging.py)
+2026-05-10 17:27:34 [INFO] com.retailmind.service.EtlService - Carga a dataset_temporal completado exitosamente (1s)
+2026-05-10 17:27:34 [INFO] com.retailmind.service.EtlService - Ejecutando ETL incremental (05_load_incremental.py)
+2026-05-10 17:27:45 [INFO] com.retailmind.service.EtlService - ETL Incremental completado exitosamente (11s)
+2026-05-10 17:27:45 [INFO] com.retailmind.service.EtlService - Proceso completo finalizado: EXITO (12s)
+2026-05-10 19:00:03 [WARN] com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Thread starvation or clock leap detected (housekeeper delta=48m29s231ms677µs100ns).
+2026-05-10 19:18:43 [INFO] com.retailmind.service.EtlService - Iniciando subida de CSV: semana_05_synthetic.csv
+2026-05-10 19:18:43 [INFO] com.retailmind.service.EtlService - CSV guardado exitosamente: C:\Users\ASUS\Documents\UTEQ\6 SEMESTRE\Construccion de software\1M6DatosCS\retailmind\dataset_upload.csv (13190 KB)
+2026-05-10 19:19:50 [INFO] com.retailmind.service.EtlService - Iniciando proceso ETL completo
+2026-05-10 19:19:50 [INFO] com.retailmind.service.EtlService - Ejecutando carga a staging (load_csv_staging.py)
+2026-05-10 19:19:52 [INFO] com.retailmind.service.EtlService - Carga a dataset_temporal completado exitosamente (2s)
+2026-05-10 19:19:52 [INFO] com.retailmind.service.EtlService - Ejecutando ETL incremental (05_load_incremental.py)
+2026-05-10 19:20:07 [INFO] com.retailmind.service.EtlService - ETL Incremental completado exitosamente (15s)
+2026-05-10 19:20:07 [INFO] com.retailmind.service.EtlService - Proceso completo finalizado: EXITO (17s)
+2026-05-10 19:39:03 [INFO] com.retailmind.service.EtlService - Iniciando subida de CSV: semana_05_synthetic.csv
+2026-05-10 19:39:03 [INFO] com.retailmind.service.EtlService - CSV guardado exitosamente: C:\Users\ASUS\Documents\UTEQ\6 SEMESTRE\Construccion de software\1M6DatosCS\retailmind\dataset_upload.csv (13190 KB)
+2026-05-10 19:39:18 [INFO] com.retailmind.service.EtlService - Iniciando proceso ETL completo
+2026-05-10 19:39:18 [INFO] com.retailmind.service.EtlService - Ejecutando carga a staging (load_csv_staging.py)
+2026-05-10 19:39:19 [INFO] com.retailmind.service.EtlService - Carga a dataset_temporal completado exitosamente (1s)
+2026-05-10 19:39:19 [INFO] com.retailmind.service.EtlService - Ejecutando ETL incremental (05_load_incremental.py)
+2026-05-10 19:39:30 [INFO] com.retailmind.service.EtlService - ETL Incremental completado exitosamente (11s)
+2026-05-10 19:39:30 [INFO] com.retailmind.service.EtlService - Proceso completo finalizado: EXITO (12s)
+2026-05-10 19:48:24 [INFO] com.retailmind.service.EtlService - Iniciando subida de CSV: semana_07_synthetic.csv
+2026-05-10 19:48:24 [INFO] com.retailmind.service.EtlService - CSV guardado exitosamente: C:\Users\ASUS\Documents\UTEQ\6 SEMESTRE\Construccion de software\1M6DatosCS\retailmind\dataset_upload.csv (13190 KB)
+2026-05-10 19:48:34 [INFO] com.retailmind.service.EtlService - Iniciando proceso ETL completo
+2026-05-10 19:48:34 [INFO] com.retailmind.service.EtlService - Ejecutando carga a staging (load_csv_staging.py)
+2026-05-10 19:48:35 [INFO] com.retailmind.service.EtlService - Carga a dataset_temporal completado exitosamente (1s)
+2026-05-10 19:48:35 [INFO] com.retailmind.service.EtlService - Ejecutando ETL incremental (05_load_incremental.py)
+2026-05-10 19:48:50 [INFO] com.retailmind.service.EtlService - ETL Incremental completado exitosamente (15s)
+2026-05-10 19:48:50 [INFO] com.retailmind.service.EtlService - Proceso completo finalizado: EXITO (16s)

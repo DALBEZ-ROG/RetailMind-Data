@@ -76,12 +76,18 @@ public class DashboardService {
         List<GrupoConteoDTO> porRegion      = sesionService.countPorRegion();
         List<GrupoConteoDTO> porDispositivo = sesionService.countPorDispositivo();
 
+        // Campos adicionales
+        Long totalEventos = jdbc.queryForObject("SELECT COUNT(*) FROM eventos", Long.class);
+        Integer semanasCargadas = jdbc.queryForObject("SELECT COUNT(*) FROM carga_historial", Integer.class);
+
         DashboardResumenDTO dto = new DashboardResumenDTO();
         dto.setTotalSesiones(mv.getTotalSesiones());
         dto.setTotalUsuarios(mv.getTotalUsuarios());
         dto.setTotalConversiones(mv.getTotalConversiones());
         dto.setTasaConversion(mv.getTasaConversion());
         dto.setTotalAbandonos(mv.getTotalAbandonos());
+        dto.setTotalEventos(totalEventos != null ? totalEventos : 0L);
+        dto.setSemanasCargadas(semanasCargadas != null ? semanasCargadas : 0);
         dto.setSesionesPorCanal(porCanal);
         dto.setSesionesPorRegion(porRegion);
         dto.setSesionesPorDispositivo(porDispositivo);
@@ -97,12 +103,18 @@ public class DashboardService {
                 ? (totalConversiones * 100.0 / totalSesiones)
                 : 0.0;
 
+        // Campos adicionales
+        Long totalEventos = jdbc.queryForObject("SELECT COUNT(*) FROM eventos", Long.class);
+        Integer semanasCargadas = jdbc.queryForObject("SELECT COUNT(*) FROM carga_historial", Integer.class);
+
         DashboardResumenDTO dto = new DashboardResumenDTO();
         dto.setTotalSesiones(totalSesiones);
         dto.setTotalUsuarios(totalUsuarios);
         dto.setTotalConversiones(totalConversiones);
         dto.setTasaConversion(Math.round(tasaConversion * 100.0) / 100.0);
         dto.setTotalAbandonos(totalAbandonos);
+        dto.setTotalEventos(totalEventos != null ? totalEventos : 0L);
+        dto.setSemanasCargadas(semanasCargadas != null ? semanasCargadas : 0);
         dto.setSesionesPorCanal(sesionService.countPorCanal());
         dto.setSesionesPorRegion(sesionService.countPorRegion());
         dto.setSesionesPorDispositivo(sesionService.countPorDispositivo());

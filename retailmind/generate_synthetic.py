@@ -21,8 +21,8 @@ PRICE_RANGES = {
 }
 
 NUM_RECORDS = 100000
-random.seed(42)
-BASE_DATE = datetime(2024, 2, 1)
+random.seed(47)
+BASE_DATE = datetime(2024, 3, 1)
 
 print(f"Generando {NUM_RECORDS:,} registros sintéticos...")
 
@@ -31,8 +31,7 @@ for i in range(NUM_RECORDS):
     category    = random.choice(CATEGORIES)
     price_min, price_max = PRICE_RANGES[category]
     is_purchase = random.random() < 0.18
-    user_action = 'purchase' if is_purchase else random.choice(
-                  [a for a in USER_ACTIONS if a != 'purchase'])
+    user_action = 'purchase' if is_purchase else random.choice([a for a in USER_ACTIONS if a != 'purchase'])
     is_conv  = is_purchase
     drop_off = not is_purchase and random.random() < 0.45
 
@@ -69,8 +68,8 @@ for i in range(NUM_RECORDS):
 
 import pandas as pd
 df = pd.DataFrame(rows)
-df.to_csv('semana_02_synthetic.csv', index=False, sep=',')
+df.to_csv('semana_07_synthetic.csv', index=False, sep=',')
 
-print(f"\n✅ CSV generado: semana_02_synthetic.csv")
+print(f"\n✅ CSV generado: semana_07_synthetic.csv")
 print(f"   Registros: {len(df):,}")
 print(f"   Columnas:  {list(df.columns)}")

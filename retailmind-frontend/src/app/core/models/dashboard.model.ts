@@ -9,6 +9,8 @@ export interface DashboardResumen {
   totalConversiones:      number;
   tasaConversion:         number;
   totalAbandonos:         number;
+  totalEventos:           number;
+  semanasCargadas:        number;
   sesionesPorCanal:       GrupoConteo[];
   sesionesPorRegion:      GrupoConteo[];
   sesionesPorDispositivo: GrupoConteo[];

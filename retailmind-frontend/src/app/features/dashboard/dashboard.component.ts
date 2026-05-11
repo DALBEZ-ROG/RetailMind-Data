@@ -83,6 +83,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   lastUpdated:       Date | null   = null;
   refreshingViews    = false;
   hasError           = false;
+  promedioEventos    = '0.0';
 
   get currentUser(): string {
     const user = this.dashboardService as any;
@@ -205,12 +206,22 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   // ── KPI Cards ──────────────────────────────────────────────────────────────
 
   private buildKpiCards(d: DashboardResumen): void {
+    const totalEventos = d.totalEventos ?? 0;
+    const semanasCargadas = d.semanasCargadas ?? 0;
+
+    this.promedioEventos = d.totalSesiones > 0
+      ? (totalEventos / d.totalSesiones).toFixed(1)
+      : '0.0';
+
     this.kpiCards = [
-      { title: 'Total Sesiones',     value: d.totalSesiones.toLocaleString(),     icon: 'timeline',      color: '#3f51b5', tooltip: 'Total de sesiones registradas en el sistema' },
-      { title: 'Total Usuarios',     value: d.totalUsuarios.toLocaleString(),     icon: 'people',        color: '#00bcd4', tooltip: 'Usuarios unicos que han interactuado' },
-      { title: 'Conversiones',       value: d.totalConversiones.toLocaleString(), icon: 'trending_up',   color: '#4caf50', tooltip: 'Sesiones que resultaron en una compra' },
-      { title: 'Tasa Conversion',    value: d.tasaConversion.toFixed(2) + '%',    icon: 'percent',       color: '#ff9800', tooltip: 'Porcentaje de sesiones que convirtieron' },
-      { title: 'Abandonos',          value: d.totalAbandonos.toLocaleString(),    icon: 'trending_down', color: '#f44336', tooltip: 'Sesiones sin conversion con drop_off=true' }
+      { title: 'Total Sesiones',     value: d.totalSesiones.toLocaleString(),     icon: 'timeline',       color: '#3f51b5', tooltip: 'Total de sesiones registradas en el sistema' },
+      { title: 'Total Usuarios',     value: d.totalUsuarios.toLocaleString(),     icon: 'people',         color: '#00bcd4', tooltip: 'Usuarios unicos que han interactuado' },
+      { title: 'Conversiones',       value: d.totalConversiones.toLocaleString(), icon: 'trending_up',    color: '#4caf50', tooltip: 'Sesiones que resultaron en una compra' },
+      { title: 'Tasa Conversion',    value: d.tasaConversion.toFixed(2) + '%',    icon: 'percent',        color: '#ff9800', tooltip: 'Porcentaje de sesiones que convirtieron' },
+      { title: 'Abandonos',          value: d.totalAbandonos.toLocaleString(),    icon: 'trending_down',  color: '#f44336', tooltip: 'Sesiones sin conversion con drop_off=true' },
+      { title: 'Total Eventos',      value: totalEventos.toLocaleString(),        icon: 'bolt',           color: '#FF9800', tooltip: 'Total de eventos registrados en todas las sesiones' },
+      { title: 'Semanas Cargadas',   value: semanasCargadas.toLocaleString(),     icon: 'calendar_today', color: '#9C27B0', tooltip: 'Número de semanas de datos cargadas al sistema' },
+      { title: 'Promedio Eventos/Sesión', value: this.promedioEventos,            icon: 'analytics',      color: '#1F77B4', tooltip: 'Promedio de eventos registrados por cada sesión' }
     ];
   }
 

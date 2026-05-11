@@ -1,0 +1,48 @@
+[2026-05-10 16:38:35] [INFO] === Inicio carga incremental semana 2 ===
+[2026-05-10 16:38:36] [INFO] Leidos 100000 registros de dataset_temporal
+[2026-05-10 16:38:40] [INFO] [SEMANA 2] Procesando tabla usuarios... [0 nuevos / 60257 duplicados] OK
+[2026-05-10 16:38:40] [INFO] [SEMANA 2] Procesando tabla productos... [0 nuevos / 9000 duplicados] OK
+[2026-05-10 16:38:56] [INFO] [SEMANA 2] Procesando tabla sesiones... [100000 nuevos / 0 duplicados] OK
+[2026-05-10 16:39:09] [INFO] [SEMANA 2] Procesando tabla eventos... [100000 nuevos / 0 duplicados] OK
+[2026-05-10 16:39:21] [INFO] [SEMANA 2] Procesando tabla conversiones... [100000 nuevos / 0 duplicados] OK
+[2026-05-10 16:39:21] [INFO] === Fin carga semana 2: 300000 nuevos de 100000 procesados ===
+[2026-05-10 17:15:15] [INFO] === Inicio carga incremental semana 3 ===
+[2026-05-10 17:15:15] [INFO] Leidos 100000 registros de dataset_temporal
+[2026-05-10 17:15:20] [INFO] [SEMANA 3] Procesando tabla usuarios... [19910 nuevos / 40375 duplicados] OK
+[2026-05-10 17:15:21] [INFO] [SEMANA 3] Procesando tabla productos... [0 nuevos / 9000 duplicados] OK
+[2026-05-10 17:15:37] [INFO] [SEMANA 3] Procesando tabla sesiones... [100000 nuevos / 0 duplicados] OK
+[2026-05-10 17:15:50] [INFO] [SEMANA 3] Procesando tabla eventos... [100000 nuevos / 0 duplicados] OK
+[2026-05-10 17:16:03] [INFO] [SEMANA 3] Procesando tabla conversiones... [100000 nuevos / 0 duplicados] OK
+[2026-05-10 17:16:03] [INFO] === Fin carga semana 3: 319910 nuevos de 100000 procesados ===
+[2026-05-10 17:27:34] [INFO] === Inicio carga incremental semana 4 ===
+[2026-05-10 17:27:34] [INFO] Leidos 100000 registros de dataset_temporal
+[2026-05-10 17:27:35] [INFO] [SEMANA 4] usuarios: 6581 nuevos / 53806 duplicados OK
+[2026-05-10 17:27:35] [INFO] [SEMANA 4] productos: 0 nuevos / 9000 duplicados OK
+[2026-05-10 17:27:40] [INFO] [SEMANA 4] sesiones: 100000 nuevos / 0 duplicados OK
+[2026-05-10 17:27:42] [INFO] [SEMANA 4] eventos: 100000 nuevos / 0 duplicados OK
+[2026-05-10 17:27:45] [INFO] [SEMANA 4] conversiones: 100000 nuevos / 0 duplicados OK
+[2026-05-10 17:27:45] [INFO] === Fin carga semana 4: 306581 nuevos de 100000 procesados (11.0s) ===
+[2026-05-10 19:19:52] [INFO] === Inicio carga incremental semana 5 ===
+[2026-05-10 19:19:52] [INFO] Leidos 100000 registros de dataset_temporal
+[2026-05-10 19:19:53] [INFO] [SEMANA 5] usuarios: 2179 nuevos / 58289 duplicados OK
+[2026-05-10 19:19:53] [INFO] [SEMANA 5] productos: 0 nuevos / 9000 duplicados OK
+[2026-05-10 19:19:59] [INFO] [SEMANA 5] sesiones: 100000 nuevos / 0 duplicados OK
+[2026-05-10 19:20:03] [INFO] [SEMANA 5] eventos: 100000 nuevos / 0 duplicados OK
+[2026-05-10 19:20:06] [INFO] [SEMANA 5] conversiones: 100000 nuevos / 0 duplicados OK
+[2026-05-10 19:20:06] [INFO] === Fin carga semana 5: 302179 nuevos de 100000 procesados (14.4s) ===
+[2026-05-10 19:39:19] [INFO] === Inicio carga incremental semana 6 ===
+[2026-05-10 19:39:19] [INFO] Leidos 100000 registros de dataset_temporal
+[2026-05-10 19:39:20] [INFO] [SEMANA 6] usuarios: 0 nuevos / 60468 duplicados OK
+[2026-05-10 19:39:20] [INFO] [SEMANA 6] productos: 0 nuevos / 9000 duplicados OK
+[2026-05-10 19:39:23] [INFO] [SEMANA 6] sesiones: 0 nuevos / 100000 duplicados OK
+[2026-05-10 19:39:26] [INFO] [SEMANA 6] eventos: 100000 nuevos / 0 duplicados OK
+[2026-05-10 19:39:29] [INFO] [SEMANA 6] conversiones: 100000 nuevos / 0 duplicados OK
+[2026-05-10 19:39:30] [INFO] === Fin carga semana 6: 200000 nuevos de 100000 procesados (10.3s) ===
+[2026-05-10 19:48:36] [INFO] === Inicio carga incremental semana 7 ===
+[2026-05-10 19:48:36] [INFO] Leidos 100000 registros de dataset_temporal
+[2026-05-10 19:48:37] [INFO] [SEMANA 7] usuarios: 722 nuevos / 59682 duplicados OK
+[2026-05-10 19:48:37] [INFO] [SEMANA 7] productos: 0 nuevos / 9000 duplicados OK
+[2026-05-10 19:48:43] [INFO] [SEMANA 7] sesiones: 100000 nuevos / 0 duplicados OK
+[2026-05-10 19:48:46] [INFO] [SEMANA 7] eventos: 100000 nuevos / 0 duplicados OK
+[2026-05-10 19:48:50] [INFO] [SEMANA 7] conversiones: 100000 nuevos / 0 duplicados OK
+[2026-05-10 19:48:50] [INFO] === Fin carga semana 7: 300722 nuevos de 100000 procesados (14.1s) ===

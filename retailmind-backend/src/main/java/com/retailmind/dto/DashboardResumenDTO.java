@@ -9,6 +9,8 @@ public class DashboardResumenDTO {
     private Long   totalConversiones;
     private Double tasaConversion;
     private Long   totalAbandonos;
+    private Long   totalEventos;
+    private Integer semanasCargadas;
 
     private List<GrupoConteoDTO> sesionesPorCanal;
     private List<GrupoConteoDTO> sesionesPorRegion;
@@ -28,6 +30,12 @@ public class DashboardResumenDTO {
 
     public Long getTotalAbandonos()  { return totalAbandonos; }
     public void setTotalAbandonos(Long v)  { this.totalAbandonos = v; }
+
+    public Long getTotalEventos() { return totalEventos; }
+    public void setTotalEventos(Long v) { this.totalEventos = v; }
+
+    public Integer getSemanasCargadas() { return semanasCargadas; }
+    public void setSemanasCargadas(Integer v) { this.semanasCargadas = v; }
 
     public List<GrupoConteoDTO> getSesionesPorCanal() { return sesionesPorCanal; }
     public void setSesionesPorCanal(List<GrupoConteoDTO> v) { this.sesionesPorCanal = v; }

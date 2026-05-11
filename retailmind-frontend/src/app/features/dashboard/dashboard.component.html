@@ -1,21 +1,26 @@
 <div class="page-container">
-  <!-- Bienvenida -->
-  <div class="welcome-section">
-    <h1 class="page-title">Dashboard</h1>
-    <p class="welcome-text" *ngIf="currentUser">
-      Bienvenido, <strong>{{ currentUser }}</strong>
-    </p>
-    <p class="last-update" *ngIf="lastUpdated">
-      Ultima actualizacion: {{ lastUpdated | date:'dd/MM/yyyy HH:mm:ss' }}
-    </p>
+  <!-- Encabezado rediseñado -->
+  <div class="dashboard-header">
+    <div class="header-top">
+      <h1 class="page-title">Dashboard</h1>
+    </div>
+    <div class="header-bottom">
+      <span class="welcome-text" *ngIf="currentUser">
+        Bienvenido, <strong>{{ currentUser }}</strong>
+      </span>
+      <span class="header-divider" *ngIf="currentUser && lastUpdated">|</span>
+      <span class="last-update" *ngIf="lastUpdated">
+        Última actualización: {{ lastUpdated | date:'dd/MM/yyyy HH:mm:ss' }}
+      </span>
+    </div>
   </div>
 
   <!-- Performance + Refresh -->
   <div class="performance-bar">
     <mat-chip *ngIf="responseTimeMs !== null" class="perf-chip">
-      <mat-icon>bolt</mat-icon> {{ responseTimeMs }}ms
+      <mat-icon>bolt</mat-icon> Tiempo de respuesta: {{ responseTimeMs }}ms
     </mat-chip>
-    <button mat-stroked-button color="primary" [disabled]="refreshingViews" (click)="refrescarVistas()">
+    <button mat-stroked-button color="primary" [disabled]="refreshingViews" (click)="refrescarVistas()" class="refresh-btn">
       <mat-icon>refresh</mat-icon> Refrescar vistas
     </button>
   </div>
