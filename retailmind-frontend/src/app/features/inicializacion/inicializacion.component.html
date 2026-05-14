@@ -1,0 +1,140 @@
+<div class="inicializacion-container">
+  <h2 class="page-title">
+    <mat-icon>rocket_launch</mat-icon>
+    Inicialización del Sistema
+  </h2>
+
+  <!-- ═══ SECCIÓN 1: Estado del sistema ═══ -->
+  <mat-card class="section-card">
+    <mat-card-header>
+      <mat-card-title>Estado del Sistema</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <div class="status-grid">
+        <div class="status-item">
+          <span class="status-dot" [class.active]="estadoPocketbase"></span>
+          <span>Pocketbase conectado</span>
+        </div>
+        <div class="status-item">
+          <span class="status-dot" [class.active]="estadoClickhouse"></span>
+          <span>ClickHouse conectado</span>
+        </div>
+        <div class="status-item">
+          <span class="status-dot" [class.active]="estadoParquet"></span>
+          <span>Datos extraídos (parquet existe)</span>
+        </div>
+        <div class="status-item">
+          <span class="status-dot" [class.active]="estadoTablas"></span>
+          <span>Tablas cargadas (fact_eventos tiene registros)</span>
+        </div>
+      </div>
+      <button mat-raised-button color="primary"
+              (click)="verificarEstado()"
+              [disabled]="verificando || ejecutando">
+        <mat-icon>refresh</mat-icon>
+        {{ verificando ? 'Verificando...' : 'Verificar Estado' }}
+      </button>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- ═══ SECCIÓN 2: Carga inicial ═══ -->
+  <mat-card class="section-card">
+    <mat-card-header>
+      <mat-card-title>Carga Inicial</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <p class="section-description">
+        Carga los 108,584 registros desde Pocketbase hacia ClickHouse por primera vez.
+      </p>
+
+      <button mat-raised-button color="accent" class="btn-carga-completa"
+              (click)="ejecutarCargaCompleta()"
+              [disabled]="ejecutando">
+        <mat-icon>cloud_download</mat-icon>
+        CARGA COMPLETA DESDE POCKETBASE
+      </button>
+
+      <mat-divider class="divider-pasos"></mat-divider>
+
+      <div class="pasos-individuales">
+        <button mat-stroked-button color="primary"
+                (click)="ejecutarPaso1()"
+                [disabled]="ejecutando">
+          <mat-icon>download</mat-icon>
+          1. Extraer de Pocketbase
+        </button>
+        <button mat-stroked-button color="primary"
+                (click)="ejecutarPaso2()"
+                [disabled]="ejecutando">
+          <mat-icon>storage</mat-icon>
+          2. Cargar a ClickHouse
+        </button>
+        <button mat-stroked-button color="primary"
+                (click)="ejecutarPaso3()"
+                [disabled]="ejecutando">
+          <mat-icon>verified</mat-icon>
+          3. Verificar carga
+        </button>
+      </div>
+
+      <!-- Barra de progreso -->
+      <div class="progress-section" *ngIf="ejecutando">
+        <mat-progress-bar mode="indeterminate" color="accent"></mat-progress-bar>
+        <span class="timer">⏱️ {{ tiempoTranscurrido }}s</span>
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- ═══ SECCIÓN 3: Consola de output ═══ -->
+  <mat-card class="section-card">
+    <mat-card-header>
+      <mat-card-title>Consola</mat-card-title>
+      <button mat-icon-button (click)="limpiarConsola()" matTooltip="Limpiar consola">
+        <mat-icon>delete_sweep</mat-icon>
+      </button>
+    </mat-card-header>
+    <mat-card-content>
+      <div class="console-output">
+        <pre>{{ consolaOutput || '> Esperando ejecución...' }}</pre>
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- ═══ SECCIÓN 4: Reset del sistema ═══ -->
+  <mat-card class="section-card danger-card">
+    <mat-card-header>
+      <mat-card-title>⚠️ Zona de Peligro</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <p class="danger-description">
+        Borra todos los datos de ClickHouse. Usar solo cuando el docente lo indique.
+      </p>
+      <button mat-raised-button class="btn-reset"
+              (click)="abrirDialogReset()"
+              [disabled]="ejecutando">
+        <mat-icon>warning</mat-icon>
+        RESETEAR SISTEMA COMPLETO
+      </button>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- Dialog de confirmación de reset -->
+  <div class="reset-dialog-overlay" *ngIf="mostrarDialogReset" (click)="cerrarDialogReset()">
+    <div class="reset-dialog" (click)="$event.stopPropagation()">
+      <h3>⚠️ Confirmar Reset del Sistema</h3>
+      <p>Esta acción eliminará <strong>TODOS</strong> los datos de ClickHouse. Esta operación no se puede deshacer.</p>
+      <p>Escribe <strong>CONFIRMAR</strong> para habilitar el botón:</p>
+      <mat-form-field appearance="outline" class="confirm-field">
+        <input matInput [(ngModel)]="confirmacionTexto" placeholder="Escribe CONFIRMAR">
+      </mat-form-field>
+      <div class="dialog-actions">
+        <button mat-button (click)="cerrarDialogReset()">Cancelar</button>
+        <button mat-raised-button class="btn-reset"
+                [disabled]="!puedeResetear"
+                (click)="ejecutarReset()">
+          ELIMINAR TODO
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,5 +1,7 @@
 package com.retailmind.security;
 
+import java.util.List;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -18,8 +20,6 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-
-import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -49,6 +49,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 // ETL solo para ADMIN
                 .requestMatchers("/api/etl/**").hasAuthority("ADMIN")
+                // Inicializacion solo para ADMIN
+                .requestMatchers("/api/init/**").hasAuthority("ADMIN")
                 // Dashboard refrescar vistas solo ADMIN
                 .requestMatchers(HttpMethod.POST, "/api/dashboard/refrescar-vistas").hasAuthority("ADMIN")
                 // Todo lo demas requiere autenticacion

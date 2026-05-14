@@ -1,18 +1,16 @@
 package com.retailmind.controller;
 
 import java.util.List;
+import java.util.Map;
 
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.retailmind.dto.GrupoConteoDTO;
-import com.retailmind.entity.Sesion;
 import com.retailmind.service.SesionService;
 
 @RestController
@@ -25,31 +23,37 @@ public class SesionController {
         this.sesionService = sesionService;
     }
 
+    /**
+     * GET /api/sesiones?page=0&size=20
+     * Retorna sesiones paginadas desde ClickHouse (fact_eventos agrupado por session_id).
+     */
     @GetMapping
-    public ResponseEntity<Page<Sesion>> findAll(
-            @PageableDefault(size = 20, sort = "sessionId") Pageable pageable) {
-        return ResponseEntity.ok(sesionService.findAll(pageable));
+    public ResponseEntity<Map<String, Object>> findAll(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(sesionService.findAll(page, size));
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<Sesion> findById(@PathVariable String id) {
-        return sesionService.findById(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
-    }
-
+    /**
+     * GET /api/sesiones/usuario/{userId}?page=0&size=20
+     */
     @GetMapping("/usuario/{userId}")
-    public ResponseEntity<Page<Sesion>> findByUsuario(
+    public ResponseEntity<Map<String, Object>> findByUsuario(
             @PathVariable String userId,
-            @PageableDefault(size = 20, sort = "timestampUtc") Pageable pageable) {
-        return ResponseEntity.ok(sesionService.findByUsuario(userId, pageable));
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(sesionService.findByUsuario(userId, page, size));
     }
 
-    @GetMapping("/canal/{canalId}")
-    public ResponseEntity<Page<Sesion>> findByCanal(
-            @PathVariable Integer canalId,
-            @PageableDefault(size = 20, sort = "timestampUtc") Pageable pageable) {
-        return ResponseEntity.ok(sesionService.findByCanal(canalId, pageable));
+    /**
+     * GET /api/sesiones/canal/{channel}?page=0&size=20
+     */
+    @GetMapping("/canal/{channel}")
+    public ResponseEntity<Map<String, Object>> findByCanal(
+            @PathVariable String channel,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(sesionService.findByCanal(channel, page, size));
     }
 
     /** GET /api/sesiones/por-canal */

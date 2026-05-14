@@ -21,8 +21,8 @@ PRICE_RANGES = {
 }
 
 NUM_RECORDS = 100000
-random.seed(47)
-BASE_DATE = datetime(2024, 3, 1)
+random.seed(48)
+BASE_DATE = datetime(2024, 3, 8)
 
 print(f"Generando {NUM_RECORDS:,} registros sintéticos...")
 
@@ -68,8 +68,8 @@ for i in range(NUM_RECORDS):
 
 import pandas as pd
 df = pd.DataFrame(rows)
-df.to_csv('semana_07_synthetic.csv', index=False, sep=',')
+df.to_csv('semana_08_synthetic.csv', index=False, sep=',')
 
-print(f"\n✅ CSV generado: semana_07_synthetic.csv")
+print(f"\n✅ CSV generado: semana_08_synthetic.csv")
 print(f"   Registros: {len(df):,}")
 print(f"   Columnas:  {list(df.columns)}")

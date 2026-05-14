@@ -2,6 +2,7 @@ package com.retailmind.migration;
 
 import com.retailmind.entity.UsuarioSistema;
 import com.retailmind.repository.UsuarioSistemaRepository;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.annotation.Order;
@@ -17,7 +18,7 @@ public class DataInitializer implements ApplicationRunner {
     private final UsuarioSistemaRepository usuarioRepo;
     private final PasswordEncoder passwordEncoder;
 
-    public DataInitializer(JdbcTemplate jdbc,
+    public DataInitializer(@Qualifier("jdbcTemplate") JdbcTemplate jdbc,
                            UsuarioSistemaRepository usuarioRepo,
                            PasswordEncoder passwordEncoder) {
         this.jdbc = jdbc;
@@ -27,7 +28,7 @@ public class DataInitializer implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        // Crear tabla primero (antes de cualquier consulta JPA)
+        // Crear tablas auxiliares (antes de cualquier consulta JPA)
         jdbc.execute("""
             CREATE TABLE IF NOT EXISTS usuarios_sistema (
                 id         SERIAL PRIMARY KEY,
@@ -37,6 +38,27 @@ public class DataInitializer implements ApplicationRunner {
                 rol        VARCHAR(20) NOT NULL DEFAULT 'VIEWER',
                 activo     BOOLEAN NOT NULL DEFAULT true,
                 created_at TIMESTAMP DEFAULT NOW()
+            )
+            """);
+
+        jdbc.execute("""
+            CREATE TABLE IF NOT EXISTS carga_historial (
+                id                   SERIAL PRIMARY KEY,
+                semana               INT NOT NULL UNIQUE,
+                fecha_carga          TIMESTAMP NOT NULL DEFAULT NOW(),
+                registros_procesados INT NOT NULL DEFAULT 0,
+                registros_nuevos     INT NOT NULL DEFAULT 0
+            )
+            """);
+
+        jdbc.execute("""
+            CREATE TABLE IF NOT EXISTS error_log (
+                id          SERIAL PRIMARY KEY,
+                timestamp   TIMESTAMP NOT NULL DEFAULT NOW(),
+                tipo_error  VARCHAR(100),
+                mensaje     TEXT,
+                stack_trace TEXT,
+                resuelto    BOOLEAN NOT NULL DEFAULT false
             )
             """);
 

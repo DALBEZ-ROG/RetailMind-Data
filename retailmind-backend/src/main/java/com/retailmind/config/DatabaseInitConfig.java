@@ -1,5 +1,6 @@
 package com.retailmind.config;
 
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -12,7 +13,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 public class DatabaseInitConfig {
 
     @Bean
-    public ApplicationRunner initAuxTables(JdbcTemplate jdbc) {
+    public ApplicationRunner initAuxTables(@Qualifier("jdbcTemplate") JdbcTemplate jdbc) {
         return args -> {
             // Tabla de historial de cargas ETL
             jdbc.execute("""

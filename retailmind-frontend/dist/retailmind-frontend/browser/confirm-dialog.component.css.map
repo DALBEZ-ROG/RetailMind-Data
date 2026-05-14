@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["angular:styles/component:css;3bbfd0f4a17cac1ff664264697896f40964723fee86cd8ed3d77beec326c578c;C:/Users/ASUS/Documents/UTEQ/6 SEMESTRE/Construccion de software/1M6DatosCS/retailmind-frontend/src/app/features/admin-etl/confirm-dialog.component.ts"],
+  "sourcesContent": ["\n    .dialog-icon { vertical-align: middle; margin-right: 8px; color: #ff9800; }\n    p { color: #616161; font-size: 0.95rem; line-height: 1.5; }\n    mat-dialog-actions { padding: 16px 0 0; }\n  "],
+  "mappings": ";AACI,CAAC;AAAc,kBAAgB;AAAQ,gBAAc;AAAK,SAAO;AAAS;AAC1E;AAAI,SAAO;AAAS,aAAW;AAAS,eAAa;AAAK;AAC1D;AAAqB,WAAS,KAAK,EAAE;AAAG;",
+  "names": []
+}

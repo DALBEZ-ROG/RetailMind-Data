@@ -5,6 +5,7 @@ import com.retailmind.dto.EstadoTablasDTO;
 import com.retailmind.dto.EtlResponseDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.retry.annotation.Backoff;
@@ -38,7 +39,7 @@ public class EtlService {
     private final JdbcTemplate jdbc;
     private static final String CSV_FILENAME = "dataset_upload.csv";
 
-    public EtlService(JdbcTemplate jdbc) {
+    public EtlService(@Qualifier("jdbcTemplate") JdbcTemplate jdbc) {
         this.jdbc = jdbc;
     }
 

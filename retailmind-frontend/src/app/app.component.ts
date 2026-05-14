@@ -45,7 +45,8 @@ export class AppComponent {
     '/dashboard': 'Dashboard',
     '/sesiones': 'Sesiones',
     '/conversiones': 'Conversiones',
-    '/admin-etl': 'Administracion ETL'
+    '/admin-etl': 'Administracion ETL',
+    '/inicializacion': 'Inicializacion del Sistema'
   };
 
   constructor(public authService: AuthService, private router: Router) {
