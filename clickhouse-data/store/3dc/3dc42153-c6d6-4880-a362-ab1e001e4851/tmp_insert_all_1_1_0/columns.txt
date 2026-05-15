@@ -1,0 +1,4 @@
+columns format version: 1
+2 columns:
+`canal_id` UInt32
+`canal_nombre` String

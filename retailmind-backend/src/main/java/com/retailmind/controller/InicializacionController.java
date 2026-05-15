@@ -21,7 +21,7 @@ public class InicializacionController {
 
     private static final Logger logger = LoggerFactory.getLogger(InicializacionController.class);
 
-    @Value("${etl.python.path:py}")
+    @Value("${etl.python.path:python}")
     private String pythonPath;
 
     @Value("${init.scripts.path}")
@@ -142,8 +142,7 @@ public class InicializacionController {
 
         try {
             File workDir = new File(scriptsPath);
-            String scriptAbs = new File(scriptsPath, scriptRelativo.replace("/", File.separator))
-                    .getAbsolutePath();
+            String scriptAbs = new File(scriptsPath, scriptRelativo).getAbsolutePath();
 
             ProcessBuilder pb = new ProcessBuilder(pythonPath, scriptAbs);
             pb.directory(workDir);
@@ -172,18 +171,33 @@ public class InicializacionController {
             // Intentar extraer registros cargados del output
             long registros = extraerRegistros(output.toString());
 
+            // Sanitizar output si contiene errores de tabla inexistente
+            String outputFinal = sanitizarOutput(output.toString());
+
             return new InicializacionResponseDTO(ok,
                     ok ? descripcion + " completado exitosamente."
                        : descripcion + " finalizo con errores (codigo " + exitCode + ").",
-                    output.toString(), dur, registros);
+                    outputFinal, dur, registros);
 
         } catch (Exception e) {
             long dur = Instant.now().getEpochSecond() - inicio;
             logger.error("Excepcion al ejecutar {}: {}", descripcion, e.getMessage(), e);
             return new InicializacionResponseDTO(false,
                     "Error al ejecutar " + descripcion + ": " + e.getMessage(),
-                    output.toString(), dur, 0);
+                    sanitizarOutput(output.toString()), dur, 0);
         }
+    }
+
+    /**
+     * Reemplaza mensajes técnicos de ClickHouse por mensajes amigables.
+     */
+    private String sanitizarOutput(String output) {
+        if (output.contains("UNKNOWN_TABLE") || output.contains("Unknown table expression identifier")
+                || output.contains("Table retailmind.") && output.contains("does not exist")) {
+            return "⚠️  Tabla no encontrada - El sistema está vacío.\n" +
+                   "Ejecute CARGA COMPLETA DESDE POCKETBASE para inicializar.\n";
+        }
+        return output;
     }
 
     /**

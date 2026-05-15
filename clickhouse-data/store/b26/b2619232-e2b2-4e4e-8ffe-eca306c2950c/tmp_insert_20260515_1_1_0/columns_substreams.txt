@@ -1,0 +1,51 @@
+columns substreams version: 1
+18 columns:
+3 substreams for column `hostname`:
+	hostname.dict_prefix
+	hostname.dict
+	hostname
+1 substreams for column `event_date`:
+	event_date
+1 substreams for column `event_time`:
+	event_time
+1 substreams for column `event_time_microseconds`:
+	event_time_microseconds
+2 substreams for column `query`:
+	query.size
+	query
+3 substreams for column `database`:
+	database.dict_prefix
+	database.dict
+	database
+3 substreams for column `table`:
+	table.dict_prefix
+	table.dict
+	table
+3 substreams for column `format`:
+	format.dict_prefix
+	format.dict
+	format
+2 substreams for column `query_id`:
+	query_id.size
+	query_id
+1 substreams for column `bytes`:
+	bytes
+1 substreams for column `rows`:
+	rows
+2 substreams for column `exception`:
+	exception.size
+	exception
+1 substreams for column `status`:
+	status
+2 substreams for column `data_kind`:
+	data_kind.sparse.idx
+	data_kind
+1 substreams for column `flush_time`:
+	flush_time
+1 substreams for column `flush_time_microseconds`:
+	flush_time_microseconds
+2 substreams for column `flush_query_id`:
+	flush_query_id.size
+	flush_query_id
+1 substreams for column `timeout_milliseconds`:
+	timeout_milliseconds

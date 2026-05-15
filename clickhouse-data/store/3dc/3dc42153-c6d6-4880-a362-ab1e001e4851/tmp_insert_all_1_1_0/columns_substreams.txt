@@ -1,0 +1,7 @@
+columns substreams version: 1
+2 columns:
+1 substreams for column `canal_id`:
+	canal_id
+2 substreams for column `canal_nombre`:
+	canal_nombre.size
+	canal_nombre

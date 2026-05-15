@@ -1,4 +1,4 @@
-import { Component, OnDestroy } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
@@ -29,7 +29,7 @@ import { InicializacionService, InicializacionResponse } from '../../core/servic
   templateUrl: './inicializacion.component.html',
   styleUrl: './inicializacion.component.scss'
 })
-export class InicializacionComponent implements OnDestroy {
+export class InicializacionComponent implements OnInit, OnDestroy {
 
   // Estado del sistema
   estadoPocketbase = false;
@@ -37,6 +37,7 @@ export class InicializacionComponent implements OnDestroy {
   estadoParquet = false;
   estadoTablas = false;
   verificando = false;
+  sistemaVacio = false;
 
   // Ejecución
   ejecutando = false;
@@ -57,6 +58,10 @@ export class InicializacionComponent implements OnDestroy {
     private dialog: MatDialog
   ) {}
 
+  ngOnInit(): void {
+    this.verificarEstado();
+  }
+
   ngOnDestroy(): void {
     this.detenerTimer();
   }
@@ -70,6 +75,7 @@ export class InicializacionComponent implements OnDestroy {
         this.verificando = false;
         this.consolaOutput += res.output + '\n';
         this.parseEstado(res);
+        this.detectarSistemaVacio(res.output);
       },
       error: (err) => {
         this.verificando = false;
@@ -78,6 +84,7 @@ export class InicializacionComponent implements OnDestroy {
         this.estadoClickhouse = false;
         this.estadoParquet = false;
         this.estadoTablas = false;
+        this.sistemaVacio = true;
       }
     });
   }
@@ -180,6 +187,12 @@ export class InicializacionComponent implements OnDestroy {
     this.progreso = 100;
     this.consolaOutput += res.output + '\n';
     this.consolaOutput += `\n${res.success ? '✅' : '❌'} ${res.mensaje} (${res.duracionSegundos}s)\n`;
+    this.detectarSistemaVacio(res.output);
+  }
+
+  private detectarSistemaVacio(output: string): void {
+    this.sistemaVacio = output.includes('sistema está vacío') ||
+                        output.includes('Tabla no encontrada');
   }
 
   private finalizarConError(err: any): void {

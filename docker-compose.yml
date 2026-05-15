@@ -1,0 +1,123 @@
+version: "3.8"
+
+services:
+  pocketbase:
+    image: ghcr.io/muchobien/pocketbase:latest
+    ports:
+      - "8090:8090"
+    volumes:
+      - pocketbase_data:/pb_data
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8090/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    user: "101:101"
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    environment:
+      CLICKHOUSE_DB: ${CH_DATABASE}
+      CLICKHOUSE_USER: ${CH_USER}
+      CLICKHOUSE_PASSWORD: ${CH_PASSWORD}
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    build: ./retailmind-backend
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./retailmind:/etl
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      CLICKHOUSE_DATASOURCE_URL: jdbc:ch://clickhouse:8123/${CH_DATABASE}?compress=0
+      CLICKHOUSE_DATASOURCE_USERNAME: ${CH_USER}
+      CLICKHOUSE_DATASOURCE_PASSWORD: ${CH_PASSWORD}
+      CH_HOST: clickhouse
+      CH_PORT: "8123"
+      CH_DATABASE: ${CH_DATABASE}
+      CH_USER: ${CH_USER}
+      CH_PASSWORD: ${CH_PASSWORD}
+      INIT_SCRIPTS_PATH: /etl
+      ETL_SCRIPTS_PATH: /etl
+      ETL_PYTHON_PATH: python
+      PB_URL: http://host.docker.internal:8090
+      PB_EMAIL: benitesperezdariemalberto@gmail.com
+      PB_PASSWORD: retailmind2026@.
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build: ./retailmind-frontend
+    ports:
+      - "4200:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  etl:
+    build: ./retailmind
+    environment:
+      CH_HOST: clickhouse
+      CH_PORT: "8123"
+      CH_DATABASE: ${CH_DATABASE}
+      CH_USER: ${CH_USER}
+      CH_PASSWORD: ${CH_PASSWORD}
+      PB_URL: http://host.docker.internal:8090
+      PB_EMAIL: ${PB_EMAIL}
+      PB_PASSWORD: ${PB_PASSWORD}
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: ${POSTGRES_DB}
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      pocketbase:
+        condition: service_healthy
+    command: tail -f /dev/null
+    restart: unless-stopped
+
+volumes:
+  clickhouse_data:
+  postgres_data:
+  pocketbase_data:

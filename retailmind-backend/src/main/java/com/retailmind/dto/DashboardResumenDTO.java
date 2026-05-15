@@ -11,6 +11,7 @@ public class DashboardResumenDTO {
     private Long   totalAbandonos;
     private Long   totalEventos;
     private Integer semanasCargadas;
+    private String  mensaje;
 
     private List<GrupoConteoDTO> sesionesPorCanal;
     private List<GrupoConteoDTO> sesionesPorRegion;
@@ -36,6 +37,9 @@ public class DashboardResumenDTO {
 
     public Integer getSemanasCargadas() { return semanasCargadas; }
     public void setSemanasCargadas(Integer v) { this.semanasCargadas = v; }
+
+    public String getMensaje() { return mensaje; }
+    public void setMensaje(String v) { this.mensaje = v; }
 
     public List<GrupoConteoDTO> getSesionesPorCanal() { return sesionesPorCanal; }
     public void setSesionesPorCanal(List<GrupoConteoDTO> v) { this.sesionesPorCanal = v; }

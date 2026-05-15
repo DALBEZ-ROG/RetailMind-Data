@@ -1,0 +1,7 @@
+target/
+.git
+*.md
+logs/
+.vscode/
+.idea/
+*.iml

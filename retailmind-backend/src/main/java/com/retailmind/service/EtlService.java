@@ -1,19 +1,5 @@
 package com.retailmind.service;
 
-import com.retailmind.dto.CargaHistorialDTO;
-import com.retailmind.dto.EstadoTablasDTO;
-import com.retailmind.dto.EtlResponseDTO;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.retry.annotation.Backoff;
-import org.springframework.retry.annotation.Recover;
-import org.springframework.retry.annotation.Retryable;
-import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
-
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
@@ -25,12 +11,27 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Recover;
+import org.springframework.retry.annotation.Retryable;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.retailmind.dto.CargaHistorialDTO;
+import com.retailmind.dto.EstadoTablasDTO;
+import com.retailmind.dto.EtlResponseDTO;
+
 @Service
 public class EtlService {
 
     private static final Logger logger = LoggerFactory.getLogger(EtlService.class);
 
-    @Value("${etl.python.path:py}")
+    @Value("${etl.python.path:python}")
     private String pythonPath;
 
     @Value("${etl.scripts.path}")
@@ -145,13 +146,13 @@ public class EtlService {
     // ── 6. Estado de tablas ───────────────────────────────────────────────────
 
     public List<EstadoTablasDTO> getEstadoTablas() {
-        String[] tablas = {"regiones", "dispositivos", "canales", "fuentes_trafico",
-                "categorias", "usuarios", "productos", "sesiones", "eventos", "conversiones"};
+        // Las tablas de datos ahora están en ClickHouse, no en PostgreSQL
+        String[] tablas = {"fact_eventos", "dim_canal", "dim_dispositivo", "dim_region",
+                "dim_categoria", "dim_fuente_trafico", "dim_producto", "dim_usuario"};
         List<EstadoTablasDTO> resultado = new ArrayList<>();
         for (String tabla : tablas) {
             try {
-                Long count = jdbc.queryForObject("SELECT COUNT(*) FROM " + tabla, Long.class);
-                resultado.add(new EstadoTablasDTO(tabla, count != null ? count : 0L, "-"));
+                resultado.add(new EstadoTablasDTO(tabla, 0L, "Ver en ClickHouse"));
             } catch (Exception e) {
                 resultado.add(new EstadoTablasDTO(tabla, -1L, "Error"));
             }
@@ -167,8 +168,7 @@ public class EtlService {
 
         try {
             File workDir = new File(scriptsPath);
-            String scriptAbs = Paths.get(scriptsPath, scriptRelativo)
-                    .toString().replace("/", File.separator);
+            String scriptAbs = Paths.get(scriptsPath, scriptRelativo).toString();
 
             ProcessBuilder pb = new ProcessBuilder(pythonPath, scriptAbs);
             pb.directory(workDir);

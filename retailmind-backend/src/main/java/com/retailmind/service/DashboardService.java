@@ -4,8 +4,6 @@ import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,12 +18,9 @@ public class DashboardService {
     private static final Logger logger = LoggerFactory.getLogger(DashboardService.class);
 
     private final FactEventoRepository factEventoRepository;
-    private final JdbcTemplate         postgresJdbc;
 
-    public DashboardService(FactEventoRepository factEventoRepository,
-                            @Qualifier("jdbcTemplate") JdbcTemplate postgresJdbc) {
+    public DashboardService(FactEventoRepository factEventoRepository) {
         this.factEventoRepository = factEventoRepository;
-        this.postgresJdbc         = postgresJdbc;
     }
 
     /**
@@ -80,6 +75,7 @@ public class DashboardService {
         dto.setTotalAbandonos(0L);
         dto.setTotalEventos(0L);
         dto.setSemanasCargadas(0);
+        dto.setMensaje("Sistema vacio - ejecute la carga inicial desde el modulo de Inicializacion");
         dto.setSesionesPorCanal(List.of());
         dto.setSesionesPorRegion(List.of());
         dto.setSesionesPorDispositivo(List.of());
@@ -87,15 +83,11 @@ public class DashboardService {
     }
 
     /**
-     * Refresca vistas materializadas en PostgreSQL (legacy).
+     * En la arquitectura con ClickHouse, los datos se consultan en tiempo real.
+     * No se necesitan vistas materializadas.
      */
     @Transactional
     public String refrescarVistas() {
-        try {
-            postgresJdbc.execute("SELECT refresh_dashboard_views()");
-            return "Vistas materializadas refrescadas exitosamente.";
-        } catch (Exception e) {
-            return "Error al refrescar vistas: " + e.getMessage();
-        }
+        return "Datos actualizados correctamente. ClickHouse consulta en tiempo real.";
     }
 }

@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+data/stage/
+data/agg/
+.git
+*.md
+logs/
+.vscode/

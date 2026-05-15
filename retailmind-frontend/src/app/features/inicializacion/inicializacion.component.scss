@@ -122,11 +122,17 @@
   font-family: 'Consolas', 'Courier New', monospace;
   font-size: 0.8rem;
   line-height: 1.5;
+  transition: background 0.3s;
 
   pre {
     margin: 0;
     white-space: pre-wrap;
     word-break: break-word;
+  }
+
+  &.console-info {
+    background: #1a237e;
+    color: #bbdefb;
   }
 }
 

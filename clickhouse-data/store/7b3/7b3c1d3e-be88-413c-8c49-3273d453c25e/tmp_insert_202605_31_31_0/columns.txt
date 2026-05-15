@@ -1,0 +1,11 @@
+columns format version: 1
+9 columns:
+`hostname` LowCardinality(String)
+`event_date` Date
+`event_time` DateTime
+`event_time_microseconds` DateTime64(6)
+`metric` LowCardinality(String)
+`labels` Map(LowCardinality(String), LowCardinality(String))
+`histogram` Map(Float64, UInt64)
+`count` UInt64
+`sum` Float64

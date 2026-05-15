@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-PB_URL      = os.getenv("PB_URL", "http://127.0.0.1:8090")
+PB_URL      = os.getenv("PB_URL", "http://host.docker.internal:8090")
 PB_EMAIL    = os.getenv("PB_EMAIL", "benitesperezdariemalberto@gmail.com")
 PB_PASSWORD = os.getenv("PB_PASSWORD", "retailmind2026@.")
 
