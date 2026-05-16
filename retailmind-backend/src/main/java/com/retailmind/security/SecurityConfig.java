@@ -51,6 +51,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/etl/**").hasAuthority("ADMIN")
                 // Inicializacion solo para ADMIN
                 .requestMatchers("/api/init/**").hasAuthority("ADMIN")
+                // Gestion de datos solo para ADMIN
+                .requestMatchers("/api/gestion/**").hasAuthority("ADMIN")
                 // Dashboard refrescar vistas solo ADMIN
                 .requestMatchers(HttpMethod.POST, "/api/dashboard/refrescar-vistas").hasAuthority("ADMIN")
                 // Todo lo demas requiere autenticacion

@@ -46,6 +46,7 @@ export class AppComponent {
     '/sesiones': 'Sesiones',
     '/conversiones': 'Conversiones',
     '/admin-etl': 'Administracion ETL',
+    '/gestion-datos': 'Gestion de Datos',
     '/inicializacion': 'Inicializacion del Sistema'
   };
 

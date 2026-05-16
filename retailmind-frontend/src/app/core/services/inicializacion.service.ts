@@ -36,4 +36,8 @@ export class InicializacionService {
   cargaCompleta(): Observable<InicializacionResponse> {
     return this.http.post<InicializacionResponse>(`${this.base}/carga-completa`, {});
   }
+
+  generarSemana(semana: number): Observable<InicializacionResponse> {
+    return this.http.post<InicializacionResponse>(`${this.base}/generar-semana?semana=${semana}`, {});
+  }
 }

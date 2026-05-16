@@ -64,6 +64,24 @@ public class InicializacionController {
     }
 
     /**
+     * POST /api/init/generar-semana?semana=N
+     * Genera 108,584 registros sintéticos para la semana indicada.
+     */
+    @PostMapping("/generar-semana")
+    public ResponseEntity<InicializacionResponseDTO> generarSemana(
+            @org.springframework.web.bind.annotation.RequestParam("semana") int semana) {
+        if (semana < 2 || semana > 52) {
+            return ResponseEntity.badRequest().body(new InicializacionResponseDTO(
+                    false, "La semana debe estar entre 2 y 52.", "", 0, 0));
+        }
+        logger.info("Generando datos sinteticos para semana {}", semana);
+        InicializacionResponseDTO result = ejecutarScript(
+                "etl/12_generate_synthetic.py --semana " + semana,
+                "Generacion semana " + semana);
+        return ResponseEntity.ok(result);
+    }
+
+    /**
      * POST /api/init/reset-sistema
      * Ejecuta etl/11_reset_clickhouse.py - Solo ADMIN
      */
@@ -142,9 +160,21 @@ public class InicializacionController {
 
         try {
             File workDir = new File(scriptsPath);
-            String scriptAbs = new File(scriptsPath, scriptRelativo).getAbsolutePath();
 
-            ProcessBuilder pb = new ProcessBuilder(pythonPath, scriptAbs);
+            // Separar script de argumentos adicionales
+            String[] parts = scriptRelativo.split("\\s+");
+            String scriptPath = parts[0];
+            String scriptAbs = new File(scriptsPath, scriptPath).getAbsolutePath();
+
+            // Construir comando: python script.py [args...]
+            java.util.List<String> command = new java.util.ArrayList<>();
+            command.add(pythonPath);
+            command.add(scriptAbs);
+            for (int i = 1; i < parts.length; i++) {
+                command.add(parts[i]);
+            }
+
+            ProcessBuilder pb = new ProcessBuilder(command);
             pb.directory(workDir);
             pb.redirectErrorStream(true);
             pb.environment().put("PYTHONIOENCODING", "utf-8");

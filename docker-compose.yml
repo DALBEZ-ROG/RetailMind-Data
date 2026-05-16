@@ -4,7 +4,7 @@ services:
   pocketbase:
     image: ghcr.io/muchobien/pocketbase:latest
     ports:
-      - "8090:8090"
+      - "8091:8090"
     volumes:
       - pocketbase_data:/pb_data
     healthcheck:
@@ -75,7 +75,7 @@ services:
       INIT_SCRIPTS_PATH: /etl
       ETL_SCRIPTS_PATH: /etl
       ETL_PYTHON_PATH: python
-      PB_URL: http://host.docker.internal:8090
+      PB_URL: http://pocketbase:8090
       PB_EMAIL: benitesperezdariemalberto@gmail.com
       PB_PASSWORD: retailmind2026@.
     depends_on:
@@ -101,7 +101,7 @@ services:
       CH_DATABASE: ${CH_DATABASE}
       CH_USER: ${CH_USER}
       CH_PASSWORD: ${CH_PASSWORD}
-      PB_URL: http://host.docker.internal:8090
+      PB_URL: http://pocketbase:8090
       PB_EMAIL: ${PB_EMAIL}
       PB_PASSWORD: ${PB_PASSWORD}
       DB_HOST: postgres

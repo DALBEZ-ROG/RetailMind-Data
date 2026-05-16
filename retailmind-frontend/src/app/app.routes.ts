@@ -38,6 +38,12 @@ export const routes: Routes = [
       import('./features/admin-etl/admin-etl.component').then(m => m.AdminEtlComponent)
   },
   {
+    path: 'gestion-datos',
+    canActivate: [authGuard, adminGuard],
+    loadComponent: () =>
+      import('./features/gestion-datos/gestion-datos.component').then(m => m.GestionDatosComponent)
+  },
+  {
     path: 'inicializacion',
     canActivate: [authGuard, adminGuard],
     loadComponent: () =>
