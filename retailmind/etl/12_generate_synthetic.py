@@ -67,7 +67,7 @@ def generar_datos(semana, n=TOTAL_REGISTROS):
     event_index = rng.integers(1, 30, size=n).astype(np.uint32)
 
     # Timestamps
-    base_ts = pd.Timestamp(f"2026-01-{(semana - 1) * 7 + 1:02d}")
+    base_ts = pd.Timestamp("2026-01-01") + pd.Timedelta(weeks=semana - 1)
     offsets = pd.to_timedelta(rng.integers(0, 7 * 24 * 3600, size=n), unit='s')
     timestamps = (base_ts + offsets).strftime("%Y-%m-%d %H:%M:%S")
 
