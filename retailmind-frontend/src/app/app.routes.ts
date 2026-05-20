@@ -10,24 +10,42 @@ export const routes: Routes = [
   },
   {
     path: '',
-    redirectTo: 'dashboard',
+    redirectTo: 'shop',
     pathMatch: 'full'
   },
   {
-    path: 'dashboard',
+    path: 'shop',
     canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/shop/shop.component').then(m => m.ShopComponent)
+  },
+  {
+    path: 'shop/producto/:id',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/shop/producto-detalle.component').then(m => m.ProductoDetalleComponent)
+  },
+  {
+    path: 'shop/carrito',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/shop/carrito.component').then(m => m.CarritoComponent)
+  },
+  {
+    path: 'dashboard',
+    canActivate: [authGuard, adminGuard],
     loadComponent: () =>
       import('./features/dashboard/dashboard.component').then(m => m.DashboardComponent)
   },
   {
     path: 'sesiones',
-    canActivate: [authGuard],
+    canActivate: [authGuard, adminGuard],
     loadComponent: () =>
       import('./features/sesiones/sesiones-list.component').then(m => m.SesionesListComponent)
   },
   {
     path: 'conversiones',
-    canActivate: [authGuard],
+    canActivate: [authGuard, adminGuard],
     loadComponent: () =>
       import('./features/conversiones/conversiones-list.component').then(m => m.ConversionesListComponent)
   },
@@ -51,6 +69,6 @@ export const routes: Routes = [
   },
   {
     path: '**',
-    redirectTo: 'dashboard'
+    redirectTo: 'shop'
   }
 ];

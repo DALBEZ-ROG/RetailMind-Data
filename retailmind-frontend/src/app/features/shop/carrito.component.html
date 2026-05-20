@@ -1,0 +1,61 @@
+<div class="carrito-container">
+  <h2 class="carrito-title">
+    <mat-icon>shopping_bag</mat-icon>
+    Mi Carrito
+  </h2>
+
+  <!-- Checkout exitoso -->
+  <mat-card class="success-card" *ngIf="checkoutExitoso">
+    <mat-card-content>
+      <mat-icon class="success-icon">check_circle</mat-icon>
+      <h3>Compra realizada con exito!</h3>
+      <p>Orden: <strong>{{ ordenId }}</strong></p>
+      <button mat-raised-button color="primary" (click)="seguirComprando()">
+        <mat-icon>storefront</mat-icon> Seguir comprando
+      </button>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- Carrito vacío -->
+  <div class="empty-state" *ngIf="!loading && items.length === 0 && !checkoutExitoso">
+    <mat-icon>remove_shopping_cart</mat-icon>
+    <p>Tu carrito esta vacio</p>
+    <button mat-raised-button color="primary" (click)="seguirComprando()">
+      <mat-icon>storefront</mat-icon> Ir a la tienda
+    </button>
+  </div>
+
+  <!-- Items del carrito -->
+  <div class="carrito-items" *ngIf="items.length > 0">
+    <mat-card class="item-card" *ngFor="let item of items">
+      <div class="item-row">
+        <div class="item-info">
+          <h4 class="item-name">{{ item.nombre }}</h4>
+          <p class="item-brand">{{ item.brand }}</p>
+          <p class="item-qty">Cantidad: {{ item.cantidad }}</p>
+        </div>
+        <div class="item-price">
+          <span class="price">${{ item.precioUnitario * item.cantidad | number:'1.2-2' }}</span>
+          <span class="unit-price">${{ item.precioUnitario | number:'1.2-2' }} c/u</span>
+        </div>
+        <button mat-icon-button color="warn" (click)="eliminarItem(item.productoId)">
+          <mat-icon>delete</mat-icon>
+        </button>
+      </div>
+    </mat-card>
+
+    <mat-divider></mat-divider>
+
+    <!-- Total y checkout -->
+    <div class="carrito-footer">
+      <div class="total-section">
+        <span class="total-label">Total:</span>
+        <span class="total-amount">${{ total | number:'1.2-2' }}</span>
+      </div>
+      <button mat-raised-button color="accent" class="btn-checkout" (click)="finalizarCompra()">
+        <mat-icon>payment</mat-icon>
+        Finalizar Compra
+      </button>
+    </div>
+  </div>
+</div>

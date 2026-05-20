@@ -97,6 +97,18 @@ public class InicializacionController {
     }
 
     /**
+     * POST /api/init/crear-tienda
+     * Ejecuta etl/13_create_shop_tables.py - Crea tablas de tienda y pobla catalogo
+     */
+    @PostMapping("/crear-tienda")
+    public ResponseEntity<InicializacionResponseDTO> crearTienda() {
+        logger.info("Creando tablas de tienda y poblando catalogo");
+        InicializacionResponseDTO result = ejecutarScript(
+                "etl/13_create_shop_tables.py", "Creacion de tienda");
+        return ResponseEntity.ok(result);
+    }
+
+    /**
      * POST /api/init/carga-completa
      * Ejecuta los 3 pasos en secuencia:
      * 08_extract_pocketbase → 09_load_clickhouse → 10_verify_clickhouse

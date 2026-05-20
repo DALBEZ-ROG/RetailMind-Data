@@ -1,0 +1,66 @@
+.carrito-container { padding: 24px; max-width: 800px; margin: 0 auto; }
+
+.carrito-title {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 1.5rem; font-weight: 600; color: #1a237e; margin-bottom: 24px;
+  mat-icon { font-size: 28px; width: 28px; height: 28px; }
+}
+
+// ── Items ────────────────────────────────────────────────────────────────────
+.item-card { margin-bottom: 12px; border-radius: 10px !important; }
+
+.item-row {
+  display: flex; align-items: center; gap: 16px; padding: 8px;
+}
+
+.item-info { flex: 1; }
+.item-name { margin: 0; font-weight: 600; color: #333; }
+.item-brand { margin: 2px 0; font-size: 0.8rem; color: #9e9e9e; }
+.item-qty { margin: 0; font-size: 0.85rem; color: #666; }
+
+.item-price { text-align: right; }
+.price { display: block; font-size: 1.1rem; font-weight: 700; color: #1a237e; }
+.unit-price { font-size: 0.75rem; color: #9e9e9e; }
+
+// ── Footer ───────────────────────────────────────────────────────────────────
+.carrito-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 24px 0; flex-wrap: wrap; gap: 16px;
+}
+
+.total-section { display: flex; align-items: baseline; gap: 8px; }
+.total-label { font-size: 1.1rem; color: #666; }
+.total-amount { font-size: 1.8rem; font-weight: 800; color: #1a237e; }
+
+.btn-checkout { height: 48px; font-size: 1rem !important; padding: 0 32px !important; }
+
+// ── Success ──────────────────────────────────────────────────────────────────
+.success-card {
+  text-align: center; padding: 40px; border-radius: 16px !important;
+  border: 2px solid #c8e6c9;
+}
+
+.success-icon { font-size: 64px; width: 64px; height: 64px; color: #43a047; }
+
+// ── Empty state ──────────────────────────────────────────────────────────────
+.empty-state {
+  text-align: center; padding: 60px; color: #9e9e9e;
+
+  > mat-icon {
+    font-size: 64px; width: 64px; height: 64px; display: block; margin: 0 auto 12px;
+  }
+
+  button mat-icon {
+    font-size: 20px; width: 20px; height: 20px; display: inline-block; margin: 0;
+  }
+}
+
+::ng-deep .snack-success {
+  --mdc-snackbar-container-color: #2e7d32;
+  --mdc-snackbar-supporting-text-color: white;
+}
+
+::ng-deep .snack-error {
+  --mdc-snackbar-container-color: #c62828;
+  --mdc-snackbar-supporting-text-color: white;
+}

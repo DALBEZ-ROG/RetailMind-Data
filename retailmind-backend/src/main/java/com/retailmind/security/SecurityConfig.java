@@ -47,6 +47,13 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/health").permitAll()
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                // Catalogo publico (sin auth)
+                .requestMatchers(HttpMethod.GET, "/api/catalogo/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/catalogo/eventos").permitAll()
+                // Gestion de usuarios solo ADMIN
+                .requestMatchers(HttpMethod.POST, "/api/auth/register").hasAuthority("ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/auth/usuarios").hasAuthority("ADMIN")
+                .requestMatchers(HttpMethod.DELETE, "/api/auth/usuarios/**").hasAuthority("ADMIN")
                 // ETL solo para ADMIN
                 .requestMatchers("/api/etl/**").hasAuthority("ADMIN")
                 // Inicializacion solo para ADMIN

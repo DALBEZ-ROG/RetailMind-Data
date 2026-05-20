@@ -37,23 +37,6 @@ services:
       retries: 5
     restart: unless-stopped
 
-  postgres:
-    image: postgres:15
-    ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
   backend:
     build: ./retailmind-backend
     ports:
@@ -61,9 +44,6 @@ services:
     volumes:
       - ./retailmind:/etl
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       CLICKHOUSE_DATASOURCE_URL: jdbc:ch://clickhouse:8123/${CH_DATABASE}?compress=0
       CLICKHOUSE_DATASOURCE_USERNAME: ${CH_USER}
       CLICKHOUSE_DATASOURCE_PASSWORD: ${CH_PASSWORD}
@@ -76,11 +56,9 @@ services:
       ETL_SCRIPTS_PATH: /etl
       ETL_PYTHON_PATH: python
       PB_URL: http://pocketbase:8090
-      PB_EMAIL: benitesperezdariemalberto@gmail.com
-      PB_PASSWORD: retailmind2026@.
+      PB_EMAIL: ${PB_EMAIL}
+      PB_PASSWORD: ${PB_PASSWORD}
     depends_on:
-      postgres:
-        condition: service_healthy
       clickhouse:
         condition: service_healthy
     restart: unless-stopped
@@ -104,11 +82,6 @@ services:
       PB_URL: http://pocketbase:8090
       PB_EMAIL: ${PB_EMAIL}
       PB_PASSWORD: ${PB_PASSWORD}
-      DB_HOST: postgres
-      DB_PORT: "5432"
-      DB_NAME: ${POSTGRES_DB}
-      DB_USER: ${POSTGRES_USER}
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
     depends_on:
       clickhouse:
         condition: service_healthy
@@ -119,5 +92,4 @@ services:
 
 volumes:
   clickhouse_data:
-  postgres_data:
   pocketbase_data:

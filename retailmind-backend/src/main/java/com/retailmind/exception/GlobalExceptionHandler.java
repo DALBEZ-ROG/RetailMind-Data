@@ -1,23 +1,25 @@
 package com.retailmind.exception;
 
-import com.retailmind.dto.ApiErrorDTO;
-import jakarta.persistence.EntityNotFoundException;
-import jakarta.servlet.http.HttpServletRequest;
+import java.util.NoSuchElementException;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import com.retailmind.dto.ApiErrorDTO;
+
+import jakarta.servlet.http.HttpServletRequest;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-    @ExceptionHandler(EntityNotFoundException.class)
-    public ResponseEntity<ApiErrorDTO> handleNotFound(EntityNotFoundException ex,
+    @ExceptionHandler(NoSuchElementException.class)
+    public ResponseEntity<ApiErrorDTO> handleNotFound(NoSuchElementException ex,
                                                        HttpServletRequest request) {
         logger.error("Recurso no encontrado: {} - {}", request.getRequestURI(), ex.getMessage());
         ApiErrorDTO error = new ApiErrorDTO(
@@ -25,15 +27,13 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
     }
 
-    @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<ApiErrorDTO> handleConflict(DataIntegrityViolationException ex,
-                                                       HttpServletRequest request) {
-        logger.error("Conflicto de integridad: {} - {}", request.getRequestURI(), ex.getMessage());
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiErrorDTO> handleBadRequest(IllegalArgumentException ex,
+                                                         HttpServletRequest request) {
+        logger.error("Argumento invalido: {} - {}", request.getRequestURI(), ex.getMessage());
         ApiErrorDTO error = new ApiErrorDTO(
-                409, "Conflict",
-                "Violacion de integridad de datos. El registro ya existe o viola una restriccion.",
-                request.getRequestURI());
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+                400, "Bad Request", ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
 
     @ExceptionHandler(Exception.class)

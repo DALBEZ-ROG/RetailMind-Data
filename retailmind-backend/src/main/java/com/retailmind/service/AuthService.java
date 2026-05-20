@@ -1,10 +1,8 @@
 package com.retailmind.service;
 
-import com.retailmind.dto.LoginRequestDTO;
-import com.retailmind.dto.LoginResponseDTO;
-import com.retailmind.entity.UsuarioSistema;
-import com.retailmind.repository.UsuarioSistemaRepository;
-import com.retailmind.security.JwtUtil;
+import java.util.List;
+
+import org.springframework.context.annotation.Lazy;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -12,19 +10,22 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
+import com.retailmind.dto.LoginRequestDTO;
+import com.retailmind.dto.LoginResponseDTO;
+import com.retailmind.entity.UsuarioSistema;
+import com.retailmind.repository.ClickHouseUserRepository;
+import com.retailmind.security.JwtUtil;
 
 @Service
 public class AuthService implements UserDetailsService {
 
-    private final UsuarioSistemaRepository usuarioRepo;
+    private final ClickHouseUserRepository usuarioRepo;
     private final JwtUtil jwtUtil;
     private final AuthenticationManager authenticationManager;
 
-    public AuthService(UsuarioSistemaRepository usuarioRepo,
+    public AuthService(ClickHouseUserRepository usuarioRepo,
                        JwtUtil jwtUtil,
                        @Lazy AuthenticationManager authenticationManager) {
         this.usuarioRepo = usuarioRepo;

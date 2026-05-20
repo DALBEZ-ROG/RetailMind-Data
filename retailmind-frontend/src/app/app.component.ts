@@ -10,6 +10,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatExpansionModule } from '@angular/material/expansion';
 import { filter } from 'rxjs';
 import { AuthService } from './core/services/auth.service';
 import { ServerStatusComponent } from './core/components/server-status/server-status.component';
@@ -31,17 +32,21 @@ import { ServerStatusComponent } from './core/components/server-status/server-st
     MatMenuModule,
     MatTooltipModule,
     MatChipsModule,
+    MatExpansionModule,
     ServerStatusComponent
   ],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss'
 })
 export class AppComponent {
-  title = 'RetailMind Analytics';
+  title = 'RetailMind Shop';
   sidenavOpened = true;
-  breadcrumb = 'Dashboard';
+  breadcrumb = 'Tienda';
+  configExpanded = false;
 
   private routeMap: Record<string, string> = {
+    '/shop': 'Tienda',
+    '/shop/carrito': 'Mi Carrito',
     '/dashboard': 'Dashboard',
     '/sesiones': 'Sesiones',
     '/conversiones': 'Conversiones',
@@ -54,7 +59,8 @@ export class AppComponent {
     this.router.events.pipe(
       filter(e => e instanceof NavigationEnd)
     ).subscribe((e: any) => {
-      this.breadcrumb = this.routeMap[e.urlAfterRedirects] || 'Dashboard';
+      const url = e.urlAfterRedirects;
+      this.breadcrumb = this.routeMap[url] || (url.includes('/shop/producto') ? 'Detalle Producto' : 'Tienda');
     });
   }
 
@@ -68,6 +74,10 @@ export class AppComponent {
 
   get isAdmin(): boolean {
     return this.authService.hasRole('ADMIN');
+  }
+
+  get isCliente(): boolean {
+    return this.authService.hasRole('CLIENTE');
   }
 
   logout(): void {

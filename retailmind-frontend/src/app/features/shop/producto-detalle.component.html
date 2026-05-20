@@ -1,0 +1,50 @@
+<div class="detalle-container" *ngIf="producto">
+  <button mat-button (click)="volver()" class="btn-volver">
+    <mat-icon>arrow_back</mat-icon> Volver a la tienda
+  </button>
+
+  <div class="detalle-grid">
+    <div class="detalle-image">
+      <mat-icon class="big-icon">{{ getCategoryIcon(producto.categoriaId) }}</mat-icon>
+    </div>
+
+    <div class="detalle-info">
+      <span class="detalle-brand">{{ producto.brand }}</span>
+      <h1 class="detalle-name">{{ producto.nombre }}</h1>
+      <span class="detalle-category">
+        <mat-icon>{{ getCategoryIcon(producto.categoriaId) }}</mat-icon>
+        {{ producto.categoriaNombre }}
+      </span>
+
+      <p class="detalle-price">${{ producto.price | number:'1.2-2' }}</p>
+
+      <p class="detalle-description">{{ producto.descripcion }}</p>
+
+      <div class="detalle-stock">
+        <mat-icon>inventory</mat-icon>
+        {{ producto.stock }} unidades disponibles
+      </div>
+
+      <div class="detalle-actions">
+        <mat-form-field appearance="outline" class="qty-field">
+          <mat-label>Cantidad</mat-label>
+          <input matInput type="number" [(ngModel)]="cantidad" min="1" [max]="producto.stock">
+        </mat-form-field>
+
+        <button mat-raised-button color="primary" class="btn-add-cart" (click)="agregarAlCarrito()">
+          <mat-icon>add_shopping_cart</mat-icon>
+          Agregar al carrito
+        </button>
+
+        <button mat-stroked-button color="warn" (click)="agregarWishlist()">
+          <mat-icon>favorite</mat-icon>
+          Wishlist
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="loading" *ngIf="loading">
+  <p>Cargando producto...</p>
+</div>

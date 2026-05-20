@@ -1,0 +1,69 @@
+<div class="shop-container">
+  <!-- Header de tienda -->
+  <div class="shop-header">
+    <h2 class="shop-title">
+      <mat-icon>storefront</mat-icon>
+      RetailMind Shop
+    </h2>
+    <div class="header-actions">
+      <button mat-icon-button (click)="irAlCarrito()" [matBadge]="carritoCount"
+              matBadgeColor="accent" [matBadgeHidden]="carritoCount === 0">
+        <mat-icon>shopping_cart</mat-icon>
+      </button>
+    </div>
+  </div>
+
+  <!-- Filtros de categoría -->
+  <div class="category-filters">
+    <mat-chip-listbox>
+      <mat-chip-option *ngFor="let cat of categorias"
+               [selected]="categoriaSeleccionada === cat.categoriaId"
+               (click)="filtrarCategoria(cat.categoriaId)">
+        <mat-icon>{{ getCategoryIcon(cat.categoriaId) }}</mat-icon>
+        {{ cat.nombre }} ({{ cat.total }})
+      </mat-chip-option>
+    </mat-chip-listbox>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading-container" *ngIf="loading">
+    <mat-spinner diameter="40"></mat-spinner>
+  </div>
+
+  <!-- Grid de productos -->
+  <div class="products-grid" *ngIf="!loading">
+    <mat-card class="product-card" *ngFor="let p of productos" (click)="verProducto(p.productoId)">
+      <div class="product-image">
+        <mat-icon class="product-icon">{{ getCategoryIcon(p.categoriaId) }}</mat-icon>
+      </div>
+      <mat-card-content>
+        <p class="product-brand">{{ p.brand }}</p>
+        <h3 class="product-name">{{ p.nombre }}</h3>
+        <p class="product-category">{{ p.categoriaNombre }}</p>
+        <p class="product-price">${{ p.price | number:'1.2-2' }}</p>
+      </mat-card-content>
+      <mat-card-actions>
+        <button mat-raised-button color="primary" class="btn-cart"
+                (click)="agregarAlCarrito(p, $event)">
+          <mat-icon>add_shopping_cart</mat-icon> Agregar
+        </button>
+        <button mat-icon-button class="btn-wishlist" (click)="agregarWishlist(p, $event)">
+          <mat-icon>favorite_border</mat-icon>
+        </button>
+      </mat-card-actions>
+    </mat-card>
+  </div>
+
+  <!-- Empty state -->
+  <div class="empty-state" *ngIf="!loading && productos.length === 0">
+    <mat-icon>inventory_2</mat-icon>
+    <p>No se encontraron productos</p>
+  </div>
+
+  <!-- Paginación -->
+  <mat-paginator *ngIf="totalProductos > 0"
+                 [length]="totalProductos" [pageSize]="size" [pageIndex]="page"
+                 [pageSizeOptions]="[12, 24, 48]" (page)="onPageChange($event)"
+                 showFirstLastButtons>
+  </mat-paginator>
+</div>

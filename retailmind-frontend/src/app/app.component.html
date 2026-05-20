@@ -44,35 +44,61 @@
   <mat-sidenav-container class="sidenav-container">
     <mat-sidenav mode="side" [opened]="sidenavOpened" class="sidenav">
       <mat-nav-list>
-        <a mat-list-item routerLink="/dashboard" routerLinkActive="active-link"
+
+        <!-- Tienda - visible para todos -->
+        <a mat-list-item routerLink="/shop" routerLinkActive="active-link"
            [routerLinkActiveOptions]="{ exact: true }">
-          <mat-icon matListItemIcon>dashboard</mat-icon>
-          <span matListItemTitle>Dashboard</span>
+          <mat-icon matListItemIcon>shopping_cart</mat-icon>
+          <span matListItemTitle>Tienda</span>
         </a>
-        <a mat-list-item routerLink="/sesiones" routerLinkActive="active-link">
-          <mat-icon matListItemIcon>timeline</mat-icon>
-          <span matListItemTitle>Sesiones</span>
+
+        <!-- Links de CLIENTE -->
+        <a mat-list-item routerLink="/shop/carrito" routerLinkActive="active-link">
+          <mat-icon matListItemIcon>shopping_bag</mat-icon>
+          <span matListItemTitle>Mi Carrito</span>
         </a>
-        <a mat-list-item routerLink="/conversiones" routerLinkActive="active-link">
-          <mat-icon matListItemIcon>trending_up</mat-icon>
-          <span matListItemTitle>Conversiones</span>
-        </a>
+
+        <!-- Panel de configuración ADMIN -->
         <ng-container *ngIf="isAdmin">
           <mat-divider></mat-divider>
-          <a mat-list-item routerLink="/admin-etl" routerLinkActive="active-link">
-            <mat-icon matListItemIcon>settings</mat-icon>
-            <span matListItemTitle>Administracion ETL</span>
-          </a>
-          <a mat-list-item routerLink="/gestion-datos" routerLinkActive="active-link">
-            <mat-icon matListItemIcon>dataset</mat-icon>
-            <span matListItemTitle>Gestion de Datos</span>
-          </a>
-          <mat-divider></mat-divider>
-          <a mat-list-item routerLink="/inicializacion" routerLinkActive="active-link">
-            <mat-icon matListItemIcon>rocket_launch</mat-icon>
-            <span matListItemTitle>Inicializacion</span>
-          </a>
+          <mat-expansion-panel class="config-panel" [expanded]="configExpanded"
+                               (opened)="configExpanded = true" (closed)="configExpanded = false">
+            <mat-expansion-panel-header>
+              <mat-panel-title>
+                <mat-icon class="config-icon">settings</mat-icon>
+                Configuracion
+              </mat-panel-title>
+            </mat-expansion-panel-header>
+
+            <mat-nav-list dense>
+              <a mat-list-item routerLink="/dashboard" routerLinkActive="active-link">
+                <mat-icon matListItemIcon>dashboard</mat-icon>
+                <span matListItemTitle>Dashboard</span>
+              </a>
+              <a mat-list-item routerLink="/sesiones" routerLinkActive="active-link">
+                <mat-icon matListItemIcon>timeline</mat-icon>
+                <span matListItemTitle>Sesiones</span>
+              </a>
+              <a mat-list-item routerLink="/conversiones" routerLinkActive="active-link">
+                <mat-icon matListItemIcon>trending_up</mat-icon>
+                <span matListItemTitle>Conversiones</span>
+              </a>
+              <a mat-list-item routerLink="/admin-etl" routerLinkActive="active-link">
+                <mat-icon matListItemIcon>sync</mat-icon>
+                <span matListItemTitle>Administracion ETL</span>
+              </a>
+              <a mat-list-item routerLink="/gestion-datos" routerLinkActive="active-link">
+                <mat-icon matListItemIcon>dataset</mat-icon>
+                <span matListItemTitle>Gestion de Datos</span>
+              </a>
+              <a mat-list-item routerLink="/inicializacion" routerLinkActive="active-link">
+                <mat-icon matListItemIcon>rocket_launch</mat-icon>
+                <span matListItemTitle>Inicializacion</span>
+              </a>
+            </mat-nav-list>
+          </mat-expansion-panel>
         </ng-container>
+
       </mat-nav-list>
     </mat-sidenav>
 
