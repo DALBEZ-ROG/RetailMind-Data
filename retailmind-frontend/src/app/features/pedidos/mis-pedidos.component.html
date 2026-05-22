@@ -1,0 +1,39 @@
+<div class="pedidos-container">
+  <h2 class="page-title">
+    <mat-icon>local_shipping</mat-icon>
+    Mis Pedidos
+  </h2>
+
+  <!-- Empty state -->
+  <div class="empty-state" *ngIf="!loading && pedidos.length === 0">
+    <mat-icon>inbox</mat-icon>
+    <p>No tienes pedidos aun.</p>
+    <p class="empty-hint">Realiza tu primera compra en la tienda.</p>
+  </div>
+
+  <!-- Lista de pedidos -->
+  <mat-accordion *ngIf="pedidos.length > 0">
+    <mat-expansion-panel *ngFor="let pedido of pedidos" class="pedido-panel">
+      <mat-expansion-panel-header>
+        <mat-panel-title>
+          <span class="orden-id">{{ getOrdenCorta(pedido.ordenId) }}</span>
+        </mat-panel-title>
+        <mat-panel-description>
+          <span class="pedido-fecha">{{ pedido.fechaOrden | date:'dd/MM/yyyy HH:mm' }}</span>
+          <mat-chip class="estado-chip estado-completada">{{ pedido.estado }}</mat-chip>
+          <span class="pedido-total">${{ pedido.total | number:'1.2-2' }}</span>
+          <span class="pedido-items">{{ pedido.numItems }} items</span>
+        </mat-panel-description>
+      </mat-expansion-panel-header>
+
+      <mat-divider></mat-divider>
+      <div class="items-list">
+        <div class="item-row" *ngFor="let item of pedido.items">
+          <span class="item-name">{{ item.nombre || item.productoId }}</span>
+          <span class="item-qty">x{{ item.cantidad }}</span>
+          <span class="item-price">${{ item.precioUnitario | number:'1.2-2' }}</span>
+        </div>
+      </div>
+    </mat-expansion-panel>
+  </mat-accordion>
+</div>

@@ -60,7 +60,17 @@ public class ClickHouseConfig {
                 ORDER BY username
                 """);
 
-            logger.info("Tabla usuarios_sistema verificada en ClickHouse");
+            jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS retailmind.wishlist_items (
+                    wishlist_id String,
+                    user_id String,
+                    producto_id String,
+                    fecha_agregado String
+                ) ENGINE = MergeTree()
+                ORDER BY (user_id, producto_id)
+                """);
+
+            logger.info("Tablas del sistema verificadas en ClickHouse");
         };
     }
 }

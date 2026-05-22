@@ -32,6 +32,36 @@ export const routes: Routes = [
       import('./features/shop/carrito.component').then(m => m.CarritoComponent)
   },
   {
+    path: 'wishlist',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/wishlist/wishlist.component').then(m => m.WishlistComponent)
+  },
+  {
+    path: 'mis-pedidos',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/pedidos/mis-pedidos.component').then(m => m.MisPedidosComponent)
+  },
+  {
+    path: 'admin-pedidos',
+    canActivate: [authGuard, adminGuard],
+    loadComponent: () =>
+      import('./features/admin-pedidos/admin-pedidos.component').then(m => m.AdminPedidosComponent)
+  },
+  {
+    path: 'admin-usuarios',
+    canActivate: [authGuard, adminGuard],
+    loadComponent: () =>
+      import('./features/admin-usuarios/admin-usuarios.component').then(m => m.AdminUsuariosComponent)
+  },
+  {
+    path: 'funnel',
+    canActivate: [authGuard, adminGuard],
+    loadComponent: () =>
+      import('./features/funnel/funnel.component').then(m => m.FunnelComponent)
+  },
+  {
     path: 'dashboard',
     canActivate: [authGuard, adminGuard],
     loadComponent: () =>

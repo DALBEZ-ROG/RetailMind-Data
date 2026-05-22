@@ -36,9 +36,9 @@
           Agregar al carrito
         </button>
 
-        <button mat-stroked-button color="warn" (click)="agregarWishlist()">
-          <mat-icon>favorite</mat-icon>
-          Wishlist
+        <button mat-stroked-button [color]="enWishlist ? 'warn' : 'primary'" (click)="toggleWishlist()">
+          <mat-icon>{{ enWishlist ? 'favorite' : 'favorite_border' }}</mat-icon>
+          {{ enWishlist ? 'En Wishlist' : 'Wishlist' }}
         </button>
       </div>
     </div>

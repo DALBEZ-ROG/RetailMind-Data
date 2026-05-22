@@ -1,0 +1,147 @@
+<div class="funnel-container">
+  <h2 class="page-title"><mat-icon>filter_alt</mat-icon> Funnel de Conversion</h2>
+
+  <!-- ═══ SECCIÓN 1: Resumen visual ═══ -->
+  <mat-card class="funnel-card">
+    <mat-card-header>
+      <mat-card-title>Embudo de Conversion</mat-card-title>
+      <span class="time-chip" *ngIf="resumenTime > 0">⚡ {{ resumenTime }}ms</span>
+    </mat-card-header>
+    <mat-card-content>
+      <div class="funnel-bars" *ngIf="resumen.totalSesiones > 0">
+        <div class="funnel-step">
+          <div class="step-header"><mat-icon>visibility</mat-icon><span>View</span></div>
+          <mat-progress-bar mode="determinate" [value]="getPercent(resumen.llegaronView)" color="primary"></mat-progress-bar>
+          <span class="step-count">{{ resumen.llegaronView | number }} ({{ getPercent(resumen.llegaronView) }}%)</span>
+        </div>
+        <div class="funnel-step">
+          <div class="step-header"><mat-icon>mouse</mat-icon><span>Click</span></div>
+          <mat-progress-bar mode="determinate" [value]="getPercent(resumen.llegaronClick)" class="bar-click"></mat-progress-bar>
+          <span class="step-count">{{ resumen.llegaronClick | number }} ({{ getPercent(resumen.llegaronClick) }}%)</span>
+        </div>
+        <div class="funnel-step">
+          <div class="step-header"><mat-icon>add_shopping_cart</mat-icon><span>Carrito</span></div>
+          <mat-progress-bar mode="determinate" [value]="getPercent(resumen.llegaronAddToCart)" class="bar-cart"></mat-progress-bar>
+          <span class="step-count">{{ resumen.llegaronAddToCart | number }} ({{ getPercent(resumen.llegaronAddToCart) }}%)</span>
+        </div>
+        <div class="funnel-step">
+          <div class="step-header"><mat-icon>favorite</mat-icon><span>Wishlist</span></div>
+          <mat-progress-bar mode="determinate" [value]="getPercent(resumen.llegaronWishlist)" class="bar-wish"></mat-progress-bar>
+          <span class="step-count">{{ resumen.llegaronWishlist | number }} ({{ getPercent(resumen.llegaronWishlist) }}%)</span>
+        </div>
+        <div class="funnel-step">
+          <div class="step-header"><mat-icon>check_circle</mat-icon><span>Compra</span></div>
+          <mat-progress-bar mode="determinate" [value]="getPercent(resumen.llegaronPurchase)" class="bar-purchase"></mat-progress-bar>
+          <span class="step-count">{{ resumen.llegaronPurchase | number }} ({{ getPercent(resumen.llegaronPurchase) }}%)</span>
+        </div>
+        <div class="funnel-step">
+          <div class="step-header"><mat-icon>cancel</mat-icon><span>Abandono</span></div>
+          <mat-progress-bar mode="determinate" [value]="getPercent(resumen.llegaronDrop)" class="bar-drop"></mat-progress-bar>
+          <span class="step-count">{{ resumen.llegaronDrop | number }} ({{ getPercent(resumen.llegaronDrop) }}%)</span>
+        </div>
+      </div>
+      <div class="kpi-row" *ngIf="resumen.totalSesiones > 0">
+        <div class="kpi"><span class="kpi-value">{{ resumen.totalSesiones | number }}</span><span class="kpi-label">Total Sesiones</span></div>
+        <div class="kpi"><span class="kpi-value kpi-green">{{ resumen.tasaConversion }}%</span><span class="kpi-label">Tasa Conversion</span></div>
+        <div class="kpi"><span class="kpi-value kpi-red">{{ resumen.tasaAbandono }}%</span><span class="kpi-label">Tasa Abandono</span></div>
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- ═══ SECCIÓN 2: Filtros ═══ -->
+  <mat-card class="filter-card">
+    <div class="filter-row">
+      <mat-form-field appearance="outline">
+        <mat-label>Semana</mat-label>
+        <mat-select [(ngModel)]="semana">
+          <mat-option [value]="null">Todas</mat-option>
+          <mat-option *ngFor="let s of semanasDisponibles" [value]="s">Semana {{ s }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Canal</mat-label>
+        <mat-select [(ngModel)]="canal">
+          <mat-option [value]="null">Todos</mat-option>
+          <mat-option value="mobile">Mobile</mat-option>
+          <mat-option value="web">Web</mat-option>
+          <mat-option value="app">App</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <button mat-raised-button color="primary" (click)="aplicarFiltros()"><mat-icon>filter_list</mat-icon> Aplicar</button>
+      <button mat-stroked-button (click)="limpiarFiltros()">Limpiar</button>
+    </div>
+  </mat-card>
+
+  <!-- ═══ SECCIÓN 3: Tabla ═══ -->
+  <mat-card class="table-card">
+    <mat-card-header>
+      <mat-card-title>Sesiones</mat-card-title>
+      <span class="time-chip" *ngIf="tableTime > 0">⚡ {{ tableTime }}ms</span>
+    </mat-card-header>
+    <mat-card-content>
+      <div class="table-wrapper">
+        <table mat-table [dataSource]="sesiones" class="full-width" *ngIf="sesiones.length > 0">
+          <ng-container matColumnDef="sessionId">
+            <th mat-header-cell *matHeaderCellDef>Session</th>
+            <td mat-cell *matCellDef="let r"><code>{{ r.sessionId | slice:0:12 }}</code></td>
+          </ng-container>
+          <ng-container matColumnDef="userId">
+            <th mat-header-cell *matHeaderCellDef>User</th>
+            <td mat-cell *matCellDef="let r">{{ r.userId | slice:0:8 }}</td>
+          </ng-container>
+          <ng-container matColumnDef="canal">
+            <th mat-header-cell *matHeaderCellDef>Canal</th>
+            <td mat-cell *matCellDef="let r">{{ r.canal }}</td>
+          </ng-container>
+          <ng-container matColumnDef="view">
+            <th mat-header-cell *matHeaderCellDef>👁</th>
+            <td mat-cell *matCellDef="let r"><mat-icon [class.action-yes]="r.hizoView" [class.action-no]="!r.hizoView">{{ r.hizoView ? 'check' : 'close' }}</mat-icon></td>
+          </ng-container>
+          <ng-container matColumnDef="click">
+            <th mat-header-cell *matHeaderCellDef>🖱</th>
+            <td mat-cell *matCellDef="let r"><mat-icon [class.action-yes]="r.hizoClick" [class.action-no]="!r.hizoClick">{{ r.hizoClick ? 'check' : 'close' }}</mat-icon></td>
+          </ng-container>
+          <ng-container matColumnDef="cart">
+            <th mat-header-cell *matHeaderCellDef>🛒</th>
+            <td mat-cell *matCellDef="let r"><mat-icon [class.action-yes]="r.hizoAddToCart" [class.action-no]="!r.hizoAddToCart">{{ r.hizoAddToCart ? 'check' : 'close' }}</mat-icon></td>
+          </ng-container>
+          <ng-container matColumnDef="purchase">
+            <th mat-header-cell *matHeaderCellDef>✅</th>
+            <td mat-cell *matCellDef="let r"><mat-icon [class.action-yes]="r.hizoPurchase" [class.action-no]="!r.hizoPurchase">{{ r.hizoPurchase ? 'check' : 'close' }}</mat-icon></td>
+          </ng-container>
+          <ng-container matColumnDef="drop">
+            <th mat-header-cell *matHeaderCellDef>❌</th>
+            <td mat-cell *matCellDef="let r"><mat-icon [class.action-yes-red]="r.hizoDrop" [class.action-no]="!r.hizoDrop">{{ r.hizoDrop ? 'check' : 'close' }}</mat-icon></td>
+          </ng-container>
+          <ng-container matColumnDef="etapa">
+            <th mat-header-cell *matHeaderCellDef>Etapa Final</th>
+            <td mat-cell *matCellDef="let r"><mat-chip [ngClass]="getEtapaClass(r.etapaFinal)">{{ r.etapaFinal }}</mat-chip></td>
+          </ng-container>
+          <tr mat-header-row *matHeaderRowDef="['sessionId','userId','canal','view','click','cart','purchase','drop','etapa']"></tr>
+          <tr mat-row *matRowDef="let r; columns: ['sessionId','userId','canal','view','click','cart','purchase','drop','etapa']" (click)="verDetalle(r.sessionId)" class="clickable-row"></tr>
+        </table>
+      </div>
+      <mat-paginator [length]="totalElements" [pageSize]="size" [pageIndex]="page"
+                     [pageSizeOptions]="[25,50,100]" (page)="onPageChange($event)" showFirstLastButtons></mat-paginator>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- ═══ Dialog detalle sesión ═══ -->
+  <div class="detalle-overlay" *ngIf="showDetalle" (click)="cerrarDetalle()">
+    <div class="detalle-dialog" (click)="$event.stopPropagation()">
+      <h3>Detalle Sesion: {{ detalleSessionId | slice:0:12 }}</h3>
+      <div class="timeline">
+        <div class="timeline-item" *ngFor="let ev of detalleSesion">
+          <div class="timeline-dot" [ngClass]="'dot-' + ev.userAction"></div>
+          <div class="timeline-content">
+            <span class="ev-action">{{ ev.userAction }}</span>
+            <span class="ev-product">{{ ev.productId }}</span>
+            <span class="ev-price" *ngIf="ev.price">${{ ev.price | number:'1.2-2' }}</span>
+            <span class="ev-time">{{ ev.timeSpentSec }}s</span>
+          </div>
+        </div>
+      </div>
+      <button mat-raised-button (click)="cerrarDetalle()">Cerrar</button>
+    </div>
+  </div>
+</div>

@@ -60,6 +60,11 @@ public class SecurityConfig {
                 .requestMatchers("/api/init/**").hasAuthority("ADMIN")
                 // Gestion de datos solo para ADMIN
                 .requestMatchers("/api/gestion/**").hasAuthority("ADMIN")
+                // Admin usuarios y pedidos solo ADMIN
+                .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
+                .requestMatchers("/api/pedidos/admin/**").hasAuthority("ADMIN")
+                // Funnel solo ADMIN
+                .requestMatchers("/api/funnel/**").hasAuthority("ADMIN")
                 // Dashboard refrescar vistas solo ADMIN
                 .requestMatchers(HttpMethod.POST, "/api/dashboard/refrescar-vistas").hasAuthority("ADMIN")
                 // Todo lo demas requiere autenticacion

@@ -8,8 +8,10 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { HttpClient } from '@angular/common/http';
 import { ShopService } from './shop.service';
 import { AuthService } from '../../core/services/auth.service';
+import { environment } from '../../../environments/environment';
 
 const CATEGORY_ICONS: Record<number, string> = {
   1: 'devices', 2: 'shopping_basket', 3: 'sports_soccer', 4: 'watch',
@@ -31,12 +33,14 @@ export class ProductoDetalleComponent implements OnInit {
   producto: any = null;
   cantidad = 1;
   loading = true;
+  enWishlist = false;
 
   constructor(
     private route: ActivatedRoute,
     private router: Router,
     private shopService: ShopService,
     private authService: AuthService,
+    private http: HttpClient,
     private snackBar: MatSnackBar
   ) {}
 
@@ -44,7 +48,7 @@ export class ProductoDetalleComponent implements OnInit {
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
       this.shopService.getProductoById(id).subscribe({
-        next: (p) => { this.producto = p; this.loading = false; this.registrarView(id); },
+        next: (p) => { this.producto = p; this.loading = false; this.registrarView(id); this.checkWishlist(id); },
         error: () => { this.loading = false; }
       });
     }
@@ -61,6 +65,17 @@ export class ProductoDetalleComponent implements OnInit {
     }).subscribe();
   }
 
+  private checkWishlist(productoId: string): void {
+    const user = this.authService.getCurrentUser();
+    if (!user) return;
+    this.http.get<any[]>(`${environment.apiUrl}/api/wishlist/${user.username}`).subscribe({
+      next: (items) => {
+        this.enWishlist = items.some(i => i.productoId === productoId);
+      },
+      error: () => {}
+    });
+  }
+
   agregarAlCarrito(): void {
     const user = this.authService.getCurrentUser();
     if (!user || !this.producto) return;
@@ -71,16 +86,29 @@ export class ProductoDetalleComponent implements OnInit {
     });
   }
 
-  agregarWishlist(): void {
+  toggleWishlist(): void {
     const user = this.authService.getCurrentUser();
-    this.shopService.registrarEvento({
-      user_id: user?.username || 'anonymous',
-      product_id: this.producto.productoId,
-      user_action: 'wishlist',
-      channel: 'web',
-      price: this.producto.price
-    }).subscribe();
-    this.snackBar.open('Agregado a wishlist ❤️', 'OK', { duration: 2000 });
+    if (!user || !this.producto) return;
+
+    const productoId = this.producto.productoId;
+
+    if (this.enWishlist) {
+      this.http.delete(`${environment.apiUrl}/api/wishlist/${user.username}/${productoId}`).subscribe({
+        next: () => {
+          this.enWishlist = false;
+          this.snackBar.open('Eliminado de wishlist', 'OK', { duration: 2000 });
+        },
+        error: () => this.snackBar.open('Error', 'Cerrar', { duration: 2000 })
+      });
+    } else {
+      this.shopService.agregarAWishlist(user.username, productoId).subscribe({
+        next: () => {
+          this.enWishlist = true;
+          this.snackBar.open('Agregado a wishlist ❤️', 'OK', { duration: 2000 });
+        },
+        error: (e: any) => this.snackBar.open(e.error?.error || 'Error', 'OK', { duration: 2000 })
+      });
+    }
   }
 
   volver(): void {

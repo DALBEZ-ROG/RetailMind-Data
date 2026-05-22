@@ -51,4 +51,9 @@ export class ShopService {
   checkout(userId: string): Observable<any> {
     return this.http.post(`${this.carrito}/${userId}/checkout`, {});
   }
+
+  // Wishlist
+  agregarAWishlist(userId: string, productoId: string): Observable<any> {
+    return this.http.post(`${environment.apiUrl}/api/wishlist/agregar`, { user_id: userId, producto_id: productoId });
+  }
 }

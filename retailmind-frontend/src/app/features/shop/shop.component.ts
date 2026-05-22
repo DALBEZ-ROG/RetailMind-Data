@@ -12,8 +12,10 @@ import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatBadgeModule } from '@angular/material/badge';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { HttpClient } from '@angular/common/http';
 import { ShopService } from './shop.service';
 import { AuthService } from '../../core/services/auth.service';
+import { environment } from '../../../environments/environment';
 
 const CATEGORY_ICONS: Record<number, string> = {
   1: 'devices', 2: 'shopping_basket', 3: 'sports_soccer', 4: 'watch',
@@ -47,9 +49,13 @@ export class ShopComponent implements OnInit {
   // Carrito badge
   carritoCount = 0;
 
+  // Wishlist
+  productosEnWishlist = new Set<string>();
+
   constructor(
     private shopService: ShopService,
     private authService: AuthService,
+    private http: HttpClient,
     private router: Router,
     private snackBar: MatSnackBar
   ) {}
@@ -58,6 +64,7 @@ export class ShopComponent implements OnInit {
     this.loadProductos();
     this.loadCategorias();
     this.loadCarritoCount();
+    this.loadWishlistIds();
   }
 
   loadProductos(): void {
@@ -92,6 +99,21 @@ export class ShopComponent implements OnInit {
     }
   }
 
+  loadWishlistIds(): void {
+    const user = this.authService.getCurrentUser();
+    if (!user) return;
+    this.http.get<any[]>(`${environment.apiUrl}/api/wishlist/${user.username}`).subscribe({
+      next: (items) => {
+        this.productosEnWishlist = new Set(items.map(i => i.productoId));
+      },
+      error: () => {}
+    });
+  }
+
+  isInWishlist(productoId: string): boolean {
+    return this.productosEnWishlist.has(productoId);
+  }
+
   filtrarCategoria(catId: number | null): void {
     this.categoriaSeleccionada = this.categoriaSeleccionada === catId ? null : catId;
     this.page = 0;
@@ -122,17 +144,32 @@ export class ShopComponent implements OnInit {
     });
   }
 
-  agregarWishlist(producto: any, event: Event): void {
+  toggleWishlist(producto: any, event: Event): void {
     event.stopPropagation();
     const user = this.authService.getCurrentUser();
-    this.shopService.registrarEvento({
-      user_id: user?.username || 'anonymous',
-      product_id: producto.productoId,
-      user_action: 'wishlist',
-      channel: 'web',
-      price: producto.price
-    }).subscribe();
-    this.snackBar.open('Agregado a wishlist ❤️', 'OK', { duration: 2000 });
+    if (!user) return;
+
+    const productoId = producto.productoId;
+
+    if (this.productosEnWishlist.has(productoId)) {
+      // Eliminar de wishlist
+      this.http.delete(`${environment.apiUrl}/api/wishlist/${user.username}/${productoId}`).subscribe({
+        next: () => {
+          this.productosEnWishlist.delete(productoId);
+          this.snackBar.open('Eliminado de wishlist', 'OK', { duration: 2000 });
+        },
+        error: () => this.snackBar.open('Error', 'Cerrar', { duration: 2000 })
+      });
+    } else {
+      // Agregar a wishlist
+      this.shopService.agregarAWishlist(user.username, productoId).subscribe({
+        next: () => {
+          this.productosEnWishlist.add(productoId);
+          this.snackBar.open('Agregado a wishlist ❤️', 'OK', { duration: 2000 });
+        },
+        error: (e: any) => this.snackBar.open(e.error?.error || 'Ya esta en wishlist', 'OK', { duration: 2000 })
+      });
+    }
   }
 
   irAlCarrito(): void {

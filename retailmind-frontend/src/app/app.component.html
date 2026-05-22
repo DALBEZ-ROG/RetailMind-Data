@@ -57,6 +57,14 @@
           <mat-icon matListItemIcon>shopping_bag</mat-icon>
           <span matListItemTitle>Mi Carrito</span>
         </a>
+        <a mat-list-item routerLink="/wishlist" routerLinkActive="active-link">
+          <mat-icon matListItemIcon>favorite</mat-icon>
+          <span matListItemTitle>Mi Wishlist</span>
+        </a>
+        <a mat-list-item routerLink="/mis-pedidos" routerLinkActive="active-link">
+          <mat-icon matListItemIcon>local_shipping</mat-icon>
+          <span matListItemTitle>Mis Pedidos</span>
+        </a>
 
         <!-- Panel de configuración ADMIN -->
         <ng-container *ngIf="isAdmin">
@@ -90,6 +98,18 @@
               <a mat-list-item routerLink="/gestion-datos" routerLinkActive="active-link">
                 <mat-icon matListItemIcon>dataset</mat-icon>
                 <span matListItemTitle>Gestion de Datos</span>
+              </a>
+              <a mat-list-item routerLink="/admin-pedidos" routerLinkActive="active-link">
+                <mat-icon matListItemIcon>receipt_long</mat-icon>
+                <span matListItemTitle>Pedidos</span>
+              </a>
+              <a mat-list-item routerLink="/admin-usuarios" routerLinkActive="active-link">
+                <mat-icon matListItemIcon>group</mat-icon>
+                <span matListItemTitle>Usuarios</span>
+              </a>
+              <a mat-list-item routerLink="/funnel" routerLinkActive="active-link">
+                <mat-icon matListItemIcon>filter_alt</mat-icon>
+                <span matListItemTitle>Funnel</span>
               </a>
               <a mat-list-item routerLink="/inicializacion" routerLinkActive="active-link">
                 <mat-icon matListItemIcon>rocket_launch</mat-icon>

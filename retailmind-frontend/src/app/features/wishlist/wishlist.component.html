@@ -1,0 +1,35 @@
+<div class="wishlist-container">
+  <h2 class="page-title">
+    <mat-icon>favorite</mat-icon>
+    Mi Wishlist
+  </h2>
+
+  <!-- Empty state -->
+  <div class="empty-state" *ngIf="!loading && items.length === 0">
+    <mat-icon>favorite_border</mat-icon>
+    <p>Tu wishlist esta vacia.</p>
+    <p class="empty-hint">Agrega productos que te gusten!</p>
+  </div>
+
+  <!-- Grid de productos -->
+  <div class="wishlist-grid" *ngIf="items.length > 0">
+    <mat-card class="wishlist-card" *ngFor="let item of items">
+      <div class="card-image" (click)="verProducto(item.productoId)">
+        <mat-icon class="product-icon">{{ getCategoryIcon(item.categoriaId) }}</mat-icon>
+      </div>
+      <mat-card-content>
+        <p class="item-brand">{{ item.brand }}</p>
+        <h3 class="item-name">{{ item.nombre }}</h3>
+        <p class="item-price">${{ item.price | number:'1.2-2' }}</p>
+      </mat-card-content>
+      <mat-card-actions>
+        <button mat-raised-button color="primary" (click)="agregarAlCarrito(item)">
+          <mat-icon>add_shopping_cart</mat-icon> Al carrito
+        </button>
+        <button mat-icon-button class="btn-remove" (click)="eliminarDeWishlist(item.productoId)">
+          <mat-icon>heart_broken</mat-icon>
+        </button>
+      </mat-card-actions>
+    </mat-card>
+  </div>
+</div>

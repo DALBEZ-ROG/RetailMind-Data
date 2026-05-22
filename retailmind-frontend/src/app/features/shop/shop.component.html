@@ -47,8 +47,10 @@
                 (click)="agregarAlCarrito(p, $event)">
           <mat-icon>add_shopping_cart</mat-icon> Agregar
         </button>
-        <button mat-icon-button class="btn-wishlist" (click)="agregarWishlist(p, $event)">
-          <mat-icon>favorite_border</mat-icon>
+        <button mat-icon-button class="btn-wishlist" (click)="toggleWishlist(p, $event)">
+          <mat-icon [class.wishlist-active]="isInWishlist(p.productoId)">
+            {{ isInWishlist(p.productoId) ? 'favorite' : 'favorite_border' }}
+          </mat-icon>
         </button>
       </mat-card-actions>
     </mat-card>
