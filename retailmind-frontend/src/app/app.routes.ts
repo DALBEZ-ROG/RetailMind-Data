@@ -47,55 +47,55 @@ export const routes: Routes = [
     path: 'admin-pedidos',
     canActivate: [authGuard, adminGuard],
     loadComponent: () =>
-      import('./features/admin-pedidos/admin-pedidos.component').then(m => m.AdminPedidosComponent)
+      import('./features/admin/pedidos/admin-pedidos.component').then(m => m.AdminPedidosComponent)
   },
   {
     path: 'admin-usuarios',
     canActivate: [authGuard, adminGuard],
     loadComponent: () =>
-      import('./features/admin-usuarios/admin-usuarios.component').then(m => m.AdminUsuariosComponent)
+      import('./features/admin/usuarios/admin-usuarios.component').then(m => m.AdminUsuariosComponent)
   },
   {
     path: 'funnel',
     canActivate: [authGuard, adminGuard],
     loadComponent: () =>
-      import('./features/funnel/funnel.component').then(m => m.FunnelComponent)
+      import('./features/analytics/funnel/funnel.component').then(m => m.FunnelComponent)
   },
   {
     path: 'dashboard',
     canActivate: [authGuard, adminGuard],
     loadComponent: () =>
-      import('./features/dashboard/dashboard.component').then(m => m.DashboardComponent)
+      import('./features/analytics/dashboard/dashboard.component').then(m => m.DashboardComponent)
   },
   {
     path: 'sesiones',
     canActivate: [authGuard, adminGuard],
     loadComponent: () =>
-      import('./features/sesiones/sesiones-list.component').then(m => m.SesionesListComponent)
+      import('./features/analytics/sesiones/sesiones-list.component').then(m => m.SesionesListComponent)
   },
   {
     path: 'conversiones',
     canActivate: [authGuard, adminGuard],
     loadComponent: () =>
-      import('./features/conversiones/conversiones-list.component').then(m => m.ConversionesListComponent)
+      import('./features/analytics/conversiones/conversiones-list.component').then(m => m.ConversionesListComponent)
   },
   {
     path: 'admin-etl',
     canActivate: [authGuard, adminGuard],
     loadComponent: () =>
-      import('./features/admin-etl/admin-etl.component').then(m => m.AdminEtlComponent)
+      import('./features/admin/etl/admin-etl.component').then(m => m.AdminEtlComponent)
   },
   {
     path: 'gestion-datos',
     canActivate: [authGuard, adminGuard],
     loadComponent: () =>
-      import('./features/gestion-datos/gestion-datos.component').then(m => m.GestionDatosComponent)
+      import('./features/admin/gestion/gestion-datos.component').then(m => m.GestionDatosComponent)
   },
   {
     path: 'inicializacion',
     canActivate: [authGuard, adminGuard],
     loadComponent: () =>
-      import('./features/inicializacion/inicializacion.component').then(m => m.InicializacionComponent)
+      import('./features/admin/inicializacion/inicializacion.component').then(m => m.InicializacionComponent)
   },
   {
     path: '**',

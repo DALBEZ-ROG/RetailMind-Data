@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["src/app/features/sesiones/sesiones-list.component.scss"],
-  "sourcesContent": [".page-title {\n  font-size: 1.8rem;\n  font-weight: 500;\n  color: #333;\n  margin-bottom: 24px;\n}\n\n.search-field {\n  width: 100%;\n  max-width: 400px;\n  margin-bottom: 16px;\n}\n\n.table-wrapper { overflow-x: auto; }\ntable { min-width: 800px; }\n\nth.mat-header-cell {\n  font-weight: 600;\n  color: #424242;\n  background-color: #f5f5f5;\n}\n\n.hoverable-row:hover {\n  background-color: #e3f2fd !important;\n}\n\n.empty-state {\n  text-align: center;\n  padding: 48px 24px;\n  color: #9e9e9e;\n\n  .empty-icon {\n    font-size: 64px;\n    width: 64px;\n    height: 64px;\n    display: block;\n    margin: 0 auto 12px;\n    color: #bdbdbd;\n  }\n\n  p { margin-bottom: 16px; font-size: 1rem; }\n}\n\n.no-data {\n  text-align: center;\n  padding: 32px;\n  color: #9e9e9e;\n}\n"],
-  "mappings": ";AAAA,CAAA;AACE,aAAA;AACA,eAAA;AACA,SAAA;AACA,iBAAA;;AAGF,CAAA;AACE,SAAA;AACA,aAAA;AACA,iBAAA;;AAGF,CAAA;AAAiB,cAAA;;AACjB;AAAQ,aAAA;;AAER,EAAA,CAAA;AACE,eAAA;AACA,SAAA;AACA,oBAAA;;AAGF,CAAA,aAAA;AACE,oBAAA;;AAGF,CAAA;AACE,cAAA;AACA,WAAA,KAAA;AACA,SAAA;;AAEA,CALF,YAKE,CAAA;AACE,aAAA;AACA,SAAA;AACA,UAAA;AACA,WAAA;AACA,UAAA,EAAA,KAAA;AACA,SAAA;;AAGF,CAdF,YAcE;AAAI,iBAAA;AAAqB,aAAA;;AAG3B,CAAA;AACE,cAAA;AACA,WAAA;AACA,SAAA;;",
-  "names": []
-}

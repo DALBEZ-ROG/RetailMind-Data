@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["src/app/core/components/server-status/server-status.component.scss"],
-  "sourcesContent": [".status-indicator {\n  position: fixed;\n  bottom: 16px;\n  right: 16px;\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  padding: 8px 14px;\n  border-radius: 20px;\n  font-size: 0.78rem;\n  font-weight: 500;\n  cursor: pointer;\n  z-index: 9999;\n  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);\n  transition: all 0.3s ease;\n\n  &.status-up {\n    background-color: #e8f5e9;\n    color: #2e7d32;\n\n    .status-dot {\n      background-color: #4caf50;\n    }\n  }\n\n  &.status-down {\n    background-color: #ffebee;\n    color: #c62828;\n\n    .status-dot {\n      background-color: #f44336;\n      animation: pulse 1.5s infinite;\n    }\n  }\n}\n\n.status-dot {\n  width: 10px;\n  height: 10px;\n  border-radius: 50%;\n  flex-shrink: 0;\n}\n\n@keyframes pulse {\n  0%, 100% { opacity: 1; }\n  50%      { opacity: 0.4; }\n}\n"],
-  "mappings": ";AAAA,CAAA;AACE,YAAA;AACA,UAAA;AACA,SAAA;AACA,WAAA;AACA,eAAA;AACA,OAAA;AACA,WAAA,IAAA;AACA,iBAAA;AACA,aAAA;AACA,eAAA;AACA,UAAA;AACA,WAAA;AACA,cAAA,EAAA,IAAA,IAAA,KAAA,CAAA,EAAA,CAAA,EAAA,CAAA,EAAA;AACA,cAAA,IAAA,KAAA;;AAEA,CAhBF,gBAgBE,CAAA;AACE,oBAAA;AACA,SAAA;;AAEA,CApBJ,gBAoBI,CAJF,UAIE,CAAA;AACE,oBAAA;;AAIJ,CAzBF,gBAyBE,CAAA;AACE,oBAAA;AACA,SAAA;;AAEA,CA7BJ,gBA6BI,CAJF,YAIE,CATA;AAUE,oBAAA;AACA,aAAA,MAAA,KAAA;;AAKN,CAhBI;AAiBF,SAAA;AACA,UAAA;AACA,iBAAA;AACA,eAAA;;AAGF,WAZM;AAaJ;AAAW,aAAA;;AACX;AAAW,aAAA;;;",
-  "names": []
-}
