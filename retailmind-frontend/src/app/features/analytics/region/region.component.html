@@ -1,0 +1,181 @@
+<div class="page-container">
+
+  <!-- Header -->
+  <div class="page-header">
+    <h2><mat-icon>public</mat-icon> Análisis por Región</h2>
+    <span class="query-ms" *ngIf="queryMs > 0">⚡ {{ queryMs }} ms</span>
+  </div>
+
+  <!-- SECCIÓN 1: Filtros -->
+  <mat-card class="filters-card">
+    <div class="filters-row">
+      <mat-form-field appearance="outline" class="filter-field">
+        <mat-label>Semana</mat-label>
+        <mat-select [(ngModel)]="semanaFiltro">
+          <mat-option [value]="null">Todas</mat-option>
+          <mat-option *ngFor="let s of semanas" [value]="s">Semana {{ s }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="filter-field">
+        <mat-label>Canal</mat-label>
+        <mat-select [(ngModel)]="canalFiltro">
+          <mat-option value="">Todos</mat-option>
+          <mat-option *ngFor="let c of canales" [value]="c">{{ c }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <button mat-raised-button color="primary" (click)="cargar()">
+        <mat-icon>search</mat-icon> Aplicar
+      </button>
+      <button mat-stroked-button (click)="limpiarFiltros()">
+        <mat-icon>clear</mat-icon> Limpiar
+      </button>
+    </div>
+  </mat-card>
+
+  <!-- Loading -->
+  <div class="loading-center" *ngIf="loading">
+    <mat-spinner diameter="40"></mat-spinner>
+  </div>
+
+  <!-- SECCIÓN 2: Mapa de calor / barras -->
+  <mat-card class="section-card" *ngIf="!loading && resumen.length > 0">
+    <div class="section-title">
+      <mat-icon>bar_chart</mat-icon>
+      Actividad por región
+    </div>
+    <div class="heatmap-list">
+      <div class="heatmap-row" *ngFor="let r of resumen">
+        <span class="heatmap-label">{{ r.regionNombre }}</span>
+        <div class="heatmap-bar-bg">
+          <div class="heatmap-bar"
+               [style.width.%]="getPorcentajeBarra(r.totalSesiones)"
+               [style.background]="getColorConversion(r.tasaConversion)">
+          </div>
+        </div>
+        <span class="heatmap-val">{{ r.totalSesiones | number }} ses.</span>
+        <span class="tasa-badge" [style.color]="getColorConversion(r.tasaConversion)">
+          {{ r.tasaConversion }}%
+        </span>
+      </div>
+    </div>
+  </mat-card>
+
+  <!-- SECCIÓN 3: Cards por región -->
+  <h3 class="sub-title" *ngIf="!loading && resumen.length > 0">
+    <mat-icon>location_on</mat-icon> Detalle por región
+    <small>(click para ver top productos)</small>
+  </h3>
+  <div class="cards-grid" *ngIf="!loading && resumen.length > 0">
+    <mat-card class="region-card" *ngFor="let r of resumen" (click)="abrirDialog(r)" matRipple>
+      <div class="region-card-header">
+        <mat-icon class="region-icon">location_on</mat-icon>
+        <span class="region-name">{{ r.regionNombre }}</span>
+      </div>
+      <div class="metrics-row">
+        <div class="metric">
+          <span class="metric-value">{{ r.totalSesiones | number }}</span>
+          <span class="metric-label">Sesiones</span>
+        </div>
+        <div class="metric">
+          <span class="metric-value">{{ r.totalUsuarios | number }}</span>
+          <span class="metric-label">Usuarios</span>
+        </div>
+      </div>
+      <div class="metrics-row">
+        <div class="metric">
+          <span class="metric-value"
+                [style.color]="getColorConversion(r.tasaConversion)">
+            {{ r.tasaConversion }}%
+          </span>
+          <span class="metric-label">Conv.</span>
+        </div>
+        <div class="metric">
+          <span class="metric-value revenue">${{ r.revenueTotal | number:'1.0-0' }}</span>
+          <span class="metric-label">Revenue</span>
+        </div>
+      </div>
+      <div class="precio-row">
+        <mat-icon>attach_money</mat-icon>
+        Precio prom.: ${{ r.precioPromedio | number:'1.2-2' }}
+      </div>
+      <div class="click-hint">
+        <mat-icon>touch_app</mat-icon> Ver top productos
+      </div>
+    </mat-card>
+  </div>
+
+  <!-- SECCIÓN 4: Tabla comparativa -->
+  <mat-card class="section-card tabla-card" *ngIf="!loading && resumen.length > 0">
+    <div class="section-title"><mat-icon>table_chart</mat-icon> Tabla comparativa</div>
+    <div class="table-scroll">
+      <table mat-table [dataSource]="resumen" class="analytics-table">
+
+        <ng-container matColumnDef="regionNombre">
+          <th mat-header-cell *matHeaderCellDef>Región</th>
+          <td mat-cell *matCellDef="let r">
+            <mat-icon class="inline-icon">location_on</mat-icon> {{ r.regionNombre }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="totalSesiones">
+          <th mat-header-cell *matHeaderCellDef>Sesiones</th>
+          <td mat-cell *matCellDef="let r"
+              [class.cell-max]="isMax(r,'totalSesiones')"
+              [class.cell-min]="isMin(r,'totalSesiones')">
+            {{ r.totalSesiones | number }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="totalUsuarios">
+          <th mat-header-cell *matHeaderCellDef>Usuarios</th>
+          <td mat-cell *matCellDef="let r"
+              [class.cell-max]="isMax(r,'totalUsuarios')">
+            {{ r.totalUsuarios | number }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="totalConversiones">
+          <th mat-header-cell *matHeaderCellDef>Conversiones</th>
+          <td mat-cell *matCellDef="let r"
+              [class.cell-max]="isMax(r,'totalConversiones')">
+            {{ r.totalConversiones | number }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="tasaConversion">
+          <th mat-header-cell *matHeaderCellDef>Tasa Conv.</th>
+          <td mat-cell *matCellDef="let r"
+              [style.color]="getColorConversion(r.tasaConversion)"
+              [class.cell-max]="isMax(r,'tasaConversion')">
+            {{ r.tasaConversion }}%
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="revenueTotal">
+          <th mat-header-cell *matHeaderCellDef>Revenue</th>
+          <td mat-cell *matCellDef="let r"
+              [class.cell-max]="isMax(r,'revenueTotal')">
+            ${{ r.revenueTotal | number:'1.0-0' }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="precioPromedio">
+          <th mat-header-cell *matHeaderCellDef>Precio Prom.</th>
+          <td mat-cell *matCellDef="let r">${{ r.precioPromedio | number:'1.2-2' }}</td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+      </table>
+    </div>
+  </mat-card>
+
+  <!-- Empty -->
+  <div class="empty-state" *ngIf="!loading && resumen.length === 0">
+    <mat-icon>public_off</mat-icon>
+    <p>No hay datos de región disponibles.</p>
+  </div>
+
+</div>

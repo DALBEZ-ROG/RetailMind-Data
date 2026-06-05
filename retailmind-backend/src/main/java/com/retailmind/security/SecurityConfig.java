@@ -65,8 +65,15 @@ public class SecurityConfig {
                 .requestMatchers("/api/pedidos/admin/**").hasAuthority("ADMIN")
                 // Funnel solo ADMIN
                 .requestMatchers("/api/funnel/**").hasAuthority("ADMIN")
+                // Analytics avanzado solo ADMIN
+                .requestMatchers("/api/analytics/region/**").hasAuthority("ADMIN")
+                .requestMatchers("/api/analytics/dispositivo/**").hasAuthority("ADMIN")
+                .requestMatchers("/api/analytics/trafico/**").hasAuthority("ADMIN")
                 // Dashboard refrescar vistas solo ADMIN
                 .requestMatchers(HttpMethod.POST, "/api/dashboard/refrescar-vistas").hasAuthority("ADMIN")
+                // Perfil y recomendaciones — usuario autenticado (cualquier rol)
+                .requestMatchers("/api/perfil/**").authenticated()
+                .requestMatchers("/api/recomendaciones/**").authenticated()
                 // Todo lo demas requiere autenticacion
                 .anyRequest().authenticated()
             )

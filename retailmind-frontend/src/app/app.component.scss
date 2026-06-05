@@ -103,3 +103,38 @@
     padding: 0 !important;
   }
 }
+
+// ── Recomendaciones hot link ─────────────────────────────────────────────────
+.rec-hot-link {
+  background: linear-gradient(90deg, #fff5f5 0%, #ffe0e0 100%) !important;
+  border-left: 3px solid #e53935 !important;
+  border-radius: 0 8px 8px 0 !important;
+  margin: 2px 8px 2px 0 !important;
+
+  &:hover {
+    background: linear-gradient(90deg, #ffebee 0%, #ffcdd2 100%) !important;
+  }
+
+  &.active-link {
+    background: linear-gradient(90deg, #ffcdd2 0%, #ef9a9a 100%) !important;
+    border-left: 4px solid #c62828 !important;
+    color: #b71c1c !important;
+
+    .rec-hot-icon, span { color: #b71c1c !important; }
+  }
+}
+
+.rec-hot-icon {
+  color: #e53935 !important;
+  animation: flame-pulse 1.6s ease-in-out infinite alternate;
+}
+
+.rec-hot-text {
+  color: #c62828 !important;
+  font-weight: 600 !important;
+}
+
+@keyframes flame-pulse {
+  from { transform: scale(1);    opacity: 0.85; }
+  to   { transform: scale(1.15); opacity: 1; }
+}

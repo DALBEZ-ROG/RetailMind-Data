@@ -1,0 +1,31 @@
+<h2 mat-dialog-title>
+  <mat-icon>location_on</mat-icon>
+  Top productos — {{ data.region.regionNombre }}
+</h2>
+
+<mat-dialog-content>
+  <p class="region-stats">
+    {{ data.region.totalSesiones | number }} sesiones &nbsp;|&nbsp;
+    {{ data.region.tasaConversion }}% conversión &nbsp;|&nbsp;
+    ${{ data.region.revenueTotal | number:'1.0-0' }} revenue
+  </p>
+
+  <div *ngIf="data.productos.length === 0" class="empty">
+    Sin datos de compras en esta región
+  </div>
+
+  <ol class="producto-list">
+    <li *ngFor="let p of data.productos; let i = index" class="producto-item">
+      <span class="rank">{{ i + 1 }}</span>
+      <div class="prod-info">
+        <span class="prod-name">{{ p.nombre }}</span>
+        <span class="prod-brand">{{ p.brand }}</span>
+      </div>
+      <span class="compras">{{ p.compras | number }} compras</span>
+    </li>
+  </ol>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="close()">Cerrar</button>
+</mat-dialog-actions>

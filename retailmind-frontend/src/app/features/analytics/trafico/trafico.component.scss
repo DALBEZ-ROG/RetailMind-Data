@@ -1,0 +1,103 @@
+$primary: #1a237e;
+
+.page-container { padding: 24px; max-width: 1300px; margin: 0 auto; }
+.page-header {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;
+  h2 { display: flex; align-items: center; gap: 8px; color: $primary; margin: 0; }
+}
+.query-ms {
+  font-size: 12px; color: #888; background: #f5f5f5; padding: 3px 10px; border-radius: 12px;
+}
+
+.filters-card { margin-bottom: 20px; padding: 16px; }
+.filters-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.filter-field { width: 160px; }
+
+.loading-center { display: flex; justify-content: center; padding: 48px; }
+
+.section-card { margin-bottom: 24px; padding: 20px; }
+.section-title {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 15px; font-weight: 600; color: $primary;
+}
+.section-title-row {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;
+}
+
+// ── Cards canales ─────────────────────────────────────────────────────────────
+.canal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px; margin-bottom: 28px;
+}
+.canal-card { padding: 18px; }
+.canal-header {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+  .canal-icon { font-size: 28px; width: 28px; height: 28px; }
+  .canal-name { font-size: 17px; font-weight: 700; color: $primary; }
+}
+.pct-row {
+  margin-bottom: 12px;
+  .pct-bar-bg {
+    height: 8px; background: #f0f0f0; border-radius: 4px; overflow: hidden; margin-bottom: 4px;
+    .pct-bar { height: 100%; border-radius: 4px; transition: width 0.4s ease; min-width: 2px; }
+  }
+  .pct-label { font-size: 11px; color: #888; }
+}
+.canal-metrics {
+  display: flex; gap: 8px; justify-content: space-between; margin-bottom: 10px;
+  .cm { flex: 1; text-align: center;
+    .cm-val { display: block; font-size: 16px; font-weight: 700; color: $primary; }
+    .cm-label { font-size: 10px; color: #888; text-transform: uppercase; }
+    .revenue { color: #2e7d32 !important; }
+  }
+}
+.tiempo-row {
+  display: flex; align-items: center; gap: 4px; font-size: 12px; color: #666;
+  mat-icon { font-size: 14px; width: 14px; height: 14px; }
+}
+
+// ── Sub-title ─────────────────────────────────────────────────────────────────
+.sub-title {
+  display: flex; align-items: center; gap: 8px;
+  color: $primary; font-size: 15px; margin: 0 0 14px;
+}
+
+// ── Funnel por canal ──────────────────────────────────────────────────────────
+.funnel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px; margin-bottom: 28px;
+}
+.funnel-card { padding: 16px; }
+.funnel-title {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 14px;
+  font-size: 15px; font-weight: 700; color: $primary;
+  mat-icon { font-size: 20px; }
+}
+.funnel-stages { display: flex; flex-direction: column; gap: 8px; }
+.stage {
+  display: flex; align-items: center; gap: 8px;
+  .stage-label { width: 64px; font-size: 12px; color: #555; flex-shrink: 0; }
+  .stage-bar-bg {
+    flex: 1; height: 14px; background: #f0f0f0; border-radius: 7px; overflow: hidden;
+    .stage-bar { height: 100%; border-radius: 7px; transition: width 0.4s ease; min-width: 2px; }
+  }
+  .stage-val { width: 60px; text-align: right; font-size: 12px; font-weight: 600; color: #444; flex-shrink: 0; }
+}
+
+// ── Tabla ─────────────────────────────────────────────────────────────────────
+.table-scroll { overflow-x: auto; }
+.analytics-table {
+  width: 100%; min-width: 700px;
+  th { background: #e8eaf6 !important; color: $primary !important; font-weight: 700; }
+  td, th { padding: 10px 16px !important; }
+  tr:hover td { background: #f5f5f5; }
+}
+.cell-max { background: #e8f5e9 !important; font-weight: 700; color: #2e7d32 !important; }
+
+// ── Empty ─────────────────────────────────────────────────────────────────────
+.empty-state {
+  text-align: center; padding: 48px; color: #bdbdbd;
+  mat-icon { font-size: 56px; width: 56px; height: 56px; display: block; margin: 0 auto 12px; }
+}

@@ -98,6 +98,36 @@ export const routes: Routes = [
       import('./features/admin/inicializacion/inicializacion.component').then(m => m.InicializacionComponent)
   },
   {
+    path: 'analytics/region',
+    canActivate: [authGuard, adminGuard],
+    loadComponent: () =>
+      import('./features/analytics/region/region.component').then(m => m.RegionComponent)
+  },
+  {
+    path: 'analytics/dispositivo',
+    canActivate: [authGuard, adminGuard],
+    loadComponent: () =>
+      import('./features/analytics/dispositivo/dispositivo.component').then(m => m.DispositivoComponent)
+  },
+  {
+    path: 'analytics/trafico',
+    canActivate: [authGuard, adminGuard],
+    loadComponent: () =>
+      import('./features/analytics/trafico/trafico.component').then(m => m.TraficoComponent)
+  },
+  {
+    path: 'perfil',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/perfil/perfil.component').then(m => m.PerfilComponent)
+  },
+  {
+    path: 'recomendaciones',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/recomendaciones/recomendaciones.component').then(m => m.RecomendacionesComponent)
+  },
+  {
     path: '**',
     redirectTo: 'shop'
   }

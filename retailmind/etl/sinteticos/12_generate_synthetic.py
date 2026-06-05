@@ -1,7 +1,11 @@
 """
-etl/12_generate_synthetic.py
+etl/sinteticos/12_generate_synthetic.py
 Genera 108,584 registros sintéticos para una semana específica
 e inserta directamente en ClickHouse retailmind.fact_eventos.
+
+CORRECCIÓN: usa user_ids existentes de dim_usuario para que los JOINs
+con dim_usuario → dim_region y dim_usuario → dim_dispositivo funcionen
+correctamente en los análisis por región y dispositivo.
 """
 import os
 import sys
@@ -24,8 +28,20 @@ CHANNEL_WEIGHTS = [0.60, 0.25, 0.15]
 ACTIONS = ['click', 'view', 'add_to_cart', 'wishlist', 'drop', 'purchase']
 ACTION_WEIGHTS = [0.35, 0.30, 0.12, 0.07, 0.12, 0.04]
 
-NUM_USUARIOS = np.random.randint(6000, 7001)
 NUM_SESIONES = np.random.randint(15000, 20001)
+
+
+def cargar_user_ids_existentes(client):
+    """Carga todos los user_ids existentes en dim_usuario."""
+    print("\n🔍 Cargando user_ids existentes de dim_usuario...")
+    result = client.query(f"SELECT user_id FROM {DB}.dim_usuario")
+    user_ids = np.array([row[0] for row in result.result_rows], dtype=object)
+    if len(user_ids) == 0:
+        raise RuntimeError(
+            "dim_usuario está vacía. Ejecuta la carga completa desde Pocketbase primero."
+        )
+    print(f"   ✅ {len(user_ids):,} usuarios reales encontrados")
+    return user_ids
 
 
 def verificar_semana_existe(client, semana):
@@ -34,65 +50,77 @@ def verificar_semana_existe(client, semana):
         f"SELECT count() FROM {DB}.fact_eventos WHERE semana = {{s:UInt8}}",
         parameters={"s": semana}
     )
-    count = result.result_rows[0][0]
-    return count > 0
+    return result.result_rows[0][0] > 0
 
 
-def generar_datos(semana, n=TOTAL_REGISTROS):
-    """Genera n registros sintéticos usando numpy vectorizado."""
+def generar_datos(semana, user_ids_reales, n=TOTAL_REGISTROS):
+    """
+    Genera n registros sintéticos usando numpy vectorizado.
+    Usa user_ids reales de dim_usuario para garantizar JOINs correctos.
+    """
     rng = np.random.default_rng()
 
-    # Generar IDs
-    user_ids = [f"user_{i:05d}" for i in rng.integers(1, NUM_USUARIOS + 1, size=n)]
-    session_ids = [f"sess_{semana:02d}_{i:06d}" for i in rng.integers(1, NUM_SESIONES + 1, size=n)]
-    product_ids = [f"prod_{i:04d}" for i in rng.integers(1, 501, size=n)]
+    # ── User IDs: muestrear de los existentes en dim_usuario ─────────────────
+    user_ids = rng.choice(user_ids_reales, size=n, replace=True)
 
-    # Canales
+    # ── Session IDs: formato original pero basados en índices de sesión ──────
+    num_sesiones = min(NUM_SESIONES, n)
+    session_indices = rng.integers(1, num_sesiones + 1, size=n)
+    session_ids = np.array(
+        [f"sess_{semana:02d}_{idx:06d}" for idx in session_indices]
+    )
+
+    # ── Product IDs ───────────────────────────────────────────────────────────
+    product_ids = np.array(
+        [f"prod_{i:04d}" for i in rng.integers(1, 501, size=n)]
+    )
+
+    # ── Canales ───────────────────────────────────────────────────────────────
     channels = rng.choice(CHANNELS, size=n, p=CHANNEL_WEIGHTS)
 
-    # Acciones
+    # ── Acciones ──────────────────────────────────────────────────────────────
     user_actions = rng.choice(ACTIONS, size=n, p=ACTION_WEIGHTS)
 
-    # is_conversion: 1 solo cuando action = purchase
+    # ── Flags de conversión y abandono ────────────────────────────────────────
     is_conversion = np.where(user_actions == 'purchase', 1, 0).astype(np.uint8)
-
-    # drop_off_flag: 1 solo cuando action = drop
     drop_off_flag = np.where(user_actions == 'drop', 1, 0).astype(np.uint8)
 
-    # Métricas numéricas
-    prices = np.round(rng.uniform(5.99, 999.99, size=n), 2).astype(np.float32)
-    time_spent = np.round(rng.uniform(10, 3600, size=n), 1).astype(np.float32)
-    session_length = np.round(rng.uniform(1, 20, size=n), 1).astype(np.float32)
+    # ── Métricas numéricas ────────────────────────────────────────────────────
+    prices            = np.round(rng.uniform(5.99, 999.99, size=n), 2).astype(np.float32)
+    time_spent        = np.round(rng.uniform(10, 3600, size=n), 1).astype(np.float32)
+    session_length    = np.round(rng.uniform(1, 20, size=n), 1).astype(np.float32)
     interaction_count = rng.integers(1, 51, size=n).astype(np.uint32)
-    event_index = rng.integers(1, 30, size=n).astype(np.uint32)
+    event_index       = rng.integers(1, 30, size=n).astype(np.uint32)
 
-    # Timestamps
+    # ── Timestamps ────────────────────────────────────────────────────────────
     base_ts = pd.Timestamp("2026-01-01") + pd.Timedelta(weeks=semana - 1)
     offsets = pd.to_timedelta(rng.integers(0, 7 * 24 * 3600, size=n), unit='s')
     timestamps = (base_ts + offsets).strftime("%Y-%m-%d %H:%M:%S")
 
     df = pd.DataFrame({
-        "session_id": session_ids,
-        "user_id": user_ids,
-        "timestamp_utc": timestamps,
-        "event_index": event_index,
-        "user_action": user_actions,
-        "product_id": product_ids,
-        "time_spent_sec": time_spent,
-        "session_length": session_length,
+        "session_id":        session_ids,
+        "user_id":           user_ids,
+        "timestamp_utc":     timestamps,
+        "event_index":       event_index,
+        "user_action":       user_actions,
+        "product_id":        product_ids,
+        "time_spent_sec":    time_spent,
+        "session_length":    session_length,
         "interaction_count": interaction_count,
-        "is_conversion": is_conversion,
-        "drop_off_flag": drop_off_flag,
-        "price": prices,
-        "channel": channels,
-        "semana": np.full(n, semana, dtype=np.uint8),
+        "is_conversion":     is_conversion,
+        "drop_off_flag":     drop_off_flag,
+        "price":             prices,
+        "channel":           channels,
+        "semana":            np.full(n, semana, dtype=np.uint8),
     })
 
     return df
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Genera datos sintéticos para una semana")
+    parser = argparse.ArgumentParser(
+        description="Genera datos sintéticos para una semana usando usuarios reales"
+    )
     parser.add_argument("--semana", type=int, required=True, help="Número de semana (2-52)")
     args = parser.parse_args()
 
@@ -103,16 +131,17 @@ def main():
 
     print("=" * 60)
     print(f"  GENERACIÓN DE DATOS SINTÉTICOS - SEMANA {semana}")
+    print(f"  (usando user_ids reales de dim_usuario)")
     print("=" * 60)
     inicio = time.time()
 
-    # Conectar a ClickHouse
+    # ── Conectar a ClickHouse ─────────────────────────────────────────────────
     print("\n🔌 Conectando a ClickHouse...")
     client = get_clickhouse_client()
     version = client.query("SELECT version()").result_rows[0][0]
     print(f"   Conectado (versión {version})")
 
-    # Verificar que la semana no exista
+    # ── Verificar semana ──────────────────────────────────────────────────────
     print(f"\n🔍 Verificando semana {semana}...")
     if verificar_semana_existe(client, semana):
         print(f"❌ Error: La semana {semana} ya tiene datos en fact_eventos.")
@@ -121,18 +150,24 @@ def main():
         sys.exit(1)
     print(f"   ✅ Semana {semana} disponible")
 
-    # Generar datos
-    print(f"\n🎲 Generando {TOTAL_REGISTROS:,} registros sintéticos...")
-    df = generar_datos(semana)
-    print(f"   ✅ Datos generados")
-    print(f"   Canales: {df['channel'].value_counts().to_dict()}")
-    print(f"   Conversiones: {df['is_conversion'].sum():,}")
-    print(f"   Abandonos: {df['drop_off_flag'].sum():,}")
-    print(f"   Usuarios únicos: {df['user_id'].nunique():,}")
-    print(f"   Sesiones únicas: {df['session_id'].nunique():,}")
+    # ── Cargar user_ids reales ────────────────────────────────────────────────
+    user_ids_reales = cargar_user_ids_existentes(client)
 
-    # Insertar en lotes
-    print(f"\n📦 Insertando en retailmind.fact_eventos (lotes de {BATCH_SIZE:,})...")
+    # ── Generar datos ─────────────────────────────────────────────────────────
+    print(f"\n🎲 Generando {TOTAL_REGISTROS:,} registros sintéticos...")
+    df = generar_datos(semana, user_ids_reales)
+
+    usuarios_usados = df['user_id'].nunique()
+    print(f"   ✅ Datos generados")
+    print(f"   Canales:          {df['channel'].value_counts().to_dict()}")
+    print(f"   Conversiones:     {df['is_conversion'].sum():,}")
+    print(f"   Abandonos:        {df['drop_off_flag'].sum():,}")
+    print(f"   Usuarios únicos:  {usuarios_usados:,} "
+          f"(de {len(user_ids_reales):,} reales disponibles)")
+    print(f"   Sesiones únicas:  {df['session_id'].nunique():,}")
+
+    # ── Insertar en lotes ─────────────────────────────────────────────────────
+    print(f"\n📦 Insertando en {DB}.fact_eventos (lotes de {BATCH_SIZE:,})...")
     total_insertados = 0
     columns = [
         "session_id", "user_id", "timestamp_utc", "event_index",
@@ -148,14 +183,15 @@ def main():
         total_insertados += len(rows)
         print(f"   Lote {i // BATCH_SIZE + 1}: {total_insertados:,}/{TOTAL_REGISTROS:,}")
 
-    # Resumen
+    # ── Resumen ───────────────────────────────────────────────────────────────
     elapsed = time.time() - inicio
     print(f"\n{'=' * 60}")
     print(f"  GENERACIÓN COMPLETADA")
     print(f"{'=' * 60}")
-    print(f"  📅 Semana: {semana}")
+    print(f"  📅 Semana:               {semana}")
     print(f"  📦 Registros insertados: {total_insertados:,}")
-    print(f"  ⏱️  Tiempo total: {elapsed:.1f} segundos")
+    print(f"  👤 Usuarios únicos:      {usuarios_usados:,} (todos en dim_usuario)")
+    print(f"  ⏱️  Tiempo total:         {elapsed:.1f} segundos")
     print(f"{'=' * 60}")
 
     client.close()

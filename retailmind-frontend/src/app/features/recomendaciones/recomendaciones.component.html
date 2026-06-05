@@ -1,0 +1,99 @@
+<div class="rec-container">
+
+  <!-- ── HEADER ──────────────────────────────────────────────────────────── -->
+  <div class="rec-header" [class.rec-header-popular]="!esPersonalizado">
+    <div class="rec-header-text">
+      <h2 class="rec-title">
+        <mat-icon>{{ iconoHeader }}</mat-icon>
+        {{ tituloHeader }}
+      </h2>
+      <p class="rec-subtitle">{{ subtituloHeader }}</p>
+      <div class="header-meta">
+        <!-- Chip de categoría favorita solo si es personalizado -->
+        <mat-chip *ngIf="esPersonalizado && categoriaFavorita" class="chip-categoria">
+          <mat-icon>category</mat-icon>
+          {{ categoriaFavorita }}
+        </mat-chip>
+        <!-- Badge de populares cuando es fallback -->
+        <mat-chip *ngIf="!esPersonalizado" class="chip-popular">
+          <mat-icon>local_fire_department</mat-icon>
+          Top ventas
+        </mat-chip>
+        <span class="query-ms">⚡ {{ queryMs }} ms</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── LOADING ──────────────────────────────────────────────────────────── -->
+  <div class="loading-center" *ngIf="loading">
+    <mat-spinner diameter="48"></mat-spinner>
+    <p>{{ esPersonalizado ? 'Analizando tu historial...' : 'Cargando productos populares...' }}</p>
+  </div>
+
+  <!-- ── AVISO pocos datos (solo cuando esPersonalizado pasa a ser false y hay productos) ── -->
+  <div class="fallback-notice" *ngIf="!loading && !esPersonalizado && recomendaciones.length > 0">
+    <mat-icon>info_outline</mat-icon>
+    <span>{{ mensajeFallback }}</span>
+  </div>
+
+  <!-- ── GRID DE PRODUCTOS ─────────────────────────────────────────────────── -->
+  <ng-container *ngIf="!loading && recomendaciones.length > 0">
+
+    <div class="rec-grid">
+      <mat-card class="rec-card"
+                [class.rec-card-popular]="!esPersonalizado"
+                *ngFor="let p of recomendaciones"
+                (click)="verProducto(p.productoId)">
+
+        <!-- Badge dinámico -->
+        <div class="rec-badge" [class.badge-popular]="!esPersonalizado">
+          {{ esPersonalizado ? 'RECOMENDADO' : '🔥 POPULAR' }}
+        </div>
+
+        <!-- Badge de ventas solo en modo popular -->
+        <div class="ventas-badge" *ngIf="!esPersonalizado && p.totalCompras > 0">
+          {{ p.totalCompras | number }} compras
+        </div>
+
+        <div class="rec-image">
+          <mat-icon class="rec-icon">{{ getCategoryIcon(p.categoriaId) }}</mat-icon>
+        </div>
+
+        <mat-card-content class="rec-content">
+          <p class="rec-brand">{{ p.brand }}</p>
+          <h4 class="rec-name">{{ p.nombre }}</h4>
+          <p class="rec-categoria">{{ p.categoriaNombre }}</p>
+          <p class="rec-price">${{ p.price | number:'1.2-2' }}</p>
+        </mat-card-content>
+
+        <mat-card-actions class="rec-actions">
+          <button mat-raised-button color="primary" class="btn-carrito"
+                  (click)="agregarAlCarrito(p, $event)">
+            <mat-icon>add_shopping_cart</mat-icon>
+            Agregar
+          </button>
+          <button mat-icon-button class="btn-wishlist"
+                  (click)="toggleWishlist(p, $event)"
+                  [matTooltip]="isInWishlist(p.productoId) ? 'Quitar de wishlist' : 'Agregar a wishlist'">
+            <mat-icon [class.wishlist-active]="isInWishlist(p.productoId)">
+              {{ isInWishlist(p.productoId) ? 'favorite' : 'favorite_border' }}
+            </mat-icon>
+          </button>
+        </mat-card-actions>
+
+      </mat-card>
+    </div>
+
+  </ng-container>
+
+  <!-- ── VACÍO ─────────────────────────────────────────────────────────────── -->
+  <div class="empty-state" *ngIf="!loading && recomendaciones.length === 0">
+    <mat-icon class="empty-icon">inventory_2</mat-icon>
+    <h3>No se encontraron productos disponibles</h3>
+    <button mat-raised-button color="primary" (click)="irATienda()">
+      <mat-icon>storefront</mat-icon>
+      Explorar tienda
+    </button>
+  </div>
+
+</div>

@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -8,7 +8,9 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { HttpClient } from '@angular/common/http';
+import { Subscription } from 'rxjs';
 import { ShopService } from './shop.service';
 import { AuthService } from '../../core/services/auth.service';
 import { environment } from '../../../environments/environment';
@@ -23,17 +25,24 @@ const CATEGORY_ICONS: Record<number, string> = {
   standalone: true,
   imports: [
     CommonModule, FormsModule, MatCardModule, MatButtonModule,
-    MatIconModule, MatFormFieldModule, MatInputModule, MatSnackBarModule
+    MatIconModule, MatFormFieldModule, MatInputModule,
+    MatSnackBarModule, MatProgressSpinnerModule
   ],
   templateUrl: './producto-detalle.component.html',
   styleUrl: './producto-detalle.component.scss'
 })
-export class ProductoDetalleComponent implements OnInit {
+export class ProductoDetalleComponent implements OnInit, OnDestroy {
 
   producto: any = null;
   cantidad = 1;
   loading = true;
   enWishlist = false;
+
+  similares: any[] = [];
+  loadingSimilares = false;
+  similaresMsLabel = '';
+
+  private routeSub?: Subscription;
 
   constructor(
     private route: ActivatedRoute,
@@ -45,13 +54,74 @@ export class ProductoDetalleComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    const id = this.route.snapshot.paramMap.get('id');
-    if (id) {
-      this.shopService.getProductoById(id).subscribe({
-        next: (p) => { this.producto = p; this.loading = false; this.registrarView(id); this.checkWishlist(id); },
-        error: () => { this.loading = false; }
-      });
-    }
+    // Subscribe to paramMap so navigating similar→similar reloads everything
+    this.routeSub = this.route.paramMap.subscribe(params => {
+      const id = params.get('id');
+      if (id) {
+        this.resetState();
+        this.cargarProducto(id);
+      }
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.routeSub?.unsubscribe();
+  }
+
+  private resetState(): void {
+    this.producto = null;
+    this.loading = true;
+    this.enWishlist = false;
+    this.similares = [];
+    this.loadingSimilares = false;
+    this.similaresMsLabel = '';
+    this.cantidad = 1;
+  }
+
+  private cargarProducto(id: string): void {
+    this.shopService.getProductoById(id).subscribe({
+      next: (p) => {
+        this.producto = p;
+        this.loading = false;
+        this.registrarView(id);
+        this.checkWishlist(id);
+        this.cargarSimilares(id);
+      },
+      error: () => { this.loading = false; }
+    });
+  }
+
+  private cargarSimilares(productoId: string): void {
+    const user = this.authService.getCurrentUser();
+    if (!user) return;
+    this.loadingSimilares = true;
+    const t0 = Date.now();
+    this.http.get<any[]>(
+      `${environment.apiUrl}/api/recomendaciones/${user.username}/similares/${productoId}`
+    ).subscribe({
+      next: (items) => {
+        this.similares = items;
+        this.similaresMsLabel = `⚡ ${Date.now() - t0} ms`;
+        this.loadingSimilares = false;
+      },
+      error: () => { this.loadingSimilares = false; }
+    });
+  }
+
+  agregarSimilarAlCarrito(productoId: string, event: Event): void {
+    event.stopPropagation();
+    const user = this.authService.getCurrentUser();
+    if (!user) return;
+    this.http.post(`${environment.apiUrl}/api/carrito/agregar`, {
+      user_id: user.username, producto_id: productoId, cantidad: 1
+    }).subscribe({
+      next: () => this.snackBar.open('Agregado al carrito ✓', 'OK', { duration: 2000, panelClass: ['snack-success'] }),
+      error: () => this.snackBar.open('Error al agregar', 'Cerrar', { duration: 2000 })
+    });
+  }
+
+  verSimilar(productoId: string): void {
+    this.router.navigate(['/shop/producto', productoId]);
   }
 
   private registrarView(productId: string): void {

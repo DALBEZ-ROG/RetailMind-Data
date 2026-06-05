@@ -1,0 +1,155 @@
+<div class="page-container">
+
+  <!-- Header -->
+  <div class="page-header">
+    <h2><mat-icon>devices</mat-icon> Análisis por Dispositivo</h2>
+    <span class="query-ms" *ngIf="queryMs > 0">⚡ {{ queryMs }} ms</span>
+  </div>
+
+  <!-- SECCIÓN 1: Filtros -->
+  <mat-card class="filters-card">
+    <div class="filters-row">
+      <mat-form-field appearance="outline" class="filter-field">
+        <mat-label>Semana</mat-label>
+        <mat-select [(ngModel)]="semanaFiltro">
+          <mat-option [value]="null">Todas</mat-option>
+          <mat-option *ngFor="let s of semanas" [value]="s">Semana {{ s }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="filter-field">
+        <mat-label>Canal</mat-label>
+        <mat-select [(ngModel)]="canalFiltro">
+          <mat-option value="">Todos</mat-option>
+          <mat-option *ngFor="let c of canales" [value]="c">{{ c }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <button mat-raised-button color="primary" (click)="cargar()">
+        <mat-icon>search</mat-icon> Aplicar
+      </button>
+      <button mat-stroked-button (click)="limpiarFiltros()">
+        <mat-icon>clear</mat-icon> Limpiar
+      </button>
+    </div>
+  </mat-card>
+
+  <div class="loading-center" *ngIf="loading"><mat-spinner diameter="40"></mat-spinner></div>
+
+  <!-- SECCIÓN 2: Cards de dispositivos -->
+  <div class="disp-grid" *ngIf="!loading && resumen.length > 0">
+    <mat-card class="disp-card" *ngFor="let d of resumen">
+      <div class="disp-header">
+        <mat-icon class="disp-icon">{{ getDispositivoIcon(d.dispositivoNombre) }}</mat-icon>
+        <span class="disp-name">{{ d.dispositivoNombre }}</span>
+      </div>
+
+      <!-- Porcentaje circular CSS -->
+      <div class="circular-wrap">
+        <svg class="circular-svg" viewBox="0 0 36 36">
+          <path class="circ-bg"
+            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+          <path class="circ-fill"
+            [attr.stroke-dasharray]="getPorcentaje(d.totalSesiones) + ', 100'"
+            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+          <text x="18" y="20.35" class="circ-text">{{ getPorcentaje(d.totalSesiones) }}%</text>
+        </svg>
+        <span class="circ-label">del total</span>
+      </div>
+
+      <div class="disp-metrics">
+        <div class="dm">
+          <span class="dm-val" [style.color]="getColorConversion(d.tasaConversion)">
+            {{ d.tasaConversion }}%
+          </span>
+          <span class="dm-label">Conversión</span>
+        </div>
+        <div class="dm">
+          <span class="dm-val">{{ d.tiempoPromedioSesion | number:'1.0-0' }}s</span>
+          <span class="dm-label">T. sesión</span>
+        </div>
+        <div class="dm">
+          <span class="dm-val">{{ d.interaccionesPromedio | number:'1.1-1' }}</span>
+          <span class="dm-label">Interacciones</span>
+        </div>
+      </div>
+
+      <div class="sesiones-row">
+        <mat-icon>equalizer</mat-icon>
+        {{ d.totalSesiones | number }} sesiones · {{ d.totalUsuarios | number }} usuarios
+      </div>
+    </mat-card>
+  </div>
+
+  <!-- SECCIÓN 3: Barras comparativas de conversión -->
+  <mat-card class="section-card" *ngIf="!loading && resumen.length > 0">
+    <div class="section-title">
+      <mat-icon>bar_chart</mat-icon> Tasa de conversión por dispositivo
+    </div>
+    <div class="bars-list">
+      <div class="bar-row" *ngFor="let d of resumen">
+        <span class="bar-label">{{ d.dispositivoNombre }}</span>
+        <div class="bar-bg">
+          <div class="bar-fill"
+               [style.width.%]="(d.tasaConversion / getMaxConversion()) * 100"
+               [style.background]="getColorConversion(d.tasaConversion)">
+          </div>
+        </div>
+        <span class="bar-val" [style.color]="getColorConversion(d.tasaConversion)">
+          {{ d.tasaConversion }}%
+        </span>
+      </div>
+    </div>
+  </mat-card>
+
+  <!-- SECCIÓN 4: Tendencia por semanas -->
+  <mat-card class="section-card" *ngIf="!loadingTendencia && tendencia.length > 0">
+    <div class="section-title-row">
+      <div class="section-title">
+        <mat-icon>timeline</mat-icon> Evolución por semanas
+      </div>
+      <span class="query-ms">⚡ {{ queryMsTendencia }} ms</span>
+    </div>
+    <div class="tendencia-filters">
+      <mat-form-field appearance="outline" class="filter-field-sm">
+        <mat-label>Desde sem.</mat-label>
+        <mat-select [(ngModel)]="semanaInicio">
+          <mat-option [value]="null">-</mat-option>
+          <mat-option *ngFor="let s of semanas" [value]="s">{{ s }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="filter-field-sm">
+        <mat-label>Hasta sem.</mat-label>
+        <mat-select [(ngModel)]="semanaFin">
+          <mat-option [value]="null">-</mat-option>
+          <mat-option *ngFor="let s of semanas" [value]="s">{{ s }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <button mat-stroked-button (click)="cargarTendencia()">
+        <mat-icon>refresh</mat-icon>
+      </button>
+    </div>
+    <div class="table-scroll">
+      <table class="tendencia-table">
+        <thead>
+          <tr>
+            <th>Semana</th>
+            <th *ngFor="let d of dispositivosUnicos">{{ d }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let s of semanasUnicas">
+            <td class="sem-col">Sem. {{ s }}</td>
+            <td *ngFor="let d of dispositivosUnicos">
+              {{ getSesionesPorSemanaDispositivo(s, d) | number }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </mat-card>
+
+  <div class="empty-state" *ngIf="!loading && resumen.length === 0">
+    <mat-icon>devices_off</mat-icon>
+    <p>No hay datos de dispositivos disponibles.</p>
+  </div>
+
+</div>

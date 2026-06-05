@@ -61,9 +61,18 @@
           <mat-icon matListItemIcon>favorite</mat-icon>
           <span matListItemTitle>Mi Wishlist</span>
         </a>
+        <a mat-list-item routerLink="/recomendaciones" routerLinkActive="active-link"
+           class="rec-hot-link">
+          <mat-icon matListItemIcon class="rec-hot-icon">local_fire_department</mat-icon>
+          <span matListItemTitle class="rec-hot-text">Recomendaciones</span>
+        </a>
         <a mat-list-item routerLink="/mis-pedidos" routerLinkActive="active-link">
           <mat-icon matListItemIcon>local_shipping</mat-icon>
           <span matListItemTitle>Mis Pedidos</span>
+        </a>
+        <a mat-list-item routerLink="/perfil" routerLinkActive="active-link">
+          <mat-icon matListItemIcon>person</mat-icon>
+          <span matListItemTitle>Mi Perfil</span>
         </a>
 
         <!-- Panel de configuración ADMIN -->
@@ -110,6 +119,18 @@
               <a mat-list-item routerLink="/funnel" routerLinkActive="active-link">
                 <mat-icon matListItemIcon>filter_alt</mat-icon>
                 <span matListItemTitle>Funnel</span>
+              </a>
+              <a mat-list-item routerLink="/analytics/region" routerLinkActive="active-link">
+                <mat-icon matListItemIcon>public</mat-icon>
+                <span matListItemTitle>Región</span>
+              </a>
+              <a mat-list-item routerLink="/analytics/dispositivo" routerLinkActive="active-link">
+                <mat-icon matListItemIcon>devices</mat-icon>
+                <span matListItemTitle>Dispositivos</span>
+              </a>
+              <a mat-list-item routerLink="/analytics/trafico" routerLinkActive="active-link">
+                <mat-icon matListItemIcon>wifi</mat-icon>
+                <span matListItemTitle>Fuente de Tráfico</span>
               </a>
               <a mat-list-item routerLink="/inicializacion" routerLinkActive="active-link">
                 <mat-icon matListItemIcon>rocket_launch</mat-icon>

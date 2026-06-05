@@ -1,0 +1,170 @@
+<div class="perfil-container">
+
+  <!-- Loading -->
+  <div class="loading-center" *ngIf="loading">
+    <mat-spinner diameter="48"></mat-spinner>
+  </div>
+
+  <ng-container *ngIf="!loading && perfil">
+
+    <!-- SECCIÓN 1: Tarjeta de perfil -->
+    <mat-card class="perfil-header-card">
+      <div class="avatar-section">
+        <div class="avatar-circle" [style.background]="getAvatarColor()">
+          {{ getInitial() }}
+        </div>
+        <div class="perfil-info">
+          <h2 class="perfil-username">{{ perfil.username }}</h2>
+          <p class="perfil-email">{{ perfil.email }}</p>
+          <div class="perfil-badges">
+            <mat-chip [class.chip-admin]="isAdmin()" [class.chip-cliente]="!isAdmin()">
+              <mat-icon>{{ isAdmin() ? 'admin_panel_settings' : 'person' }}</mat-icon>
+              {{ perfil.rol }}
+            </mat-chip>
+            <mat-chip [class.chip-activo]="perfil.activo" [class.chip-inactivo]="!perfil.activo">
+              <mat-icon>{{ perfil.activo ? 'check_circle' : 'cancel' }}</mat-icon>
+              {{ perfil.activo ? 'Activo' : 'Inactivo' }}
+            </mat-chip>
+          </div>
+          <p class="perfil-fecha">Miembro desde: {{ perfil.fechaCreacion | date:'mediumDate' }}</p>
+        </div>
+      </div>
+      <div class="query-badge">⚡ {{ queryMs }} ms</div>
+    </mat-card>
+
+    <!-- SECCIÓN 2: Estadísticas -->
+    <h3 class="section-title">
+      <mat-icon>bar_chart</mat-icon>
+      Tu actividad en RetailMind
+    </h3>
+    <div class="stats-grid">
+
+      <mat-card class="stat-card">
+        <mat-icon class="stat-icon icon-compras">shopping_bag</mat-icon>
+        <div class="stat-value">{{ perfil.totalCompras }}</div>
+        <div class="stat-label">Total Compras</div>
+      </mat-card>
+
+      <mat-card class="stat-card">
+        <mat-icon class="stat-icon icon-gastado">payments</mat-icon>
+        <div class="stat-value">${{ perfil.totalGastado | number:'1.2-2' }}</div>
+        <div class="stat-label">Total Gastado</div>
+      </mat-card>
+
+      <mat-card class="stat-card">
+        <mat-icon class="stat-icon icon-wishlist">favorite</mat-icon>
+        <div class="stat-value">{{ perfil.productosWishlist }}</div>
+        <div class="stat-label">En Wishlist</div>
+      </mat-card>
+
+      <mat-card class="stat-card">
+        <mat-icon class="stat-icon icon-eventos">analytics</mat-icon>
+        <div class="stat-value">{{ perfil.totalEventos }}</div>
+        <div class="stat-label">Total Eventos</div>
+      </mat-card>
+
+      <mat-card class="stat-card">
+        <mat-icon class="stat-icon icon-categoria">category</mat-icon>
+        <div class="stat-value stat-text">{{ perfil.categoriaFavorita }}</div>
+        <div class="stat-label">Categoría Favorita</div>
+      </mat-card>
+
+      <mat-card class="stat-card">
+        <mat-icon class="stat-icon icon-canal">devices</mat-icon>
+        <div class="stat-value stat-text">{{ perfil.canalPreferido }}</div>
+        <div class="stat-label">Canal Preferido</div>
+      </mat-card>
+
+    </div>
+
+    <!-- SECCIÓN 3: Editar perfil -->
+    <h3 class="section-title">
+      <mat-icon>edit</mat-icon>
+      Configuración de cuenta
+    </h3>
+
+    <mat-accordion class="edit-accordion">
+
+      <!-- Panel email -->
+      <mat-expansion-panel>
+        <mat-expansion-panel-header>
+          <mat-panel-title>
+            <mat-icon>email</mat-icon>
+            Editar información
+          </mat-panel-title>
+          <mat-panel-description>Actualizar email</mat-panel-description>
+        </mat-expansion-panel-header>
+
+        <form [formGroup]="emailForm" (ngSubmit)="guardarEmail()" class="edit-form">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Email</mat-label>
+            <input matInput formControlName="email" type="email" placeholder="correo@ejemplo.com">
+            <mat-icon matPrefix>email</mat-icon>
+            <mat-error *ngIf="emailForm.get('email')?.hasError('required')">El email es requerido</mat-error>
+            <mat-error *ngIf="emailForm.get('email')?.hasError('email')">Formato de email inválido</mat-error>
+          </mat-form-field>
+          <div class="form-actions">
+            <button mat-raised-button color="primary" type="submit"
+                    [disabled]="emailForm.invalid || savingEmail">
+              <mat-icon>save</mat-icon>
+              {{ savingEmail ? 'Guardando...' : 'Guardar email' }}
+            </button>
+          </div>
+        </form>
+      </mat-expansion-panel>
+
+      <!-- Panel password -->
+      <mat-expansion-panel>
+        <mat-expansion-panel-header>
+          <mat-panel-title>
+            <mat-icon>lock</mat-icon>
+            Cambiar contraseña
+          </mat-panel-title>
+          <mat-panel-description>Actualizar tu contraseña de acceso</mat-panel-description>
+        </mat-expansion-panel-header>
+
+        <form [formGroup]="passwordForm" (ngSubmit)="cambiarPassword()" class="edit-form">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Contraseña actual</mat-label>
+            <input matInput formControlName="passwordActual" type="password">
+            <mat-icon matPrefix>lock_outline</mat-icon>
+            <mat-error *ngIf="passwordForm.get('passwordActual')?.hasError('required')">Requerido</mat-error>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Nueva contraseña</mat-label>
+            <input matInput formControlName="passwordNuevo" type="password">
+            <mat-icon matPrefix>lock</mat-icon>
+            <mat-error *ngIf="passwordForm.get('passwordNuevo')?.hasError('required')">Requerido</mat-error>
+            <mat-error *ngIf="passwordForm.get('passwordNuevo')?.hasError('minlength')">Mínimo 6 caracteres</mat-error>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Confirmar nueva contraseña</mat-label>
+            <input matInput formControlName="confirmarPassword" type="password">
+            <mat-icon matPrefix>lock_reset</mat-icon>
+            <mat-error *ngIf="passwordForm.get('confirmarPassword')?.hasError('required')">Requerido</mat-error>
+          </mat-form-field>
+
+          <div class="form-error" *ngIf="passwordForm.hasError('noCoinciden')">
+            Las contraseñas no coinciden
+          </div>
+          <div class="form-error" *ngIf="passwordForm.hasError('mismaPassword')">
+            La nueva contraseña debe ser diferente a la actual
+          </div>
+
+          <div class="form-actions">
+            <button mat-raised-button color="accent" type="submit"
+                    [disabled]="passwordForm.invalid || savingPassword">
+              <mat-icon>key</mat-icon>
+              {{ savingPassword ? 'Actualizando...' : 'Cambiar contraseña' }}
+            </button>
+          </div>
+        </form>
+      </mat-expansion-panel>
+
+    </mat-accordion>
+
+  </ng-container>
+
+</div>

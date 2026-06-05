@@ -43,6 +43,45 @@
       </div>
     </div>
   </div>
+
+  <!-- Sección: Productos similares -->
+  <div class="similares-section">
+    <div class="similares-header">
+      <mat-icon class="similares-flame">local_fire_department</mat-icon>
+      <h3 class="similares-title">Productos similares</h3>
+      <span class="similares-ms" *ngIf="similaresMsLabel">{{ similaresMsLabel }}</span>
+    </div>
+
+    <div class="similares-loading" *ngIf="loadingSimilares">
+      <mat-spinner diameter="32" color="warn"></mat-spinner>
+    </div>
+
+    <div class="similares-grid" *ngIf="!loadingSimilares && similares.length > 0">
+      <mat-card class="similar-card" *ngFor="let s of similares" (click)="verSimilar(s.productoId)">
+        <div class="similar-hot-badge">🔥 Similar</div>
+        <div class="similar-image">
+          <mat-icon class="similar-icon">{{ getCategoryIcon(s.categoriaId) }}</mat-icon>
+        </div>
+        <mat-card-content class="similar-content">
+          <p class="similar-brand">{{ s.brand }}</p>
+          <p class="similar-name">{{ s.nombre }}</p>
+          <p class="similar-price">${{ s.price | number:'1.2-2' }}</p>
+        </mat-card-content>
+        <mat-card-actions class="similar-actions">
+          <button mat-raised-button class="btn-similar-cart"
+                  (click)="agregarSimilarAlCarrito(s.productoId, $event)">
+            <mat-icon>add_shopping_cart</mat-icon>
+            Agregar
+          </button>
+        </mat-card-actions>
+      </mat-card>
+    </div>
+
+    <p class="similares-empty" *ngIf="!loadingSimilares && similares.length === 0">
+      No se encontraron productos similares.
+    </p>
+  </div>
+
 </div>
 
 <div class="loading" *ngIf="loading">
