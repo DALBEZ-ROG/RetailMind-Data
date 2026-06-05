@@ -116,6 +116,12 @@ export const routes: Routes = [
       import('./features/analytics/trafico/trafico.component').then(m => m.TraficoComponent)
   },
   {
+    path: 'admin/reportes',
+    canActivate: [authGuard, adminGuard],
+    loadComponent: () =>
+      import('./features/admin/reportes/reportes.component').then(m => m.ReportesComponent)
+  },
+  {
     path: 'perfil',
     canActivate: [authGuard],
     loadComponent: () =>

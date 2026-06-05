@@ -1,0 +1,118 @@
+<div class="reportes-container">
+
+  <!-- Header -->
+  <div class="page-header">
+    <h2><mat-icon>assessment</mat-icon> Reportes y Exportación</h2>
+    <p class="page-subtitle">Descarga reportes del sistema en Excel o PDF</p>
+  </div>
+
+  <!-- SECCIÓN 2: Cards de reportes -->
+  <div class="reportes-grid">
+
+    <!-- Dashboard Completo -->
+    <mat-card class="reporte-card">
+      <mat-icon class="reporte-icon icon-dashboard">dashboard</mat-icon>
+      <h3 class="reporte-name">Dashboard Completo</h3>
+      <p class="reporte-desc">KPIs, sesiones por semana, métricas globales</p>
+      <div class="reporte-actions">
+        <button mat-raised-button class="btn-excel"
+                [disabled]="isGenerando('Dashboard', 'Excel')"
+                (click)="descargar('excel/dashboard', 'dashboard_retailmind.xlsx', 'Dashboard', 'Excel')">
+          <mat-spinner *ngIf="isGenerando('Dashboard', 'Excel')" diameter="18"></mat-spinner>
+          <mat-icon *ngIf="!isGenerando('Dashboard', 'Excel')">table_view</mat-icon>
+          Excel
+        </button>
+        <button mat-raised-button class="btn-pdf"
+                [disabled]="isGenerando('Dashboard', 'PDF')"
+                (click)="descargar('pdf/dashboard', 'reporte_retailmind.pdf', 'Dashboard', 'PDF')">
+          <mat-spinner *ngIf="isGenerando('Dashboard', 'PDF')" diameter="18"></mat-spinner>
+          <mat-icon *ngIf="!isGenerando('Dashboard', 'PDF')">picture_as_pdf</mat-icon>
+          PDF
+        </button>
+      </div>
+    </mat-card>
+
+    <!-- Pedidos y Ventas -->
+    <mat-card class="reporte-card">
+      <mat-icon class="reporte-icon icon-pedidos">receipt_long</mat-icon>
+      <h3 class="reporte-name">Pedidos y Ventas</h3>
+      <p class="reporte-desc">Todas las órdenes con detalle por usuario</p>
+      <div class="reporte-actions">
+        <button mat-raised-button class="btn-excel"
+                [disabled]="isGenerando('Pedidos', 'Excel')"
+                (click)="descargar('excel/pedidos', 'pedidos_retailmind.xlsx', 'Pedidos', 'Excel')">
+          <mat-spinner *ngIf="isGenerando('Pedidos', 'Excel')" diameter="18"></mat-spinner>
+          <mat-icon *ngIf="!isGenerando('Pedidos', 'Excel')">table_view</mat-icon>
+          Excel
+        </button>
+      </div>
+    </mat-card>
+
+    <!-- Funnel de Conversión -->
+    <mat-card class="reporte-card">
+      <mat-icon class="reporte-icon icon-funnel">filter_alt</mat-icon>
+      <h3 class="reporte-name">Funnel de Conversión</h3>
+      <p class="reporte-desc">Análisis completo del embudo de conversión</p>
+      <div class="reporte-actions">
+        <button mat-raised-button class="btn-excel"
+                [disabled]="isGenerando('Funnel', 'Excel')"
+                (click)="descargar('excel/funnel', 'funnel_retailmind.xlsx', 'Funnel', 'Excel')">
+          <mat-spinner *ngIf="isGenerando('Funnel', 'Excel')" diameter="18"></mat-spinner>
+          <mat-icon *ngIf="!isGenerando('Funnel', 'Excel')">table_view</mat-icon>
+          Excel
+        </button>
+      </div>
+    </mat-card>
+
+    <!-- Análisis por Región -->
+    <mat-card class="reporte-card">
+      <mat-icon class="reporte-icon icon-region">location_on</mat-icon>
+      <h3 class="reporte-name">Análisis por Región</h3>
+      <p class="reporte-desc">Métricas de ventas y conversión por región</p>
+      <div class="reporte-actions">
+        <button mat-raised-button class="btn-excel"
+                [disabled]="isGenerando('Región', 'Excel')"
+                (click)="descargar('excel/region', 'region_retailmind.xlsx', 'Región', 'Excel')">
+          <mat-spinner *ngIf="isGenerando('Región', 'Excel')" diameter="18"></mat-spinner>
+          <mat-icon *ngIf="!isGenerando('Región', 'Excel')">table_view</mat-icon>
+          Excel
+        </button>
+      </div>
+    </mat-card>
+
+  </div>
+
+  <!-- SECCIÓN 3: Historial de descargas -->
+  <mat-card class="historial-card" *ngIf="historial.length > 0">
+    <div class="section-title">
+      <mat-icon>history</mat-icon>
+      Historial de descargas (sesión actual)
+    </div>
+    <table mat-table [dataSource]="historial" class="historial-table">
+      <ng-container matColumnDef="reporte">
+        <th mat-header-cell *matHeaderCellDef>Reporte</th>
+        <td mat-cell *matCellDef="let h">{{ h.reporte }}</td>
+      </ng-container>
+      <ng-container matColumnDef="formato">
+        <th mat-header-cell *matHeaderCellDef>Formato</th>
+        <td mat-cell *matCellDef="let h">
+          <span class="formato-badge" [class.badge-excel]="h.formato === 'Excel'"
+                [class.badge-pdf]="h.formato === 'PDF'">
+            {{ h.formato }}
+          </span>
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="fecha">
+        <th mat-header-cell *matHeaderCellDef>Fecha/Hora</th>
+        <td mat-cell *matCellDef="let h">{{ h.fecha }}</td>
+      </ng-container>
+      <ng-container matColumnDef="estado">
+        <th mat-header-cell *matHeaderCellDef>Estado</th>
+        <td mat-cell *matCellDef="let h">{{ h.estado }}</td>
+      </ng-container>
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+    </table>
+  </mat-card>
+
+</div>

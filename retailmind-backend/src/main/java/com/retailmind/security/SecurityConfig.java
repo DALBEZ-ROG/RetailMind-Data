@@ -69,6 +69,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/analytics/region/**").hasAuthority("ADMIN")
                 .requestMatchers("/api/analytics/dispositivo/**").hasAuthority("ADMIN")
                 .requestMatchers("/api/analytics/trafico/**").hasAuthority("ADMIN")
+                // Reportes solo ADMIN
+                .requestMatchers("/api/reportes/**").hasAuthority("ADMIN")
                 // Dashboard refrescar vistas solo ADMIN
                 .requestMatchers(HttpMethod.POST, "/api/dashboard/refrescar-vistas").hasAuthority("ADMIN")
                 // Perfil y recomendaciones — usuario autenticado (cualquier rol)
