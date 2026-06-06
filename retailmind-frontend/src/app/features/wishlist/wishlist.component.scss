@@ -2,7 +2,7 @@
 
 .page-title {
   display: flex; align-items: center; gap: 10px;
-  font-size: 1.5rem; font-weight: 600; color: #e91e63; margin-bottom: 24px;
+  font-size: 1.5rem; font-weight: 800; color: #e91e63; margin-bottom: 24px;
   mat-icon { font-size: 28px; width: 28px; height: 28px; }
 }
 
@@ -13,29 +13,90 @@
 }
 
 .wishlist-card {
-  border-radius: 12px !important;
-  transition: transform 0.2s;
-  &:hover { transform: translateY(-3px); }
+  border-radius: 16px !important;
+  overflow: hidden;
+  box-shadow: var(--shadow-soft) !important;
+  transition: var(--transition);
+  background: white;
+
+  &:hover {
+    transform: translateY(-6px);
+    box-shadow: var(--shadow-strong) !important;
+  }
+
+  .card-image {
+    height: 180px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #fce4ec, #f8bbd0);
+    cursor: pointer;
+    position: relative;
+
+    mat-icon {
+      font-size: 56px;
+      width: 56px;
+      height: 56px;
+      color: #e91e63;
+      opacity: 0.5;
+    }
+  }
+
+  .card-body {
+    padding: 16px 18px;
+
+    .card-marca {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #546e7a;
+      margin: 0 0 4px;
+    }
+
+    .card-nombre {
+      font-size: 15px;
+      font-weight: 700;
+      color: #1a237e;
+      margin: 0 0 8px;
+      line-height: 1.3;
+    }
+
+    .card-precio {
+      font-size: 20px;
+      font-weight: 800;
+      background: var(--primary-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin: 0 0 14px;
+    }
+
+    .card-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+  }
 }
 
+// Legacy support
 .card-image {
-  height: 120px; display: flex; align-items: center; justify-content: center;
+  height: 180px; display: flex; align-items: center; justify-content: center;
   background: linear-gradient(135deg, #fce4ec, #f8bbd0);
-  border-radius: 12px 12px 0 0; cursor: pointer;
+  cursor: pointer;
 }
 
-.product-icon { font-size: 48px; width: 48px; height: 48px; color: #e91e63; opacity: 0.6; }
-
-.item-brand { font-size: 0.75rem; color: #9e9e9e; text-transform: uppercase; margin: 8px 0 4px; }
-.item-name { font-size: 0.9rem; font-weight: 600; color: #333; margin: 0 0 8px; }
-.item-price { font-size: 1.1rem; font-weight: 700; color: #1a237e; margin: 0; }
+.product-icon { font-size: 56px; width: 56px; height: 56px; color: #e91e63; opacity: 0.5; }
+.item-brand { font-size: 10px; font-weight: 700; color: #546e7a; text-transform: uppercase; letter-spacing: 1.5px; margin: 8px 0 4px; }
+.item-name { font-size: 15px; font-weight: 700; color: #1a237e; margin: 0 0 8px; line-height: 1.3; }
+.item-price { font-size: 20px; font-weight: 800; background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0; }
 
 mat-card-actions { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px !important; }
-
 .btn-remove { color: #e91e63 !important; }
 
 .empty-state {
-  text-align: center; padding: 80px 20px; color: #9e9e9e;
+  text-align: center; padding: 80px 20px; color: var(--text-light);
   > mat-icon { font-size: 64px; width: 64px; height: 64px; display: block; margin: 0 auto 16px; color: #f8bbd0; }
   p { margin: 4px 0; }
   .empty-hint { font-size: 0.9rem; }

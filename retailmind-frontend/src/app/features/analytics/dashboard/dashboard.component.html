@@ -56,13 +56,13 @@
                 [matTooltip]="card.tooltip" matTooltipShowDelay="500">
         <mat-card-content>
           <div class="kpi-inner">
-            <div class="kpi-info">
+            <div class="kpi-header">
               <p class="kpi-label">{{ card.title }}</p>
-              <p class="kpi-value">{{ card.value }}</p>
+              <div class="kpi-icon" [style.background]="card.color">
+                <mat-icon>{{ card.icon }}</mat-icon>
+              </div>
             </div>
-            <div class="kpi-icon" [style.background]="card.color">
-              <mat-icon>{{ card.icon }}</mat-icon>
-            </div>
+            <p class="kpi-value">{{ card.value }}</p>
           </div>
         </mat-card-content>
       </mat-card>

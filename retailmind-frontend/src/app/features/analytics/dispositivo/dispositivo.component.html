@@ -102,23 +102,19 @@
       </div>
       <span class="query-ms">⚡ {{ queryMsTendencia }} ms</span>
     </div>
-    <div class="tendencia-filters">
-      <mat-form-field appearance="outline" class="filter-field-sm">
-        <mat-label>Desde sem.</mat-label>
-        <mat-select [(ngModel)]="semanaInicio">
-          <mat-option [value]="null">-</mat-option>
-          <mat-option *ngFor="let s of semanas" [value]="s">{{ s }}</mat-option>
-        </mat-select>
-      </mat-form-field>
-      <mat-form-field appearance="outline" class="filter-field-sm">
-        <mat-label>Hasta sem.</mat-label>
-        <mat-select [(ngModel)]="semanaFin">
-          <mat-option [value]="null">-</mat-option>
-          <mat-option *ngFor="let s of semanas" [value]="s">{{ s }}</mat-option>
-        </mat-select>
-      </mat-form-field>
-      <button mat-stroked-button (click)="cargarTendencia()">
-        <mat-icon>refresh</mat-icon>
+    <div class="filtros-container" style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; align-items:center">
+      <mat-select [(ngModel)]="semanaInicio" class="semana-select" placeholder="Desde semana">
+        <mat-option [value]="null">Desde semana</mat-option>
+        <mat-option *ngFor="let s of semanasDisponibles" [value]="s">Semana {{ s }}</mat-option>
+      </mat-select>
+      <mat-select [(ngModel)]="semanaFin" class="semana-select" placeholder="Hasta semana">
+        <mat-option [value]="null">Hasta semana</mat-option>
+        <mat-option *ngFor="let s of semanasDisponibles" [value]="s">Semana {{ s }}</mat-option>
+      </mat-select>
+    </div>
+    <div style="display:flex; gap:12px; margin-top:12px; margin-bottom:20px">
+      <button class="btn-aplicar" (click)="cargarTendencia()">
+        <mat-icon>refresh</mat-icon> Actualizar
       </button>
     </div>
     <div class="table-scroll">

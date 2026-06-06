@@ -1,8 +1,8 @@
 <div class="pedidos-container">
-  <h2 class="page-title">
+  <div class="pedidos-header">
     <mat-icon>local_shipping</mat-icon>
-    Mis Pedidos
-  </h2>
+    <h2>Mis Pedidos</h2>
+  </div>
 
   <!-- Empty state -->
   <div class="empty-state" *ngIf="!loading && pedidos.length === 0">

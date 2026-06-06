@@ -1,63 +1,76 @@
 <div class="page-container">
-  <h1 class="page-title">Administracion ETL</h1>
+  <h1 class="page-title"><mat-icon>sync</mat-icon> Administración ETL</h1>
 
   <!-- ═══ SECCIÓN 1: Estado de datos por semana ═══ -->
-  <mat-card class="section-card">
-    <mat-card-header>
-      <mat-icon mat-card-avatar>table_chart</mat-icon>
-      <mat-card-title>Estado de Datos por Semana</mat-card-title>
-    </mat-card-header>
-    <mat-card-content>
-      <div class="section-actions">
-        <button mat-stroked-button (click)="cargarEstadoSemanas()" [disabled]="loadingSemanas">
-          <mat-icon>refresh</mat-icon>
-          Actualizar
-        </button>
-      </div>
+  <div class="section-header" style="margin-bottom:24px; display:flex; align-items:center; gap:16px">
+    <mat-icon style="color:white;font-size:24px;width:24px;height:24px">table_chart</mat-icon>
+    <div>
+      <h3 style="color:white;margin:0;font-size:18px;font-weight:700">Estado de Datos por Semana</h3>
+      <p style="color:rgba(255,255,255,0.7);margin:4px 0 0;font-size:13px">
+        {{ semanasDisponibles.length }} semanas cargadas • {{ totalRegistros | number }} registros totales
+      </p>
+    </div>
+  </div>
 
-      <div *ngIf="semanasCargadas.length === 0 && !loadingSemanas" class="empty-state">
-        <mat-icon>inbox</mat-icon>
-        <p>Sin datos cargados. Ejecute la carga inicial desde Inicializacion.</p>
-      </div>
+  <div style="display:flex; gap:12px; margin-bottom:20px">
+    <button class="btn-limpiar" (click)="actualizarEstado()" [disabled]="loadingSemanas">
+      <mat-icon>refresh</mat-icon> Actualizar
+    </button>
+  </div>
 
-      <table mat-table [dataSource]="semanasCargadas" class="full-width"
-             *ngIf="semanasCargadas.length > 0">
-        <ng-container matColumnDef="semana">
-          <th mat-header-cell *matHeaderCellDef>Semana</th>
-          <td mat-cell *matCellDef="let row">
-            <mat-chip class="chip-semana">Semana {{ row.semana }}</mat-chip>
+  <div *ngIf="semanasCargadas.length === 0 && !loadingSemanas" class="empty-state">
+    <mat-icon>inbox</mat-icon>
+    <p>Sin datos cargados. Ejecute la carga inicial desde Inicialización.</p>
+  </div>
+
+  <div class="table-wrapper" *ngIf="semanasCargadas.length > 0">
+    <table class="semanas-table">
+      <thead>
+        <tr>
+          <th>Semana</th>
+          <th>Registros</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let row of semanasCargadas">
+          <td>
+            <span class="semana-badge">
+              <mat-icon style="font-size:14px;width:14px;height:14px">date_range</mat-icon>
+              Semana {{ row.semana }}
+            </span>
           </td>
-        </ng-container>
-        <ng-container matColumnDef="registros">
-          <th mat-header-cell *matHeaderCellDef>Registros</th>
-          <td mat-cell *matCellDef="let row">{{ row.registros | number }}</td>
-        </ng-container>
-        <tr mat-header-row *matHeaderRowDef="['semana', 'registros']"></tr>
-        <tr mat-row *matRowDef="let row; columns: ['semana', 'registros'];"></tr>
-      </table>
-    </mat-card-content>
-  </mat-card>
+          <td><span class="registros-valor">{{ row.registros | number }}</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
 
   <!-- ═══ SECCIÓN 2: Generar nueva semana ═══ -->
   <mat-card class="section-card">
     <mat-card-header>
       <mat-icon mat-card-avatar>auto_awesome</mat-icon>
       <mat-card-title>Generar Nueva Semana de Datos</mat-card-title>
-      <mat-card-subtitle>Genera 108,584 registros sinteticos para la semana indicada</mat-card-subtitle>
+      <mat-card-subtitle>Genera 108,584 registros sintéticos para la semana indicada</mat-card-subtitle>
     </mat-card-header>
     <mat-card-content>
       <div class="generate-form">
-        <mat-form-field appearance="outline" class="semana-field">
-          <mat-label>Numero de semana</mat-label>
-          <input matInput type="number" [(ngModel)]="semanaInput" min="2" max="52">
-          <mat-hint>Entre 2 y 52</mat-hint>
-        </mat-form-field>
+        <mat-select class="semana-select"
+                    [(ngModel)]="semanaSeleccionada"
+                    placeholder="Seleccionar semana">
+          <mat-option [value]="proximaSemana" class="opcion-siguiente">
+            ⚡ Semana {{ proximaSemana }} (siguiente)
+          </mat-option>
+          <mat-divider></mat-divider>
+          <mat-option *ngFor="let s of semanasDisponibles" [value]="s">
+            Semana {{ s }} (ya cargada)
+          </mat-option>
+        </mat-select>
 
-        <button mat-raised-button color="primary" class="btn-generar"
+        <button class="btn-aplicar" style="height:48px"
                 (click)="generarSemana()"
-                [disabled]="ejecutando || semanaInput < 2 || semanaInput > 52">
-          <mat-icon>{{ ejecutando ? 'hourglass_top' : 'play_arrow' }}</mat-icon>
-          {{ ejecutando ? 'GENERANDO...' : 'GENERAR DATOS SEMANA ' + semanaInput }}
+                [disabled]="ejecutando || semanaSeleccionada < 2 || semanaSeleccionada > 52">
+          <mat-icon>{{ ejecutando ? 'hourglass_top' : 'auto_awesome' }}</mat-icon>
+          {{ ejecutando ? 'GENERANDO...' : 'GENERAR DATOS SEMANA ' + semanaSeleccionada }}
         </button>
       </div>
 
@@ -79,7 +92,7 @@
       </button>
     </mat-card-header>
     <mat-card-content>
-      <pre class="console-output">{{ consoleOutput || '> Esperando ejecucion...' }}</pre>
+      <pre class="console-output">{{ consoleOutput || '> Esperando ejecución...' }}</pre>
     </mat-card-content>
   </mat-card>
 
@@ -94,17 +107,17 @@
         <ng-container matColumnDef="semana">
           <th mat-header-cell *matHeaderCellDef>Semana</th>
           <td mat-cell *matCellDef="let row">
-            <mat-chip class="chip-semana">Semana {{ row.semana }}</mat-chip>
+            <span class="semana-badge">Semana {{ row.semana }}</span>
           </td>
         </ng-container>
         <ng-container matColumnDef="registros">
           <th mat-header-cell *matHeaderCellDef>Registros</th>
           <td mat-cell *matCellDef="let row">
-            <span class="nuevos-badge">+{{ row.registros | number }}</span>
+            <span class="registros-valor">+{{ row.registros | number }}</span>
           </td>
         </ng-container>
         <ng-container matColumnDef="duracion">
-          <th mat-header-cell *matHeaderCellDef>Duracion</th>
+          <th mat-header-cell *matHeaderCellDef>Duración</th>
           <td mat-cell *matCellDef="let row">{{ row.duracion }}s</td>
         </ng-container>
         <ng-container matColumnDef="fecha">

@@ -133,6 +133,7 @@ public class ProductoCatalogoService {
         }
     }
 
+    @SuppressWarnings("null")
     public void registrarEvento(String userId, String productId, String userAction,
                                  String channel, Float price, String sessionId) {
         try {

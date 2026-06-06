@@ -97,8 +97,9 @@
 // ── KPI Cards — Glassmorphism ──────────────────────────────────────────────
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 20px;
+  width: 100%;
   margin-bottom: 28px;
 }
 
@@ -109,10 +110,14 @@
   border: 1px solid rgba(255, 255, 255, 0.9);
   border-radius: var(--border-radius) !important;
   padding: 24px;
+  min-height: 140px;
   box-shadow: var(--shadow-soft) !important;
   transition: var(--transition);
   position: relative;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 
   &::before {
     content: '';
@@ -132,9 +137,15 @@
 
   .kpi-inner {
     display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  .kpi-header {
+    display: flex;
+    align-items: flex-start;
     justify-content: space-between;
-    align-items: center;
-    padding: 4px 0;
+    margin-bottom: 12px;
   }
 
   .kpi-info {
@@ -142,25 +153,29 @@
   }
 
   .kpi-label {
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--text-secondary);
-    margin-bottom: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #546e7a;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.8px;
+    line-height: 1.4;
+    max-width: 70%;
+    margin: 0;
   }
 
   .kpi-value {
-    font-size: 32px;
+    font-size: 28px;
     font-weight: 800;
-    color: var(--text-primary);
+    color: #1a237e;
     line-height: 1;
+    word-break: break-all;
+    margin: 0;
   }
 
   .kpi-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 14px;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -168,9 +183,9 @@
 
     mat-icon {
       color: white;
-      font-size: 24px;
-      width: 24px;
-      height: 24px;
+      font-size: 22px;
+      width: 22px;
+      height: 22px;
     }
   }
 }

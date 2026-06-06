@@ -11,10 +11,12 @@
 
     <!-- Dashboard Completo -->
     <mat-card class="reporte-card">
-      <mat-icon class="reporte-icon icon-dashboard">dashboard</mat-icon>
-      <h3 class="reporte-name">Dashboard Completo</h3>
-      <p class="reporte-desc">KPIs, sesiones por semana, métricas globales</p>
-      <div class="reporte-actions">
+      <div class="card-icon icon-dashboard">
+        <mat-icon>dashboard</mat-icon>
+      </div>
+      <h3 class="card-title">Dashboard Completo</h3>
+      <p class="card-desc">KPIs, sesiones por semana, métricas globales</p>
+      <div class="card-buttons">
         <button mat-raised-button class="btn-excel"
                 [disabled]="isGenerando('Dashboard', 'Excel')"
                 (click)="descargar('excel/dashboard', 'dashboard_retailmind.xlsx', 'Dashboard', 'Excel')">
@@ -34,10 +36,12 @@
 
     <!-- Pedidos y Ventas -->
     <mat-card class="reporte-card">
-      <mat-icon class="reporte-icon icon-pedidos">receipt_long</mat-icon>
-      <h3 class="reporte-name">Pedidos y Ventas</h3>
-      <p class="reporte-desc">Todas las órdenes con detalle por usuario</p>
-      <div class="reporte-actions">
+      <div class="card-icon icon-pedidos">
+        <mat-icon>receipt_long</mat-icon>
+      </div>
+      <h3 class="card-title">Pedidos y Ventas</h3>
+      <p class="card-desc">Todas las órdenes con detalle por usuario</p>
+      <div class="card-buttons">
         <button mat-raised-button class="btn-excel"
                 [disabled]="isGenerando('Pedidos', 'Excel')"
                 (click)="descargar('excel/pedidos', 'pedidos_retailmind.xlsx', 'Pedidos', 'Excel')">
@@ -50,10 +54,12 @@
 
     <!-- Funnel de Conversión -->
     <mat-card class="reporte-card">
-      <mat-icon class="reporte-icon icon-funnel">filter_alt</mat-icon>
-      <h3 class="reporte-name">Funnel de Conversión</h3>
-      <p class="reporte-desc">Análisis completo del embudo de conversión</p>
-      <div class="reporte-actions">
+      <div class="card-icon icon-funnel">
+        <mat-icon>filter_alt</mat-icon>
+      </div>
+      <h3 class="card-title">Funnel de Conversión</h3>
+      <p class="card-desc">Análisis completo del embudo de conversión</p>
+      <div class="card-buttons">
         <button mat-raised-button class="btn-excel"
                 [disabled]="isGenerando('Funnel', 'Excel')"
                 (click)="descargar('excel/funnel', 'funnel_retailmind.xlsx', 'Funnel', 'Excel')">
@@ -66,10 +72,12 @@
 
     <!-- Análisis por Región -->
     <mat-card class="reporte-card">
-      <mat-icon class="reporte-icon icon-region">location_on</mat-icon>
-      <h3 class="reporte-name">Análisis por Región</h3>
-      <p class="reporte-desc">Métricas de ventas y conversión por región</p>
-      <div class="reporte-actions">
+      <div class="card-icon icon-region">
+        <mat-icon>location_on</mat-icon>
+      </div>
+      <h3 class="card-title">Análisis por Región</h3>
+      <p class="card-desc">Métricas de ventas y conversión por región</p>
+      <div class="card-buttons">
         <button mat-raised-button class="btn-excel"
                 [disabled]="isGenerando('Región', 'Excel')"
                 (click)="descargar('excel/region', 'region_retailmind.xlsx', 'Región', 'Excel')">

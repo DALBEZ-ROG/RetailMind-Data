@@ -47,27 +47,27 @@
       </div>
 
       <div class="canal-metrics">
-        <div class="cm">
+        <div class="metric-item">
           <span class="metric-value">{{ c.totalSesiones | number }}</span>
           <span class="metric-label">Sesiones</span>
         </div>
-        <div class="cm">
+        <div class="metric-item">
           <span class="metric-value">{{ c.totalUsuarios | number }}</span>
           <span class="metric-label">Usuarios</span>
         </div>
-        <div class="cm">
+        <div class="metric-item">
           <span class="metric-value" [style.color]="getColorConversion(c.tasaConversion)">
             {{ c.tasaConversion }}%
           </span>
-          <span class="metric-label">Conv.</span>
+          <span class="metric-label">Conversión</span>
         </div>
-        <div class="cm">
-          <span class="metric-value revenue">{{ formatRevenue(c.revenueTotal) }}</span>
+        <div class="metric-item">
+          <span class="metric-value">{{ formatRevenue(c.revenueTotal) }}</span>
           <span class="metric-label">Revenue</span>
         </div>
       </div>
 
-      <div class="tiempo-row">
+      <div class="canal-footer">
         <mat-icon>schedule</mat-icon>
         {{ c.tiempoPromedio | number:'1.0-0' }}s prom. por sesión
       </div>
@@ -80,31 +80,29 @@
     <span class="query-ms">⚡ {{ queryMsEmbudo }} ms</span>
   </h3>
 
-  <div class="funnel-grid" *ngIf="!loadingEmbudo && embudo.length > 0">
-    <mat-card class="funnel-card" *ngFor="let c of embudo"
-              [style.border-top]="'4px solid ' + getCanalColor(c.canal)">
-      <div class="funnel-title">
+  <div class="embudo-canal-grid" *ngIf="!loadingEmbudo && embudo.length > 0">
+    <div class="embudo-canal-card" *ngFor="let c of embudo"
+         [style.border-top]="'4px solid ' + getCanalColor(c.canal)">
+      <div class="canal-header">
         <mat-icon [style.color]="getCanalColor(c.canal)">{{ getCanalIcon(c.canal) }}</mat-icon>
         <span>{{ c.canal | titlecase }}</span>
       </div>
-      <div class="funnel-stages">
-        <div class="stage" *ngFor="let etapa of [
-          {key:'vistas',   label:'Vistas',   color:'#1565c0'},
-          {key:'clicks',   label:'Clicks',   color:'#0288d1'},
-          {key:'carritos', label:'Carrito',  color:'#f57c00'},
-          {key:'compras',  label:'Compras',  color:'#2e7d32'},
-          {key:'abandonos',label:'Abandono', color:'#c62828'}
-        ]">
-          <span class="stage-label">{{ etapa.label }}</span>
-          <div class="stage-bar-bg">
-            <div class="stage-bar"
-                 [style.width.%]="getPctEmbudo(c[etapa.key], c)"
-                 [style.background]="etapa.color"></div>
-          </div>
-          <span class="stage-val">{{ c[etapa.key] | number }}</span>
+      <div *ngFor="let etapa of [
+        {key:'vistas',   label:'Vistas',   color:'#1565c0'},
+        {key:'clicks',   label:'Clicks',   color:'#0288d1'},
+        {key:'carritos', label:'Carrito',  color:'#f57c00'},
+        {key:'compras',  label:'Compras',  color:'#2e7d32'},
+        {key:'abandonos',label:'Abandono', color:'#c62828'}
+      ]" class="etapa-row">
+        <span class="etapa-label">{{ etapa.label }}</span>
+        <div class="etapa-bar">
+          <div class="etapa-fill"
+               [style.width.%]="getPctEmbudo(c[etapa.key], c)"
+               [style.background]="etapa.color"></div>
         </div>
+        <span class="etapa-valor">{{ c[etapa.key] | number }}</span>
       </div>
-    </mat-card>
+    </div>
   </div>
 
   <!-- SECCIÓN 4: Tabla comparativa -->

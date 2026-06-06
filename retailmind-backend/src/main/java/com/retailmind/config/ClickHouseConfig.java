@@ -23,6 +23,7 @@ public class ClickHouseConfig {
 
     @Primary
     @Bean(name = {"jdbcTemplate", "clickHouseJdbc"})
+    @SuppressWarnings("null")
     public JdbcTemplate clickHouseJdbcTemplate(
             @Value("${clickhouse.datasource.url}") String url,
             @Value("${clickhouse.datasource.username}") String username,

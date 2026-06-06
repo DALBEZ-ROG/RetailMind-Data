@@ -5,165 +5,146 @@
 }
 
 // ── Header ───────────────────────────────────────────────────────────────────
-
 .rec-header {
   margin-bottom: 28px;
   padding: 24px;
   background: linear-gradient(135deg, #3f51b5 0%, #7c4dff 100%);
-  border-radius: 12px;
+  border-radius: 16px;
   color: #fff;
+  box-shadow: 0 8px 32px rgba(63, 81, 181, 0.3);
 
-  // Modo popular: gradiente cálido naranja-rojo
   &.rec-header-popular {
     background: linear-gradient(135deg, #b71c1c 0%, #e53935 50%, #ff7043 100%);
+    box-shadow: 0 8px 32px rgba(229, 57, 53, 0.3);
   }
 }
 
 .rec-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 0 0 6px;
-  font-size: 26px;
-  font-weight: 700;
-
+  display: flex; align-items: center; gap: 10px;
+  margin: 0 0 6px; font-size: 26px; font-weight: 800;
   mat-icon { font-size: 30px; width: 30px; height: 30px; }
 }
 
-.rec-subtitle {
-  margin: 0 0 12px;
-  opacity: 0.88;
-  font-size: 14px;
-}
+.rec-subtitle { margin: 0 0 12px; opacity: 0.88; font-size: 14px; }
 
-.header-meta {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
+.header-meta { display: flex; align-items: center; gap: 12px; }
+.chip-categoria { background: rgba(255,255,255,0.2) !important; color: #fff !important; font-size: 13px; mat-icon { font-size: 16px; width: 16px; height: 16px; } }
+.chip-popular { background: rgba(255,255,255,0.22) !important; color: #fff !important; font-size: 13px; font-weight: 600; mat-icon { font-size: 16px; width: 16px; height: 16px; } }
+.query-ms { font-size: 12px; opacity: 0.8; background: rgba(255,255,255,0.15); padding: 2px 10px; border-radius: 12px; }
 
-.chip-categoria {
-  background: rgba(255,255,255,0.2) !important;
-  color: #fff !important;
-  font-size: 13px;
+// ── Loading ──────────────────────────────────────────────────────────────────
+.loading-center { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 64px 0; color: #666; }
 
-  mat-icon { font-size: 16px; width: 16px; height: 16px; }
-}
-
-.query-ms {
-  font-size: 12px;
-  opacity: 0.8;
-  background: rgba(255,255,255,0.15);
-  padding: 2px 10px;
-  border-radius: 12px;
-}
-
-// ── Loading ───────────────────────────────────────────────────────────────────
-
-.loading-center {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  padding: 64px 0;
-  color: #666;
-}
-
-// ── Tipo badge ────────────────────────────────────────────────────────────────
-
+// ── Tipo badge ───────────────────────────────────────────────────────────────
 .tipo-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  border-radius: 20px;
-  font-size: 13px;
-  font-weight: 500;
-  margin-bottom: 20px;
-  background: #e8eaf6;
-  color: #3f51b5;
-
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 500; margin-bottom: 20px;
+  background: #e8eaf6; color: #3f51b5;
   mat-icon { font-size: 18px; width: 18px; height: 18px; }
-
-  &.tipo-popular {
-    background: #fff3e0;
-    color: #e65100;
-  }
+  &.tipo-popular { background: #fff3e0; color: #e65100; }
 }
 
-// ── Grid de productos ─────────────────────────────────────────────────────────
+// ── Fallback notice ──────────────────────────────────────────────────────────
+.fallback-notice {
+  display: flex; align-items: center; gap: 8px;
+  background: #fff8e1; border: 1px solid #ffe082; border-radius: 12px;
+  padding: 10px 16px; margin-bottom: 20px; font-size: 13px; color: #795548;
+  mat-icon { font-size: 18px; width: 18px; height: 18px; color: #f57c00; }
+}
 
+// ── Grid ─────────────────────────────────────────────────────────────────────
 .rec-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 20px;
 
-  @media (max-width: 900px) {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  @media (max-width: 560px) {
-    grid-template-columns: 1fr;
-  }
+  @media (max-width: 900px) { grid-template-columns: repeat(2, 1fr); }
+  @media (max-width: 560px) { grid-template-columns: 1fr; }
 }
 
+// ── Cards ────────────────────────────────────────────────────────────────────
 .rec-card {
   position: relative;
   cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-  overflow: visible;
+  border-radius: 16px !important;
+  overflow: hidden;
+  background: white;
+  box-shadow: var(--shadow-soft) !important;
+  transition: var(--transition);
 
   &:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 6px 20px rgba(0,0,0,0.14);
+    transform: translateY(-6px);
+    box-shadow: var(--shadow-strong) !important;
   }
 }
 
 .rec-badge {
   position: absolute;
-  top: -8px;
+  top: 12px;
   left: 12px;
-  background: #7c4dff;
-  color: #fff;
+  padding: 4px 10px;
+  border-radius: 20px;
   font-size: 10px;
   font-weight: 700;
-  padding: 3px 10px;
-  border-radius: 12px;
-  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: var(--primary-gradient);
+  color: white;
+  box-shadow: 0 4px 12px rgba(26, 35, 126, 0.3);
   z-index: 1;
+
+  &.badge-popular {
+    background: linear-gradient(90deg, #e53935, #ff7043) !important;
+  }
+}
+
+.ventas-badge {
+  position: absolute;
+  top: 6px; right: 8px;
+  font-size: 10px; font-weight: 700;
+  background: #fff3e0; color: #e65100;
+  border: 1px solid #ffcc80;
+  padding: 2px 7px; border-radius: 10px; z-index: 1;
 }
 
 .rec-image {
-  background: linear-gradient(135deg, #e8eaf6, #ede7f6);
-  height: 120px;
+  height: 180px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px 8px 0 0;
+  background: linear-gradient(135deg, #e8eaf6, #ede7f6);
+  position: relative;
+
+  mat-icon {
+    font-size: 56px;
+    width: 56px;
+    height: 56px;
+    opacity: 0.45;
+    color: #7c4dff;
+  }
 }
 
 .rec-icon {
-  font-size: 52px;
-  width: 52px;
-  height: 52px;
-  color: #7c4dff;
-  opacity: 0.8;
+  font-size: 56px; width: 56px; height: 56px; color: #7c4dff; opacity: 0.45;
 }
 
-.rec-content {
-  padding: 12px 16px 4px !important;
+.rec-content, .rec-body {
+  padding: 16px 18px !important;
 
-  .rec-brand {
-    margin: 0;
-    font-size: 11px;
-    color: #888;
+  .rec-brand, .rec-marca {
+    margin: 0 0 4px;
+    font-size: 10px;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 1.5px;
+    color: #546e7a;
   }
 
-  .rec-name {
-    margin: 4px 0;
-    font-size: 14px;
-    font-weight: 600;
+  .rec-name, .rec-nombre {
+    margin: 0 0 4px;
+    font-size: 15px;
+    font-weight: 700;
+    color: #1a237e;
     line-height: 1.3;
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -172,16 +153,26 @@
   }
 
   .rec-categoria {
-    margin: 0 0 6px;
+    margin: 0 0 10px;
     font-size: 12px;
+    font-weight: 600;
     color: #9c27b0;
   }
 
-  .rec-price {
-    margin: 0;
+  .rec-price, .rec-precio {
+    margin: 0 0 14px;
     font-size: 20px;
-    font-weight: 700;
-    color: #1a237e;
+    font-weight: 800;
+    background: var(--primary-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .rec-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
   }
 }
 
@@ -191,115 +182,27 @@
   justify-content: space-between;
   padding: 8px 12px 12px !important;
 
-  .btn-carrito {
-    flex: 1;
-    margin-right: 8px;
-    font-size: 13px;
-  }
-
-  .btn-wishlist mat-icon {
-    color: #9e9e9e;
-    transition: color 0.2s;
-  }
-
-  .btn-wishlist .wishlist-active {
-    color: #e53935;
-  }
+  .btn-carrito { flex: 1; margin-right: 8px; font-size: 13px; }
+  .btn-wishlist mat-icon { color: #9e9e9e; transition: color 0.2s; }
+  .btn-wishlist .wishlist-active { color: #e53935; }
 }
 
-// ── Empty state ───────────────────────────────────────────────────────────────
-
-.empty-state {
-  text-align: center;
-  padding: 48px 24px;
-  color: #666;
-
-  .empty-icon {
-    font-size: 64px;
-    width: 64px;
-    height: 64px;
-    color: #bdbdbd;
-    margin-bottom: 16px;
-  }
-
-  h3 {
-    font-size: 18px;
-    margin: 0 0 8px;
-    color: #444;
-  }
-
-  p {
-    margin: 0 0 24px;
-    font-size: 14px;
-  }
-}
-
-// ── Chip popular ─────────────────────────────────────────────────────────────
-
-.chip-popular {
-  background: rgba(255,255,255,0.22) !important;
-  color: #fff !important;
-  font-size: 13px;
-  font-weight: 600;
-
-  mat-icon { font-size: 16px; width: 16px; height: 16px; }
-}
-
-// ── Aviso fallback ────────────────────────────────────────────────────────────
-
-.fallback-notice {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: #fff8e1;
-  border: 1px solid #ffe082;
-  border-radius: 8px;
-  padding: 10px 16px;
-  margin-bottom: 20px;
-  font-size: 13px;
-  color: #795548;
-
-  mat-icon { font-size: 18px; width: 18px; height: 18px; color: #f57c00; }
-}
-
-// ── Card variante popular ─────────────────────────────────────────────────────
-
+// ── Popular variant ──────────────────────────────────────────────────────────
 .rec-card-popular {
   background: linear-gradient(160deg, #fff8f8 0%, #fff3f3 100%) !important;
   border: 1px solid #ffcdd2 !important;
 
-  &:hover {
-    box-shadow: 0 6px 20px rgba(229, 57, 53, 0.15) !important;
-    border-color: #ef9a9a !important;
-  }
-
-  .rec-image {
-    background: linear-gradient(135deg, #ffebee, #fce4ec) !important;
-  }
-
-  .rec-icon { color: #e53935 !important; }
-
+  &:hover { box-shadow: 0 6px 20px rgba(229, 57, 53, 0.15) !important; border-color: #ef9a9a !important; }
+  .rec-image { background: linear-gradient(135deg, #ffebee, #fce4ec) !important; }
+  .rec-icon, .rec-image mat-icon { color: #e53935 !important; }
   .rec-categoria { color: #e53935 !important; }
-
-  .rec-price { color: #c62828 !important; }
+  .rec-price, .rec-precio { color: #c62828 !important; -webkit-text-fill-color: #c62828 !important; background: none !important; }
 }
 
-// Badge popular
-.badge-popular {
-  background: linear-gradient(90deg, #e53935, #ff7043) !important;
-}
-
-// Badge de ventas
-.ventas-badge {
-  position: absolute;
-  top: 6px;
-  right: 8px;
-  font-size: 10px;
-  font-weight: 700;
-  background: #fff3e0;
-  color: #e65100;
-  border: 1px solid #ffcc80;
-  padding: 2px 7px;
-  border-radius: 10px;
-  z-index: 1;
+// ── Empty state ──────────────────────────────────────────────────────────────
+.empty-state {
+  text-align: center; padding: 48px 24px; color: #666;
+  .empty-icon { font-size: 64px; width: 64px; height: 64px; color: #bdbdbd; margin-bottom: 16px; }
+  h3 { font-size: 18px; margin: 0 0 8px; color: #444; }
+  p { margin: 0 0 24px; font-size: 14px; }
 }

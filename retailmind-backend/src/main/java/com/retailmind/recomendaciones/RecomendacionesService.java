@@ -249,6 +249,7 @@ public class RecomendacionesService {
         return r;
     }
 
+    @SuppressWarnings("null")
     private Long queryLong(String sql) {
         try {
             Long val = ch.queryForObject(sql, Long.class);

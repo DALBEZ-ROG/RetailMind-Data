@@ -104,25 +104,45 @@ $primary: #1a237e;
 
   .canal-metrics {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px 20px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #f0f4f8;
+  }
+
+  .metric-item {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+
+    .metric-value {
+      font-size: 15px;
+      font-weight: 800;
+      color: #1a237e;
+      line-height: 1;
+    }
+
+    .metric-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: #90a4ae;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+  }
+
+  .canal-footer {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid #f0f4f8;
     font-size: 12px;
-    margin-bottom: 10px;
-  }
+    color: #546e7a;
+    display: flex;
+    align-items: center;
+    gap: 6px;
 
-  .metric-value {
-    font-size: 13px;
-    font-weight: 700;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .metric-label {
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--text-secondary);
+    mat-icon { font-size: 14px; width: 14px; height: 14px; }
   }
 }
 
@@ -141,51 +161,84 @@ $primary: #1a237e;
   .pct-label { font-size: 11px; color: var(--text-light); }
 }
 
-.tiempo-row {
-  display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-secondary);
-  mat-icon { font-size: 14px; width: 14px; height: 14px; }
-}
-
 // ── Sub-title ─────────────────────────────────────────────────────────────────
 .sub-title {
   display: flex; align-items: center; gap: 8px;
   color: var(--text-primary); font-size: 15px; font-weight: 600; margin: 0 0 14px;
 }
 
-// ── Funnel per channel ────────────────────────────────────────────────────────
-.funnel-grid {
+// ── Embudo por canal — Premium cards ──────────────────────────────────────────
+.embudo-canal-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  width: 100%;
   margin-bottom: 28px;
 }
 
-.funnel-card {
-  padding: 16px;
-  border-radius: var(--border-radius) !important;
-  box-shadow: var(--shadow-soft) !important;
+.embudo-canal-card {
+  padding: 24px;
+  border-radius: 16px;
+  background: white;
+  box-shadow: var(--shadow-soft);
   transition: var(--transition);
 
   &:hover {
-    box-shadow: var(--shadow-medium) !important;
+    box-shadow: var(--shadow-medium);
   }
-}
 
-.funnel-title {
-  display: flex; align-items: center; gap: 8px; margin-bottom: 14px;
-  font-size: 15px; font-weight: 700; color: var(--text-primary);
-  mat-icon { font-size: 20px; }
-}
+  .canal-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    padding-bottom: 14px;
+    border-bottom: 2px solid #f0f4f8;
 
-.funnel-stages { display: flex; flex-direction: column; gap: 8px; }
-.stage {
-  display: flex; align-items: center; gap: 8px;
-  .stage-label { width: 64px; font-size: 12px; color: var(--text-secondary); flex-shrink: 0; }
-  .stage-bar-bg {
-    flex: 1; height: 14px; background: #f0f4f8; border-radius: 7px; overflow: hidden;
-    .stage-bar { height: 100%; border-radius: 7px; transition: width 0.4s ease; min-width: 2px; }
+    mat-icon { font-size: 22px; width: 22px; height: 22px; }
+
+    span {
+      font-size: 16px;
+      font-weight: 700;
+      color: #1a237e;
+    }
   }
-  .stage-val { width: 60px; text-align: right; font-size: 12px; font-weight: 600; color: var(--text-primary); flex-shrink: 0; }
+
+  .etapa-row {
+    display: grid;
+    grid-template-columns: 80px 1fr 60px;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+
+    .etapa-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #546e7a;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .etapa-bar {
+      height: 8px;
+      border-radius: 4px;
+      background: #e8eaf6;
+      overflow: hidden;
+
+      .etapa-fill {
+        height: 100%;
+        border-radius: 4px;
+        transition: width 0.6s ease;
+      }
+    }
+
+    .etapa-valor {
+      font-size: 12px;
+      font-weight: 700;
+      color: #1a237e;
+      text-align: right;
+    }
+  }
 }
 
 // ── Table ─────────────────────────────────────────────────────────────────────

@@ -40,6 +40,7 @@ export class DispositivoComponent implements OnInit {
 
   semanas = Array.from({ length: 52 }, (_, i) => i + 1);
   canales = ['mobile', 'web', 'app'];
+  semanasDisponibles: number[] = [];
 
   dispositivosUnicos: string[] = [];
 
@@ -50,6 +51,14 @@ export class DispositivoComponent implements OnInit {
   ngOnInit(): void {
     this.cargar();
     this.cargarTendencia();
+    this.loadSemanasDisponibles();
+  }
+
+  loadSemanasDisponibles(): void {
+    this.http.get<number[]>(`${environment.apiUrl}/api/funnel/semanas-disponibles`).subscribe({
+      next: (data) => this.semanasDisponibles = data,
+      error: () => { this.semanasDisponibles = this.semanas; }
+    });
   }
 
   cargar(): void {

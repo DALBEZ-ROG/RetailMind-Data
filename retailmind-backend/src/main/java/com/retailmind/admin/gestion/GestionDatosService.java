@@ -5,8 +5,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -15,7 +13,6 @@ import org.springframework.stereotype.Service;
 @Service
 public class GestionDatosService {
 
-    private static final Logger logger = LoggerFactory.getLogger(GestionDatosService.class);
     private final JdbcTemplate ch;
 
     public GestionDatosService(@Lazy @Qualifier("clickHouseJdbc") JdbcTemplate ch) {
@@ -84,6 +81,7 @@ public class GestionDatosService {
         return rows.isEmpty() ? null : rows.get(0);
     }
 
+    @SuppressWarnings("null")
     public void updateFactEvento(long eventPk, Map<String, Object> fields) {
         StringBuilder sb = new StringBuilder("ALTER TABLE retailmind.fact_eventos UPDATE ");
         List<String> sets = new ArrayList<>();
@@ -94,7 +92,8 @@ public class GestionDatosService {
         sb.append(String.join(", ", sets));
         sb.append(" WHERE event_pk = ").append(eventPk);
         sb.append(" SETTINGS mutations_sync = 1");
-        ch.execute(sb.toString());
+        String sql = sb.toString();
+        ch.execute(sql);
     }
 
     public void deleteFactEvento(long eventPk) {

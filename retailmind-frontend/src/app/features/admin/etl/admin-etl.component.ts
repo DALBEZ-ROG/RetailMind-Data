@@ -1,6 +1,7 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -9,12 +10,11 @@ import { MatTableModule } from '@angular/material/table';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { environment } from '../../../../environments/environment';
 
 import { InicializacionService, InicializacionResponse } from '../../../core/services/inicializacion.service';
-import { DashboardService } from '../../../core/services/dashboard.service';
 
 @Component({
   selector: 'app-admin-etl',
@@ -30,8 +30,7 @@ import { DashboardService } from '../../../core/services/dashboard.service';
     MatChipsModule,
     MatDividerModule,
     MatSnackBarModule,
-    MatFormFieldModule,
-    MatInputModule,
+    MatSelectModule,
     MatTooltipModule
   ],
   templateUrl: './admin-etl.component.html',
@@ -43,8 +42,12 @@ export class AdminEtlComponent implements OnInit, OnDestroy {
   semanasCargadas: { semana: number; registros: number }[] = [];
   loadingSemanas = false;
 
+  // ── Semanas disponibles y selección ────────────────────────────────────────
+  semanasDisponibles: number[] = [];
+  proximaSemana = 2;
+  semanaSeleccionada = 2;
+
   // ── Generación ─────────────────────────────────────────────────────────────
-  semanaInput = 2;
   ejecutando = false;
   tiempoTranscurrido = 0;
   private timerInterval: any = null;
@@ -58,18 +61,49 @@ export class AdminEtlComponent implements OnInit, OnDestroy {
 
   constructor(
     private inicializacionService: InicializacionService,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    private http: HttpClient
   ) {}
 
   ngOnInit(): void {
     this.cargarEstadoSemanas();
+    this.loadSemanasDisponibles();
   }
 
   ngOnDestroy(): void {
     this.detenerTimer();
   }
 
+  // ── Cargar semanas disponibles ─────────────────────────────────────────────
+
+  loadSemanasDisponibles(): void {
+    this.http.get<number[]>(`${environment.apiUrl}/api/funnel/semanas-disponibles`).subscribe({
+      next: (data) => {
+        this.semanasDisponibles = data;
+        const maxSemana = data.length > 0 ? Math.max(...data) : 1;
+        this.proximaSemana = maxSemana + 1;
+        this.semanaSeleccionada = this.proximaSemana;
+      },
+      error: () => {
+        this.semanasDisponibles = [];
+        this.proximaSemana = 2;
+        this.semanaSeleccionada = 2;
+      }
+    });
+  }
+
+  // ── Computed ───────────────────────────────────────────────────────────────
+
+  get totalRegistros(): number {
+    return this.semanasCargadas.reduce((s, r) => s + r.registros, 0);
+  }
+
   // ── Sección 1: Estado de datos por semana ──────────────────────────────────
+
+  actualizarEstado(): void {
+    this.cargarEstadoSemanas();
+    this.loadSemanasDisponibles();
+  }
 
   cargarEstadoSemanas(): void {
     this.loadingSemanas = true;
@@ -86,8 +120,6 @@ export class AdminEtlComponent implements OnInit, OnDestroy {
   }
 
   private parseSemanas(output: string): void {
-    // El output del verify muestra conteos por tabla
-    // Intentar extraer info de semanas del output
     this.semanasCargadas = [];
     const lines = output.split('\n');
     for (const line of lines) {
@@ -95,7 +127,6 @@ export class AdminEtlComponent implements OnInit, OnDestroy {
       if (match) {
         const total = parseInt(match[1].replace(/,/g, ''), 10);
         if (total > 0) {
-          // Estimar semanas basado en 108,584 por semana
           const numSemanas = Math.round(total / 108584) || 1;
           for (let i = 1; i <= numSemanas; i++) {
             this.semanasCargadas.push({ semana: i, registros: 108584 });
@@ -108,17 +139,17 @@ export class AdminEtlComponent implements OnInit, OnDestroy {
   // ── Sección 2: Generar nueva semana ────────────────────────────────────────
 
   generarSemana(): void {
-    if (this.semanaInput < 2 || this.semanaInput > 52) {
+    if (this.semanaSeleccionada < 2 || this.semanaSeleccionada > 52) {
       this.snackBar.open('La semana debe estar entre 2 y 52', 'Cerrar', { duration: 3000 });
       return;
     }
 
     this.ejecutando = true;
     this.tiempoTranscurrido = 0;
-    this.consoleOutput += `\n>>> Generando datos para semana ${this.semanaInput}...\n`;
+    this.consoleOutput += `\n>>> Generando datos para semana ${this.semanaSeleccionada}...\n`;
     this.iniciarTimer();
 
-    this.inicializacionService.generarSemana(this.semanaInput).subscribe({
+    this.inicializacionService.generarSemana(this.semanaSeleccionada).subscribe({
       next: (res) => {
         this.detenerTimer();
         this.ejecutando = false;
@@ -127,13 +158,13 @@ export class AdminEtlComponent implements OnInit, OnDestroy {
 
         if (res.success) {
           this.historial.unshift({
-            semana: this.semanaInput,
+            semana: this.semanaSeleccionada,
             registros: res.registrosCargados || 108584,
             duracion: res.duracionSegundos,
             fecha: new Date().toISOString()
           });
-          this.snackBar.open(`Semana ${this.semanaInput} generada exitosamente`, 'OK', { duration: 3000 });
-          this.cargarEstadoSemanas();
+          this.snackBar.open(`Semana ${this.semanaSeleccionada} generada exitosamente`, 'OK', { duration: 3000 });
+          this.actualizarEstado();
         } else {
           this.snackBar.open(res.mensaje, 'Cerrar', { duration: 5000 });
         }
