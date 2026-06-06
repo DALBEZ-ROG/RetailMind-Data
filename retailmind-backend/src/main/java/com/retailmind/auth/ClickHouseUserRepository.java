@@ -10,6 +10,7 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
 @Repository
+@SuppressWarnings("null")
 public class ClickHouseUserRepository {
 
     private final JdbcTemplate jdbc;

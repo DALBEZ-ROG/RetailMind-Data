@@ -13,6 +13,7 @@ import com.retailmind.auth.ClickHouseUserRepository;
 import com.retailmind.auth.UsuarioSistema;
 
 @Service
+@SuppressWarnings("null")
 public class PerfilService {
 
     private final JdbcTemplate ch;
@@ -81,7 +82,7 @@ public class PerfilService {
                     "ORDER BY count() DESC LIMIT 1",
                     (rs, rn) -> rs.getString("categoria_nombre"));
             return result.isEmpty() ? null : result.get(0);
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             return null;
         }
     }
@@ -94,7 +95,7 @@ public class PerfilService {
                     "GROUP BY channel ORDER BY count() DESC LIMIT 1",
                     (rs, rn) -> rs.getString("channel"));
             return result.isEmpty() ? null : result.get(0);
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             return null;
         }
     }
@@ -123,7 +124,7 @@ public class PerfilService {
     private Long queryLong(String sql) {
         try {
             return ch.queryForObject(sql, Long.class);
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             return 0L;
         }
     }
@@ -131,7 +132,7 @@ public class PerfilService {
     private Double queryDouble(String sql) {
         try {
             return ch.queryForObject(sql, Double.class);
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             return 0.0;
         }
     }

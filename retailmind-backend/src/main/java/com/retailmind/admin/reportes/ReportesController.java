@@ -70,6 +70,7 @@ public class ReportesController {
     }
 
     @GetMapping("/pdf/dashboard")
+    @SuppressWarnings("null")
     public ResponseEntity<byte[]> pdfDashboard() {
         try {
             byte[] bytes = reportesService.generarPdfDashboard();

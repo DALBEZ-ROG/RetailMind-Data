@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import com.retailmind.catalogo.ProductoCatalogoService;
 
 @Service
+@SuppressWarnings("null")
 public class CarritoService {
 
     private final JdbcTemplate ch;

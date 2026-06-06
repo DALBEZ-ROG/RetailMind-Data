@@ -14,6 +14,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 @Service
+@SuppressWarnings({"null", "resource"})
 public class ProductoCatalogoService {
 
     private static final Logger logger = LoggerFactory.getLogger(ProductoCatalogoService.class);
@@ -65,7 +66,7 @@ public class ProductoCatalogoService {
             long t = total != null ? total : 0L;
             return Map.of("content", rows, "totalElements", t,
                     "totalPages", (int) Math.ceil((double) t / size), "number", page, "size", size);
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             logger.error("Error al obtener productos: {}", e.getMessage());
             return Map.of("content", List.of(), "totalElements", 0L, "totalPages", 0, "number", page, "size", size);
         }
@@ -94,7 +95,7 @@ public class ProductoCatalogoService {
                         return r;
                     });
             return rows.isEmpty() ? null : rows.get(0);
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             logger.error("Error al obtener producto {}: {}", productoId, e.getMessage());
             return null;
         }
@@ -116,7 +117,7 @@ public class ProductoCatalogoService {
                         r.put("total", rs.getLong("total"));
                         return r;
                     });
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             logger.error("Error al obtener categorias: {}", e.getMessage());
             return List.of();
         }
@@ -127,7 +128,7 @@ public class ProductoCatalogoService {
             return ch.query(
                     "SELECT DISTINCT brand FROM retailmind.productos_catalogo WHERE activo = 1 ORDER BY brand",
                     (rs, rn) -> rs.getString("brand"));
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             logger.error("Error al obtener marcas: {}", e.getMessage());
             return List.of();
         }
@@ -156,7 +157,7 @@ public class ProductoCatalogoService {
                     isConversion, dropOff,
                     price != null ? price.toString() : "0",
                     channel != null ? channel : "web", semana));
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             logger.warn("Error al registrar evento: {}", e.getMessage());
         }
     }

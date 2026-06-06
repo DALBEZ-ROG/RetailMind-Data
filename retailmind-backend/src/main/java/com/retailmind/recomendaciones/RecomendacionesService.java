@@ -12,6 +12,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 @Service
+@SuppressWarnings({"null", "resource"})
 public class RecomendacionesService {
 
     private static final Logger logger = LoggerFactory.getLogger(RecomendacionesService.class);
@@ -108,7 +109,7 @@ public class RecomendacionesService {
                         r.put("imagenUrl",    rs.getString("imagen_url"));
                         return r;
                     });
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             logger.warn("Error al obtener similares para {}: {}", productoId, e.getMessage());
             return List.of();
         }
@@ -132,7 +133,7 @@ public class RecomendacionesService {
                     "         dc.categoria_nombre " +
                     "ORDER BY total_compras DESC LIMIT 12",
                     (rs, rn) -> mapProductoCompleto(rs));
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             logger.warn("Error en getProductosPopulares: {}", e.getMessage());
             // Último recurso: productos del catálogo sin join a eventos
             return getProductosCatalogoFallback();
@@ -150,7 +151,7 @@ public class RecomendacionesService {
                     "JOIN retailmind.dim_categoria dc ON pc.categoria_id = dc.categoria_id " +
                     "WHERE pc.activo = 1 ORDER BY pc.stock DESC LIMIT 12",
                     (rs, rn) -> mapProductoCompleto(rs));
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             logger.warn("Error en getProductosCatalogoFallback: {}", e.getMessage());
             return List.of();
         }
@@ -169,7 +170,7 @@ public class RecomendacionesService {
                     "WHERE fe.user_id = '" + username + "' " +
                     "GROUP BY p.categoria_id ORDER BY score DESC LIMIT 3",
                     (rs, rn) -> rs.getInt("categoria_id"));
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             logger.warn("Error en getTopCategoriasPonderadas: {}", e.getMessage());
             return List.of();
         }
@@ -181,7 +182,7 @@ public class RecomendacionesService {
                     "SELECT DISTINCT product_id FROM retailmind.fact_eventos " +
                     "WHERE user_id = '" + username + "'",
                     (rs, rn) -> rs.getString("product_id"));
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             return List.of();
         }
     }
@@ -205,7 +206,7 @@ public class RecomendacionesService {
                     (exclusion.isEmpty() ? "" : " AND pc.producto_id NOT IN (" + exclusion + ")") +
                     " AND pc.activo = 1 ORDER BY rand() LIMIT 12",
                     (rs, rn) -> mapProductoCompleto(rs));
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             logger.warn("Error en getProductosRecomendados: {}", e.getMessage());
             return getProductosPopulares();
         }
@@ -223,7 +224,7 @@ public class RecomendacionesService {
                     "ORDER BY count() DESC LIMIT 1",
                     (rs, rn) -> rs.getString("categoria_nombre"));
             return result.isEmpty() ? null : result.get(0);
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             return null;
         }
     }
@@ -254,7 +255,7 @@ public class RecomendacionesService {
         try {
             Long val = ch.queryForObject(sql, Long.class);
             return val != null ? val : 0L;
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             return 0L;
         }
     }
