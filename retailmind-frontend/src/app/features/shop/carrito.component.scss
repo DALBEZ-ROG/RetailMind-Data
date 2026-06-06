@@ -154,7 +154,7 @@
   text-align: center;
   color: var(--text-light);
 
-  mat-icon, > mat-icon {
+  > mat-icon {
     font-size: 80px;
     width: 80px;
     height: 80px;
@@ -173,6 +173,12 @@
     font-size: 14px;
     color: #90a4ae;
     margin-bottom: 24px;
+  }
+
+  button mat-icon {
+    font-size: 20px !important;
+    width: 20px !important;
+    height: 20px !important;
   }
 }
 
