@@ -88,8 +88,8 @@ public class GestionDatosController {
     @PostMapping("/dim-canal")
     public ResponseEntity<?> createDimCanal(@RequestBody Map<String, Object> body) {
         try {
-            service.insertDimension("dim_canal", "canal_id", "canal_nombre",
-                    ((Number) body.get("id")).longValue(), (String) body.get("nombre"));
+            service.insertDimensionAutoId("dim_canal", "canal_id", "canal_nombre",
+                    (String) body.get("nombre"));
             return ResponseEntity.ok(Map.of("success", true, "mensaje", "Canal creado"));
         } catch (Exception e) { return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage())); }
     }
@@ -123,8 +123,8 @@ public class GestionDatosController {
     @PostMapping("/dim-region")
     public ResponseEntity<?> createDimRegion(@RequestBody Map<String, Object> body) {
         try {
-            service.insertDimension("dim_region", "region_id", "region_nombre",
-                    ((Number) body.get("id")).longValue(), (String) body.get("nombre"));
+            service.insertDimensionAutoId("dim_region", "region_id", "region_nombre",
+                    (String) body.get("nombre"));
             return ResponseEntity.ok(Map.of("success", true, "mensaje", "Region creada"));
         } catch (Exception e) { return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage())); }
     }
@@ -158,8 +158,8 @@ public class GestionDatosController {
     @PostMapping("/dim-dispositivo")
     public ResponseEntity<?> createDimDispositivo(@RequestBody Map<String, Object> body) {
         try {
-            service.insertDimension("dim_dispositivo", "dispositivo_id", "dispositivo_nombre",
-                    ((Number) body.get("id")).longValue(), (String) body.get("nombre"));
+            service.insertDimensionAutoId("dim_dispositivo", "dispositivo_id", "dispositivo_nombre",
+                    (String) body.get("nombre"));
             return ResponseEntity.ok(Map.of("success", true, "mensaje", "Dispositivo creado"));
         } catch (Exception e) { return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage())); }
     }
@@ -193,8 +193,8 @@ public class GestionDatosController {
     @PostMapping("/dim-categoria")
     public ResponseEntity<?> createDimCategoria(@RequestBody Map<String, Object> body) {
         try {
-            service.insertDimension("dim_categoria", "categoria_id", "categoria_nombre",
-                    ((Number) body.get("id")).longValue(), (String) body.get("nombre"));
+            service.insertDimensionAutoId("dim_categoria", "categoria_id", "categoria_nombre",
+                    (String) body.get("nombre"));
             return ResponseEntity.ok(Map.of("success", true, "mensaje", "Categoria creada"));
         } catch (Exception e) { return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage())); }
     }
@@ -228,8 +228,8 @@ public class GestionDatosController {
     @PostMapping("/dim-fuente-trafico")
     public ResponseEntity<?> createDimFuenteTrafico(@RequestBody Map<String, Object> body) {
         try {
-            service.insertDimension("dim_fuente_trafico", "fuente_id", "fuente_nombre",
-                    ((Number) body.get("id")).longValue(), (String) body.get("nombre"));
+            service.insertDimensionAutoId("dim_fuente_trafico", "fuente_id", "fuente_nombre",
+                    (String) body.get("nombre"));
             return ResponseEntity.ok(Map.of("success", true, "mensaje", "Fuente de trafico creada"));
         } catch (Exception e) { return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage())); }
     }

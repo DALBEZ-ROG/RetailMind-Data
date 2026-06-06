@@ -7,28 +7,26 @@
   </div>
 
   <!-- SECCIÓN 1: Filtro semana -->
-  <mat-card class="filters-card">
-    <div class="filters-row">
-      <mat-form-field appearance="outline" class="filter-field">
-        <mat-label>Semana</mat-label>
-        <mat-select [(ngModel)]="semanaFiltro">
-          <mat-option [value]="null">Todas</mat-option>
-          <mat-option *ngFor="let s of semanas" [value]="s">Semana {{ s }}</mat-option>
-        </mat-select>
-      </mat-form-field>
-      <button mat-raised-button color="primary" (click)="aplicar()">
-        <mat-icon>search</mat-icon> Aplicar
-      </button>
-      <button mat-stroked-button (click)="limpiar()">
-        <mat-icon>clear</mat-icon> Limpiar
-      </button>
-    </div>
-  </mat-card>
+  <div class="filtros-container" style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; align-items:center">
+    <mat-select [(ngModel)]="semanaFiltro" class="semana-select" placeholder="Todas las semanas">
+      <mat-option [value]="null">Todas</mat-option>
+      <mat-option *ngFor="let s of semanas" [value]="s">Semana {{ s }}</mat-option>
+    </mat-select>
+    <div></div>
+  </div>
+  <div style="display:flex; gap:12px; margin-top:12px; margin-bottom:24px">
+    <button class="btn-aplicar" (click)="aplicar()">
+      <mat-icon>search</mat-icon> Aplicar
+    </button>
+    <button class="btn-limpiar" (click)="limpiar()">
+      <mat-icon>clear</mat-icon> Limpiar
+    </button>
+  </div>
 
   <div class="loading-center" *ngIf="loading"><mat-spinner diameter="40"></mat-spinner></div>
 
   <!-- SECCIÓN 2: Cards de canales -->
-  <div class="canal-grid" *ngIf="!loading && resumen.length > 0">
+  <div class="canal-cards-grid" *ngIf="!loading && resumen.length > 0">
     <mat-card class="canal-card" *ngFor="let c of resumen"
               [style.border-top]="'4px solid ' + getCanalColor(c.fuente)">
       <div class="canal-header">
@@ -50,22 +48,22 @@
 
       <div class="canal-metrics">
         <div class="cm">
-          <span class="cm-val">{{ c.totalSesiones | number }}</span>
-          <span class="cm-label">Sesiones</span>
+          <span class="metric-value">{{ c.totalSesiones | number }}</span>
+          <span class="metric-label">Sesiones</span>
         </div>
         <div class="cm">
-          <span class="cm-val">{{ c.totalUsuarios | number }}</span>
-          <span class="cm-label">Usuarios</span>
+          <span class="metric-value">{{ c.totalUsuarios | number }}</span>
+          <span class="metric-label">Usuarios</span>
         </div>
         <div class="cm">
-          <span class="cm-val" [style.color]="getColorConversion(c.tasaConversion)">
+          <span class="metric-value" [style.color]="getColorConversion(c.tasaConversion)">
             {{ c.tasaConversion }}%
           </span>
-          <span class="cm-label">Conv.</span>
+          <span class="metric-label">Conv.</span>
         </div>
         <div class="cm">
-          <span class="cm-val revenue">${{ c.revenueTotal | number:'1.0-0' }}</span>
-          <span class="cm-label">Revenue</span>
+          <span class="metric-value revenue">{{ formatRevenue(c.revenueTotal) }}</span>
+          <span class="metric-label">Revenue</span>
         </div>
       </div>
 
@@ -147,7 +145,7 @@
         </ng-container>
         <ng-container matColumnDef="revenueTotal">
           <th mat-header-cell *matHeaderCellDef>Revenue</th>
-          <td mat-cell *matCellDef="let r" [class.cell-max]="isMax(r,'revenueTotal')">${{ r.revenueTotal | number:'1.0-0' }}</td>
+          <td mat-cell *matCellDef="let r" [class.cell-max]="isMax(r,'revenueTotal')">{{ formatRevenue(r.revenueTotal) }}</td>
         </ng-container>
         <ng-container matColumnDef="tiempoPromedio">
           <th mat-header-cell *matHeaderCellDef>T. Prom.</th>

@@ -1,4 +1,8 @@
-// ── Header rediseñado ───────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+// DASHBOARD — Premium Design
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── Header ──────────────────────────────────────────────────────────────────
 .dashboard-header {
   padding-bottom: 16px;
 
@@ -16,14 +20,16 @@
 
 .page-title {
   font-size: 1.8rem;
-  font-weight: 500;
-  color: #333;
+  font-weight: 800;
+  background: var(--primary-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
   margin: 0;
 }
 
 .welcome-text {
   font-size: 0.9rem;
-  color: #616161;
+  color: var(--text-secondary);
 }
 
 .header-divider {
@@ -34,7 +40,7 @@
 
 .last-update {
   font-size: 0.82rem;
-  color: #9e9e9e;
+  color: var(--text-light);
 }
 
 // ── Performance bar ────────────────────────────────────────────────────────
@@ -51,6 +57,7 @@
   color: #2e7d32 !important;
   font-weight: 600;
   font-size: 0.82rem;
+  border-radius: 20px !important;
 
   mat-icon {
     font-size: 16px;
@@ -63,11 +70,12 @@
 
 .refresh-btn {
   margin-left: 8px;
+  border-radius: var(--border-radius-sm) !important;
 }
 
 // ── Error card ─────────────────────────────────────────────────────────────
 .error-card {
-  border-radius: 12px !important;
+  border-radius: var(--border-radius) !important;
   margin-bottom: 24px;
 
   .error-content {
@@ -86,7 +94,7 @@
   }
 }
 
-// ── KPI Cards ──────────────────────────────────────────────────────────────
+// ── KPI Cards — Glassmorphism ──────────────────────────────────────────────
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -95,13 +103,31 @@
 }
 
 .kpi-card {
-  border-radius: 12px !important;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important;
-  transition: transform 0.2s, box-shadow 0.2s;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: var(--border-radius) !important;
+  padding: 24px;
+  box-shadow: var(--shadow-soft) !important;
+  transition: var(--transition);
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -20%;
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    opacity: 0.08;
+  }
 
   &:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 6px 16px rgba(0,0,0,0.14) !important;
+    transform: translateY(-6px);
+    box-shadow: var(--shadow-strong) !important;
   }
 
   .kpi-inner {
@@ -111,35 +137,68 @@
     padding: 4px 0;
   }
 
+  .kpi-info {
+    flex: 1;
+  }
+
   .kpi-label {
-    font-size: 0.82rem;
-    color: #757575;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
     margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
   }
 
   .kpi-value {
-    font-size: 1.7rem;
-    font-weight: 700;
-    color: #212121;
+    font-size: 32px;
+    font-weight: 800;
+    color: var(--text-primary);
+    line-height: 1;
   }
 
   .kpi-icon {
-    width: 52px;
-    height: 52px;
-    border-radius: 50%;
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
 
     mat-icon {
-      color: #fff;
-      font-size: 26px;
-      width: 26px;
-      height: 26px;
+      color: white;
+      font-size: 24px;
+      width: 24px;
+      height: 24px;
     }
   }
 }
+
+// KPI card color variants
+.kpi-sesiones .kpi-icon { background: linear-gradient(135deg, #1a237e, #3949ab); }
+.kpi-sesiones::before { background: #1a237e; }
+
+.kpi-usuarios .kpi-icon { background: linear-gradient(135deg, #00695c, #00897b); }
+.kpi-usuarios::before { background: #00695c; }
+
+.kpi-conversiones .kpi-icon { background: linear-gradient(135deg, #1b5e20, #2e7d32); }
+.kpi-conversiones::before { background: #1b5e20; }
+
+.kpi-tasa .kpi-icon { background: linear-gradient(135deg, #e65100, #f57c00); }
+.kpi-tasa::before { background: #e65100; }
+
+.kpi-abandonos .kpi-icon { background: linear-gradient(135deg, #b71c1c, #c62828); }
+.kpi-abandonos::before { background: #b71c1c; }
+
+.kpi-eventos .kpi-icon { background: linear-gradient(135deg, #4a148c, #6a1b9a); }
+.kpi-eventos::before { background: #4a148c; }
+
+.kpi-semanas .kpi-icon { background: linear-gradient(135deg, #006064, #00838f); }
+.kpi-semanas::before { background: #006064; }
+
+.kpi-promedio .kpi-icon { background: linear-gradient(135deg, #f57f17, #f9a825); }
+.kpi-promedio::before { background: #f57f17; }
 
 // ── Charts ─────────────────────────────────────────────────────────────────
 .charts-grid {
@@ -154,8 +213,13 @@
 }
 
 .chart-card {
-  border-radius: 12px !important;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important;
+  border-radius: var(--border-radius) !important;
+  box-shadow: var(--shadow-soft) !important;
+  transition: var(--transition);
+
+  &:hover {
+    box-shadow: var(--shadow-medium) !important;
+  }
 
   &--wide {
     grid-column: 1 / -1;
@@ -165,8 +229,8 @@
 
   mat-card-title {
     font-size: 1rem !important;
-    font-weight: 500;
-    color: #424242;
+    font-weight: 600;
+    color: var(--text-primary);
   }
 
   canvas { max-height: 280px; }
@@ -178,15 +242,15 @@
   canvas { max-width: 280px; }
 }
 
-// ── Tabla ──────────────────────────────────────────────────────────────────
+// ── Table ──────────────────────────────────────────────────────────────────
 .table-card {
-  border-radius: 12px !important;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important;
+  border-radius: var(--border-radius) !important;
+  box-shadow: var(--shadow-soft) !important;
 
   mat-card-title {
     font-size: 1rem !important;
-    font-weight: 500;
-    color: #424242;
+    font-weight: 600;
+    color: var(--text-primary);
   }
 }
 
@@ -195,17 +259,17 @@
 table { min-width: 700px; }
 
 th.mat-header-cell {
-  font-weight: 600;
-  color: #424242;
-  background-color: #f5f5f5;
+  font-weight: 700;
+  color: var(--text-primary);
+  background-color: #f0f4f8;
 }
 
-tr.mat-row:hover { background-color: #fafafa; }
+tr.mat-row:hover { background-color: #f8f9fc; }
 
 .no-data {
   text-align: center;
   padding: 32px;
-  color: #9e9e9e;
+  color: var(--text-light);
 }
 
 ::ng-deep .snack-error {

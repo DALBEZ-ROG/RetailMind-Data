@@ -5,8 +5,6 @@ import { MatPaginatorModule, MatPaginator, PageEvent } from '@angular/material/p
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
-import { MatChipsModule } from '@angular/material/chips';
-import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { ConversionService } from '../../../core/services/conversion.service';
 import { Conversion, ConversionResumen } from '../../../core/models/conversion.model';
 
@@ -19,9 +17,7 @@ import { Conversion, ConversionResumen } from '../../../core/models/conversion.m
     MatPaginatorModule,
     MatProgressSpinnerModule,
     MatCardModule,
-    MatIconModule,
-    MatChipsModule,
-    MatButtonToggleModule
+    MatIconModule
   ],
   templateUrl: './conversiones-list.component.html',
   styleUrl: './conversiones-list.component.scss'

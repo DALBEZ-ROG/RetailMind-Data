@@ -109,6 +109,12 @@ export class TraficoComponent implements OnInit {
     return '#c62828';
   }
 
+  formatRevenue(value: number): string {
+    if (value >= 1000000) return '$' + (value / 1000000).toFixed(1) + 'M';
+    if (value >= 1000) return '$' + (value / 1000).toFixed(1) + 'K';
+    return '$' + value.toFixed(0);
+  }
+
   getMaxEmbudo(canal: any): number {
     return Math.max(canal.vistas, canal.clicks, canal.carritos, canal.compras, canal.abandonos, 1);
   }

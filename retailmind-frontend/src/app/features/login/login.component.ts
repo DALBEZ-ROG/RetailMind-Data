@@ -2,13 +2,8 @@ import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
-import { MatCardModule } from '@angular/material/card';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { AuthService } from '../../core/services/auth.service';
 
 @Component({
@@ -17,13 +12,8 @@ import { AuthService } from '../../core/services/auth.service';
   imports: [
     CommonModule,
     ReactiveFormsModule,
-    MatCardModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatButtonModule,
     MatIconModule,
-    MatProgressSpinnerModule,
-    MatSnackBarModule
+    MatProgressSpinnerModule
   ],
   templateUrl: './login.component.html',
   styleUrl: './login.component.scss'
@@ -33,12 +23,12 @@ export class LoginComponent {
   loading      = false;
   hidePassword = true;
   shakeCard    = false;
+  errorMessage = '';
 
   constructor(
     private fb:          FormBuilder,
     private authService: AuthService,
-    private router:      Router,
-    private snackBar:    MatSnackBar
+    private router:      Router
   ) {
     this.loginForm = this.fb.group({
       username: ['', [Validators.required, Validators.minLength(3)]],
@@ -52,12 +42,12 @@ export class LoginComponent {
     if (this.loginForm.invalid) return;
 
     this.loading = true;
+    this.errorMessage = '';
     const { username, password } = this.loginForm.value;
 
     this.authService.login(username, password).subscribe({
       next: () => {
         this.loading = false;
-        // Redirigir según rol
         const user = this.authService.getCurrentUser();
         if (user?.rol === 'ADMIN') {
           this.router.navigate(['/dashboard']);
@@ -67,12 +57,8 @@ export class LoginComponent {
       },
       error: () => {
         this.loading = false;
+        this.errorMessage = 'Credenciales incorrectas. Intenta de nuevo.';
         this.triggerShake();
-        this.snackBar.open(
-          'Credenciales incorrectas. Intenta de nuevo.',
-          'Cerrar',
-          { duration: 4000, panelClass: 'snack-error' }
-        );
       }
     });
   }

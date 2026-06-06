@@ -1,33 +1,29 @@
 .page-title {
   font-size: 1.8rem;
-  font-weight: 500;
-  color: #333;
+  font-weight: 800;
+  background: var(--primary-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
   margin-bottom: 24px;
-}
-
-.search-field {
-  width: 100%;
-  max-width: 400px;
-  margin-bottom: 16px;
 }
 
 .table-wrapper { overflow-x: auto; }
 table { min-width: 800px; }
 
 th.mat-header-cell {
-  font-weight: 600;
-  color: #424242;
-  background-color: #f5f5f5;
+  font-weight: 700;
+  color: var(--text-primary);
+  background-color: #f0f4f8;
 }
 
 .hoverable-row:hover {
-  background-color: #e3f2fd !important;
+  background-color: #f8f9ff !important;
 }
 
 .empty-state {
   text-align: center;
   padding: 48px 24px;
-  color: #9e9e9e;
+  color: var(--text-light);
 
   .empty-icon {
     font-size: 64px;
@@ -44,5 +40,5 @@ th.mat-header-cell {
 .no-data {
   text-align: center;
   padding: 32px;
-  color: #9e9e9e;
+  color: var(--text-light);
 }

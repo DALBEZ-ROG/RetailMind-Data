@@ -116,6 +116,14 @@ public class GestionDatosService {
                 id + ", '" + nombre + "')");
     }
 
+    public void insertDimensionAutoId(String table, String idCol, String nameCol, String nombre) {
+        Long maxId = ch.queryForObject(
+                "SELECT max(" + idCol + ") FROM retailmind." + table, Long.class);
+        long nextId = (maxId != null ? maxId : 0) + 1;
+        ch.execute("INSERT INTO retailmind." + table + " (" + idCol + ", " + nameCol + ") VALUES (" +
+                nextId + ", '" + nombre + "')");
+    }
+
     public void updateDimension(String table, String idCol, String nameCol, long id, String nombre) {
         ch.execute("ALTER TABLE retailmind." + table + " UPDATE " + nameCol + " = '" + nombre +
                 "' WHERE " + idCol + " = " + id + " SETTINGS mutations_sync = 1");

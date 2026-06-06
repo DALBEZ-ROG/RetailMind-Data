@@ -5,15 +5,16 @@
     <mat-card-content>
 
       <!-- Busqueda -->
-      <mat-form-field appearance="outline" class="search-field">
-        <mat-label>Buscar por User ID</mat-label>
-        <input matInput [ngModel]="searchTerm" (ngModelChange)="onSearchChange($event)"
-               placeholder="Escribe un user_id...">
-        <mat-icon matPrefix>search</mat-icon>
-        <button mat-icon-button matSuffix *ngIf="searchTerm" (click)="clearFilters()">
-          <mat-icon>close</mat-icon>
+      <div class="filtros-container" style="background:white">
+        <div class="search-bar-container" style="width:100%">
+          <mat-icon class="search-icon">search</mat-icon>
+          <input class="search-input" placeholder="Buscar por User ID..."
+                 [ngModel]="searchTerm" (ngModelChange)="onSearchChange($event)">
+        </div>
+        <button class="btn-limpiar" *ngIf="searchTerm" (click)="clearFilters()">
+          <mat-icon>clear</mat-icon> Limpiar
         </button>
-      </mat-form-field>
+      </div>
 
       <div *ngIf="loading" class="spinner-container">
         <mat-spinner diameter="50"></mat-spinner>

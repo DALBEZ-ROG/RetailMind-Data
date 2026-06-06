@@ -49,28 +49,22 @@
   </mat-card>
 
   <!-- ═══ SECCIÓN 2: Filtros ═══ -->
-  <mat-card class="filter-card">
-    <div class="filter-row">
-      <mat-form-field appearance="outline">
-        <mat-label>Semana</mat-label>
-        <mat-select [(ngModel)]="semana">
-          <mat-option [value]="null">Todas</mat-option>
-          <mat-option *ngFor="let s of semanasDisponibles" [value]="s">Semana {{ s }}</mat-option>
-        </mat-select>
-      </mat-form-field>
-      <mat-form-field appearance="outline">
-        <mat-label>Canal</mat-label>
-        <mat-select [(ngModel)]="canal">
-          <mat-option [value]="null">Todos</mat-option>
-          <mat-option value="mobile">Mobile</mat-option>
-          <mat-option value="web">Web</mat-option>
-          <mat-option value="app">App</mat-option>
-        </mat-select>
-      </mat-form-field>
-      <button mat-raised-button color="primary" (click)="aplicarFiltros()"><mat-icon>filter_list</mat-icon> Aplicar</button>
-      <button mat-stroked-button (click)="limpiarFiltros()">Limpiar</button>
-    </div>
-  </mat-card>
+  <div class="filtros-container" style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; align-items:center">
+    <mat-select [(ngModel)]="semana" class="semana-select" placeholder="Todas las semanas">
+      <mat-option [value]="null">Todas</mat-option>
+      <mat-option *ngFor="let s of semanasDisponibles" [value]="s">Semana {{ s }}</mat-option>
+    </mat-select>
+    <mat-select [(ngModel)]="canal" class="canal-select" placeholder="Todos los canales">
+      <mat-option [value]="null">Todos</mat-option>
+      <mat-option value="mobile">Mobile</mat-option>
+      <mat-option value="web">Web</mat-option>
+      <mat-option value="app">App</mat-option>
+    </mat-select>
+  </div>
+  <div style="display:flex; gap:12px; margin-top:12px; margin-bottom:24px">
+    <button class="btn-aplicar" (click)="aplicarFiltros()"><mat-icon>filter_list</mat-icon> Aplicar</button>
+    <button class="btn-limpiar" (click)="limpiarFiltros()"><mat-icon>clear</mat-icon> Limpiar</button>
+  </div>
 
   <!-- ═══ SECCIÓN 3: Tabla ═══ -->
   <mat-card class="table-card">

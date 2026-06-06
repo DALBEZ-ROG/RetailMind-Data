@@ -16,19 +16,151 @@
   align-items: center;
   gap: 10px;
   font-size: 1.5rem;
-  font-weight: 600;
-  color: #1a237e;
+  font-weight: 800;
+  background: var(--primary-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
   margin: 0;
 
-  mat-icon { font-size: 28px; width: 28px; height: 28px; }
+  mat-icon {
+    font-size: 28px;
+    width: 28px;
+    height: 28px;
+    -webkit-text-fill-color: var(--primary);
+  }
 }
 
-.category-filters {
+// ══════════════════════════════════════════════════════════════════════════════
+// CATEGORY CHIPS — Pastel Soft, Large & Centered
+// ══════════════════════════════════════════════════════════════════════════════
+.category-chips-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
   margin-bottom: 24px;
-  overflow-x: auto;
+}
 
-  mat-chip-option {
-    mat-icon { font-size: 16px; width: 16px; height: 16px; margin-right: 4px; }
+.category-chip {
+  height: 44px !important;
+  padding: 0 18px !important;
+  border-radius: 22px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  cursor: pointer;
+  transition: var(--transition) !important;
+
+  mat-icon {
+    font-size: 18px !important;
+    width: 18px !important;
+    height: 18px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    line-height: 1 !important;
+  }
+
+  span {
+    line-height: 1 !important;
+    white-space: nowrap !important;
+  }
+
+  &:hover {
+    transform: translateY(-2px);
+  }
+}
+
+.chip-electronics {
+  background: #e3f2fd !important;
+  color: #1565c0 !important;
+  border: 1.5px solid #90caf9 !important;
+
+  &.selected {
+    background: #bbdefb !important;
+    box-shadow: 0 4px 12px rgba(21, 101, 192, 0.25) !important;
+  }
+}
+
+.chip-groceries {
+  background: #fff3e0 !important;
+  color: #e65100 !important;
+  border: 1.5px solid #ffcc80 !important;
+
+  &.selected {
+    background: #ffe0b2 !important;
+    box-shadow: 0 4px 12px rgba(230, 81, 0, 0.25) !important;
+  }
+}
+
+.chip-sports {
+  background: #e8f5e9 !important;
+  color: #2e7d32 !important;
+  border: 1.5px solid #a5d6a7 !important;
+
+  &.selected {
+    background: #c8e6c9 !important;
+    box-shadow: 0 4px 12px rgba(46, 125, 50, 0.25) !important;
+  }
+}
+
+.chip-accessories {
+  background: #fff8e1 !important;
+  color: #f57f17 !important;
+  border: 1.5px solid #ffe082 !important;
+
+  &.selected {
+    background: #ffecb3 !important;
+    box-shadow: 0 4px 12px rgba(245, 127, 23, 0.25) !important;
+  }
+}
+
+.chip-beauty {
+  background: #fce4ec !important;
+  color: #880e4f !important;
+  border: 1.5px solid #f48fb1 !important;
+
+  &.selected {
+    background: #f8bbd0 !important;
+    box-shadow: 0 4px 12px rgba(136, 14, 79, 0.25) !important;
+  }
+}
+
+.chip-home {
+  background: #e0f2f1 !important;
+  color: #00695c !important;
+  border: 1.5px solid #80cbc4 !important;
+
+  &.selected {
+    background: #b2dfdb !important;
+    box-shadow: 0 4px 12px rgba(0, 105, 92, 0.25) !important;
+  }
+}
+
+.chip-shoes {
+  background: #ede7f6 !important;
+  color: #4a148c !important;
+  border: 1.5px solid #ce93d8 !important;
+
+  &.selected {
+    background: #d1c4e9 !important;
+    box-shadow: 0 4px 12px rgba(74, 20, 140, 0.25) !important;
+  }
+}
+
+.chip-apparel {
+  background: #e8eaf6 !important;
+  color: #1a237e !important;
+  border: 1.5px solid #9fa8da !important;
+
+  &.selected {
+    background: #c5cae9 !important;
+    box-shadow: 0 4px 12px rgba(26, 35, 126, 0.25) !important;
   }
 }
 
@@ -38,55 +170,106 @@
   padding: 60px;
 }
 
-// ── Grid de productos ────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+// PRODUCT GRID & CARDS
+// ══════════════════════════════════════════════════════════════════════════════
 .products-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
+  gap: 24px;
   margin-bottom: 24px;
 }
 
 .product-card {
+  background: white;
+  border-radius: var(--border-radius);
+  overflow: hidden;
+  transition: var(--transition), opacity 0.3s ease !important;
+  box-shadow: var(--shadow-soft);
+  border: 1px solid rgba(26, 35, 126, 0.06);
   cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
-  border-radius: 12px !important;
 
   &:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 20px 60px rgba(26, 35, 126, 0.15);
+  }
+
+  &.categoria-activa {
     transform: translateY(-4px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12) !important;
+    box-shadow: var(--shadow-medium) !important;
+  }
+
+  &.categoria-inactiva {
+    opacity: 0.5;
+    transform: none !important;
+
+    &:hover {
+      opacity: 0.75;
+    }
+  }
+}
+
+.product-image-area {
+  background: linear-gradient(135deg, #f0f4f8, #e8eaf6);
+  height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  transition: background-color 0.3s ease;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: -30%;
+    right: -20%;
+    width: 150px;
+    height: 150px;
+    background: rgba(26, 35, 126, 0.05);
+    border-radius: 50%;
+  }
+
+  mat-icon {
+    font-size: 64px;
+    width: 64px;
+    height: 64px;
+    opacity: 0.4;
+    color: #3f51b5;
+    transition: color 0.3s ease;
   }
 }
 
 .product-image {
-  height: 140px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #e8eaf6, #c5cae9);
-  border-radius: 12px 12px 0 0;
+  @extend .product-image-area;
 }
 
 .product-icon {
-  font-size: 56px;
-  width: 56px;
-  height: 56px;
+  font-size: 64px;
+  width: 64px;
+  height: 64px;
   color: #3f51b5;
-  opacity: 0.7;
+  opacity: 0.4;
+}
+
+.product-info {
+  padding: 16px;
 }
 
 .product-brand {
-  font-size: 0.75rem;
-  color: #9e9e9e;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  color: var(--text-secondary);
   margin: 8px 0 4px;
 }
 
 .product-name {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: #333;
-  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 4px 0 8px;
   line-height: 1.3;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -101,9 +284,11 @@
 }
 
 .product-price {
-  font-size: 1.2rem;
-  font-weight: 700;
-  color: #1a237e;
+  font-size: 20px;
+  font-weight: 800;
+  background: var(--primary-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
   margin: 0;
 }
 
@@ -131,9 +316,15 @@ mat-card-actions {
 .empty-state {
   text-align: center;
   padding: 60px;
-  color: #9e9e9e;
+  color: var(--text-light);
 
-  mat-icon { font-size: 64px; width: 64px; height: 64px; display: block; margin: 0 auto 12px; }
+  mat-icon {
+    font-size: 64px;
+    width: 64px;
+    height: 64px;
+    display: block;
+    margin: 0 auto 12px;
+  }
 }
 
 // ── Snackbar ─────────────────────────────────────────────────────────────────

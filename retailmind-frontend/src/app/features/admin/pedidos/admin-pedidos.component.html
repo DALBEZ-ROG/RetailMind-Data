@@ -1,12 +1,15 @@
 <div class="admin-pedidos-container">
   <h2 class="page-title"><mat-icon>receipt_long</mat-icon> Todos los Pedidos</h2>
 
-  <mat-card class="filter-card">
-    <mat-form-field appearance="outline">
-      <mat-label>Filtrar por usuario</mat-label>
-      <input matInput [(ngModel)]="filtroUsername" (ngModelChange)="filtrar()" placeholder="username...">
-    </mat-form-field>
-  </mat-card>
+  <div class="filtros-container" style="background:white">
+    <div class="search-bar-container" style="width:100%">
+      <mat-icon class="search-icon">search</mat-icon>
+      <input class="search-input"
+             placeholder="Buscar por usuario..."
+             [(ngModel)]="filtroUsername"
+             (input)="filtrar()">
+    </div>
+  </div>
 
   <div class="empty-state" *ngIf="!loading && filteredPedidos.length === 0">
     <mat-icon>inbox</mat-icon>

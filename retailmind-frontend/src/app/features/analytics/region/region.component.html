@@ -7,32 +7,25 @@
   </div>
 
   <!-- SECCIÓN 1: Filtros -->
-  <mat-card class="filters-card">
-    <div class="filters-row">
-      <mat-form-field appearance="outline" class="filter-field">
-        <mat-label>Semana</mat-label>
-        <mat-select [(ngModel)]="semanaFiltro">
-          <mat-option [value]="null">Todas</mat-option>
-          <mat-option *ngFor="let s of semanas" [value]="s">Semana {{ s }}</mat-option>
-        </mat-select>
-      </mat-form-field>
+  <div class="filtros-container" style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; align-items:center">
+    <mat-select [(ngModel)]="semanaFiltro" class="semana-select" placeholder="Todas las semanas">
+      <mat-option [value]="null">Todas</mat-option>
+      <mat-option *ngFor="let s of semanas" [value]="s">Semana {{ s }}</mat-option>
+    </mat-select>
 
-      <mat-form-field appearance="outline" class="filter-field">
-        <mat-label>Canal</mat-label>
-        <mat-select [(ngModel)]="canalFiltro">
-          <mat-option value="">Todos</mat-option>
-          <mat-option *ngFor="let c of canales" [value]="c">{{ c }}</mat-option>
-        </mat-select>
-      </mat-form-field>
-
-      <button mat-raised-button color="primary" (click)="cargar()">
-        <mat-icon>search</mat-icon> Aplicar
-      </button>
-      <button mat-stroked-button (click)="limpiarFiltros()">
-        <mat-icon>clear</mat-icon> Limpiar
-      </button>
-    </div>
-  </mat-card>
+    <mat-select [(ngModel)]="canalFiltro" class="canal-select" placeholder="Todos los canales">
+      <mat-option value="">Todos</mat-option>
+      <mat-option *ngFor="let c of canales" [value]="c">{{ c }}</mat-option>
+    </mat-select>
+  </div>
+  <div style="display:flex; gap:12px; margin-top:12px; margin-bottom:24px">
+    <button class="btn-aplicar" (click)="cargar()">
+      <mat-icon>search</mat-icon> Aplicar
+    </button>
+    <button class="btn-limpiar" (click)="limpiarFiltros()">
+      <mat-icon>clear</mat-icon> Limpiar
+    </button>
+  </div>
 
   <!-- Loading -->
   <div class="loading-center" *ngIf="loading">

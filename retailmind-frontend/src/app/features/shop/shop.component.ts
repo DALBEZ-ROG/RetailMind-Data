@@ -5,7 +5,6 @@ import { Router } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatChipsModule } from '@angular/material/chips';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
@@ -22,12 +21,23 @@ const CATEGORY_ICONS: Record<number, string> = {
   5: 'spa', 6: 'home', 7: 'directions_walk', 8: 'checkroom'
 };
 
+const CATEGORY_COLORS: Record<number, { bg: string; border: string; icon: string }> = {
+  1: { bg: '#e3f2fd', border: '#90caf9', icon: '#1565c0' },
+  2: { bg: '#fff3e0', border: '#ffcc80', icon: '#e65100' },
+  3: { bg: '#e8f5e9', border: '#a5d6a7', icon: '#2e7d32' },
+  4: { bg: '#fff8e1', border: '#ffe082', icon: '#f57f17' },
+  5: { bg: '#fce4ec', border: '#f48fb1', icon: '#880e4f' },
+  6: { bg: '#e0f2f1', border: '#80cbc4', icon: '#00695c' },
+  7: { bg: '#ede7f6', border: '#ce93d8', icon: '#4a148c' },
+  8: { bg: '#e8eaf6', border: '#9fa8da', icon: '#1a237e' }
+};
+
 @Component({
   selector: 'app-shop',
   standalone: true,
   imports: [
     CommonModule, FormsModule, MatCardModule, MatButtonModule,
-    MatIconModule, MatChipsModule, MatFormFieldModule, MatInputModule,
+    MatIconModule, MatFormFieldModule, MatInputModule,
     MatPaginatorModule, MatSnackBarModule, MatBadgeModule, MatProgressSpinnerModule
   ],
   templateUrl: './shop.component.html',
@@ -51,6 +61,9 @@ export class ShopComponent implements OnInit {
 
   // Wishlist
   productosEnWishlist = new Set<string>();
+
+  // Color de categoría activa
+  categoriaColorActiva: { bg: string; border: string; icon: string } | null = null;
 
   constructor(
     private shopService: ShopService,
@@ -116,6 +129,9 @@ export class ShopComponent implements OnInit {
 
   filtrarCategoria(catId: number | null): void {
     this.categoriaSeleccionada = this.categoriaSeleccionada === catId ? null : catId;
+    this.categoriaColorActiva = this.categoriaSeleccionada
+      ? (CATEGORY_COLORS[this.categoriaSeleccionada] || null)
+      : null;
     this.page = 0;
     this.loadProductos();
   }
@@ -152,7 +168,6 @@ export class ShopComponent implements OnInit {
     const productoId = producto.productoId;
 
     if (this.productosEnWishlist.has(productoId)) {
-      // Eliminar de wishlist
       this.http.delete(`${environment.apiUrl}/api/wishlist/${user.username}/${productoId}`).subscribe({
         next: () => {
           this.productosEnWishlist.delete(productoId);
@@ -161,7 +176,6 @@ export class ShopComponent implements OnInit {
         error: () => this.snackBar.open('Error', 'Cerrar', { duration: 2000 })
       });
     } else {
-      // Agregar a wishlist
       this.shopService.agregarAWishlist(user.username, productoId).subscribe({
         next: () => {
           this.productosEnWishlist.add(productoId);
@@ -178,5 +192,30 @@ export class ShopComponent implements OnInit {
 
   getCategoryIcon(catId: number): string {
     return CATEGORY_ICONS[catId] || 'inventory_2';
+  }
+
+  // ── Dynamic card styles based on active category ─────────────────────────
+  getCardStyle(producto: any): Record<string, string> {
+    if (!this.categoriaSeleccionada || !this.categoriaColorActiva) return {};
+    if (producto.categoriaId === this.categoriaSeleccionada) {
+      return { 'border': '1.5px solid ' + this.categoriaColorActiva.border };
+    }
+    return {};
+  }
+
+  getImageAreaStyle(producto: any): Record<string, string> {
+    if (!this.categoriaSeleccionada || !this.categoriaColorActiva) return {};
+    if (producto.categoriaId === this.categoriaSeleccionada) {
+      return { 'background-color': this.categoriaColorActiva.bg };
+    }
+    return {};
+  }
+
+  getIconStyle(producto: any): Record<string, string> {
+    if (!this.categoriaSeleccionada || !this.categoriaColorActiva) return {};
+    if (producto.categoriaId === this.categoriaSeleccionada) {
+      return { 'color': this.categoriaColorActiva.icon, 'opacity': '0.7' };
+    }
+    return {};
   }
 }

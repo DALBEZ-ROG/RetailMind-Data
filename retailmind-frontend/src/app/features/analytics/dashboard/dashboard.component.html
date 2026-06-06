@@ -44,7 +44,15 @@
   <ng-container *ngIf="!loading && !hasError">
     <!-- KPI Cards -->
     <div class="kpi-grid">
-      <mat-card *ngFor="let card of kpiCards" class="kpi-card"
+      <mat-card *ngFor="let card of kpiCards; let i = index" class="kpi-card"
+                [class.kpi-sesiones]="i === 0"
+                [class.kpi-usuarios]="i === 1"
+                [class.kpi-conversiones]="i === 2"
+                [class.kpi-tasa]="i === 3"
+                [class.kpi-abandonos]="i === 4"
+                [class.kpi-eventos]="i === 5"
+                [class.kpi-semanas]="i === 6"
+                [class.kpi-promedio]="i === 7"
                 [matTooltip]="card.tooltip" matTooltipShowDelay="500">
         <mat-card-content>
           <div class="kpi-inner">
@@ -52,7 +60,7 @@
               <p class="kpi-label">{{ card.title }}</p>
               <p class="kpi-value">{{ card.value }}</p>
             </div>
-            <div class="kpi-icon" [style.background-color]="card.color">
+            <div class="kpi-icon" [style.background]="card.color">
               <mat-icon>{{ card.icon }}</mat-icon>
             </div>
           </div>

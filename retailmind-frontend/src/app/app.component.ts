@@ -80,7 +80,16 @@ export class AppComponent {
     return this.authService.hasRole('CLIENTE');
   }
 
+  goToProfile(): void {
+    this.router.navigate(['/perfil']);
+  }
+
   logout(): void {
     this.authService.logout();
+  }
+
+  get userInitial(): string {
+    const name = this.currentUser?.nombre || this.currentUser?.username || '?';
+    return name.charAt(0).toUpperCase();
   }
 }

@@ -14,15 +14,22 @@
   </div>
 
   <!-- Filtros de categoría -->
-  <div class="category-filters">
-    <mat-chip-listbox>
-      <mat-chip-option *ngFor="let cat of categorias"
-               [selected]="categoriaSeleccionada === cat.categoriaId"
-               (click)="filtrarCategoria(cat.categoriaId)">
-        <mat-icon>{{ getCategoryIcon(cat.categoriaId) }}</mat-icon>
-        {{ cat.nombre }} ({{ cat.total }})
-      </mat-chip-option>
-    </mat-chip-listbox>
+  <div class="category-chips-container">
+    <div *ngFor="let cat of categorias"
+         class="category-chip"
+         [class.chip-electronics]="cat.nombre === 'Electronics'"
+         [class.chip-groceries]="cat.nombre === 'Groceries'"
+         [class.chip-sports]="cat.nombre === 'Sports'"
+         [class.chip-accessories]="cat.nombre === 'Accessories'"
+         [class.chip-beauty]="cat.nombre === 'Beauty'"
+         [class.chip-home]="cat.nombre === 'Home'"
+         [class.chip-shoes]="cat.nombre === 'Shoes'"
+         [class.chip-apparel]="cat.nombre === 'Apparel'"
+         [class.selected]="categoriaSeleccionada === cat.categoriaId"
+         (click)="filtrarCategoria(cat.categoriaId)">
+      <mat-icon>{{ getCategoryIcon(cat.categoriaId) }}</mat-icon>
+      <span>{{ cat.nombre }} ({{ cat.total }})</span>
+    </div>
   </div>
 
   <!-- Loading -->
@@ -32,11 +39,17 @@
 
   <!-- Grid de productos -->
   <div class="products-grid" *ngIf="!loading">
-    <mat-card class="product-card" *ngFor="let p of productos" (click)="verProducto(p.productoId)">
-      <div class="product-image">
-        <mat-icon class="product-icon">{{ getCategoryIcon(p.categoriaId) }}</mat-icon>
+    <mat-card class="product-card"
+              *ngFor="let p of productos"
+              [class.categoria-activa]="categoriaSeleccionada && p.categoriaId === categoriaSeleccionada"
+              [class.categoria-inactiva]="categoriaSeleccionada && p.categoriaId !== categoriaSeleccionada"
+              [ngStyle]="getCardStyle(p)"
+              (click)="verProducto(p.productoId)">
+      <div class="product-image-area"
+           [ngStyle]="getImageAreaStyle(p)">
+        <mat-icon [ngStyle]="getIconStyle(p)">{{ getCategoryIcon(p.categoriaId) }}</mat-icon>
       </div>
-      <mat-card-content>
+      <mat-card-content class="product-info">
         <p class="product-brand">{{ p.brand }}</p>
         <h3 class="product-name">{{ p.nombre }}</h3>
         <p class="product-category">{{ p.categoriaNombre }}</p>

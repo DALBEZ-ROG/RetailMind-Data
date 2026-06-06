@@ -2,17 +2,32 @@
   <h1 class="page-title">Conversiones</h1>
 
   <!-- Resumen chips -->
-  <div class="resumen-chips" *ngIf="resumen">
-    <mat-chip class="chip-green">{{ resumen.conversiones | number }} conversiones</mat-chip>
-    <mat-chip class="chip-red">{{ resumen.noConversiones | number }} abandonos</mat-chip>
+  <div style="display:flex; gap:10px; margin-bottom:20px" *ngIf="resumen">
+    <span class="stat-chip chip-success">
+      <mat-icon style="font-size:16px;width:16px;height:16px">check_circle</mat-icon>
+      {{ resumen.conversiones | number }} conversiones
+    </span>
+    <span class="stat-chip chip-warning">
+      <mat-icon style="font-size:16px;width:16px;height:16px">cancel</mat-icon>
+      {{ resumen.noConversiones | number }} abandonos
+    </span>
   </div>
 
   <!-- Filtro -->
-  <mat-button-toggle-group [value]="filterValue" (change)="onFilterChange($event.value)" class="filter-group">
-    <mat-button-toggle value="all">Todos</mat-button-toggle>
-    <mat-button-toggle value="conversiones">Solo conversiones</mat-button-toggle>
-    <mat-button-toggle value="abandonos">Solo abandonos</mat-button-toggle>
-  </mat-button-toggle-group>
+  <div class="filter-tabs">
+    <button class="filter-tab" [class.activo]="filterValue === 'all'"
+            (click)="onFilterChange('all')">
+      <mat-icon>list</mat-icon> Todos
+    </button>
+    <button class="filter-tab" [class.activo-verde]="filterValue === 'conversiones'"
+            (click)="onFilterChange('conversiones')">
+      <mat-icon>check_circle</mat-icon> Solo Conversiones
+    </button>
+    <button class="filter-tab" [class.activo-rojo]="filterValue === 'abandonos'"
+            (click)="onFilterChange('abandonos')">
+      <mat-icon>cancel</mat-icon> Solo Abandonos
+    </button>
+  </div>
 
   <mat-card>
     <mat-card-content>

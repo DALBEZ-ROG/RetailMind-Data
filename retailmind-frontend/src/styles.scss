@@ -3,7 +3,7 @@
 @include mat.core();
 
 $primary: mat.define-palette(mat.$indigo-palette);
-$accent:  mat.define-palette(mat.$pink-palette, A200, A100, A400);
+$accent:  mat.define-palette(mat.$cyan-palette, A200, A100, A400);
 $warn:    mat.define-palette(mat.$red-palette);
 
 $theme: mat.define-light-theme((
@@ -14,17 +14,148 @@ $theme: mat.define-light-theme((
 
 @include mat.all-component-themes($theme);
 
+// ══════════════════════════════════════════════════════════════════════════════
+// CSS VARIABLES — Premium Design System
+// ══════════════════════════════════════════════════════════════════════════════
+:root {
+  --primary: #1a237e;
+  --primary-light: #3949ab;
+  --primary-gradient: linear-gradient(135deg, #1a237e 0%, #3949ab 50%, #5c6bc0 100%);
+  --accent: #00bcd4;
+  --accent-gradient: linear-gradient(135deg, #00bcd4, #0097a7);
+  --success: #00c853;
+  --warning: #ff6f00;
+  --error: #d50000;
+  --bg-main: #f0f4f8;
+  --bg-card: rgba(255, 255, 255, 0.85);
+  --bg-glass: rgba(255, 255, 255, 0.25);
+  --text-primary: #1a237e;
+  --text-secondary: #546e7a;
+  --text-light: #90a4ae;
+  --shadow-soft: 0 4px 24px rgba(26, 35, 126, 0.08);
+  --shadow-medium: 0 8px 32px rgba(26, 35, 126, 0.12);
+  --shadow-strong: 0 16px 48px rgba(26, 35, 126, 0.18);
+  --shadow-glass: 0 8px 32px rgba(31, 38, 135, 0.15);
+  --border-radius: 16px;
+  --border-radius-sm: 10px;
+  --border-radius-lg: 24px;
+  --blur: blur(20px);
+  --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// GLOBAL RESETS
+// ══════════════════════════════════════════════════════════════════════════════
 * {
+  font-family: 'Inter', sans-serif;
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
 body {
-  font-family: Roboto, sans-serif;
-  background-color: #f5f5f5;
+  background: var(--bg-main);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// UTILITY CLASSES
+// ══════════════════════════════════════════════════════════════════════════════
+.glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-glass);
+}
+
+.premium-card {
+  background: white;
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-soft);
+  transition: var(--transition);
+
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-strong);
+  }
+}
+
+.gradient-text {
+  background: var(--primary-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.section-header {
+  background: var(--primary-gradient);
+  border-radius: var(--border-radius);
+  padding: 20px 28px;
+  color: white;
+  margin-bottom: 24px;
+  box-shadow: var(--shadow-medium);
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -10%;
+    width: 200px;
+    height: 200px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 50%;
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: -60%;
+    right: 10%;
+    width: 150px;
+    height: 150px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 50%;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ANGULAR MATERIAL OVERRIDES
+// ══════════════════════════════════════════════════════════════════════════════
+.mat-mdc-card {
+  border-radius: var(--border-radius) !important;
+  box-shadow: var(--shadow-soft) !important;
+}
+
+.mat-mdc-button,
+.mat-mdc-raised-button {
+  border-radius: var(--border-radius-sm) !important;
+  font-family: 'Inter', sans-serif !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.3px !important;
+}
+
+.mat-mdc-raised-button.mat-primary {
+  background: var(--primary-gradient) !important;
+  box-shadow: 0 4px 15px rgba(26, 35, 126, 0.3) !important;
+  transition: var(--transition) !important;
+
+  &:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 25px rgba(26, 35, 126, 0.4) !important;
+  }
+}
+
+.mat-mdc-snack-bar-container {
+  border-radius: var(--border-radius-sm) !important;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// GLOBAL LAYOUT HELPERS
+// ══════════════════════════════════════════════════════════════════════════════
 .page-container {
   padding: 24px;
 }
@@ -38,4 +169,365 @@ body {
 
 .full-width {
   width: 100%;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ANIMATIONS
+// ══════════════════════════════════════════════════════════════════════════════
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInLeft {
+  from { opacity: 0; transform: translateX(-20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.05); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-fade-up {
+  animation: fadeInUp 0.5s ease forwards;
+}
+
+.animate-fade-left {
+  animation: fadeInLeft 0.4s ease forwards;
+}
+
+.loading-shimmer {
+  background: linear-gradient(90deg, #f0f4f8 25%, #e8eaf6 50%, #f0f4f8 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 8px;
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// GLOBAL DROPDOWNS / MAT-SELECT
+// ══════════════════════════════════════════════════════════════════════════════
+::ng-deep .mat-mdc-select-panel {
+  border-radius: 14px !important;
+  box-shadow: 0 12px 40px rgba(26, 35, 126, 0.15) !important;
+  border: 1px solid rgba(26, 35, 126, 0.08) !important;
+  overflow: hidden !important;
+
+  .mat-mdc-option {
+    font-family: 'Inter', sans-serif !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    color: #1a237e !important;
+
+    &:hover {
+      background: rgba(26, 35, 126, 0.06) !important;
+    }
+
+    &.mdc-list-item--selected {
+      background: rgba(26, 35, 126, 0.1) !important;
+      font-weight: 700 !important;
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// GLOBAL BUTTON — APLICAR (Premium Gradient)
+// ══════════════════════════════════════════════════════════════════════════════
+.btn-aplicar {
+  height: 44px !important;
+  padding: 0 22px !important;
+  background: var(--primary-gradient) !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 12px !important;
+  font-family: 'Inter', sans-serif !important;
+  font-weight: 700 !important;
+  font-size: 13px !important;
+  letter-spacing: 0.3px !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  box-shadow: 0 4px 15px rgba(26, 35, 126, 0.3) !important;
+  transition: all 0.3s ease !important;
+
+  &:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 24px rgba(26, 35, 126, 0.4) !important;
+  }
+
+  mat-icon {
+    font-size: 18px !important;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// GLOBAL BUTTON — LIMPIAR (Ghost Elegant)
+// ══════════════════════════════════════════════════════════════════════════════
+.btn-limpiar {
+  height: 44px !important;
+  padding: 0 20px !important;
+  background: transparent !important;
+  color: #546e7a !important;
+  border: 1.5px solid #e0e0e0 !important;
+  border-radius: 12px !important;
+  font-family: 'Inter', sans-serif !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  transition: all 0.3s ease !important;
+
+  &:hover {
+    border-color: #b0bec5 !important;
+    color: #1a237e !important;
+    background: rgba(26, 35, 126, 0.04) !important;
+  }
+
+  mat-icon {
+    font-size: 18px !important;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// GLOBAL FILTER CONTAINER
+// ══════════════════════════════════════════════════════════════════════════════
+.filtros-container {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 20px 24px;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(26, 35, 126, 0.08);
+  border-radius: 16px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 12px rgba(26, 35, 126, 0.06);
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// GLOBAL SEARCH BAR PREMIUM
+// ══════════════════════════════════════════════════════════════════════════════
+.search-bar-container {
+  position: relative;
+  width: 100%;
+
+  .search-icon {
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #9fa8da;
+    font-size: 20px;
+    transition: color 0.3s ease;
+    pointer-events: none;
+  }
+
+  input.search-input {
+    width: 100%;
+    height: 48px;
+    padding: 0 16px 0 48px;
+    border: 1.5px solid #e8eaf6;
+    border-radius: 14px;
+    background: white;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    color: #1a237e;
+    outline: none;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(26, 35, 126, 0.06);
+
+    &::placeholder {
+      color: #b0bec5;
+      font-weight: 400;
+    }
+
+    &:focus {
+      border-color: #1a237e;
+      box-shadow:
+        0 0 0 4px rgba(26, 35, 126, 0.08),
+        0 4px 16px rgba(26, 35, 126, 0.08);
+      background: white;
+    }
+
+    &:focus ~ .search-icon,
+    &:focus + .search-icon {
+      color: #1a237e;
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// FILTER TABS (Todos / Solo conversiones / etc)
+// ══════════════════════════════════════════════════════════════════════════════
+.filter-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  background: rgba(26, 35, 126, 0.05);
+  border-radius: 14px;
+  width: fit-content;
+  margin-bottom: 20px;
+
+  .filter-tab {
+    padding: 8px 20px;
+    border-radius: 10px;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    color: #546e7a;
+    border: none;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    mat-icon { font-size: 16px; width: 16px; height: 16px; }
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.7);
+      color: #1a237e;
+    }
+
+    &.activo {
+      background: white;
+      color: #1a237e;
+      box-shadow: 0 4px 12px rgba(26, 35, 126, 0.12);
+      font-weight: 700;
+    }
+
+    &.activo-verde {
+      background: white;
+      color: #2e7d32;
+      box-shadow: 0 4px 12px rgba(46, 125, 50, 0.12);
+    }
+
+    &.activo-rojo {
+      background: white;
+      color: #c62828;
+      box-shadow: 0 4px 12px rgba(198, 40, 40, 0.12);
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// STAT CHIPS (conversiones count, abandonos count)
+// ══════════════════════════════════════════════════════════════════════════════
+.stat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+
+  &.chip-success {
+    background: #e8f5e9;
+    color: #2e7d32;
+    border: 1px solid #a5d6a7;
+  }
+
+  &.chip-warning {
+    background: #ffebee;
+    color: #c62828;
+    border: 1px solid #ef9a9a;
+  }
+
+  &.chip-info {
+    background: #e3f2fd;
+    color: #1565c0;
+    border: 1px solid #90caf9;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SELECT PREMIUM GLOBAL (native)
+// ══════════════════════════════════════════════════════════════════════════════
+select.select-premium,
+.select-premium {
+  height: 48px;
+  min-width: 180px;
+  padding: 0 40px 0 16px;
+  border: 1.5px solid #e8eaf6;
+  border-radius: 14px;
+  background: white url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='%231a237e'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E") no-repeat right 12px center;
+  background-size: 20px;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: #1a237e;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(26, 35, 126, 0.06);
+  appearance: none;
+  -webkit-appearance: none;
+
+  &:focus {
+    border-color: #1a237e;
+    box-shadow: 0 0 0 4px rgba(26, 35, 126, 0.08);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MAT-SELECT CLASS OVERRIDES — semana-select / canal-select
+// ══════════════════════════════════════════════════════════════════════════════
+.semana-select .mat-mdc-select-trigger {
+  min-width: 180px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: 48px !important;
+  padding: 0 16px !important;
+  border: 1.5px solid #e8eaf6 !important;
+  border-radius: 14px !important;
+  background: white !important;
+  box-shadow: 0 2px 8px rgba(26, 35, 126, 0.06) !important;
+  font-family: 'Inter', sans-serif !important;
+  font-weight: 500 !important;
+  font-size: 14px !important;
+  color: #1a237e !important;
+}
+
+.canal-select .mat-mdc-select-trigger {
+  min-width: 160px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: 48px !important;
+  padding: 0 16px !important;
+  border: 1.5px solid #e8eaf6 !important;
+  border-radius: 14px !important;
+  background: white !important;
+  box-shadow: 0 2px 8px rgba(26, 35, 126, 0.06) !important;
+  font-family: 'Inter', sans-serif !important;
+  font-weight: 500 !important;
+  font-size: 14px !important;
+  color: #1a237e !important;
+}
+
+.semana-select,
+.canal-select {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+.semana-select.mat-mdc-select-focused .mat-mdc-select-trigger,
+.canal-select.mat-mdc-select-focused .mat-mdc-select-trigger {
+  border-color: #1a237e !important;
+  box-shadow: 0 0 0 4px rgba(26, 35, 126, 0.08) !important;
 }

@@ -1,398 +1,322 @@
 <div class="gestion-container">
   <h2 class="page-title">
     <mat-icon>dataset</mat-icon>
-    Gestion de Datos
+    Gestión de Datos
   </h2>
 
-  <mat-tab-group (selectedIndexChange)="onTabChange($event)" animationDuration="200ms">
+  <!-- Custom Tabs -->
+  <div class="tabs-container">
+    <div *ngFor="let tab of tabs; let i = index"
+         class="tab-item"
+         [class.activo]="activeTab === i"
+         (click)="selectTab(i)">
+      <mat-icon>{{ tab.icon }}</mat-icon>
+      <span>{{ tab.label }}</span>
+    </div>
+  </div>
 
-    <!-- ═══ TAB 1: Fact Eventos ═══ -->
-    <mat-tab>
-      <ng-template mat-tab-label>
-        <mat-icon class="tab-icon">table_rows</mat-icon> Hechos
-      </ng-template>
-      <div class="tab-content">
-        <div class="tab-header">
-          <h3 class="section-title">fact_eventos</h3>
-          <span class="time-chip" [ngClass]="getTimeClass(factTime)" *ngIf="factTime > 0">
-            ⚡ {{ factTime }}ms
-          </span>
+  <!-- Section Title -->
+  <div class="section-header-title">
+    {{ tabs[activeTab].title }}
+    <span class="time-chip" [ngClass]="getTimeClass(getActiveTime())" *ngIf="getActiveTime() > 0">
+      ⚡ {{ getActiveTime() }}ms
+    </span>
+  </div>
+
+  <!-- ═══ TAB 0: Fact Eventos ═══ -->
+  <div *ngIf="activeTab === 0">
+    <div class="filtros-container" style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; align-items:center">
+      <mat-select [(ngModel)]="factSemana" class="semana-select" placeholder="Todas las semanas">
+        <mat-option [value]="null">Todas las semanas</mat-option>
+        <mat-option *ngFor="let s of semanasDisponibles" [value]="s">Semana {{ s }}</mat-option>
+      </mat-select>
+      <div></div>
+    </div>
+    <div style="display:flex; gap:12px; margin-top:12px; margin-bottom:24px">
+      <button class="btn-aplicar" (click)="filtrarPorSemana()">
+        <mat-icon>filter_list</mat-icon> Filtrar
+      </button>
+      <button class="btn-limpiar" (click)="factSemana = null; filtrarPorSemana()">
+        <mat-icon>clear</mat-icon> Limpiar
+      </button>
+    </div>
+
+    <!-- Formulario de edición premium -->
+    <div class="edit-panel" *ngIf="editingEvento">
+      <div class="edit-panel-header">
+        <div class="edit-header-left">
+          <mat-icon>edit</mat-icon>
+          <div class="edit-header-info">
+            <span class="edit-header-title">Editando Evento</span>
+            <span class="edit-header-sub">Session: {{ editingEvento.sessionId }}</span>
+          </div>
+        </div>
+        <button class="edit-close-btn" (click)="cancelEdit()">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+      <div class="edit-panel-body">
+        <div class="edit-grid">
+          <div class="edit-field">
+            <label>Acción del usuario</label>
+            <select [(ngModel)]="editForm.user_action">
+              <option value="click">click</option>
+              <option value="view">view</option>
+              <option value="add_to_cart">add_to_cart</option>
+              <option value="wishlist">wishlist</option>
+              <option value="drop">drop</option>
+              <option value="purchase">purchase</option>
+            </select>
+          </div>
+          <div class="edit-field">
+            <label>Canal</label>
+            <select [(ngModel)]="editForm.channel">
+              <option value="mobile">mobile</option>
+              <option value="web">web</option>
+              <option value="app">app</option>
+            </select>
+          </div>
+          <div class="edit-field">
+            <label>Precio</label>
+            <input type="number" [(ngModel)]="editForm.price" step="0.01">
+          </div>
+          <div class="edit-field">
+            <label>Tiempo (seg)</label>
+            <input type="number" [(ngModel)]="editForm.time_spent_sec">
+          </div>
+          <div class="edit-field">
+            <label>Duración sesión</label>
+            <input type="number" [(ngModel)]="editForm.session_length">
+          </div>
+          <div class="edit-field">
+            <label>Interacciones</label>
+            <input type="number" [(ngModel)]="editForm.interaction_count">
+          </div>
+          <div class="edit-field">
+            <label>Semana</label>
+            <input type="number" [(ngModel)]="editForm.semana" min="1" max="52">
+          </div>
         </div>
 
-        <div class="filter-row">
-          <mat-form-field appearance="outline" class="filter-field">
-            <mat-label>Semana</mat-label>
-            <input matInput type="number" [(ngModel)]="factSemana" min="1" max="52" placeholder="Todas">
-          </mat-form-field>
-          <button mat-stroked-button color="primary" (click)="filtrarPorSemana()">
-            <mat-icon>filter_list</mat-icon> Filtrar
-          </button>
-          <button mat-stroked-button (click)="factSemana = null; filtrarPorSemana()">Limpiar</button>
+        <div class="edit-toggles">
+          <div class="toggle-field"
+               [class.activo-conversion]="editForm.is_conversion"
+               (click)="editForm.is_conversion = !editForm.is_conversion">
+            <mat-icon>{{ editForm.is_conversion ? 'check_circle' : 'radio_button_unchecked' }}</mat-icon>
+            <span class="toggle-label">Conversión</span>
+          </div>
+          <div class="toggle-field"
+               [class.activo-abandono]="editForm.drop_off_flag"
+               (click)="editForm.drop_off_flag = !editForm.drop_off_flag">
+            <mat-icon>{{ editForm.drop_off_flag ? 'cancel' : 'radio_button_unchecked' }}</mat-icon>
+            <span class="toggle-label">Abandono</span>
+          </div>
         </div>
 
-        <!-- Formulario de edición -->
-        <mat-card class="edit-card" *ngIf="editingEvento">
-          <mat-card-header>
-            <mat-icon mat-card-avatar>edit_note</mat-icon>
-            <mat-card-title>Editar Evento #{{ editingEvento.eventPk }}</mat-card-title>
-            <mat-card-subtitle>Session: {{ editingEvento.sessionId }}</mat-card-subtitle>
-          </mat-card-header>
-          <mat-card-content>
-            <div class="edit-grid">
-              <div class="field-group">
-                <label class="field-label">Accion del usuario</label>
-                <mat-form-field appearance="outline" class="full-field">
-                  <mat-select [(ngModel)]="editForm.user_action">
-                    <mat-option value="click">click</mat-option>
-                    <mat-option value="view">view</mat-option>
-                    <mat-option value="add_to_cart">add_to_cart</mat-option>
-                    <mat-option value="wishlist">wishlist</mat-option>
-                    <mat-option value="drop">drop</mat-option>
-                    <mat-option value="purchase">purchase</mat-option>
-                  </mat-select>
-                </mat-form-field>
-              </div>
-              <div class="field-group">
-                <label class="field-label">Canal</label>
-                <mat-form-field appearance="outline" class="full-field">
-                  <mat-select [(ngModel)]="editForm.channel">
-                    <mat-option value="mobile">mobile</mat-option>
-                    <mat-option value="web">web</mat-option>
-                    <mat-option value="app">app</mat-option>
-                  </mat-select>
-                </mat-form-field>
-              </div>
-              <div class="field-group">
-                <label class="field-label">Precio</label>
-                <mat-form-field appearance="outline" class="full-field">
-                  <input matInput type="number" [(ngModel)]="editForm.price" step="0.01">
-                </mat-form-field>
-              </div>
-              <div class="field-group">
-                <label class="field-label">Tiempo (seg)</label>
-                <mat-form-field appearance="outline" class="full-field">
-                  <input matInput type="number" [(ngModel)]="editForm.time_spent_sec">
-                </mat-form-field>
-              </div>
-              <div class="field-group">
-                <label class="field-label">Duracion sesion</label>
-                <mat-form-field appearance="outline" class="full-field">
-                  <input matInput type="number" [(ngModel)]="editForm.session_length">
-                </mat-form-field>
-              </div>
-              <div class="field-group">
-                <label class="field-label">Interacciones</label>
-                <mat-form-field appearance="outline" class="full-field">
-                  <input matInput type="number" [(ngModel)]="editForm.interaction_count">
-                </mat-form-field>
-              </div>
-              <div class="field-group">
-                <label class="field-label">Semana</label>
-                <mat-form-field appearance="outline" class="full-field">
-                  <input matInput type="number" [(ngModel)]="editForm.semana" min="1" max="52">
-                </mat-form-field>
-              </div>
-            </div>
-            <div class="edit-checks">
-              <mat-checkbox [(ngModel)]="editForm.is_conversion" color="primary">Conversion</mat-checkbox>
-              <mat-checkbox [(ngModel)]="editForm.drop_off_flag" color="warn">Abandono</mat-checkbox>
-            </div>
-          </mat-card-content>
-          <mat-card-actions align="end">
-            <button mat-button (click)="cancelEdit()">Cancelar</button>
-            <button mat-raised-button color="primary" (click)="saveEvento()">
+        <div class="edit-panel-footer">
+          <div class="edit-footer-actions">
+            <button class="btn-cancel" (click)="cancelEdit()">Cancelar</button>
+            <button class="btn-save" (click)="saveEvento()">
               <mat-icon>save</mat-icon> Guardar cambios
             </button>
-          </mat-card-actions>
-        </mat-card>
-
-        <div class="table-wrapper">
-          <table mat-table [dataSource]="factEventos" class="full-width data-table">
-            <ng-container matColumnDef="eventPk">
-              <th mat-header-cell *matHeaderCellDef>PK</th>
-              <td mat-cell *matCellDef="let r">{{ r.eventPk }}</td>
-            </ng-container>
-            <ng-container matColumnDef="sessionId">
-              <th mat-header-cell *matHeaderCellDef>Session ID</th>
-              <td mat-cell *matCellDef="let r"><code>{{ r.sessionId }}</code></td>
-            </ng-container>
-            <ng-container matColumnDef="userAction">
-              <th mat-header-cell *matHeaderCellDef>Accion</th>
-              <td mat-cell *matCellDef="let r">
-                <span class="action-badge" [attr.data-action]="r.userAction">{{ r.userAction }}</span>
-              </td>
-            </ng-container>
-            <ng-container matColumnDef="channel">
-              <th mat-header-cell *matHeaderCellDef>Canal</th>
-              <td mat-cell *matCellDef="let r">{{ r.channel }}</td>
-            </ng-container>
-            <ng-container matColumnDef="price">
-              <th mat-header-cell *matHeaderCellDef>Precio</th>
-              <td mat-cell *matCellDef="let r">${{ r.price | number:'1.2-2' }}</td>
-            </ng-container>
-            <ng-container matColumnDef="isConversion">
-              <th mat-header-cell *matHeaderCellDef>Conv</th>
-              <td mat-cell *matCellDef="let r">
-                <mat-icon *ngIf="r.isConversion" class="icon-ok">check_circle</mat-icon>
-              </td>
-            </ng-container>
-            <ng-container matColumnDef="semana">
-              <th mat-header-cell *matHeaderCellDef>Sem</th>
-              <td mat-cell *matCellDef="let r">{{ r.semana }}</td>
-            </ng-container>
-            <ng-container matColumnDef="acciones">
-              <th mat-header-cell *matHeaderCellDef>Acciones</th>
-              <td mat-cell *matCellDef="let r">
-                <button mat-icon-button class="btn-edit" (click)="editEvento(r)" matTooltip="Editar">
-                  <mat-icon>edit</mat-icon>
-                </button>
-                <button mat-icon-button class="btn-delete" (click)="deleteEvento(r.eventPk)" matTooltip="Eliminar">
-                  <mat-icon>delete</mat-icon>
-                </button>
-              </td>
-            </ng-container>
-            <tr mat-header-row *matHeaderRowDef="['eventPk','sessionId','userAction','channel','price','isConversion','semana','acciones']"></tr>
-            <tr mat-row *matRowDef="let r; columns: ['eventPk','sessionId','userAction','channel','price','isConversion','semana','acciones']"></tr>
-          </table>
+          </div>
         </div>
-        <mat-paginator [length]="factTotal" [pageSize]="factSize" [pageIndex]="factPage"
-                       [pageSizeOptions]="[10,20,50]" (page)="onFactPageChange($event)" showFirstLastButtons></mat-paginator>
       </div>
-    </mat-tab>
+    </div>
 
-    <!-- ═══ TAB 2: Canales ═══ -->
-    <mat-tab>
-      <ng-template mat-tab-label>
-        <mat-icon class="tab-icon">cell_tower</mat-icon> Canales
-      </ng-template>
-      <ng-template matTabContent>
-        <div class="tab-content">
-          <div class="tab-header">
-            <h3 class="section-title">dim_canal</h3>
-            <span class="time-chip" [ngClass]="getTimeClass(canalesTime)" *ngIf="canalesTime > 0">⚡ {{ canalesTime }}ms</span>
-          </div>
-          <mat-card class="add-card">
-            <mat-card-content>
-              <div class="add-row">
-                <mat-form-field appearance="outline"><mat-label>ID</mat-label><input matInput type="number" [(ngModel)]="newDimId"></mat-form-field>
-                <mat-form-field appearance="outline"><mat-label>Nombre del canal</mat-label><input matInput [(ngModel)]="newDimNombre"></mat-form-field>
-                <button mat-raised-button color="primary" (click)="addDimension('dim-canal')"><mat-icon>add</mat-icon> Agregar</button>
-              </div>
-            </mat-card-content>
-          </mat-card>
-          <div class="table-wrapper">
-            <table mat-table [dataSource]="canales" class="full-width data-table">
-              <ng-container matColumnDef="id"><th mat-header-cell *matHeaderCellDef>ID</th><td mat-cell *matCellDef="let r">{{ r.id }}</td></ng-container>
-              <ng-container matColumnDef="nombre"><th mat-header-cell *matHeaderCellDef>Nombre</th><td mat-cell *matCellDef="let r">{{ r.nombre }}</td></ng-container>
-              <ng-container matColumnDef="acciones"><th mat-header-cell *matHeaderCellDef></th>
-                <td mat-cell *matCellDef="let r"><button mat-icon-button class="btn-delete" (click)="deleteDim('dim-canal', r.id)" matTooltip="Eliminar"><mat-icon>delete</mat-icon></button></td>
-              </ng-container>
-              <tr mat-header-row *matHeaderRowDef="['id','nombre','acciones']"></tr>
-              <tr mat-row *matRowDef="let r; columns: ['id','nombre','acciones']"></tr>
-            </table>
-          </div>
-        </div>
-      </ng-template>
-    </mat-tab>
+    <div class="table-wrapper">
+      <table mat-table [dataSource]="factEventos" class="full-width data-table">
+        <ng-container matColumnDef="eventPk">
+          <th mat-header-cell *matHeaderCellDef>PK</th>
+          <td mat-cell *matCellDef="let r">{{ r.eventPk }}</td>
+        </ng-container>
+        <ng-container matColumnDef="sessionId">
+          <th mat-header-cell *matHeaderCellDef>Session ID</th>
+          <td mat-cell *matCellDef="let r"><code>{{ r.sessionId }}</code></td>
+        </ng-container>
+        <ng-container matColumnDef="userAction">
+          <th mat-header-cell *matHeaderCellDef>Acción</th>
+          <td mat-cell *matCellDef="let r">
+            <span class="action-badge" [attr.data-action]="r.userAction">{{ r.userAction }}</span>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="channel">
+          <th mat-header-cell *matHeaderCellDef>Canal</th>
+          <td mat-cell *matCellDef="let r">{{ r.channel }}</td>
+        </ng-container>
+        <ng-container matColumnDef="price">
+          <th mat-header-cell *matHeaderCellDef>Precio</th>
+          <td mat-cell *matCellDef="let r">${{ r.price | number:'1.2-2' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="isConversion">
+          <th mat-header-cell *matHeaderCellDef>Conv</th>
+          <td mat-cell *matCellDef="let r">
+            <mat-icon *ngIf="r.isConversion" class="icon-ok">check_circle</mat-icon>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="semana">
+          <th mat-header-cell *matHeaderCellDef>Sem</th>
+          <td mat-cell *matCellDef="let r">{{ r.semana }}</td>
+        </ng-container>
+        <ng-container matColumnDef="acciones">
+          <th mat-header-cell *matHeaderCellDef>Acciones</th>
+          <td mat-cell *matCellDef="let r">
+            <button mat-icon-button class="btn-edit" (click)="editEvento(r)" matTooltip="Editar">
+              <mat-icon>edit</mat-icon>
+            </button>
+            <button mat-icon-button class="btn-delete" (click)="deleteEvento(r.eventPk)" matTooltip="Eliminar">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="['eventPk','sessionId','userAction','channel','price','isConversion','semana','acciones']"></tr>
+        <tr mat-row *matRowDef="let r; columns: ['eventPk','sessionId','userAction','channel','price','isConversion','semana','acciones']"></tr>
+      </table>
+    </div>
+    <mat-paginator [length]="factTotal" [pageSize]="factSize" [pageIndex]="factPage"
+                   [pageSizeOptions]="[10,20,50]" (page)="onFactPageChange($event)" showFirstLastButtons></mat-paginator>
+  </div>
 
-    <!-- ═══ TAB 3: Regiones ═══ -->
-    <mat-tab>
-      <ng-template mat-tab-label>
-        <mat-icon class="tab-icon">public</mat-icon> Regiones
-      </ng-template>
-      <ng-template matTabContent>
-        <div class="tab-content">
-          <div class="tab-header">
-            <h3 class="section-title">dim_region</h3>
-            <span class="time-chip" [ngClass]="getTimeClass(regionesTime)" *ngIf="regionesTime > 0">⚡ {{ regionesTime }}ms</span>
-          </div>
-          <mat-card class="add-card">
-            <mat-card-content>
-              <div class="add-row">
-                <mat-form-field appearance="outline"><mat-label>ID</mat-label><input matInput type="number" [(ngModel)]="newDimId"></mat-form-field>
-                <mat-form-field appearance="outline"><mat-label>Nombre de la region</mat-label><input matInput [(ngModel)]="newDimNombre"></mat-form-field>
-                <button mat-raised-button color="primary" (click)="addDimension('dim-region')"><mat-icon>add</mat-icon> Agregar</button>
-              </div>
-            </mat-card-content>
-          </mat-card>
-          <div class="table-wrapper">
-            <table mat-table [dataSource]="regiones" class="full-width data-table">
-              <ng-container matColumnDef="id"><th mat-header-cell *matHeaderCellDef>ID</th><td mat-cell *matCellDef="let r">{{ r.id }}</td></ng-container>
-              <ng-container matColumnDef="nombre"><th mat-header-cell *matHeaderCellDef>Nombre</th><td mat-cell *matCellDef="let r">{{ r.nombre }}</td></ng-container>
-              <ng-container matColumnDef="acciones"><th mat-header-cell *matHeaderCellDef></th>
-                <td mat-cell *matCellDef="let r"><button mat-icon-button class="btn-delete" (click)="deleteDim('dim-region', r.id)" matTooltip="Eliminar"><mat-icon>delete</mat-icon></button></td>
-              </ng-container>
-              <tr mat-header-row *matHeaderRowDef="['id','nombre','acciones']"></tr>
-              <tr mat-row *matRowDef="let r; columns: ['id','nombre','acciones']"></tr>
-            </table>
-          </div>
-        </div>
-      </ng-template>
-    </mat-tab>
+  <!-- ═══ TAB 1: Canales ═══ -->
+  <div *ngIf="activeTab === 1">
+    <div class="dimension-form">
+      <input class="dimension-input" [(ngModel)]="newDimNombre" placeholder="Nombre del canal">
+      <button class="btn-agregar" (click)="addDimension('dim-canal')">
+        <mat-icon>add</mat-icon> Agregar
+      </button>
+    </div>
+    <div class="table-wrapper">
+      <table mat-table [dataSource]="canales" class="full-width data-table">
+        <ng-container matColumnDef="id"><th mat-header-cell *matHeaderCellDef>ID</th><td mat-cell *matCellDef="let r">{{ r.id }}</td></ng-container>
+        <ng-container matColumnDef="nombre"><th mat-header-cell *matHeaderCellDef>Nombre</th><td mat-cell *matCellDef="let r">{{ r.nombre }}</td></ng-container>
+        <ng-container matColumnDef="acciones"><th mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let r"><button mat-icon-button class="btn-delete" (click)="deleteDim('dim-canal', r.id)" matTooltip="Eliminar"><mat-icon>delete</mat-icon></button></td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="['id','nombre','acciones']"></tr>
+        <tr mat-row *matRowDef="let r; columns: ['id','nombre','acciones']"></tr>
+      </table>
+    </div>
+  </div>
 
-    <!-- ═══ TAB 4: Dispositivos ═══ -->
-    <mat-tab>
-      <ng-template mat-tab-label>
-        <mat-icon class="tab-icon">devices</mat-icon> Dispositivos
-      </ng-template>
-      <ng-template matTabContent>
-        <div class="tab-content">
-          <div class="tab-header">
-            <h3 class="section-title">dim_dispositivo</h3>
-            <span class="time-chip" [ngClass]="getTimeClass(dispositivosTime)" *ngIf="dispositivosTime > 0">⚡ {{ dispositivosTime }}ms</span>
-          </div>
-          <mat-card class="add-card">
-            <mat-card-content>
-              <div class="add-row">
-                <mat-form-field appearance="outline"><mat-label>ID</mat-label><input matInput type="number" [(ngModel)]="newDimId"></mat-form-field>
-                <mat-form-field appearance="outline"><mat-label>Nombre del dispositivo</mat-label><input matInput [(ngModel)]="newDimNombre"></mat-form-field>
-                <button mat-raised-button color="primary" (click)="addDimension('dim-dispositivo')"><mat-icon>add</mat-icon> Agregar</button>
-              </div>
-            </mat-card-content>
-          </mat-card>
-          <div class="table-wrapper">
-            <table mat-table [dataSource]="dispositivos" class="full-width data-table">
-              <ng-container matColumnDef="id"><th mat-header-cell *matHeaderCellDef>ID</th><td mat-cell *matCellDef="let r">{{ r.id }}</td></ng-container>
-              <ng-container matColumnDef="nombre"><th mat-header-cell *matHeaderCellDef>Nombre</th><td mat-cell *matCellDef="let r">{{ r.nombre }}</td></ng-container>
-              <ng-container matColumnDef="acciones"><th mat-header-cell *matHeaderCellDef></th>
-                <td mat-cell *matCellDef="let r"><button mat-icon-button class="btn-delete" (click)="deleteDim('dim-dispositivo', r.id)" matTooltip="Eliminar"><mat-icon>delete</mat-icon></button></td>
-              </ng-container>
-              <tr mat-header-row *matHeaderRowDef="['id','nombre','acciones']"></tr>
-              <tr mat-row *matRowDef="let r; columns: ['id','nombre','acciones']"></tr>
-            </table>
-          </div>
-        </div>
-      </ng-template>
-    </mat-tab>
+  <!-- ═══ TAB 2: Regiones ═══ -->
+  <div *ngIf="activeTab === 2">
+    <div class="dimension-form">
+      <input class="dimension-input" [(ngModel)]="newDimNombre" placeholder="Nombre de la región">
+      <button class="btn-agregar" (click)="addDimension('dim-region')">
+        <mat-icon>add</mat-icon> Agregar
+      </button>
+    </div>
+    <div class="table-wrapper">
+      <table mat-table [dataSource]="regiones" class="full-width data-table">
+        <ng-container matColumnDef="id"><th mat-header-cell *matHeaderCellDef>ID</th><td mat-cell *matCellDef="let r">{{ r.id }}</td></ng-container>
+        <ng-container matColumnDef="nombre"><th mat-header-cell *matHeaderCellDef>Nombre</th><td mat-cell *matCellDef="let r">{{ r.nombre }}</td></ng-container>
+        <ng-container matColumnDef="acciones"><th mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let r"><button mat-icon-button class="btn-delete" (click)="deleteDim('dim-region', r.id)" matTooltip="Eliminar"><mat-icon>delete</mat-icon></button></td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="['id','nombre','acciones']"></tr>
+        <tr mat-row *matRowDef="let r; columns: ['id','nombre','acciones']"></tr>
+      </table>
+    </div>
+  </div>
 
-    <!-- ═══ TAB 5: Categorías ═══ -->
-    <mat-tab>
-      <ng-template mat-tab-label>
-        <mat-icon class="tab-icon">category</mat-icon> Categorias
-      </ng-template>
-      <ng-template matTabContent>
-        <div class="tab-content">
-          <div class="tab-header">
-            <h3 class="section-title">dim_categoria</h3>
-            <span class="time-chip" [ngClass]="getTimeClass(categoriasTime)" *ngIf="categoriasTime > 0">⚡ {{ categoriasTime }}ms</span>
-          </div>
-          <mat-card class="add-card">
-            <mat-card-content>
-              <div class="add-row">
-                <mat-form-field appearance="outline"><mat-label>ID</mat-label><input matInput type="number" [(ngModel)]="newDimId"></mat-form-field>
-                <mat-form-field appearance="outline"><mat-label>Nombre de la categoria</mat-label><input matInput [(ngModel)]="newDimNombre"></mat-form-field>
-                <button mat-raised-button color="primary" (click)="addDimension('dim-categoria')"><mat-icon>add</mat-icon> Agregar</button>
-              </div>
-            </mat-card-content>
-          </mat-card>
-          <div class="table-wrapper">
-            <table mat-table [dataSource]="categorias" class="full-width data-table">
-              <ng-container matColumnDef="id"><th mat-header-cell *matHeaderCellDef>ID</th><td mat-cell *matCellDef="let r">{{ r.id }}</td></ng-container>
-              <ng-container matColumnDef="nombre"><th mat-header-cell *matHeaderCellDef>Nombre</th><td mat-cell *matCellDef="let r">{{ r.nombre }}</td></ng-container>
-              <ng-container matColumnDef="acciones"><th mat-header-cell *matHeaderCellDef></th>
-                <td mat-cell *matCellDef="let r"><button mat-icon-button class="btn-delete" (click)="deleteDim('dim-categoria', r.id)" matTooltip="Eliminar"><mat-icon>delete</mat-icon></button></td>
-              </ng-container>
-              <tr mat-header-row *matHeaderRowDef="['id','nombre','acciones']"></tr>
-              <tr mat-row *matRowDef="let r; columns: ['id','nombre','acciones']"></tr>
-            </table>
-          </div>
-        </div>
-      </ng-template>
-    </mat-tab>
+  <!-- ═══ TAB 3: Dispositivos ═══ -->
+  <div *ngIf="activeTab === 3">
+    <div class="dimension-form">
+      <input class="dimension-input" [(ngModel)]="newDimNombre" placeholder="Nombre del dispositivo">
+      <button class="btn-agregar" (click)="addDimension('dim-dispositivo')">
+        <mat-icon>add</mat-icon> Agregar
+      </button>
+    </div>
+    <div class="table-wrapper">
+      <table mat-table [dataSource]="dispositivos" class="full-width data-table">
+        <ng-container matColumnDef="id"><th mat-header-cell *matHeaderCellDef>ID</th><td mat-cell *matCellDef="let r">{{ r.id }}</td></ng-container>
+        <ng-container matColumnDef="nombre"><th mat-header-cell *matHeaderCellDef>Nombre</th><td mat-cell *matCellDef="let r">{{ r.nombre }}</td></ng-container>
+        <ng-container matColumnDef="acciones"><th mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let r"><button mat-icon-button class="btn-delete" (click)="deleteDim('dim-dispositivo', r.id)" matTooltip="Eliminar"><mat-icon>delete</mat-icon></button></td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="['id','nombre','acciones']"></tr>
+        <tr mat-row *matRowDef="let r; columns: ['id','nombre','acciones']"></tr>
+      </table>
+    </div>
+  </div>
 
-    <!-- ═══ TAB 6: Fuentes de Tráfico ═══ -->
-    <mat-tab>
-      <ng-template mat-tab-label>
-        <mat-icon class="tab-icon">traffic</mat-icon> Fuentes
-      </ng-template>
-      <ng-template matTabContent>
-        <div class="tab-content">
-          <div class="tab-header">
-            <h3 class="section-title">dim_fuente_trafico</h3>
-            <span class="time-chip" [ngClass]="getTimeClass(fuentesTime)" *ngIf="fuentesTime > 0">⚡ {{ fuentesTime }}ms</span>
-          </div>
-          <mat-card class="add-card">
-            <mat-card-content>
-              <div class="add-row">
-                <mat-form-field appearance="outline"><mat-label>ID</mat-label><input matInput type="number" [(ngModel)]="newDimId"></mat-form-field>
-                <mat-form-field appearance="outline"><mat-label>Nombre de la fuente</mat-label><input matInput [(ngModel)]="newDimNombre"></mat-form-field>
-                <button mat-raised-button color="primary" (click)="addDimension('dim-fuente-trafico')"><mat-icon>add</mat-icon> Agregar</button>
-              </div>
-            </mat-card-content>
-          </mat-card>
-          <div class="table-wrapper">
-            <table mat-table [dataSource]="fuentes" class="full-width data-table">
-              <ng-container matColumnDef="id"><th mat-header-cell *matHeaderCellDef>ID</th><td mat-cell *matCellDef="let r">{{ r.id }}</td></ng-container>
-              <ng-container matColumnDef="nombre"><th mat-header-cell *matHeaderCellDef>Nombre</th><td mat-cell *matCellDef="let r">{{ r.nombre }}</td></ng-container>
-              <ng-container matColumnDef="acciones"><th mat-header-cell *matHeaderCellDef></th>
-                <td mat-cell *matCellDef="let r"><button mat-icon-button class="btn-delete" (click)="deleteDim('dim-fuente-trafico', r.id)" matTooltip="Eliminar"><mat-icon>delete</mat-icon></button></td>
-              </ng-container>
-              <tr mat-header-row *matHeaderRowDef="['id','nombre','acciones']"></tr>
-              <tr mat-row *matRowDef="let r; columns: ['id','nombre','acciones']"></tr>
-            </table>
-          </div>
-        </div>
-      </ng-template>
-    </mat-tab>
+  <!-- ═══ TAB 4: Categorías ═══ -->
+  <div *ngIf="activeTab === 4">
+    <div class="dimension-form">
+      <input class="dimension-input" [(ngModel)]="newDimNombre" placeholder="Nombre de la categoría">
+      <button class="btn-agregar" (click)="addDimension('dim-categoria')">
+        <mat-icon>add</mat-icon> Agregar
+      </button>
+    </div>
+    <div class="table-wrapper">
+      <table mat-table [dataSource]="categorias" class="full-width data-table">
+        <ng-container matColumnDef="id"><th mat-header-cell *matHeaderCellDef>ID</th><td mat-cell *matCellDef="let r">{{ r.id }}</td></ng-container>
+        <ng-container matColumnDef="nombre"><th mat-header-cell *matHeaderCellDef>Nombre</th><td mat-cell *matCellDef="let r">{{ r.nombre }}</td></ng-container>
+        <ng-container matColumnDef="acciones"><th mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let r"><button mat-icon-button class="btn-delete" (click)="deleteDim('dim-categoria', r.id)" matTooltip="Eliminar"><mat-icon>delete</mat-icon></button></td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="['id','nombre','acciones']"></tr>
+        <tr mat-row *matRowDef="let r; columns: ['id','nombre','acciones']"></tr>
+      </table>
+    </div>
+  </div>
 
-    <!-- ═══ TAB 7: Productos ═══ -->
-    <mat-tab>
-      <ng-template mat-tab-label>
-        <mat-icon class="tab-icon">inventory_2</mat-icon> Productos
-      </ng-template>
-      <ng-template matTabContent>
-        <div class="tab-content">
-          <div class="tab-header">
-            <h3 class="section-title">dim_producto</h3>
-            <span class="time-chip" [ngClass]="getTimeClass(prodTime)" *ngIf="prodTime > 0">⚡ {{ prodTime }}ms</span>
-          </div>
-          <div class="table-wrapper">
-            <table mat-table [dataSource]="productos" class="full-width data-table">
-              <ng-container matColumnDef="productoId"><th mat-header-cell *matHeaderCellDef>Producto ID</th><td mat-cell *matCellDef="let r"><code>{{ r.productoId }}</code></td></ng-container>
-              <ng-container matColumnDef="brand"><th mat-header-cell *matHeaderCellDef>Marca</th><td mat-cell *matCellDef="let r">{{ r.brand }}</td></ng-container>
-              <ng-container matColumnDef="price"><th mat-header-cell *matHeaderCellDef>Precio</th><td mat-cell *matCellDef="let r">${{ r.price | number:'1.2-2' }}</td></ng-container>
-              <ng-container matColumnDef="categoriaId"><th mat-header-cell *matHeaderCellDef>Categoria</th><td mat-cell *matCellDef="let r">{{ r.categoriaId }}</td></ng-container>
-              <ng-container matColumnDef="acciones"><th mat-header-cell *matHeaderCellDef></th>
-                <td mat-cell *matCellDef="let r"><button mat-icon-button class="btn-delete" (click)="deleteProducto(r.productoId)" matTooltip="Eliminar"><mat-icon>delete</mat-icon></button></td>
-              </ng-container>
-              <tr mat-header-row *matHeaderRowDef="['productoId','brand','price','categoriaId','acciones']"></tr>
-              <tr mat-row *matRowDef="let r; columns: ['productoId','brand','price','categoriaId','acciones']"></tr>
-            </table>
-          </div>
-          <mat-paginator [length]="prodTotal" [pageSize]="prodSize" [pageIndex]="prodPage"
-                         [pageSizeOptions]="[10,20,50]" (page)="onProdPageChange($event)" showFirstLastButtons></mat-paginator>
-        </div>
-      </ng-template>
-    </mat-tab>
+  <!-- ═══ TAB 5: Fuentes de Tráfico ═══ -->
+  <div *ngIf="activeTab === 5">
+    <div class="dimension-form">
+      <input class="dimension-input" [(ngModel)]="newDimNombre" placeholder="Nombre de la fuente">
+      <button class="btn-agregar" (click)="addDimension('dim-fuente-trafico')">
+        <mat-icon>add</mat-icon> Agregar
+      </button>
+    </div>
+    <div class="table-wrapper">
+      <table mat-table [dataSource]="fuentes" class="full-width data-table">
+        <ng-container matColumnDef="id"><th mat-header-cell *matHeaderCellDef>ID</th><td mat-cell *matCellDef="let r">{{ r.id }}</td></ng-container>
+        <ng-container matColumnDef="nombre"><th mat-header-cell *matHeaderCellDef>Nombre</th><td mat-cell *matCellDef="let r">{{ r.nombre }}</td></ng-container>
+        <ng-container matColumnDef="acciones"><th mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let r"><button mat-icon-button class="btn-delete" (click)="deleteDim('dim-fuente-trafico', r.id)" matTooltip="Eliminar"><mat-icon>delete</mat-icon></button></td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="['id','nombre','acciones']"></tr>
+        <tr mat-row *matRowDef="let r; columns: ['id','nombre','acciones']"></tr>
+      </table>
+    </div>
+  </div>
 
-    <!-- ═══ TAB 8: Usuarios ═══ -->
-    <mat-tab>
-      <ng-template mat-tab-label>
-        <mat-icon class="tab-icon">people</mat-icon> Usuarios
-      </ng-template>
-      <ng-template matTabContent>
-        <div class="tab-content">
-          <div class="tab-header">
-            <h3 class="section-title">dim_usuario</h3>
-            <span class="time-chip" [ngClass]="getTimeClass(userTime)" *ngIf="userTime > 0">⚡ {{ userTime }}ms</span>
-          </div>
-          <div class="table-wrapper">
-            <table mat-table [dataSource]="usuarios" class="full-width data-table">
-              <ng-container matColumnDef="userId"><th mat-header-cell *matHeaderCellDef>User ID</th><td mat-cell *matCellDef="let r"><code>{{ r.userId }}</code></td></ng-container>
-              <ng-container matColumnDef="regionId"><th mat-header-cell *matHeaderCellDef>Region</th><td mat-cell *matCellDef="let r">{{ r.regionId }}</td></ng-container>
-              <ng-container matColumnDef="dispositivoId"><th mat-header-cell *matHeaderCellDef>Dispositivo</th><td mat-cell *matCellDef="let r">{{ r.dispositivoId }}</td></ng-container>
-              <ng-container matColumnDef="acciones"><th mat-header-cell *matHeaderCellDef></th>
-                <td mat-cell *matCellDef="let r"><button mat-icon-button class="btn-delete" (click)="deleteUsuario(r.userId)" matTooltip="Eliminar"><mat-icon>delete</mat-icon></button></td>
-              </ng-container>
-              <tr mat-header-row *matHeaderRowDef="['userId','regionId','dispositivoId','acciones']"></tr>
-              <tr mat-row *matRowDef="let r; columns: ['userId','regionId','dispositivoId','acciones']"></tr>
-            </table>
-          </div>
-          <mat-paginator [length]="userTotal" [pageSize]="userSize" [pageIndex]="userPage"
-                         [pageSizeOptions]="[10,20,50]" (page)="onUserPageChange($event)" showFirstLastButtons></mat-paginator>
-        </div>
-      </ng-template>
-    </mat-tab>
+  <!-- ═══ TAB 6: Productos ═══ -->
+  <div *ngIf="activeTab === 6">
+    <div class="table-wrapper">
+      <table mat-table [dataSource]="productos" class="full-width data-table">
+        <ng-container matColumnDef="productoId"><th mat-header-cell *matHeaderCellDef>Producto ID</th><td mat-cell *matCellDef="let r"><code>{{ r.productoId }}</code></td></ng-container>
+        <ng-container matColumnDef="brand"><th mat-header-cell *matHeaderCellDef>Marca</th><td mat-cell *matCellDef="let r">{{ r.brand }}</td></ng-container>
+        <ng-container matColumnDef="price"><th mat-header-cell *matHeaderCellDef>Precio</th><td mat-cell *matCellDef="let r">${{ r.price | number:'1.2-2' }}</td></ng-container>
+        <ng-container matColumnDef="categoriaId"><th mat-header-cell *matHeaderCellDef>Categoría</th><td mat-cell *matCellDef="let r">{{ r.categoriaId }}</td></ng-container>
+        <ng-container matColumnDef="acciones"><th mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let r"><button mat-icon-button class="btn-delete" (click)="deleteProducto(r.productoId)" matTooltip="Eliminar"><mat-icon>delete</mat-icon></button></td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="['productoId','brand','price','categoriaId','acciones']"></tr>
+        <tr mat-row *matRowDef="let r; columns: ['productoId','brand','price','categoriaId','acciones']"></tr>
+      </table>
+    </div>
+    <mat-paginator [length]="prodTotal" [pageSize]="prodSize" [pageIndex]="prodPage"
+                   [pageSizeOptions]="[10,20,50]" (page)="onProdPageChange($event)" showFirstLastButtons></mat-paginator>
+  </div>
 
-  </mat-tab-group>
+  <!-- ═══ TAB 7: Usuarios ═══ -->
+  <div *ngIf="activeTab === 7">
+    <div class="table-wrapper">
+      <table mat-table [dataSource]="usuarios" class="full-width data-table">
+        <ng-container matColumnDef="userId"><th mat-header-cell *matHeaderCellDef>User ID</th><td mat-cell *matCellDef="let r"><code>{{ r.userId }}</code></td></ng-container>
+        <ng-container matColumnDef="regionId"><th mat-header-cell *matHeaderCellDef>Región</th><td mat-cell *matCellDef="let r">{{ r.regionId }}</td></ng-container>
+        <ng-container matColumnDef="dispositivoId"><th mat-header-cell *matHeaderCellDef>Dispositivo</th><td mat-cell *matCellDef="let r">{{ r.dispositivoId }}</td></ng-container>
+        <ng-container matColumnDef="acciones"><th mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let r"><button mat-icon-button class="btn-delete" (click)="deleteUsuario(r.userId)" matTooltip="Eliminar"><mat-icon>delete</mat-icon></button></td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="['userId','regionId','dispositivoId','acciones']"></tr>
+        <tr mat-row *matRowDef="let r; columns: ['userId','regionId','dispositivoId','acciones']"></tr>
+      </table>
+    </div>
+    <mat-paginator [length]="userTotal" [pageSize]="userSize" [pageIndex]="userPage"
+                   [pageSizeOptions]="[10,20,50]" (page)="onUserPageChange($event)" showFirstLastButtons></mat-paginator>
+  </div>
+
 </div>

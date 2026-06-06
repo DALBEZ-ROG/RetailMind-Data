@@ -3,154 +3,144 @@
 </ng-container>
 
 <ng-template #mainLayout>
-  <mat-toolbar color="primary" class="app-toolbar">
-    <button mat-icon-button (click)="sidenavOpened = !sidenavOpened" aria-label="Toggle menu">
-      <mat-icon>menu</mat-icon>
-    </button>
-    <span class="toolbar-title">{{ title }}</span>
+  <!-- Navbar flotante glassmorphism -->
+  <nav class="navbar">
+    <span class="navbar-logo">RetailMind</span>
+    <span class="navbar-spacer"></span>
 
-    <span class="toolbar-spacer"></span>
-
-    <ng-container *ngIf="currentUser">
-      <mat-chip class="role-chip"
-                [class.role-admin]="isAdmin"
-                [class.role-viewer]="!isAdmin">
+    <div class="navbar-actions" *ngIf="currentUser">
+      <span class="role-badge" [class.admin]="isAdmin" [class.cliente]="!isAdmin">
         {{ currentUser.rol }}
-      </mat-chip>
+      </span>
 
       <button mat-button [matMenuTriggerFor]="userMenu" class="user-btn">
         <mat-icon>account_circle</mat-icon>
-        <span class="user-name">{{ currentUser.nombre }}</span>
+        <span>{{ currentUser.nombre }}</span>
       </button>
-      <mat-menu #userMenu="matMenu">
-        <button mat-menu-item disabled>
-          <mat-icon>person</mat-icon>
-          <span>{{ currentUser.username }}</span>
-        </button>
+      <mat-menu #userMenu="matMenu" panelClass="user-menu-panel">
+        <div class="user-menu-header">
+          <div class="avatar">{{ userInitial }}</div>
+          <div class="user-info">
+            <div class="user-name">{{ currentUser.nombre }}</div>
+            <div class="user-email">{{ currentUser.username }}</div>
+          </div>
+        </div>
         <mat-divider></mat-divider>
-        <button mat-menu-item (click)="logout()" matTooltip="Cerrar sesion" matTooltipShowDelay="500">
+        <button mat-menu-item class="menu-item-perfil" (click)="goToProfile()">
+          <mat-icon>person</mat-icon>
+          <span>Mi Perfil</span>
+        </button>
+        <button mat-menu-item class="menu-item-logout" (click)="logout()">
           <mat-icon>logout</mat-icon>
-          <span>Cerrar sesion</span>
+          <span>Cerrar Sesión</span>
         </button>
       </mat-menu>
+    </div>
+  </nav>
+
+  <!-- Sidebar premium -->
+  <aside class="sidebar">
+    <div class="sidebar-section-label">Tienda</div>
+
+    <a class="nav-item" routerLink="/shop" routerLinkActive="active"
+       [routerLinkActiveOptions]="{ exact: true }">
+      <mat-icon class="icon-tienda">storefront</mat-icon>
+      <span>Tienda</span>
+    </a>
+    <a class="nav-item" routerLink="/shop/carrito" routerLinkActive="active">
+      <mat-icon class="icon-carrito">shopping_bag</mat-icon>
+      <span>Mi Carrito</span>
+    </a>
+    <a class="nav-item" routerLink="/wishlist" routerLinkActive="active">
+      <mat-icon class="icon-wishlist">favorite</mat-icon>
+      <span>Mi Wishlist</span>
+    </a>
+    <a class="nav-item" routerLink="/recomendaciones" routerLinkActive="active">
+      <mat-icon class="icon-recomendaciones">local_fire_department</mat-icon>
+      <span>Recomendaciones</span>
+    </a>
+    <a class="nav-item" routerLink="/mis-pedidos" routerLinkActive="active">
+      <mat-icon class="icon-pedidos">local_shipping</mat-icon>
+      <span>Mis Pedidos</span>
+    </a>
+    <a class="nav-item" routerLink="/perfil" routerLinkActive="active">
+      <mat-icon class="icon-perfil">person</mat-icon>
+      <span>Mi Perfil</span>
+    </a>
+
+    <!-- Admin Section -->
+    <ng-container *ngIf="isAdmin">
+      <div class="sidebar-section-label">Administración</div>
+
+      <div class="config-section">
+        <div class="config-header" [class.expanded]="configExpanded"
+             (click)="configExpanded = !configExpanded">
+          <mat-icon>expand_more</mat-icon>
+          <span>Configuración</span>
+        </div>
+
+        <div class="config-items" *ngIf="configExpanded">
+          <a class="nav-item" routerLink="/dashboard" routerLinkActive="active">
+            <mat-icon class="icon-dashboard">dashboard</mat-icon>
+            <span>Dashboard</span>
+          </a>
+          <a class="nav-item" routerLink="/sesiones" routerLinkActive="active">
+            <mat-icon class="icon-funnel">timeline</mat-icon>
+            <span>Sesiones</span>
+          </a>
+          <a class="nav-item" routerLink="/conversiones" routerLinkActive="active">
+            <mat-icon class="icon-funnel">trending_up</mat-icon>
+            <span>Conversiones</span>
+          </a>
+          <a class="nav-item" routerLink="/admin-etl" routerLinkActive="active">
+            <mat-icon class="icon-etl">sync</mat-icon>
+            <span>Administracion ETL</span>
+          </a>
+          <a class="nav-item" routerLink="/gestion-datos" routerLinkActive="active">
+            <mat-icon class="icon-gestion">dataset</mat-icon>
+            <span>Gestion de Datos</span>
+          </a>
+          <a class="nav-item" routerLink="/admin-pedidos" routerLinkActive="active">
+            <mat-icon class="icon-pedidos-admin">receipt_long</mat-icon>
+            <span>Pedidos</span>
+          </a>
+          <a class="nav-item" routerLink="/admin-usuarios" routerLinkActive="active">
+            <mat-icon class="icon-usuarios">group</mat-icon>
+            <span>Usuarios</span>
+          </a>
+          <a class="nav-item" routerLink="/funnel" routerLinkActive="active">
+            <mat-icon class="icon-funnel">filter_alt</mat-icon>
+            <span>Funnel</span>
+          </a>
+          <a class="nav-item" routerLink="/analytics/region" routerLinkActive="active">
+            <mat-icon class="icon-region">public</mat-icon>
+            <span>Región</span>
+          </a>
+          <a class="nav-item" routerLink="/analytics/dispositivo" routerLinkActive="active">
+            <mat-icon class="icon-dispositivo">devices</mat-icon>
+            <span>Dispositivos</span>
+          </a>
+          <a class="nav-item" routerLink="/analytics/trafico" routerLinkActive="active">
+            <mat-icon class="icon-trafico">wifi</mat-icon>
+            <span>Fuente de Tráfico</span>
+          </a>
+          <a class="nav-item" routerLink="/inicializacion" routerLinkActive="active">
+            <mat-icon class="icon-inicializacion">rocket_launch</mat-icon>
+            <span>Inicializacion</span>
+          </a>
+          <a class="nav-item" routerLink="/admin/reportes" routerLinkActive="active">
+            <mat-icon class="icon-reportes">assessment</mat-icon>
+            <span>Reportes</span>
+          </a>
+        </div>
+      </div>
     </ng-container>
-  </mat-toolbar>
+  </aside>
 
-  <!-- Breadcrumb -->
-  <div class="breadcrumb-bar">
-    <span class="breadcrumb-text">RetailMind &gt; {{ breadcrumb }}</span>
-  </div>
-
-  <mat-sidenav-container class="sidenav-container">
-    <mat-sidenav mode="side" [opened]="sidenavOpened" class="sidenav">
-      <mat-nav-list>
-
-        <!-- Tienda - visible para todos -->
-        <a mat-list-item routerLink="/shop" routerLinkActive="active-link"
-           [routerLinkActiveOptions]="{ exact: true }">
-          <mat-icon matListItemIcon>shopping_cart</mat-icon>
-          <span matListItemTitle>Tienda</span>
-        </a>
-
-        <!-- Links de CLIENTE -->
-        <a mat-list-item routerLink="/shop/carrito" routerLinkActive="active-link">
-          <mat-icon matListItemIcon>shopping_bag</mat-icon>
-          <span matListItemTitle>Mi Carrito</span>
-        </a>
-        <a mat-list-item routerLink="/wishlist" routerLinkActive="active-link">
-          <mat-icon matListItemIcon>favorite</mat-icon>
-          <span matListItemTitle>Mi Wishlist</span>
-        </a>
-        <a mat-list-item routerLink="/recomendaciones" routerLinkActive="active-link"
-           class="rec-hot-link">
-          <mat-icon matListItemIcon class="rec-hot-icon">local_fire_department</mat-icon>
-          <span matListItemTitle class="rec-hot-text">Recomendaciones</span>
-        </a>
-        <a mat-list-item routerLink="/mis-pedidos" routerLinkActive="active-link">
-          <mat-icon matListItemIcon>local_shipping</mat-icon>
-          <span matListItemTitle>Mis Pedidos</span>
-        </a>
-        <a mat-list-item routerLink="/perfil" routerLinkActive="active-link">
-          <mat-icon matListItemIcon>person</mat-icon>
-          <span matListItemTitle>Mi Perfil</span>
-        </a>
-
-        <!-- Panel de configuración ADMIN -->
-        <ng-container *ngIf="isAdmin">
-          <mat-divider></mat-divider>
-          <mat-expansion-panel class="config-panel" [expanded]="configExpanded"
-                               (opened)="configExpanded = true" (closed)="configExpanded = false">
-            <mat-expansion-panel-header>
-              <mat-panel-title>
-                <mat-icon class="config-icon">settings</mat-icon>
-                Configuracion
-              </mat-panel-title>
-            </mat-expansion-panel-header>
-
-            <mat-nav-list dense>
-              <a mat-list-item routerLink="/dashboard" routerLinkActive="active-link">
-                <mat-icon matListItemIcon>dashboard</mat-icon>
-                <span matListItemTitle>Dashboard</span>
-              </a>
-              <a mat-list-item routerLink="/sesiones" routerLinkActive="active-link">
-                <mat-icon matListItemIcon>timeline</mat-icon>
-                <span matListItemTitle>Sesiones</span>
-              </a>
-              <a mat-list-item routerLink="/conversiones" routerLinkActive="active-link">
-                <mat-icon matListItemIcon>trending_up</mat-icon>
-                <span matListItemTitle>Conversiones</span>
-              </a>
-              <a mat-list-item routerLink="/admin-etl" routerLinkActive="active-link">
-                <mat-icon matListItemIcon>sync</mat-icon>
-                <span matListItemTitle>Administracion ETL</span>
-              </a>
-              <a mat-list-item routerLink="/gestion-datos" routerLinkActive="active-link">
-                <mat-icon matListItemIcon>dataset</mat-icon>
-                <span matListItemTitle>Gestion de Datos</span>
-              </a>
-              <a mat-list-item routerLink="/admin-pedidos" routerLinkActive="active-link">
-                <mat-icon matListItemIcon>receipt_long</mat-icon>
-                <span matListItemTitle>Pedidos</span>
-              </a>
-              <a mat-list-item routerLink="/admin-usuarios" routerLinkActive="active-link">
-                <mat-icon matListItemIcon>group</mat-icon>
-                <span matListItemTitle>Usuarios</span>
-              </a>
-              <a mat-list-item routerLink="/funnel" routerLinkActive="active-link">
-                <mat-icon matListItemIcon>filter_alt</mat-icon>
-                <span matListItemTitle>Funnel</span>
-              </a>
-              <a mat-list-item routerLink="/analytics/region" routerLinkActive="active-link">
-                <mat-icon matListItemIcon>public</mat-icon>
-                <span matListItemTitle>Región</span>
-              </a>
-              <a mat-list-item routerLink="/analytics/dispositivo" routerLinkActive="active-link">
-                <mat-icon matListItemIcon>devices</mat-icon>
-                <span matListItemTitle>Dispositivos</span>
-              </a>
-              <a mat-list-item routerLink="/analytics/trafico" routerLinkActive="active-link">
-                <mat-icon matListItemIcon>wifi</mat-icon>
-                <span matListItemTitle>Fuente de Tráfico</span>
-              </a>
-              <a mat-list-item routerLink="/inicializacion" routerLinkActive="active-link">
-                <mat-icon matListItemIcon>rocket_launch</mat-icon>
-                <span matListItemTitle>Inicializacion</span>
-              </a>
-              <a mat-list-item routerLink="/admin/reportes" routerLinkActive="active-link">
-                <mat-icon matListItemIcon>assessment</mat-icon>
-                <span matListItemTitle>Reportes</span>
-              </a>
-            </mat-nav-list>
-          </mat-expansion-panel>
-        </ng-container>
-
-      </mat-nav-list>
-    </mat-sidenav>
-
-    <mat-sidenav-content class="sidenav-content">
-      <router-outlet />
-    </mat-sidenav-content>
-  </mat-sidenav-container>
+  <!-- Main content -->
+  <main class="main-content">
+    <router-outlet />
+  </main>
 </ng-template>
 
 <app-server-status></app-server-status>

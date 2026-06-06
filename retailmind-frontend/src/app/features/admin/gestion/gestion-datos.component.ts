@@ -1,7 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { MatTabsModule } from '@angular/material/tabs';
 import { MatTableModule } from '@angular/material/table';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -16,12 +15,14 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatChipsModule } from '@angular/material/chips';
 import { GestionDatosService } from './gestion-datos.service';
+import { HttpClient } from '@angular/common/http';
+import { environment } from '../../../../environments/environment';
 
 @Component({
   selector: 'app-gestion-datos',
   standalone: true,
   imports: [
-    CommonModule, FormsModule, MatTabsModule, MatTableModule,
+    CommonModule, FormsModule, MatTableModule,
     MatButtonModule, MatIconModule, MatPaginatorModule,
     MatFormFieldModule, MatInputModule, MatSelectModule,
     MatCheckboxModule, MatCardModule, MatSnackBarModule,
@@ -73,16 +74,40 @@ export class GestionDatosComponent implements OnInit {
   userTime = 0;
 
   // ── Nuevo item dimensión ───────────────────────────────────────────────────
-  newDimId = 0;
   newDimNombre = '';
+
+  // ── Tabs ───────────────────────────────────────────────────────────────────
+  activeTab = 0;
+  tabs = [
+    { label: 'Hechos', icon: 'table_rows', title: 'Tabla de Eventos' },
+    { label: 'Canales', icon: 'cell_tower', title: 'Canales de Venta' },
+    { label: 'Regiones', icon: 'public', title: 'Regiones Geográficas' },
+    { label: 'Dispositivos', icon: 'devices', title: 'Tipos de Dispositivo' },
+    { label: 'Categorías', icon: 'category', title: 'Categorías de Producto' },
+    { label: 'Fuentes', icon: 'wifi_tethering', title: 'Fuentes de Tráfico' },
+    { label: 'Productos', icon: 'inventory_2', title: 'Catálogo de Productos' },
+    { label: 'Usuarios', icon: 'people', title: 'Usuarios del Sistema' }
+  ];
+
+  // ── Semanas disponibles ────────────────────────────────────────────────────
+  semanasDisponibles: number[] = [];
 
   constructor(
     private service: GestionDatosService,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    private http: HttpClient
   ) {}
 
   ngOnInit(): void {
     this.loadFactEventos();
+    this.loadSemanasDisponibles();
+  }
+
+  loadSemanasDisponibles(): void {
+    this.http.get<number[]>(`${environment.apiUrl}/api/funnel/semanas-disponibles`).subscribe({
+      next: (data) => this.semanasDisponibles = data,
+      error: () => { this.semanasDisponibles = Array.from({ length: 52 }, (_, i) => i + 1); }
+    });
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -115,7 +140,7 @@ export class GestionDatosComponent implements OnInit {
   }
 
   editEvento(row: any): void {
-    this.editingEvento = row;
+    this.editingEvento = JSON.parse(JSON.stringify(row));
     this.editForm = {
       user_action: row.userAction,
       channel: row.channel,
@@ -169,12 +194,12 @@ export class GestionDatosComponent implements OnInit {
   }
 
   addDimension(tabla: string): void {
-    if (!this.newDimNombre.trim() || this.newDimId <= 0) {
-      this.msgErr({ error: { error: 'ID y Nombre son requeridos' } });
+    if (!this.newDimNombre.trim()) {
+      this.msgErr({ error: { error: 'El nombre es requerido' } });
       return;
     }
-    this.service.createDimension(tabla, { id: this.newDimId, nombre: this.newDimNombre }).subscribe({
-      next: () => { this.msgOk('Registro creado'); this.newDimId = 0; this.newDimNombre = ''; this.loadDimension(tabla); },
+    this.service.createDimension(tabla, { nombre: this.newDimNombre }).subscribe({
+      next: () => { this.msgOk('Registro creado'); this.newDimNombre = ''; this.loadDimension(tabla); },
       error: (e) => this.msgErr(e)
     });
   }
@@ -243,6 +268,11 @@ export class GestionDatosComponent implements OnInit {
   // TAB CHANGE
   // ══════════════════════════════════════════════════════════════════════════
 
+  selectTab(index: number): void {
+    this.activeTab = index;
+    this.onTabChange(index);
+  }
+
   onTabChange(index: number): void {
     switch (index) {
       case 0: this.loadFactEventos(); break;
@@ -257,6 +287,20 @@ export class GestionDatosComponent implements OnInit {
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
+  getActiveTime(): number {
+    switch (this.activeTab) {
+      case 0: return this.factTime;
+      case 1: return this.canalesTime;
+      case 2: return this.regionesTime;
+      case 3: return this.dispositivosTime;
+      case 4: return this.categoriasTime;
+      case 5: return this.fuentesTime;
+      case 6: return this.prodTime;
+      case 7: return this.userTime;
+      default: return 0;
+    }
+  }
+
   getTimeClass(ms: number): string {
     if (ms === 0) return 'time-neutral';
     if (ms < 200) return 'time-fast';
