@@ -42,7 +42,7 @@ export class AppComponent {
   title = 'RetailMind Shop';
   sidenavOpened = true;
   breadcrumb = 'Tienda';
-  configExpanded = false;
+  configExpanded = true;
 
   private routeMap: Record<string, string> = {
     '/shop': 'Tienda',

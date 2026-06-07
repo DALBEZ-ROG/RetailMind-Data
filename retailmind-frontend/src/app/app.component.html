@@ -40,40 +40,13 @@
 
   <!-- Sidebar premium -->
   <aside class="sidebar">
-    <div class="sidebar-section-label">Tienda</div>
-
-    <a class="nav-item" routerLink="/shop" routerLinkActive="active"
-       [routerLinkActiveOptions]="{ exact: true }">
-      <mat-icon class="icon-tienda">storefront</mat-icon>
-      <span>Tienda</span>
-    </a>
-    <a class="nav-item" routerLink="/shop/carrito" routerLinkActive="active">
-      <mat-icon class="icon-carrito">shopping_bag</mat-icon>
-      <span>Mi Carrito</span>
-    </a>
-    <a class="nav-item" routerLink="/wishlist" routerLinkActive="active">
-      <mat-icon class="icon-wishlist">favorite</mat-icon>
-      <span>Mi Wishlist</span>
-    </a>
-    <a class="nav-item" routerLink="/recomendaciones" routerLinkActive="active">
-      <mat-icon class="icon-recomendaciones">local_fire_department</mat-icon>
-      <span>Recomendaciones</span>
-    </a>
-    <a class="nav-item" routerLink="/mis-pedidos" routerLinkActive="active">
-      <mat-icon class="icon-pedidos">local_shipping</mat-icon>
-      <span>Mis Pedidos</span>
-    </a>
-    <a class="nav-item" routerLink="/perfil" routerLinkActive="active">
-      <mat-icon class="icon-perfil">person</mat-icon>
-      <span>Mi Perfil</span>
-    </a>
-
-    <!-- Admin Section -->
+    <!-- Admin Section FIRST -->
     <ng-container *ngIf="isAdmin">
       <div class="sidebar-section-label">Administración</div>
 
       <div class="config-section">
-        <div class="config-header" [class.expanded]="configExpanded"
+        <div class="config-header expanded"
+             [class.expanded]="configExpanded"
              (click)="configExpanded = !configExpanded">
           <mat-icon>expand_more</mat-icon>
           <span>Configuración</span>
@@ -135,6 +108,35 @@
         </div>
       </div>
     </ng-container>
+
+    <!-- Tienda Section -->
+    <div class="sidebar-section-label">Tienda</div>
+
+    <a class="nav-item" routerLink="/shop" routerLinkActive="active"
+       [routerLinkActiveOptions]="{ exact: true }">
+      <mat-icon class="icon-tienda">storefront</mat-icon>
+      <span>Tienda</span>
+    </a>
+    <a class="nav-item" routerLink="/shop/carrito" routerLinkActive="active">
+      <mat-icon class="icon-carrito">shopping_bag</mat-icon>
+      <span>Mi Carrito</span>
+    </a>
+    <a class="nav-item" routerLink="/wishlist" routerLinkActive="active">
+      <mat-icon class="icon-wishlist">favorite</mat-icon>
+      <span>Mi Wishlist</span>
+    </a>
+    <a class="nav-item" routerLink="/recomendaciones" routerLinkActive="active">
+      <mat-icon class="icon-recomendaciones">local_fire_department</mat-icon>
+      <span>Recomendaciones</span>
+    </a>
+    <a class="nav-item" routerLink="/mis-pedidos" routerLinkActive="active">
+      <mat-icon class="icon-pedidos">local_shipping</mat-icon>
+      <span>Mis Pedidos</span>
+    </a>
+    <a class="nav-item" routerLink="/perfil" routerLinkActive="active">
+      <mat-icon class="icon-perfil">person</mat-icon>
+      <span>Mi Perfil</span>
+    </a>
   </aside>
 
   <!-- Main content -->

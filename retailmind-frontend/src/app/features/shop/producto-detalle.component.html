@@ -26,17 +26,21 @@
       </div>
 
       <div class="detalle-actions">
-        <mat-form-field appearance="outline" class="qty-field">
-          <mat-label>Cantidad</mat-label>
-          <input matInput type="number" [(ngModel)]="cantidad" min="1" [max]="producto.stock">
-        </mat-form-field>
+        <div class="qty-wrapper">
+          <label class="qty-label">Cantidad</label>
+          <div class="qty-control">
+            <button class="qty-btn" (click)="cantidad > 1 ? cantidad = cantidad - 1 : null">−</button>
+            <input type="number" class="qty-input" [(ngModel)]="cantidad" min="1" [max]="producto.stock">
+            <button class="qty-btn" (click)="cantidad < producto.stock ? cantidad = cantidad + 1 : null">+</button>
+          </div>
+        </div>
 
-        <button mat-raised-button color="primary" class="btn-add-cart" (click)="agregarAlCarrito()">
+        <button class="btn-add-cart" (click)="agregarAlCarrito()">
           <mat-icon>add_shopping_cart</mat-icon>
           Agregar al carrito
         </button>
 
-        <button mat-stroked-button [color]="enWishlist ? 'warn' : 'primary'" (click)="toggleWishlist()">
+        <button class="btn-wishlist-premium" [class.active]="enWishlist" (click)="toggleWishlist()">
           <mat-icon>{{ enWishlist ? 'favorite' : 'favorite_border' }}</mat-icon>
           {{ enWishlist ? 'En Wishlist' : 'Wishlist' }}
         </button>
