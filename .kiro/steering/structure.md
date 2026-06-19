@@ -1,78 +1,112 @@
 # Project Structure
 
-Monorepo with three independent sub-projects sharing a PostgreSQL database.
+Monorepo con tres sub-proyectos independientes que comparten **ClickHouse** como base de datos
+operativa, orquestados con Docker Compose.
 
 ```
 1M6DatosCS/
-├── retailmind/                  # Python ETL pipeline
-│   ├── main.py                  # Orchestrator: runs steps 1-4 sequentially
+├── retailmind/                       # Pipeline ETL en Python 3.12
 │   ├── config/
-│   │   └── db_connection.py     # PostgreSQL connection + logging setup
+│   │   └── clickhouse_connection.py  # Conexion ClickHouse + logging
 │   ├── etl/
-│   │   ├── 01_create_tables.py  # DDL execution
-│   │   ├── 02_load_lookup_tables.py  # Load dimension/lookup tables
-│   │   ├── 03_load_main_tables.py    # Load fact tables from CSV
-│   │   ├── 04_verify_load.py         # Post-load validation
-│   │   ├── 05_load_incremental.py    # Weekly incremental loads
-│   │   ├── 06_optimize_database.py   # Index + vacuum
-│   │   ├── 07_monitor_performance.py # Query stats
-│   │   ├── 08_apply_advanced_optimize.py
-│   │   ├── 09_create_refresh_function.py
-│   │   └── load_csv_staging.py       # CSV → staging helper
-│   ├── sql/
-│   │   ├── create_tables.sql    # Full DDL (10 tables)
-│   │   ├── optimize.sql         # Index definitions
-│   │   └── advanced_optimize.sql
+│   │   ├── extraccion/
+│   │   │   ├── 08_extract_pocketbase.py   # PocketBase -> data/stage/datos.parquet
+│   │   │   └── 13_create_shop_tables.py   # Tablas de tienda en ClickHouse
+│   │   ├── carga/
+│   │   │   ├── 09_load_clickhouse.py      # Parquet -> ClickHouse
+│   │   │   ├── 10_verify_clickhouse.py    # Verificacion de carga
+│   │   │   └── 11_reset_clickhouse.py     # Reset de datos
+│   │   ├── sinteticos/
+│   │   │   └── 12_generate_synthetic.py   # Generador de datos sinteticos
+│   │   ├── analytics/                # Scripts/notas de analitica
+│   │   └── reportes/                 # Scripts/notas de reportes
+│   ├── data/
+│   │   ├── stage/                    # Capa cruda en Parquet (datos.parquet)
+│   │   └── agg/                      # Capa procesada/agregada (PENDIENTE: vacia)
+│   ├── sql/                          # DDL legacy de PostgreSQL (no usar)
 │   ├── utils/
-│   │   ├── error_reporter.py
-│   │   └── load_tracker.py
-│   ├── logs/                    # ETL log output
-│   ├── generate_synthetic.py    # Test data generator
+│   ├── logs/
 │   ├── requirements.txt
-│   └── .env                     # DB credentials (not committed)
+│   ├── Dockerfile
+│   └── .env                          # Credenciales (no versionado)
 │
-├── retailmind-backend/          # Java Spring Boot REST API
+├── retailmind-backend/               # API REST Spring Boot 3.5
 │   ├── pom.xml
+│   ├── Dockerfile
 │   └── src/main/java/com/retailmind/
 │       ├── RetailmindApplication.java
-│       ├── config/              # CORS, DB init
-│       ├── controller/          # REST endpoints (Auth, Dashboard, ETL, etc.)
-│       ├── dto/                 # Data Transfer Objects
-│       ├── entity/              # JPA entities (maps to ETL tables)
-│       ├── exception/           # Global error handler
-│       ├── migration/           # DataInitializer (seed data)
-│       ├── repository/          # Spring Data JPA repositories
-│       ├── security/            # JWT filter, config
-│       └── service/             # Business logic layer
+│       ├── auth/                     # Login JWT, ClickHouseUserRepository, DataInitializer
+│       ├── security/                 # SecurityConfig, JwtAuthenticationFilter
+│       ├── config/                   # ClickHouseConfig, CorsConfig, Health
+│       ├── dto/                      # DTOs + repos JdbcTemplate (FactEvento, Dim*, ...)
+│       ├── exception/                # GlobalExceptionHandler
+│       │
+│       │   # --- Nivel Operativo (genera ventas) ---
+│       ├── catalogo/                 # Catalogo publico
+│       ├── carrito/                  # Carrito de compras
+│       ├── wishlist/                 # Lista de deseos
+│       ├── pedidos/                  # Ordenes y checkout
+│       ├── perfil/                   # Perfil de usuario
+│       ├── recomendaciones/          # Motor de recomendaciones
+│       │
+│       │   # --- Nivel Tactico + Estrategico ---
+│       ├── analytics/
+│       │   ├── dashboard/            # KPIs ejecutivos (estrategico)
+│       │   ├── sesiones/             # Explorer de sesiones
+│       │   ├── conversiones/         # Analisis de conversion
+│       │   ├── funnel/               # Embudo (solo ADMIN)
+│       │   ├── region/               # Analytics por region (solo ADMIN)
+│       │   ├── dispositivo/          # Analytics por dispositivo (solo ADMIN)
+│       │   └── trafico/              # Analytics por fuente (solo ADMIN)
+│       └── admin/
+│           ├── etl/                  # Disparo de ETL (EtlController/EtlService)
+│           ├── gestion/              # CRUD de dimensiones
+│           ├── usuarios/             # Admin de usuarios
+│           └── reportes/             # Excel + PDF
 │
-├── retailmind-frontend/         # Angular 17 SPA
+├── retailmind-frontend/              # SPA Angular 17 standalone
 │   ├── package.json
 │   ├── angular.json
 │   ├── tsconfig.json
+│   ├── Dockerfile
+│   ├── nginx.conf
 │   └── src/app/
-│       ├── app.routes.ts        # Route definitions
-│       ├── app.config.ts        # Standalone app config
-│       ├── core/                # Shared infrastructure
-│       │   ├── components/      # Layout components (navbar, sidebar)
-│       │   ├── guards/          # Auth guards
-│       │   ├── interceptors/    # HTTP interceptors (JWT attach)
-│       │   ├── models/          # TypeScript interfaces
-│       │   └── services/        # API services (HttpClient wrappers)
-│       └── features/            # Feature modules (lazy-loaded routes)
-│           ├── dashboard/       # Main analytics dashboard
-│           ├── sesiones/        # Session explorer
-│           ├── conversiones/    # Conversion analytics
-│           ├── admin-etl/       # ETL management UI
-│           └── login/           # Authentication page
+│       ├── core/                     # Infraestructura transversal
+│       │   ├── services/             # Servicios API (HttpClient)
+│       │   ├── guards/               # Auth guards
+│       │   ├── interceptors/         # Interceptor JWT
+│       │   └── models/               # Interfaces TypeScript
+│       └── features/                 # Modulos por feature (lazy-loaded)
+│           ├── login/                # Autenticacion
+│           ├── shop/                 # Tienda, carrito, detalle
+│           ├── wishlist/             # Lista de deseos
+│           ├── recomendaciones/      # Productos recomendados
+│           ├── pedidos/              # Mis pedidos
+│           ├── perfil/               # Perfil
+│           ├── analytics/            # Dashboard, funnel, region, etc.
+│           └── admin/                # ETL, gestion, reportes
 │
-└── .kiro/                       # Kiro configuration
-    ├── specs/                   # Feature specifications
-    └── steering/                # Steering rules (this file)
+├── docker-compose.yml                # 5 servicios: pocketbase, clickhouse, backend, frontend, etl
+├── clickhouse-data/                  # Volumen persistente ClickHouse
+├── pocketbase-data/                  # Volumen persistente PocketBase
+├── .env                              # Variables de entorno
+└── .kiro/                            # Configuracion Kiro
+    ├── specs/                        # Especificaciones de features
+    └── steering/                     # Reglas de steering (este archivo)
 ```
 
 ## Architecture Patterns
 
-- **ETL**: Numbered scripts (01-09) run in sequence. Each exposes a main function callable from `main.py` or standalone.
-- **Backend**: Standard Spring Boot layered architecture (Controller → Service → Repository). JPA entities map directly to the ETL-created tables. No Hibernate DDL — schema is owned by the Python ETL.
-- **Frontend**: Angular standalone components with feature-based folder structure. Core folder holds cross-cutting concerns (guards, interceptors, services). Features are self-contained route modules.
-- **Data flow**: CSV → Python ETL → PostgreSQL ← Spring Boot API ← Angular Frontend
+- **Niveles empresariales**: el dominio se separa en operativo (ventas), táctico (decisión) y
+  estratégico (KPIs). Cada módulo nuevo debe declararse dentro de un nivel.
+- **ETL**: scripts numerados organizados por fase (`extraccion`, `carga`, `sinteticos`). El flujo
+  canónico es PocketBase → `data/stage/*.parquet` → (`data/agg/`) → ClickHouse. La capa `data/agg/`
+  está prevista pero aún vacía.
+- **Backend**: arquitectura por capas Controller → Service → acceso a datos con `JdbcTemplate`
+  (sin JPA). El esquema es propiedad del ETL; el backend no genera DDL vía ORM. Resiliencia del ETL
+  con Spring Retry.
+- **Frontend**: componentes standalone Angular con estructura por features lazy-loaded. `core/`
+  agrupa lo transversal (guards, interceptors, services, models).
+- **Seguridad**: JWT STATELESS + RBAC (ADMIN/CLIENTE). Catálogo público; analítica avanzada, ETL,
+  gestión, reportes y admin solo ADMIN; tienda y datos de usuario requieren autenticación.
+- **Flujo de datos**: PocketBase → Python ETL (Parquet) → ClickHouse ← Spring Boot API ← Angular.
