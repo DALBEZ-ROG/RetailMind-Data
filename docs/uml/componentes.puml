@@ -1,0 +1,106 @@
+@startuml componentes
+title Diagrama de Componentes - RetailMind (alto nivel)
+
+skinparam shadowing false
+skinparam componentStyle rectangle
+skinparam component {
+    BackgroundColor #FDF6E3
+    BorderColor #586E75
+}
+skinparam package {
+    BackgroundColor #F7F1DD
+    BorderColor #586E75
+}
+skinparam database {
+    BackgroundColor #FFF3CD
+    BorderColor #586E75
+}
+
+' ============================================================
+'  FRONTEND - SPA Angular
+' ============================================================
+package "Frontend (Angular 17)" as FE {
+    component "SPA RetailMind" as SPA {
+        component "core\n(services, guards,\ninterceptors, models)" as FE_CORE
+        component "features\n(login, shop, wishlist,\npedidos, perfil, recomendaciones,\nanalytics, admin)" as FE_FEATURES
+    }
+}
+
+' ============================================================
+'  BACKEND - API REST Spring Boot
+' ============================================================
+package "Backend API REST (Spring Boot 3.5)" as BE {
+
+    component "Seguridad / Auth\n(JWT, RBAC)" as BE_SEC
+    component "Nivel Operativo\n(catalogo, carrito, wishlist,\npedidos, perfil, recomendaciones)" as BE_OPER
+    component "Nivel Tactico/Estrategico\n(analytics, dashboard)" as BE_ANALYTICS
+    component "Administracion\n(etl, gestion, usuarios, reportes)" as BE_ADMIN
+    component "Acceso a Datos\n(DTOs + Repositorios JdbcTemplate)" as BE_DATA
+}
+
+' ============================================================
+'  ALMACENAMIENTO Y FUENTE DE DATOS
+' ============================================================
+database "ClickHouse\n(BD operativa: retailmind)" as CH
+database "PocketBase\n(fuente: dataset_retail)" as PB
+
+' ============================================================
+'  ETL - Pipeline Python
+' ============================================================
+package "ETL Pipeline (Python 3.12)" as ETL {
+    component "extraccion\n(PocketBase -> Parquet)" as ETL_EXTRACT
+    component "carga\n(Parquet -> ClickHouse)" as ETL_LOAD
+    component "sinteticos\n(generacion de datos)" as ETL_SYNTH
+}
+artifact "data/stage/*.parquet" as PARQUET
+
+' ============================================================
+'  INTERFACES PROVISTAS
+' ============================================================
+interface "REST / JSON" as I_REST
+interface "JDBC\n(clickhouse-jdbc)" as I_JDBC
+interface "REST PocketBase\n(HTTP)" as I_PB
+interface "HTTP nativo :8123" as I_CH_HTTP
+
+' ============================================================
+'  CONEXIONES
+' ============================================================
+' Frontend -> Backend (REST)
+BE - I_REST : expone
+FE_CORE ..> I_REST : consume (HttpClient + JWT)
+FE_FEATURES ..> FE_CORE
+
+' Backend interno
+BE_SEC ..> BE_OPER : protege (RBAC)
+BE_SEC ..> BE_ANALYTICS : protege (RBAC)
+BE_SEC ..> BE_ADMIN : protege (RBAC)
+BE_OPER ..> BE_DATA
+BE_ANALYTICS ..> BE_DATA
+BE_ADMIN ..> BE_DATA
+
+' Backend -> ClickHouse (JDBC)
+CH - I_JDBC : expone
+BE_DATA ..> I_JDBC : consultas SQL parametrizadas
+BE_SEC ..> I_JDBC : usuarios_sistema
+
+' Backend admin dispara el ETL
+BE_ADMIN ..> ETL : dispara scripts\n(ProcessBuilder)
+
+' ETL
+PB - I_PB : expone
+ETL_EXTRACT ..> I_PB : extrae dataset (HTTP/REST)
+ETL_EXTRACT --> PARQUET : escribe
+ETL_LOAD <-- PARQUET : lee
+CH - I_CH_HTTP : expone
+ETL_LOAD ..> I_CH_HTTP : carga (insert)
+ETL_SYNTH ..> I_CH_HTTP : datos sinteticos
+
+note as N1
+  Flujo de datos:
+  PocketBase -> ETL (Parquet) -> ClickHouse
+  <- API Spring Boot <- SPA Angular
+  Acceso a datos: JdbcTemplate (sin JPA).
+  Seguridad: JWT STATELESS + RBAC (ADMIN / CLIENTE).
+end note
+
+@enduml

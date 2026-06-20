@@ -1,0 +1,54 @@
+@startuml secuencia-checkout
+title Diagrama de Secuencia - CU-09 Checkout
+
+skinparam shadowing false
+skinparam sequence {
+    ArrowColor #586E75
+    LifeLineBorderColor #586E75
+    ParticipantBorderColor #586E75
+    ParticipantBackgroundColor #FDF6E3
+}
+
+actor "Cliente\n(Frontend Angular)" as Cliente
+participant "CarritoController\n/api/carrito/{userId}/checkout" as Controller
+participant "CarritoService" as Service
+participant "ProductoCatalogoService" as Catalogo
+database "ClickHouse" as CH
+
+Cliente -> Controller : POST /api/carrito/{userId}/checkout
+activate Controller
+
+Controller -> Service : checkout(userId)
+activate Service
+
+Service -> Service : getCarrito(userId)
+Service -> CH : SELECT ... FROM carrito_items ci\nLEFT JOIN productos_catalogo p\nWHERE user_id = ? AND activo = 1
+CH --> Service : items del carrito
+
+alt carrito vacio (items.isEmpty())
+    Service --> Controller : IllegalStateException\n"El carrito esta vacio"
+    Controller --> Cliente : HTTP 400\n{ error: "El carrito esta vacio" }
+end
+
+Service -> Service : generar ordenId\n(ORD-XXXXXXXX), total = 0
+
+loop por cada item del carrito
+    Service -> Service : total += cantidad * precioUnitario
+    Service -> CH : INSERT INTO orden_items\n(orden_id, producto_id, cantidad, precio_unitario)
+    Service -> Catalogo : registrarEvento(userId, productoId,\n"purchase", "web", precio)
+    activate Catalogo
+    Catalogo -> CH : INSERT INTO fact_eventos\n(evento purchase)
+    deactivate Catalogo
+end
+
+Service -> CH : INSERT INTO ordenes\n(orden_id, user_id, total,\nestado='COMPLETADA', fecha, canal='web')
+
+Service -> CH : ALTER TABLE carrito_items\nUPDATE activo = 0 WHERE user_id = ?\n(vaciar carrito) SETTINGS mutations_sync = 1
+
+Service --> Controller : { ordenId, total, items }
+deactivate Service
+
+Controller --> Cliente : HTTP 200\n{ ordenId, total, items }
+deactivate Controller
+
+@enduml

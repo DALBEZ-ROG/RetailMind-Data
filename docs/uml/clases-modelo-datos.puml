@@ -1,0 +1,188 @@
+@startuml clases-modelo-datos
+title Modelo de Datos - Nivel Operativo RetailMind (ClickHouse)
+
+skinparam class {
+    BackgroundColor #FDF6E3
+    BorderColor #586E75
+    ArrowColor #586E75
+}
+skinparam classFontStyle bold
+hide methods
+hide circle
+
+' ============================================================
+'  ENUM
+' ============================================================
+enum Rol {
+    ADMIN
+    CLIENTE
+    VIEWER
+}
+
+' ============================================================
+'  TABLAS DE TIENDA / IDENTIDAD (nivel operativo)
+' ============================================================
+class usuarios_sistema <<table>> {
+    +id : String
+    +username : String
+    +password : String
+    +nombre : String
+    +rol : String
+    +activo : UInt8
+    +fecha_creacion : String
+}
+
+class productos_catalogo <<table>> {
+    +producto_id : String
+    +nombre : String
+    +descripcion : String
+    +categoria_id : UInt32
+    +brand : String
+    +price : Float32
+    +stock : UInt32
+    +imagen_url : String
+    +activo : UInt8
+    +fecha_creacion : String
+}
+
+class carrito_items <<table>> {
+    +carrito_id : String
+    +user_id : String
+    +producto_id : String
+    +cantidad : UInt32
+    +precio_unitario : Float32
+    +fecha_agregado : String
+    +activo : UInt8
+}
+
+class ordenes <<table>> {
+    +orden_id : String
+    +user_id : String
+    +total : Float32
+    +estado : String
+    +fecha_orden : String
+    +canal : String
+}
+
+class orden_items <<table>> {
+    +orden_id : String
+    +producto_id : String
+    +cantidad : UInt32
+    +precio_unitario : Float32
+}
+
+class wishlist_items <<table>> {
+    +wishlist_id : String
+    +user_id : String
+    +producto_id : String
+    +fecha_agregado : String
+}
+
+' ============================================================
+'  TABLA DE HECHOS
+' ============================================================
+class fact_eventos <<table>> {
+    +event_pk : UInt64
+    +session_id : String
+    +user_id : String
+    +timestamp_utc : String
+    +event_index : UInt32
+    +user_action : String
+    +product_id : String
+    +time_spent_sec : Float32
+    +session_length : Float32
+    +interaction_count : UInt32
+    +is_conversion : UInt8
+    +drop_off_flag : UInt8
+    +price : Float32
+    +channel : String
+    +semana : UInt8
+}
+
+' ============================================================
+'  DIMENSIONES (esquema estrella)
+' ============================================================
+class dim_canal <<table>> {
+    +canal_id : UInt32
+    +canal_nombre : String
+}
+
+class dim_dispositivo <<table>> {
+    +dispositivo_id : UInt32
+    +dispositivo_nombre : String
+}
+
+class dim_region <<table>> {
+    +region_id : UInt32
+    +region_nombre : String
+}
+
+class dim_categoria <<table>> {
+    +categoria_id : UInt32
+    +categoria_nombre : String
+}
+
+class dim_fuente_trafico <<table>> {
+    +fuente_id : UInt32
+    +fuente_nombre : String
+}
+
+class dim_producto <<table>> {
+    +producto_id : String
+    +categoria_id : UInt32
+    +brand : String
+    +price : Float32
+}
+
+class dim_usuario <<table>> {
+    +user_id : String
+    +region_id : UInt32
+    +dispositivo_id : UInt32
+}
+
+' ============================================================
+'  RELACIONES LOGICAS (por id, sin FKs fisicas en ClickHouse)
+' ============================================================
+
+' Enum de rol del usuario del sistema
+usuarios_sistema ..> Rol : rol
+
+' Tienda / operativo
+usuarios_sistema "1" -- "0..*" carrito_items : user_id
+usuarios_sistema "1" -- "0..*" ordenes : user_id
+usuarios_sistema "1" -- "0..*" wishlist_items : user_id
+
+productos_catalogo "1" -- "0..*" carrito_items : producto_id
+productos_catalogo "1" -- "0..*" orden_items : producto_id
+productos_catalogo "1" -- "0..*" wishlist_items : producto_id
+
+ordenes "1" -- "0..*" orden_items : orden_id
+
+productos_catalogo "1" -- "0..1" dim_producto : producto_id
+productos_catalogo "0..*" -- "1" dim_categoria : categoria_id
+
+' Esquema estrella: fact_eventos hacia dimensiones
+fact_eventos "0..*" -- "1" dim_usuario : user_id
+fact_eventos "0..*" -- "1" dim_producto : product_id
+fact_eventos "0..*" -- "1" dim_canal : channel
+
+' Dimensiones jerarquicas
+dim_producto "0..*" -- "1" dim_categoria : categoria_id
+dim_usuario "0..*" -- "1" dim_region : region_id
+dim_usuario "0..*" -- "1" dim_dispositivo : dispositivo_id
+
+' Dimension de fuente de trafico (asociada por origen del trafico de sesion)
+fact_eventos ..> dim_fuente_trafico : fuente (logica)
+
+note as N1
+  <b>Relaciones logicas</b>
+  ClickHouse NO impone claves foraneas (FK) fisicas.
+  Todas las asociaciones mostradas son <b>logicas</b>,
+  resueltas por <i>id</i> mediante JOINs en consultas
+  (JdbcTemplate / scripts ETL), no por integridad
+  referencial del motor.
+end note
+
+N1 .. fact_eventos
+
+@enduml

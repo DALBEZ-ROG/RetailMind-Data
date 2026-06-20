@@ -1,0 +1,82 @@
+@startuml secuencia-login
+title Diagrama de Secuencia - CU-01 Login
+
+skinparam shadowing false
+skinparam sequence {
+    ArrowColor #586E75
+    LifeLineBorderColor #586E75
+    ParticipantBorderColor #586E75
+    ParticipantBackgroundColor #FDF6E3
+}
+
+actor "Cliente\n(Frontend Angular)" as Cliente
+participant "AuthController\n/api/auth/login" as Controller
+participant "AuthService" as Service
+participant "AuthenticationManager\n(Spring Security)" as AuthMgr
+participant "ClickHouseUserRepository" as Repo
+participant "PasswordEncoder\n(BCrypt)" as BCrypt
+participant "JwtUtil" as Jwt
+database "ClickHouse\n(usuarios_sistema)" as CH
+
+Cliente -> Controller : POST /api/auth/login\n{ username, password }
+activate Controller
+
+Controller -> Service : login(LoginRequestDTO)
+activate Service
+
+Service -> AuthMgr : authenticate(\nUsernamePasswordAuthenticationToken)
+activate AuthMgr
+
+AuthMgr -> Service : loadUserByUsername(username)
+note right of Service : AuthService implementa\nUserDetailsService
+Service -> Repo : findByUsername(username)
+activate Repo
+Repo -> CH : SELECT * FROM usuarios_sistema\nWHERE username = ?
+CH --> Repo : fila de usuario
+Repo --> Service : Optional<UsuarioSistema>
+deactivate Repo
+
+alt usuario inactivo (activo = 0)
+    Service --> AuthMgr : UsernameNotFoundException
+    AuthMgr --> Service : AuthenticationException
+end
+
+Service --> AuthMgr : UserDetails (username, hash, rol)
+
+AuthMgr -> BCrypt : matches(password, hashBCrypt)
+activate BCrypt
+BCrypt --> AuthMgr : true / false
+deactivate BCrypt
+
+alt credenciales invalidas
+    AuthMgr --> Service : BadCredentialsException
+    Service --> Controller : Exception
+    Controller --> Cliente : HTTP 401\n{ error: "Credenciales incorrectas" }
+end
+
+AuthMgr --> Service : Authentication OK
+deactivate AuthMgr
+
+Service -> Repo : findByUsername(username)
+activate Repo
+Repo -> CH : SELECT * FROM usuarios_sistema\nWHERE username = ?
+CH --> Repo : fila de usuario
+Repo --> Service : UsuarioSistema
+deactivate Repo
+
+Service -> Jwt : generateToken(userDetails)
+activate Jwt
+Jwt --> Service : token JWT (rol embebido)
+Service -> Jwt : generateRefreshToken(userDetails)
+Jwt --> Service : refreshToken
+deactivate Jwt
+
+Service --> Controller : LoginResponseDTO\n(token, refreshToken, username,\nnombre, rol, expiracion)
+deactivate Service
+
+Controller --> Cliente : HTTP 200\n{ token, refreshToken, rol, ... }
+deactivate Controller
+
+note over Cliente : El frontend redirige segun rol:\nADMIN -> dashboard / admin\nCLIENTE -> tienda (shop)
+
+@enduml

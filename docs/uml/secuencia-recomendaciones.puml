@@ -1,0 +1,55 @@
+@startuml secuencia-recomendaciones
+title Diagrama de Secuencia - CU-17 Recomendaciones
+
+skinparam shadowing false
+skinparam sequence {
+    ArrowColor #586E75
+    LifeLineBorderColor #586E75
+    ParticipantBorderColor #586E75
+    ParticipantBackgroundColor #FDF6E3
+}
+
+actor "Cliente\n(Frontend Angular)" as Cliente
+participant "RecomendacionesController\n/api/recomendaciones/{username}" as Controller
+participant "RecomendacionesService" as Service
+database "ClickHouse\n(fact_eventos, productos_catalogo,\ndim_producto, dim_categoria)" as CH
+
+Cliente -> Controller : GET /api/recomendaciones/{username}
+activate Controller
+
+Controller -> Service : getRecomendaciones(username)
+activate Service
+
+Service -> CH : SELECT count() FROM fact_eventos\nWHERE user_id = username
+CH --> Service : totalEventos
+
+alt totalEventos < 10  (FALLBACK)
+    Service -> CH : SELECT productos + count() compras\nFROM fact_eventos JOIN productos_catalogo\nJOIN dim_categoria\nWHERE user_action='purchase'\nGROUP BY producto ORDER BY total_compras DESC LIMIT 12
+    CH --> Service : productos populares
+    Service -> Service : esPersonalizado = false\ntipo = "populares"\nmensajeFallback
+else totalEventos >= 10  (PERSONALIZADO)
+    Service -> CH : top categorias ponderadas\n(purchase=5, add_to_cart=3, wishlist=2,\nclick=1, otro=0.5) sobre fact_eventos\nGROUP BY categoria ORDER BY score DESC LIMIT 3
+    CH --> Service : topCategorias
+    Service -> CH : SELECT DISTINCT product_id\nFROM fact_eventos WHERE user_id = username
+    CH --> Service : productosVistos
+    Service -> CH : SELECT productos FROM productos_catalogo\nJOIN dim_producto JOIN dim_categoria\nWHERE categoria_id IN (top)\nAND producto_id NOT IN (vistos)\nORDER BY rand() LIMIT 12
+    CH --> Service : productos recomendados
+
+    alt recomendados.size() < 4
+        Service -> CH : getProductosPopulares() (completar)
+        CH --> Service : productos populares
+    end
+
+    Service -> CH : categoria favorita\nGROUP BY categoria ORDER BY count() DESC LIMIT 1
+    CH --> Service : categoriaFavorita
+    Service -> Service : esPersonalizado = true\ntipo = "personalizado"
+end
+
+Service -> Service : queryMs = tiempo transcurrido
+Service --> Controller : { username, totalEventos,\nrecomendaciones[], esPersonalizado,\ntipo, categoriaFavorita, queryMs }
+deactivate Service
+
+Controller --> Cliente : HTTP 200 -> grid de productos
+deactivate Controller
+
+@enduml

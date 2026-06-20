@@ -1,0 +1,75 @@
+@startuml despliegue
+title Diagrama de Despliegue - RetailMind (Docker Compose)
+
+skinparam shadowing false
+skinparam node {
+    BackgroundColor #FDF6E3
+    BorderColor #586E75
+}
+skinparam database {
+    BackgroundColor #FFF3CD
+    BorderColor #586E75
+}
+skinparam artifact {
+    BackgroundColor #E8F4FD
+    BorderColor #586E75
+}
+
+actor "Usuario\n(Navegador)" as Browser
+
+node "Docker Host\n(red Docker Compose)" as Host {
+
+    node "Contenedor: frontend\n(Angular 17 + Nginx)" as Frontend {
+        artifact "SPA Angular\n(nginx :80)" as AngularApp
+    }
+    note bottom of Frontend : Puerto host 4200 -> 80
+
+    node "Contenedor: backend\n(Spring Boot 3.5 - Java 17)" as Backend {
+        artifact "API REST\n(:8080)" as ApiApp
+    }
+    note bottom of Backend : Puerto host 8080 -> 8080\nMonta ./retailmind -> /etl\n(ejecuta scripts ETL por ProcessBuilder)
+
+    node "Contenedor: clickhouse\n(clickhouse-server)" as ClickHouse {
+        artifact "ClickHouse\n(HTTP :8123 / Nativo :9000)" as ChEngine
+    }
+    note bottom of ClickHouse : Puertos host 8123->8123, 9000->9000\nBD: retailmind
+
+    node "Contenedor: pocketbase\n(PocketBase)" as PocketBase {
+        artifact "PocketBase\n(:8090)" as PbEngine
+    }
+    note bottom of PocketBase : Puerto host 8091 -> 8090\nColeccion: dataset_retail
+
+    node "Contenedor: etl\n(Python 3.12)" as Etl {
+        artifact "Pipeline ETL\n(extraccion / carga / sinteticos)" as EtlApp
+    }
+    note bottom of Etl : Sin puertos expuestos\n(command: tail -f /dev/null)
+}
+
+' ── Volumenes nombrados de persistencia ──────────────────────────
+database "Volumen: clickhouse_data\n(/var/lib/clickhouse)" as VolCh
+database "Volumen: pocketbase_data\n(/pb_data)" as VolPb
+
+ClickHouse -- VolCh : persiste datos
+PocketBase -- VolPb : persiste datos
+
+' ── Conexiones de red ────────────────────────────────────────────
+Browser --> Frontend : HTTP :4200
+Frontend --> Backend : HTTP / API REST (JSON)
+Backend --> ClickHouse : JDBC\njdbc:ch://clickhouse:8123
+Backend ..> PocketBase : HTTP\nPB_URL http://pocketbase:8090
+Etl --> PocketBase : HTTP (extrae dataset)\nhttp://pocketbase:8090
+Etl --> ClickHouse : HTTP nativo :8123\n(carga de datos)
+
+' ── Dependencias de arranque (depends_on) ────────────────────────
+Frontend ..> Backend : depends_on
+Backend ..> ClickHouse : depends_on\n(service_healthy)
+Etl ..> ClickHouse : depends_on\n(service_healthy)
+Etl ..> PocketBase : depends_on\n(service_healthy)
+
+legend right
+  Lineas continuas: conexiones en tiempo de ejecucion
+  Lineas punteadas (..>): dependencias de arranque (depends_on)
+  Flujo: PocketBase -> ETL -> ClickHouse <- Backend <- Frontend
+endlegend
+
+@enduml

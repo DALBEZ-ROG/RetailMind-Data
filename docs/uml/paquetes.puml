@@ -1,0 +1,134 @@
+@startuml paquetes
+title Diagrama de Paquetes - RetailMind (Backend + Frontend + ETL)
+
+skinparam packageStyle rectangle
+skinparam package {
+    BackgroundColor #FDF6E3
+    BorderColor #586E75
+}
+skinparam shadowing false
+left to right direction
+
+' ============================================================
+'  FRONTEND - Angular 17 (SPA)
+' ============================================================
+package "Frontend (Angular 17)" as FRONT #E8F4FD {
+
+    package "core" as FE_CORE {
+        package "guards" as FE_GUARDS
+        package "interceptors" as FE_INTERCEPT
+        package "services\n(HttpClient API)" as FE_SERVICES
+        package "models" as FE_MODELS
+        package "components" as FE_COMPONENTS
+    }
+
+    package "features" as FE_FEATURES {
+        package "login" as FE_LOGIN
+        package "shop\n(tienda, carrito)" as FE_SHOP
+        package "wishlist" as FE_WISHLIST
+        package "pedidos\n(mis-pedidos)" as FE_PEDIDOS
+        package "perfil" as FE_PERFIL
+        package "recomendaciones" as FE_RECO
+        package "analytics" as FE_ANALYTICS
+        package "admin" as FE_ADMIN
+    }
+}
+
+' ============================================================
+'  BACKEND - Spring Boot 3.5 (API REST)
+' ============================================================
+package "Backend (Spring Boot)" as BACK #F3E8FD {
+
+    package "Capa Transversal" as B_CROSS {
+        package "config" as B_CONFIG
+        package "security" as B_SECURITY
+        package "auth" as B_AUTH
+        package "exception" as B_EXCEPTION
+        package "dto\n(DTOs + Repositorios JdbcTemplate)" as B_DTO
+    }
+
+    package "Capa Operativa\n(genera ventas)" as B_OPER {
+        package "catalogo" as B_CATALOGO
+        package "carrito" as B_CARRITO
+        package "wishlist" as B_WISHLIST
+        package "pedidos" as B_PEDIDOS
+        package "perfil" as B_PERFIL
+        package "recomendaciones" as B_RECO
+    }
+
+    package "Capa Tactica + Estrategica" as B_ANALYTICS_L {
+        package "analytics" as B_ANALYTICS
+        package "admin\n(etl, gestion, usuarios, reportes)" as B_ADMIN
+    }
+}
+
+' ============================================================
+'  ETL - Pipeline Python 3.12
+' ============================================================
+package "ETL (Python 3.12)" as ETL #E8FDEC {
+    package "extraccion" as ETL_EXTRACT
+    package "carga" as ETL_LOAD
+    package "sinteticos" as ETL_SYNTH
+    package "config\n(clickhouse_connection)" as ETL_CONFIG
+}
+
+' ============================================================
+'  ALMACENAMIENTO
+' ============================================================
+database "ClickHouse\n(retailmind)" as CH #FFF3CD
+database "PocketBase\n(dataset_retail)" as PB #FFF3CD
+
+' ============================================================
+'  DEPENDENCIAS - Frontend
+' ============================================================
+FE_FEATURES ..> FE_SERVICES : usa
+FE_FEATURES ..> FE_MODELS : usa
+FE_SERVICES ..> FE_MODELS : tipa
+FE_GUARDS ..> FE_SERVICES : protege rutas
+FE_INTERCEPT ..> FE_SERVICES : inyecta JWT
+
+' Frontend -> API REST del backend
+FE_SERVICES ..> BACK : HTTP / API REST (JSON)
+
+' ============================================================
+'  DEPENDENCIAS - Backend (Controller -> Service -> Repositorio)
+' ============================================================
+' Operativa
+B_OPER ..> B_DTO : Service -> Repositorio
+B_ANALYTICS_L ..> B_DTO : Service -> Repositorio
+
+' Transversal: seguridad y autenticacion
+B_SECURITY ..> B_AUTH : valida JWT
+B_AUTH ..> B_DTO : login / usuarios
+B_OPER ..> B_SECURITY : protegido por RBAC
+B_ANALYTICS_L ..> B_SECURITY : protegido por RBAC
+BACK ..> B_EXCEPTION : manejo global de errores
+BACK ..> B_CONFIG : configuracion (CORS, ClickHouse)
+
+' Repositorios -> base de datos
+B_DTO ..> CH : JdbcTemplate (SQL parametrizado)
+B_AUTH ..> CH : usuarios_sistema
+
+' Admin dispara el ETL
+B_ADMIN ..> ETL : ProcessBuilder (dispara scripts)
+
+' ============================================================
+'  DEPENDENCIAS - ETL
+' ============================================================
+ETL_EXTRACT ..> PB : extrae dataset crudo
+ETL_EXTRACT ..> ETL_CONFIG : conexion
+ETL_LOAD ..> ETL_CONFIG : conexion
+ETL_SYNTH ..> ETL_CONFIG : conexion
+ETL_EXTRACT ..> ETL_LOAD : Parquet (data/stage)
+ETL_LOAD ..> CH : carga tablas (insert)
+ETL_SYNTH ..> CH : datos sinteticos
+
+note as N1
+  <b>Flujo de datos</b>
+  PocketBase -> ETL (Parquet) -> ClickHouse
+  <- API Spring Boot <- SPA Angular
+  Acceso a datos: JdbcTemplate (sin JPA).
+  Seguridad: JWT STATELESS + RBAC (ADMIN / CLIENTE).
+end note
+
+@enduml
