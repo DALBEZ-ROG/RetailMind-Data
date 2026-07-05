@@ -1,0 +1,110 @@
+import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { MatTableModule } from '@angular/material/table';
+import { MatIconModule } from '@angular/material/icon';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { ComprasService } from '../../../core/services/compras.service';
+import { ReferenciasService } from '../../../core/services/referencias.service';
+import { mensajeError } from '../../../core/services/api-error.util';
+import { OrdenCompraRow, OrdenCompraDetalle, StockRow } from '../../../core/models/operativo.model';
+
+interface LineaRecepcion {
+  detalleId: number; sku: string; producto: string; varianteId: number;
+  pedida: number; yaRecibida: number; aRecibir: number;
+}
+
+@Component({
+  selector: 'app-recepciones',
+  standalone: true,
+  imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
+    MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule],
+  templateUrl: './recepciones.component.html',
+  styleUrl: '../operativo-shared.scss'
+})
+export class RecepcionesComponent implements OnInit {
+
+  ordenes: OrdenCompraRow[] = [];
+  ordenId: number | null = null;
+  orden: OrdenCompraDetalle | null = null;
+  lineas: LineaRecepcion[] = [];
+  observacion = '';
+
+  resultado: { numero: string; estadoOrden: string } | null = null;
+  stockDespues: StockRow[] = [];
+  procesando = false;
+
+  constructor(private compras: ComprasService, private referencias: ReferenciasService,
+              private snackBar: MatSnackBar) {}
+
+  ngOnInit(): void {
+    this.compras.ordenes().subscribe(o =>
+      this.ordenes = o.filter(x => x.estado !== 'recibida'));
+  }
+
+  cargarOrden(): void {
+    if (!this.ordenId) return;
+    this.resultado = null;
+    this.stockDespues = [];
+    this.compras.orden(this.ordenId).subscribe({
+      next: o => {
+        this.orden = o;
+        this.lineas = o.detalles.map(d => ({
+          detalleId: d.id, sku: d.sku, producto: d.producto,
+          varianteId: d.producto_variante_id,
+          pedida: d.cantidad, yaRecibida: d.cantidad_recibida,
+          aRecibir: Math.max(d.cantidad - d.cantidad_recibida, 0)
+        }));
+      },
+      error: () => this.snackBar.open('No se pudo cargar la orden', 'Cerrar', { duration: 3000 })
+    });
+  }
+
+  registrar(): void {
+    if (!this.orden) return;
+    const items = this.lineas
+      .filter(l => l.aRecibir > 0)
+      .map(l => ({ ordenCompraDetalleId: l.detalleId, cantidadRecibida: l.aRecibir }));
+    if (!items.length) {
+      this.snackBar.open('Indica al menos una cantidad a recibir mayor que 0', 'Cerrar', { duration: 3500 });
+      return;
+    }
+    const excedida = this.lineas.find(l => l.aRecibir > l.pedida - l.yaRecibida);
+    if (excedida) {
+      this.snackBar.open(`No puedes recibir ${excedida.aRecibir} de ${excedida.sku}: solo quedan ${excedida.pedida - excedida.yaRecibida} pendientes`, 'Cerrar', { duration: 4500 });
+      return;
+    }
+    this.procesando = true;
+    this.compras.registrarRecepcion(this.orden.id, { observacion: this.observacion, items }).subscribe({
+      next: res => {
+        this.procesando = false;
+        this.resultado = { numero: res.numero, estadoOrden: res.estadoOrden };
+        this.snackBar.open(`Recepción ${res.numero} confirmada — orden ${res.estadoOrden}`, 'OK',
+          { duration: 3500, panelClass: ['snack-success'] });
+        this.verificarStock();
+        this.cargarOrden();
+        this.compras.ordenes().subscribe(o =>
+          this.ordenes = o.filter(x => x.estado !== 'recibida' || x.id === this.ordenId));
+      },
+      error: e => {
+        this.procesando = false;
+        this.snackBar.open(mensajeError(e, 'No se pudo registrar la recepción'), 'Cerrar', { duration: 5000 });
+        this.cargarOrden(); // refresca cantidades ya recibidas
+      }
+    });
+  }
+
+  /** Consulta el inventario en la bodega de la orden para evidenciar que el stock subió. */
+  private verificarStock(): void {
+    if (!this.orden) return;
+    this.stockDespues = [];
+    const varianteIds = new Set(this.lineas.map(l => l.varianteId));
+    this.referencias.stock().subscribe(rows => {
+      this.stockDespues = rows.filter(r => varianteIds.has(r.producto_variante_id));
+    });
+  }
+}

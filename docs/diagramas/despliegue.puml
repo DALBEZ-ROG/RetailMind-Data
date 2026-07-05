@@ -1,0 +1,70 @@
+@startuml despliegue
+title Diagrama de Despliegue — RetailMind (arquitectura hibrida)
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing true
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam titleFontSize 16
+skinparam titleFontColor #1F3B5B
+skinparam ArrowColor #4A6A8A
+skinparam ArrowFontColor #555555
+skinparam ArrowFontSize 10
+skinparam NodeBorderColor #1F3B5B
+skinparam NodeBackgroundColor #EAF0F7
+skinparam NodeFontColor #1F3B5B
+skinparam DatabaseBorderColor #2E5A88
+skinparam DatabaseBackgroundColor #DFF5E1
+skinparam ArtifactBackgroundColor #FFFFFF
+skinparam ArtifactBorderColor #2E5A88
+skinparam NoteBackgroundColor #FFFBE6
+skinparam NoteBorderColor #B7950B
+
+node "Dispositivo del usuario" as cliente {
+  artifact "SPA Angular 17\n(HTML/JS/CSS)" as spa
+}
+
+node "Host Docker (docker-compose)" as host {
+  node "Contenedor frontend\n(nginx)  [4200:80]" as fe {
+    artifact "Build Angular\n(dist/)" as feart
+  }
+  node "Contenedor backend\n(Spring Boot 3.5 / Java 17)  [8080]" as be {
+    artifact "retailmind-backend.jar" as bejar
+  }
+  node "Contenedor clickhouse\n[8123 / 9000]" as ch {
+    database "ClickHouse\n(analytics)" as chdb
+  }
+  node "Contenedor pocketbase\n[8091:8090]" as pb {
+    database "PocketBase\n(dataset crudo)" as pbdb
+  }
+  node "Contenedor etl\n(Python 3.12)" as etl {
+    artifact "Scripts ETL" as etlart
+  }
+}
+
+node "Servidor PostgreSQL\n(host / externo)  [5432]" as pgnode {
+  database "PostgreSQL\nBD 'retailmind'\n(nucleo operativo)" as pgdb
+}
+
+cliente --> fe : HTTP(S)
+fe --> be : REST /api  (proxy)
+be --> pgdb : JDBC (Hikari, usuario retailmind_app)\nSET LOCAL ROLE por transaccion
+be --> chdb : JDBC (solo analytics)
+be ..> pbdb : HTTP (dispara ETL / fuente)
+etl --> pbdb : extrae dataset
+etl --> chdb : carga analitica
+
+note right of pgnode
+  PostgreSQL es la fuente de verdad operativa
+  (FKs, RLS, triggers, roles grp_*).
+  NO es un servicio del docker-compose actual:
+  corre como servidor externo/host (localhost:5432).
+end note
+
+note bottom of be
+  CORS restringido al origen del frontend.
+  JWT STATELESS + RBAC en la capa web;
+  privilegios/RLS/horario reforzados en la BD.
+end note
+
+@enduml

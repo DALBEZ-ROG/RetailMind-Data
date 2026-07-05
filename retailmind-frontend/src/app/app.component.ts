@@ -52,7 +52,17 @@ export class AppComponent {
     '/conversiones': 'Conversiones',
     '/admin-etl': 'Administracion ETL',
     '/gestion-datos': 'Gestion de Datos',
-    '/inicializacion': 'Inicializacion del Sistema'
+    '/inicializacion': 'Inicializacion del Sistema',
+    '/operativo/productos': 'Productos y Variantes',
+    '/operativo/compras/ordenes': 'Órdenes de Compra',
+    '/operativo/compras/recepciones': 'Recepción de Mercancía',
+    '/operativo/compras/facturas': 'Facturas de Compra',
+    '/operativo/inventario/transferencias': 'Transferencias de Stock',
+    '/operativo/ventas/pedidos': 'Pedidos de Venta',
+    '/operativo/ventas/facturas': 'Facturas de Venta',
+    '/operativo/ventas/despachos': 'Despachos',
+    '/operativo/ventas/devoluciones': 'Devoluciones',
+    '/operativo/horarios': 'Horarios de Acceso'
   };
 
   constructor(public authService: AuthService, private router: Router) {
@@ -79,6 +89,20 @@ export class AppComponent {
   get isCliente(): boolean {
     return this.authService.hasRole('CLIENTE');
   }
+
+  /** true si el usuario actual tiene alguno de los roles indicados. */
+  hasAnyRole(roles: string[]): boolean {
+    const user = this.authService.getCurrentUser();
+    return !!user && roles.includes(user.rol);
+  }
+
+  // Visibilidad de las secciones operativas del sidebar (espeja SecurityConfig)
+  get canCatalogo(): boolean   { return this.hasAnyRole(['ADMIN']); }
+  get canCompras(): boolean    { return this.hasAnyRole(['ADMIN', 'GERENTE', 'COMPRAS', 'BODEGA']); }
+  get canInventario(): boolean { return this.hasAnyRole(['ADMIN', 'GERENTE', 'BODEGA']); }
+  get canVentas(): boolean     { return this.hasAnyRole(['ADMIN', 'GERENTE', 'VENDEDOR']); }
+  get canLogistica(): boolean  { return this.hasAnyRole(['ADMIN', 'GERENTE', 'VENDEDOR', 'DESPACHO']); }
+  get canDespachar(): boolean  { return this.hasAnyRole(['ADMIN', 'GERENTE', 'DESPACHO']); }
 
   goToProfile(): void {
     this.router.navigate(['/perfil']);

@@ -22,16 +22,21 @@ import com.retailmind.dto.LoginRequestDTO;
 import com.retailmind.dto.LoginResponseDTO;
 import com.retailmind.dto.RefreshTokenRequestDTO;
 
+/**
+ * Autenticación y gestión de usuarios contra PostgreSQL.
+ * El identificador de login es el EMAIL (el campo "username" del DTO se
+ * mantiene por compatibilidad con el frontend).
+ */
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
 
     private final AuthService authService;
-    private final ClickHouseUserRepository usuarioRepo;
+    private final PostgresUserRepository usuarioRepo;
     private final PasswordEncoder passwordEncoder;
 
     public AuthController(AuthService authService,
-                          ClickHouseUserRepository usuarioRepo,
+                          PostgresUserRepository usuarioRepo,
                           PasswordEncoder passwordEncoder) {
         this.authService = authService;
         this.usuarioRepo = usuarioRepo;
@@ -85,33 +90,33 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody Map<String, String> body) {
         try {
-            String username = body.get("username");
+            String email = body.getOrDefault("email", body.get("username"));
             String password = body.get("password");
-            String email = body.get("email");
             String rol = body.get("rol");
+            String nombre = body.getOrDefault("nombre", email);
+            String apellido = body.get("apellido");
 
-            if (username == null || password == null || rol == null) {
+            if (email == null || password == null || rol == null) {
                 return ResponseEntity.badRequest()
-                        .body(Map.of("error", "username, password y rol son requeridos"));
+                        .body(Map.of("error", "email (o username), password y rol son requeridos"));
             }
 
-            if (usuarioRepo.existsByUsername(username)) {
+            String rolCodigo = rol.toUpperCase();
+            if (!usuarioRepo.rolExiste(rolCodigo)) {
                 return ResponseEntity.badRequest()
-                        .body(Map.of("error", "El usuario '" + username + "' ya existe"));
+                        .body(Map.of("error", "Rol invalido: " + rol
+                                + ". Use ADMIN, GERENTE, VENDEDOR, COMPRAS, BODEGA, DESPACHO, CLIENTE o ANALISTA"));
             }
 
-            UsuarioSistema usuario = new UsuarioSistema();
-            usuario.setUsername(username);
-            usuario.setPassword(passwordEncoder.encode(password));
-            usuario.setNombre(email != null ? email : "");
-            usuario.setRol(UsuarioSistema.Rol.valueOf(rol.toUpperCase()));
-            usuario.setActivo(true);
-            usuarioRepo.save(usuario);
+            if (usuarioRepo.existsByEmail(email)) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "El usuario '" + email + "' ya existe"));
+            }
 
-            return ResponseEntity.ok(Map.of("success", true, "mensaje", "Usuario creado"));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("error", "Rol invalido. Use ADMIN o CLIENTE"));
+            long id = usuarioRepo.crearUsuario(email, passwordEncoder.encode(password),
+                    nombre, apellido, rolCodigo);
+
+            return ResponseEntity.ok(Map.of("success", true, "id", id, "mensaje", "Usuario creado"));
         } catch (Exception e) {
             return ResponseEntity.internalServerError()
                     .body(Map.of("error", "Error al crear usuario: " + e.getMessage()));
@@ -125,12 +130,12 @@ public class AuthController {
             List<Map<String, Object>> usuarios = usuarioRepo.findAll().stream()
                     .map(u -> {
                         Map<String, Object> m = new LinkedHashMap<>();
-                        m.put("id", u.getId());
-                        m.put("username", u.getUsername());
-                        m.put("nombre", u.getNombre());
-                        m.put("rol", u.getRol().name());
-                        m.put("activo", u.getActivo());
-                        m.put("fechaCreacion", u.getFechaCreacion());
+                        m.put("id", u.id());
+                        m.put("username", u.email());
+                        m.put("nombre", u.apellido() != null ? u.nombre() + " " + u.apellido() : u.nombre());
+                        m.put("rol", u.rolCodigo());
+                        m.put("activo", u.activo());
+                        m.put("clienteId", u.clienteId());
                         return m;
                     })
                     .collect(Collectors.toList());
@@ -141,21 +146,21 @@ public class AuthController {
         }
     }
 
-    /** DELETE /api/auth/usuarios/{username} - Solo ADMIN */
-    @DeleteMapping("/usuarios/{username}")
-    public ResponseEntity<?> eliminarUsuario(@PathVariable String username) {
+    /** DELETE /api/auth/usuarios/{email} - Solo ADMIN */
+    @DeleteMapping("/usuarios/{email}")
+    public ResponseEntity<?> eliminarUsuario(@PathVariable String email) {
         try {
-            if ("admin".equals(username)) {
+            if (DataInitializer.ADMIN_EMAIL.equalsIgnoreCase(email)) {
                 return ResponseEntity.badRequest()
                         .body(Map.of("error", "No se puede eliminar al usuario admin"));
             }
 
-            if (!usuarioRepo.existsByUsername(username)) {
+            if (!usuarioRepo.existsByEmail(email)) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(Map.of("error", "Usuario no encontrado: " + username));
+                        .body(Map.of("error", "Usuario no encontrado: " + email));
             }
 
-            usuarioRepo.deleteByUsername(username);
+            usuarioRepo.eliminarPorEmail(email);
             return ResponseEntity.ok(Map.of("success", true, "mensaje", "Usuario eliminado"));
         } catch (Exception e) {
             return ResponseEntity.internalServerError()

@@ -1,0 +1,71 @@
+@startuml seq_realizar_pedido
+title Secuencia — CU-O-18 Realizar pedido (Order-to-Cash)
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing true
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam titleFontSize 16
+skinparam titleFontColor #1F3B5B
+skinparam sequenceMessageAlign center
+skinparam ParticipantBorderColor #1F3B5B
+skinparam ParticipantBackgroundColor #EAF0F7
+skinparam ParticipantFontColor #1F3B5B
+skinparam ActorBorderColor #1F3B5B
+skinparam ActorBackgroundColor #FFFFFF
+skinparam DatabaseBorderColor #2E5A88
+skinparam DatabaseBackgroundColor #DFF5E1
+skinparam ArrowColor #4A6A8A
+skinparam NoteBackgroundColor #FFFBE6
+skinparam NoteBorderColor #B7950B
+
+actor "Vendedor" as usr
+participant "Frontend\n(Angular)" as fe
+participant "VentasController" as ctrl
+participant "PgSessionRoleAspect" as asp
+participant "VentasService\n<<@Transactional>>" as svc
+participant "StockService" as stock
+database "PostgreSQL\n(retailmind)" as db
+
+usr -> fe : Completa pedido (cliente, bodega, items)
+fe -> ctrl : POST /api/ventas/pedidos
+ctrl -> svc : crearPedido(clienteId, bodegaId, canal, items)
+activate svc
+
+asp -> db : SET LOCAL ROLE grp_vendedor
+note right of asp
+  Primera sentencia de la transaccion.
+  Si el actor es CLIENTE tambien:
+  SET LOCAL app.cliente_id = <id> (RLS)
+end note
+
+svc -> db : INSERT pedido (numero PED-..., estado 'confirmado')
+db --> svc : pedidoId
+
+loop por cada item
+  svc -> db : SELECT variante activa (sku, precio)
+  db --> svc : snapshot precio/nombre
+  svc -> db : INSERT pedido_detalle\n(subtotal = columna GENERATED)
+  svc -> stock : mover('salida_venta', cantidad)
+  activate stock
+  stock -> db : upsert inventario + SELECT ... FOR UPDATE
+  stock -> db : INSERT movimiento_inventario (kardex)
+  stock -> db : UPDATE inventario.stock_actual
+  db --> stock : stock resultante
+  stock --> svc : ok (rechaza si stock < 0)
+  deactivate stock
+  db -> db : trigger fn_recalcular_total_pedido
+end
+
+svc -> db : INSERT historial_estado_pedido ('confirmado')
+svc --> ctrl : pedido con totales (leidos de la BD)
+deactivate svc
+ctrl --> fe : 201 Created (pedido)
+fe --> usr : Muestra pedido confirmado
+
+note over db
+  COMMIT: el SET LOCAL ROLE se descarta;
+  la conexion vuelve al pool como retailmind_app.
+end note
+
+@enduml

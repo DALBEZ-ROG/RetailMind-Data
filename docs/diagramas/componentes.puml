@@ -1,0 +1,96 @@
+@startuml componentes
+title Diagrama de Componentes — RetailMind (nivel operativo)
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing true
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam titleFontSize 16
+skinparam titleFontColor #1F3B5B
+skinparam ArrowColor #4A6A8A
+skinparam componentStyle uml2
+skinparam ComponentBackgroundColor #EAF0F7
+skinparam ComponentBorderColor #1F3B5B
+skinparam ComponentFontColor #1F3B5B
+skinparam PackageBorderColor #2E5A88
+skinparam PackageFontColor #1F3B5B
+skinparam PackageFontStyle bold
+skinparam DatabaseBorderColor #2E5A88
+skinparam DatabaseBackgroundColor #DFF5E1
+skinparam InterfaceBackgroundColor #FCF3CF
+skinparam NoteBackgroundColor #FFFBE6
+skinparam NoteBorderColor #B7950B
+
+package "Frontend — Angular 17 (standalone)" #F4F8FD {
+  package "features" as feat {
+    [features/operativo\n(catalogo, compras, inventario,\nventas, horarios)] as fop
+    [login / shop / pedidos / perfil] as fusr
+    [analytics\n(dashboard, funnel, ...)] as fana
+  }
+  package "core" as fcore {
+    [services (HttpClient)] as fsvc
+    [guards + interceptor JWT] as fguard
+    [models] as fmodels
+  }
+}
+
+interface "REST /api (JSON + JWT)" as api
+
+package "Backend — Spring Boot 3.5 / Java 17" #F4F8FD {
+  package "security" as sec {
+    [SecurityConfig (RBAC)] as scfg
+    [JwtAuthenticationFilter] as jwtf
+    [PgSessionRoleAspect\n(SET LOCAL ROLE)] as asp
+    [DbGroupRole (lista blanca)] as dbg
+  }
+  [auth\n(login JWT, PostgresUserRepository)] as auth
+  package "operativo" as oper {
+    [catalogo] as ccat
+    [compras] as ccmp
+    [ventas] as cven
+    [pedidos] as cped
+    [inventario] as cinv
+    [referencias] as cref
+    [admin\n(catalogo/horarios/usuarios)] as cadm
+    [pdf (iText)] as cpdf
+    [StockService\n(stock + kardex)] as stock
+  }
+  [analytics] as bana
+  package "config" as cfg {
+    [PostgresConfig\n(pgJdbcTemplate)] as pgc
+    [ClickHouseConfig] as chc
+  }
+}
+
+database "PostgreSQL\n(retailmind, operativo)" as pg
+database "ClickHouse\n(analytics)" as ch
+
+' Frontend -> Backend
+fsvc --> api
+api --> jwtf
+
+' Cadena de seguridad
+jwtf --> scfg
+scfg ..> asp : cada @Transactional
+asp ..> dbg : mapea rol -> grp_*
+
+' Operativo usa StockService y datos PostgreSQL
+ccmp --> stock
+cven --> stock
+cinv --> stock
+oper --> pgc : JdbcTemplate (parametrizado)
+auth --> pgc
+pgc --> pg
+asp --> pg : SET LOCAL ROLE grp_*
+
+' Analytics separado
+bana --> chc
+chc --> ch
+
+note bottom of asp
+  El aspecto de rol de motor se aplica a
+  com.retailmind..* EXCEPTO
+  com.retailmind.analytics..*
+end note
+
+@enduml

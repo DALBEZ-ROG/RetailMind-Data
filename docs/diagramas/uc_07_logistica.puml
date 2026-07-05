@@ -1,0 +1,38 @@
+@startuml uc_07_logistica
+title Casos de Uso — Paquete 7: Logística y Envíos
+
+left to right direction
+skinparam backgroundColor #FFFFFF
+skinparam shadowing true
+skinparam linetype polyline
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam titleFontSize 16
+skinparam titleFontColor #1F3B5B
+skinparam packageStyle folder
+skinparam packageBorderColor #117A65
+skinparam packageFontColor #1F3B5B
+skinparam packageFontStyle bold
+skinparam actorBackgroundColor #FFFFFF
+skinparam actorBorderColor #1F3B5B
+skinparam actorFontColor #1F3B5B
+skinparam usecaseBackgroundColor #FFFFFF
+skinparam usecaseBorderColor #117A65
+skinparam usecaseFontColor #333333
+skinparam arrowColor #4A6A8A
+
+actor "Encargado\nde Despacho" as despacho
+
+package "Logística y Envíos" #D6F0EC {
+  usecase "CU-O-24\nDespachar pedido" as UC24
+  usecase "CU-O-25\nConsultar seguimiento\nde envío" as UC25
+}
+
+actor "Cliente" as cliente
+
+despacho --> UC24
+despacho --> UC25
+
+UC25 <-- cliente
+
+@enduml

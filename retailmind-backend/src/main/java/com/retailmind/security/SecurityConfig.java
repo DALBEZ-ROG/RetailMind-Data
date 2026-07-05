@@ -54,6 +54,15 @@ public class SecurityConfig {
                 .requestMatchers("/api/init/**").hasAuthority("ADMIN")
                 // Gestion de datos solo para ADMIN
                 .requestMatchers("/api/gestion/**").hasAuthority("ADMIN")
+                // Ciclo de compra: roles operativos (la BD afina por SET LOCAL ROLE)
+                .requestMatchers("/api/compras/**")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "COMPRAS", "BODEGA")
+                // Ciclo de venta: vendedor/despacho + cliente (RLS lo aisla a sus filas)
+                .requestMatchers("/api/ventas/**")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "VENDEDOR", "DESPACHO", "CLIENTE")
+                // Transferencias de inventario: bodega
+                .requestMatchers("/api/inventario/**")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "BODEGA")
                 // Admin usuarios y pedidos solo ADMIN
                 .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
                 .requestMatchers("/api/pedidos/admin/**").hasAuthority("ADMIN")

@@ -1,0 +1,50 @@
+@startuml uc_05_ventas
+title Casos de Uso — Paquete 5: Ventas y Pedidos
+
+left to right direction
+skinparam backgroundColor #FFFFFF
+skinparam shadowing true
+skinparam linetype polyline
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam titleFontSize 16
+skinparam titleFontColor #1F3B5B
+skinparam packageStyle folder
+skinparam packageBorderColor #76448A
+skinparam packageFontColor #1F3B5B
+skinparam packageFontStyle bold
+skinparam actorBackgroundColor #FFFFFF
+skinparam actorBorderColor #1F3B5B
+skinparam actorFontColor #1F3B5B
+skinparam usecaseBackgroundColor #FFFFFF
+skinparam usecaseBorderColor #76448A
+skinparam usecaseFontColor #333333
+skinparam arrowColor #4A6A8A
+skinparam noteBackgroundColor #FFFBE6
+skinparam noteBorderColor #B7950B
+
+actor "Vendedor" as vendedor
+actor "Administrador" as admin
+
+package "Ventas y Pedidos" #EADCF5 {
+  usecase "CU-O-18\nRealizar pedido" as UC18
+  usecase "CU-O-19\nConsultar pedidos" as UC19
+  usecase "CU-O-20\nConsultar mis pedidos" as UC20
+}
+
+actor "Cliente" as cliente
+
+vendedor --> UC18
+vendedor --> UC19
+
+admin --> UC19
+
+UC20 <-- cliente
+
+note bottom of UC20
+  El aislamiento del cliente
+  lo garantiza la RLS de la BD
+  (app.cliente_id)
+end note
+
+@enduml

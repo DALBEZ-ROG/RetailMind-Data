@@ -1,0 +1,74 @@
+@startuml seq_recepcion_mercancia
+title Secuencia — CU-O-13 Registrar recepcion de mercancia (stock + kardex)
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing true
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam titleFontSize 16
+skinparam titleFontColor #1F3B5B
+skinparam sequenceMessageAlign center
+skinparam ParticipantBorderColor #1F3B5B
+skinparam ParticipantBackgroundColor #EAF0F7
+skinparam ParticipantFontColor #1F3B5B
+skinparam ActorBorderColor #1F3B5B
+skinparam ActorBackgroundColor #FFFFFF
+skinparam DatabaseBorderColor #2E5A88
+skinparam DatabaseBackgroundColor #DFF5E1
+skinparam ArrowColor #4A6A8A
+skinparam NoteBackgroundColor #FFFBE6
+skinparam NoteBorderColor #B7950B
+
+actor "Encargado\nde Bodega" as usr
+participant "Frontend\n(Angular)" as fe
+participant "ComprasController" as ctrl
+participant "PgSessionRoleAspect" as asp
+participant "ComprasService\n<<@Transactional>>" as svc
+database "PostgreSQL\n(retailmind)" as db
+
+usr -> fe : Registra recepcion de una orden
+fe -> ctrl : POST /api/compras/ordenes/{id}/recepciones
+ctrl -> svc : registrarRecepcion(ordenId, items)
+activate svc
+
+asp -> db : SET LOCAL ROLE grp_bodega
+
+svc -> db : SELECT orden_compra (estado, bodega)
+db --> svc : orden
+alt orden 'recibida' o 'cancelada'
+  svc --> ctrl : Error (no admite recepcion)
+else orden valida
+  svc -> db : SELECT tipo_movimiento 'entrada_compra'
+  svc -> db : INSERT recepcion_mercancia (numero RM-..., 'confirmada')
+  db --> svc : recepcionId
+
+  loop por cada item recibido
+    svc -> db : SELECT orden_compra_detalle (cantidad, cantidad_recibida)
+    db --> svc : linea
+    alt cantidadRecibida > pendiente
+      svc --> ctrl : Error 'solo quedan N pendientes'
+    else cantidad valida
+      svc -> db : INSERT recepcion_detalle
+      svc -> db : upsert inventario + SELECT ... FOR UPDATE
+      svc -> db : INSERT movimiento_inventario ('entrada_compra')
+      svc -> db : UPDATE inventario.stock_actual (+ cantidad)
+      svc -> db : UPDATE orden_compra_detalle.cantidad_recibida
+    end
+  end
+
+  svc -> db : bool_and(cantidad_recibida >= cantidad)
+  db --> svc : completa?
+  svc -> db : UPDATE orden_compra.estado\n('recibida' | 'recibida_parcial')
+  svc --> ctrl : recepcion + estado de la orden
+end
+deactivate svc
+ctrl --> fe : 201 Created
+fe --> usr : Confirma recepcion
+
+note over db
+  Transaccion atomica: si una linea falla,
+  se revierte la recepcion completa.
+  COMMIT descarta el SET LOCAL ROLE.
+end note
+
+@enduml

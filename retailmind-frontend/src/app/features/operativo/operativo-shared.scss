@@ -1,0 +1,176 @@
+// Estilos compartidos por las pantallas operativas (catálogo, compras,
+// inventario, ventas, horarios). Complementa las clases globales del
+// diseño Dubai en styles.scss (.glass-card, .section-header, .btn-aplicar…).
+
+.op-page {
+  padding: 24px;
+  animation: fadeInUp 0.5s ease forwards;
+
+  .section-header {
+    h2 {
+      font-size: 22px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      position: relative;
+      z-index: 1;
+    }
+    p {
+      margin-top: 4px;
+      font-size: 13px;
+      opacity: 0.85;
+      position: relative;
+      z-index: 1;
+    }
+  }
+}
+
+.op-card {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-glass);
+  padding: 24px;
+  margin-bottom: 24px;
+
+  h3 {
+    color: var(--text-primary);
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    mat-icon { font-size: 20px; width: 20px; height: 20px; }
+  }
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px 16px;
+  margin-bottom: 8px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+  border-radius: var(--border-radius-sm);
+
+  table {
+    width: 100%;
+    background: transparent;
+  }
+
+  th.mat-mdc-header-cell {
+    color: var(--text-primary);
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+  }
+
+  td.mat-mdc-cell {
+    color: var(--text-secondary);
+    font-size: 13px;
+  }
+
+  tr.mat-mdc-row:hover td { background: rgba(26, 35, 126, 0.04); }
+  tr.fila-seleccionada td { background: rgba(26, 35, 126, 0.08) !important; }
+}
+
+.estado-chip {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  background: #e8eaf6;
+  color: var(--primary);
+
+  &.ok      { background: #e8f5e9; color: #2e7d32; }
+  &.warn    { background: #fff3e0; color: #e65100; }
+  &.error   { background: #ffebee; color: #c62828; }
+  &.neutral { background: #eceff1; color: #546e7a; }
+}
+
+.total-banner {
+  display: flex;
+  gap: 24px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  padding: 16px 24px;
+  border-radius: var(--border-radius-sm);
+  background: var(--primary-gradient);
+  color: white;
+  box-shadow: var(--shadow-medium);
+  margin-top: 16px;
+
+  .total-item {
+    .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8; }
+    .val { font-size: 20px; font-weight: 800; }
+  }
+}
+
+.linea-item {
+  display: grid;
+  grid-template-columns: 2fr 100px 130px 48px;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.resultado-box {
+  border-left: 4px solid var(--success);
+  background: #f1f8f4;
+  border-radius: var(--border-radius-sm);
+  padding: 16px 20px;
+  margin-top: 16px;
+
+  .titulo {
+    color: #2e7d32;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .dato { font-size: 13px; color: var(--text-secondary); margin: 2px 0; strong { color: var(--text-primary); } }
+}
+
+.timeline {
+  .timeline-item {
+    display: flex;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px dashed rgba(26, 35, 126, 0.1);
+
+    mat-icon { color: var(--accent); }
+    .t-info {
+      .t-estado { font-weight: 700; color: var(--text-primary); font-size: 13px; }
+      .t-desc   { font-size: 12px; color: var(--text-secondary); }
+      .t-fecha  { font-size: 11px; color: var(--text-light); }
+    }
+  }
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: var(--text-light);
+
+  mat-icon { font-size: 48px; width: 48px; height: 48px; opacity: 0.4; }
+  p { margin-top: 8px; font-size: 14px; }
+}

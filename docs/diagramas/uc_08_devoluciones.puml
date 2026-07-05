@@ -1,0 +1,39 @@
+@startuml uc_08_devoluciones
+title Casos de Uso — Paquete 8: Devoluciones
+
+left to right direction
+skinparam backgroundColor #FFFFFF
+skinparam shadowing true
+skinparam linetype polyline
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam titleFontSize 16
+skinparam titleFontColor #1F3B5B
+skinparam packageStyle folder
+skinparam packageBorderColor #A93E76
+skinparam packageFontColor #1F3B5B
+skinparam packageFontStyle bold
+skinparam actorBackgroundColor #FFFFFF
+skinparam actorBorderColor #1F3B5B
+skinparam actorFontColor #1F3B5B
+skinparam usecaseBackgroundColor #FFFFFF
+skinparam usecaseBorderColor #A93E76
+skinparam usecaseFontColor #333333
+skinparam arrowColor #4A6A8A
+
+actor "Vendedor" as vendedor
+actor "Encargado\nde Despacho" as despacho
+
+package "Devoluciones" #FBE3EE {
+  usecase "CU-O-26\nProcesar devolución" as UC26
+  usecase "CU-O-27\nConsultar devolución" as UC27
+}
+
+actor "Roles operativos\n(consulta)" as operativos
+
+vendedor --> UC26
+despacho --> UC26
+
+UC27 <-- operativos
+
+@enduml

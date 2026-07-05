@@ -109,6 +109,65 @@
       </div>
     </ng-container>
 
+    <!-- Operación Section (visibilidad por rol, espeja SecurityConfig) -->
+    <ng-container *ngIf="canCatalogo || canCompras || canInventario || canVentas || canLogistica">
+      <div class="sidebar-section-label">Operación</div>
+
+      <ng-container *ngIf="canCatalogo">
+        <a class="nav-item" routerLink="/operativo/productos" routerLinkActive="active">
+          <mat-icon>inventory_2</mat-icon>
+          <span>Productos y Variantes</span>
+        </a>
+        <a class="nav-item" routerLink="/operativo/horarios" routerLinkActive="active">
+          <mat-icon>schedule</mat-icon>
+          <span>Horarios de Acceso</span>
+        </a>
+      </ng-container>
+
+      <ng-container *ngIf="canCompras">
+        <a class="nav-item" routerLink="/operativo/compras/ordenes" routerLinkActive="active">
+          <mat-icon>shopping_cart_checkout</mat-icon>
+          <span>Órdenes de Compra</span>
+        </a>
+        <a class="nav-item" routerLink="/operativo/compras/recepciones" routerLinkActive="active">
+          <mat-icon>move_to_inbox</mat-icon>
+          <span>Recepciones</span>
+        </a>
+        <a class="nav-item" routerLink="/operativo/compras/facturas" routerLinkActive="active">
+          <mat-icon>request_quote</mat-icon>
+          <span>Facturas de Compra</span>
+        </a>
+      </ng-container>
+
+      <a class="nav-item" *ngIf="canInventario"
+         routerLink="/operativo/inventario/transferencias" routerLinkActive="active">
+        <mat-icon>swap_horiz</mat-icon>
+        <span>Transferir Stock</span>
+      </a>
+
+      <ng-container *ngIf="canVentas">
+        <a class="nav-item" routerLink="/operativo/ventas/pedidos" routerLinkActive="active">
+          <mat-icon>point_of_sale</mat-icon>
+          <span>Pedidos de Venta</span>
+        </a>
+        <a class="nav-item" routerLink="/operativo/ventas/facturas" routerLinkActive="active">
+          <mat-icon>receipt</mat-icon>
+          <span>Facturas de Venta</span>
+        </a>
+      </ng-container>
+
+      <a class="nav-item" *ngIf="canDespachar"
+         routerLink="/operativo/ventas/despachos" routerLinkActive="active">
+        <mat-icon>local_shipping</mat-icon>
+        <span>Despachos</span>
+      </a>
+      <a class="nav-item" *ngIf="canLogistica"
+         routerLink="/operativo/ventas/devoluciones" routerLinkActive="active">
+        <mat-icon>assignment_return</mat-icon>
+        <span>Devoluciones</span>
+      </a>
+    </ng-container>
+
     <!-- Tienda Section -->
     <div class="sidebar-section-label">Tienda</div>
 

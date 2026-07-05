@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
-import { adminGuard } from './core/guards/role.guard';
+import { adminGuard, roleGuard } from './core/guards/role.guard';
 
 export const routes: Routes = [
   {
@@ -132,6 +132,67 @@ export const routes: Routes = [
     canActivate: [authGuard],
     loadComponent: () =>
       import('./features/recomendaciones/recomendaciones.component').then(m => m.RecomendacionesComponent)
+  },
+  // ── Módulo operativo (casos de uso 1-10) ────────────────────────────────
+  {
+    path: 'operativo/productos',
+    canActivate: [authGuard, roleGuard(['ADMIN'])],
+    loadComponent: () =>
+      import('./features/operativo/catalogo/productos-admin.component').then(m => m.ProductosAdminComponent)
+  },
+  {
+    path: 'operativo/compras/ordenes',
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'COMPRAS', 'BODEGA'])],
+    loadComponent: () =>
+      import('./features/operativo/compras/ordenes-compra.component').then(m => m.OrdenesCompraComponent)
+  },
+  {
+    path: 'operativo/compras/recepciones',
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'COMPRAS', 'BODEGA'])],
+    loadComponent: () =>
+      import('./features/operativo/compras/recepciones.component').then(m => m.RecepcionesComponent)
+  },
+  {
+    path: 'operativo/compras/facturas',
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'COMPRAS', 'BODEGA'])],
+    loadComponent: () =>
+      import('./features/operativo/compras/facturas-compra.component').then(m => m.FacturasCompraComponent)
+  },
+  {
+    path: 'operativo/inventario/transferencias',
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'BODEGA'])],
+    loadComponent: () =>
+      import('./features/operativo/inventario/transferencias.component').then(m => m.TransferenciasComponent)
+  },
+  {
+    path: 'operativo/ventas/pedidos',
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'VENDEDOR'])],
+    loadComponent: () =>
+      import('./features/operativo/ventas/pedidos-venta.component').then(m => m.PedidosVentaComponent)
+  },
+  {
+    path: 'operativo/ventas/facturas',
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'VENDEDOR'])],
+    loadComponent: () =>
+      import('./features/operativo/ventas/facturas-venta.component').then(m => m.FacturasVentaComponent)
+  },
+  {
+    path: 'operativo/ventas/despachos',
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'DESPACHO'])],
+    loadComponent: () =>
+      import('./features/operativo/ventas/despachos.component').then(m => m.DespachosComponent)
+  },
+  {
+    path: 'operativo/ventas/devoluciones',
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'VENDEDOR', 'DESPACHO'])],
+    loadComponent: () =>
+      import('./features/operativo/ventas/devoluciones.component').then(m => m.DevolucionesComponent)
+  },
+  {
+    path: 'operativo/horarios',
+    canActivate: [authGuard, roleGuard(['ADMIN'])],
+    loadComponent: () =>
+      import('./features/operativo/horarios/horarios.component').then(m => m.HorariosComponent)
   },
   {
     path: '**',

@@ -1,0 +1,88 @@
+@startuml paquetes_general
+title RetailMind — Nivel Operativo: Paquetes y Actores (vista de contexto)
+
+left to right direction
+hide stereotype
+skinparam backgroundColor #FFFFFF
+skinparam shadowing true
+skinparam linetype ortho
+skinparam nodesep 40
+skinparam ranksep 60
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam titleFontSize 16
+skinparam titleFontColor #1F3B5B
+skinparam packageStyle folder
+skinparam packageBorderColor #2E5A88
+skinparam packageFontColor #1F3B5B
+skinparam packageFontStyle bold
+skinparam actorBackgroundColor #FFFFFF
+skinparam actorBorderColor #1F3B5B
+skinparam actorFontColor #1F3B5B
+skinparam arrowColor #4A6A8A
+skinparam arrowFontColor #555555
+skinparam arrowFontSize 11
+skinparam noteBackgroundColor #FFFBE6
+skinparam noteBorderColor #B7950B
+
+' ── Actores lado izquierdo ──
+actor "Administrador" as admin
+actor "Vendedor" as vendedor
+actor "Encargado\nde Compras" as compras
+actor "Encargado\nde Bodega" as bodega
+
+' ── Paquetes (centro) ──
+package "Seguridad y\nControl de Acceso" as PSEG <<Folder>> #F9E0E0
+package "Catálogo" as PCAT <<Folder>> #DDEBF7
+package "Ventas y Pedidos" as PVEN <<Folder>> #EADCF5
+package "Facturación" as PFAC <<Folder>> #FCF3CF
+package "Proveedores y Compras" as PCMP <<Folder>> #FDEBD0
+package "Inventario y Bodegas" as PINV <<Folder>> #DFF5E1
+package "Logística y Envíos" as PLOG <<Folder>> #D6F0EC
+package "Devoluciones" as PDEV <<Folder>> #FBE3EE
+
+' ── Actores lado derecho ──
+actor "Cliente" as cliente
+actor "Gerente" as gerente
+actor "Encargado\nde Despacho" as despacho
+actor "Analista\nde Datos" as analista
+
+' ── Conexiones lado izquierdo ──
+admin --> PSEG : gestiona usuarios\ny horarios
+admin --> PCAT : gestiona catálogo
+admin --> PVEN : consulta global
+
+vendedor --> PVEN : registra pedidos
+vendedor --> PFAC : factura venta
+vendedor --> PDEV : procesa devolución
+
+compras --> PCMP : órdenes y pagos
+compras --> PFAC : factura compra
+
+bodega --> PCMP : recibe mercancía
+bodega --> PINV : transfiere stock
+
+' ── Conexiones lado derecho ──
+PCAT <-- cliente : consulta catálogo
+PVEN <-- cliente : sus pedidos
+PLOG <-- cliente : seguimiento
+
+PCMP <-- gerente : consulta / aprueba
+PINV <-- gerente : consulta
+PVEN <-- gerente : consulta
+
+PLOG <-- despacho : despacha
+PDEV <-- despacho : procesa devolución
+
+PINV <-- analista : existencias
+PDEV <-- analista : devoluciones
+
+note as N1
+  Todos los actores se autentican a través de
+  "Seguridad y Control de Acceso" (login JWT);
+  se muestran solo los usos principales.
+  El Administrador tiene acceso total al sistema.
+end note
+N1 .. PSEG
+
+@enduml

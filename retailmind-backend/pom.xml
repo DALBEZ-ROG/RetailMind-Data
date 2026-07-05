@@ -35,6 +35,19 @@
             <artifactId>spring-boot-starter-jdbc</artifactId>
         </dependency>
 
+        <!-- PostgreSQL JDBC Driver (transaccional/operativo) -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- AOP (aspecto SET LOCAL ROLE por transaccion) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
+
         <!-- ClickHouse JDBC Driver -->
         <dependency>
             <groupId>com.clickhouse</groupId>

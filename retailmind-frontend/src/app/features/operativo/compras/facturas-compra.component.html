@@ -1,0 +1,84 @@
+<div class="op-page">
+  <div class="section-header">
+    <h2><mat-icon>request_quote</mat-icon> Facturas de Compra</h2>
+    <p>Registra la factura del proveedor contra una orden y abre su PDF.</p>
+  </div>
+
+  <div class="op-card">
+    <h3><mat-icon>post_add</mat-icon> Registrar factura</h3>
+    <p class="hint-numero">El número de factura lo genera el sistema automáticamente.</p>
+    <div class="form-grid">
+      <mat-form-field appearance="outline">
+        <mat-label>Orden de compra</mat-label>
+        <mat-select [(ngModel)]="ordenId">
+          <mat-option *ngFor="let o of ordenes" [value]="o.id">
+            {{ o.numero }} — {{ o.proveedor }} ({{ o.total | currency:'USD' }})
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+    <div class="form-actions">
+      <button class="btn-aplicar" (click)="registrarFactura()" [disabled]="procesando">
+        <mat-icon>receipt</mat-icon> {{ procesando ? 'Registrando…' : 'Registrar Factura' }}
+      </button>
+    </div>
+
+    <div class="resultado-box" *ngIf="factura">
+      <div class="titulo"><mat-icon>check_circle</mat-icon> Factura registrada</div>
+      <div class="dato">Número: <strong>{{ factura.numero_factura }}</strong> · Proveedor: <strong>{{ factura.proveedor }}</strong></div>
+      <div class="dato">Vence: <strong>{{ factura.fecha_vencimiento }}</strong> · Estado CxP: <strong>{{ factura.estado_cxp || 'pendiente' }}</strong></div>
+      <div class="total-banner">
+        <div class="total-item"><div class="lbl">Subtotal</div><div class="val">{{ factura.subtotal | currency:'USD' }}</div></div>
+        <div class="total-item"><div class="lbl">IVA</div><div class="val">{{ factura.monto_impuesto | currency:'USD' }}</div></div>
+        <div class="total-item"><div class="lbl">Total</div><div class="val">{{ factura.total | currency:'USD' }}</div></div>
+      </div>
+      <div class="form-actions" style="margin-top:16px;">
+        <button class="btn-aplicar" (click)="verPdf(factura.id)">
+          <mat-icon>picture_as_pdf</mat-icon> Ver PDF
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="op-card">
+    <h3><mat-icon>account_balance_wallet</mat-icon> Cuentas por pagar ({{ cuentas.length }})</h3>
+    <div class="table-wrapper" *ngIf="cuentas.length; else vacio">
+      <table mat-table [dataSource]="cuentas">
+        <ng-container matColumnDef="factura">
+          <th mat-header-cell *matHeaderCellDef>Factura</th>
+          <td mat-cell *matCellDef="let c"><strong>{{ c.numero_factura }}</strong></td>
+        </ng-container>
+        <ng-container matColumnDef="proveedor">
+          <th mat-header-cell *matHeaderCellDef>Proveedor</th>
+          <td mat-cell *matCellDef="let c">{{ c.proveedor }}</td>
+        </ng-container>
+        <ng-container matColumnDef="monto">
+          <th mat-header-cell *matHeaderCellDef>Monto</th>
+          <td mat-cell *matCellDef="let c">{{ c.monto_original | currency:'USD' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="saldo">
+          <th mat-header-cell *matHeaderCellDef>Saldo</th>
+          <td mat-cell *matCellDef="let c">{{ c.saldo_pendiente | currency:'USD' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="vence">
+          <th mat-header-cell *matHeaderCellDef>Vence</th>
+          <td mat-cell *matCellDef="let c">{{ c.fecha_vencimiento }}</td>
+        </ng-container>
+        <ng-container matColumnDef="estado">
+          <th mat-header-cell *matHeaderCellDef>Estado</th>
+          <td mat-cell *matCellDef="let c">
+            <span class="estado-chip"
+                  [class.ok]="c.estado === 'pagada'"
+                  [class.warn]="c.estado === 'parcial'"
+                  [class.error]="c.estado === 'pendiente'">{{ c.estado }}</span>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="['factura','proveedor','monto','saldo','vence','estado']"></tr>
+        <tr mat-row *matRowDef="let c; columns: ['factura','proveedor','monto','saldo','vence','estado']"></tr>
+      </table>
+    </div>
+    <ng-template #vacio>
+      <div class="empty-state"><mat-icon>account_balance_wallet</mat-icon><p>Sin cuentas por pagar registradas.</p></div>
+    </ng-template>
+  </div>
+</div>

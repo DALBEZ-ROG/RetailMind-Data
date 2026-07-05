@@ -1,0 +1,82 @@
+@startuml seq_procesar_devolucion
+title Secuencia — CU-O-26 Procesar devolucion (reingreso de stock)
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing true
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam titleFontSize 16
+skinparam titleFontColor #1F3B5B
+skinparam sequenceMessageAlign center
+skinparam ParticipantBorderColor #1F3B5B
+skinparam ParticipantBackgroundColor #EAF0F7
+skinparam ParticipantFontColor #1F3B5B
+skinparam ActorBorderColor #1F3B5B
+skinparam ActorBackgroundColor #FFFFFF
+skinparam DatabaseBorderColor #2E5A88
+skinparam DatabaseBackgroundColor #DFF5E1
+skinparam ArrowColor #4A6A8A
+skinparam NoteBackgroundColor #FFFBE6
+skinparam NoteBorderColor #B7950B
+
+actor "Vendedor /\nEnc. de Despacho" as usr
+participant "Frontend\n(Angular)" as fe
+participant "VentasController" as ctrl
+participant "PgSessionRoleAspect" as asp
+participant "VentasService\n<<@Transactional>>" as svc
+participant "StockService" as stock
+database "PostgreSQL\n(retailmind)" as db
+
+usr -> fe : Registra devolucion (motivo, items)
+fe -> ctrl : POST /api/ventas/pedidos/{id}/devolucion
+ctrl -> svc : procesarDevolucion(pedidoId, motivo, bodega, items)
+activate svc
+
+asp -> db : SET LOCAL ROLE grp_vendedor / grp_despacho
+
+svc -> db : SELECT estado del pedido
+db --> svc : estado
+alt estado 'cancelado' o 'pendiente'
+  svc --> ctrl : Error (no se puede devolver)
+else estado valido
+  svc -> db : SELECT motivo_devolucion (activo)
+  db --> svc : motivo ok?
+  alt motivo inexistente/inactivo
+    svc --> ctrl : Error 'motivo no existe o inactivo'
+  else motivo valido
+    svc -> db : INSERT devolucion (numero DV-..., 'recibida')
+    db --> svc : devolucionId
+
+    loop por cada item devuelto
+      svc -> db : SELECT pedido_detalle (precio, cantidad)
+      svc -> db : SUM(cantidad) devoluciones previas de la linea
+      db --> svc : ya devueltas
+      alt devueltas + cantidad > compradas
+        svc --> ctrl : Error 'se compraron N y ya se devolvieron M'
+      else cantidad valida
+        svc -> db : INSERT devolucion_detalle (estado, accion)
+        svc -> stock : mover('entrada_devolucion_cliente', cantidad)
+        activate stock
+        stock -> db : upsert inventario + SELECT ... FOR UPDATE
+        stock -> db : INSERT movimiento_inventario (kardex)
+        stock -> db : UPDATE inventario.stock_actual (+ cantidad)
+        stock --> svc : stock resultante
+        deactivate stock
+      end
+    end
+
+    svc -> db : UPDATE devolucion.monto_total
+    svc -> db : UPDATE pedido.estado 'devuelto' + historial
+    svc --> ctrl : devolucion + detalle
+  end
+end
+deactivate svc
+ctrl --> fe : 201 Created
+fe --> usr : Confirma devolucion
+
+note over db
+  Transaccion atomica.
+  COMMIT descarta el SET LOCAL ROLE.
+end note
+
+@enduml

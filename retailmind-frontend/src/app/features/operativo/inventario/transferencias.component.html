@@ -1,0 +1,91 @@
+<div class="op-page">
+  <div class="section-header">
+    <h2><mat-icon>swap_horiz</mat-icon> Transferencias entre Bodegas</h2>
+    <p>Mueve stock de una bodega a otra con registro en el kardex.</p>
+  </div>
+
+  <div class="op-card">
+    <h3><mat-icon>forklift</mat-icon> Nueva transferencia</h3>
+    <div class="form-grid">
+      <mat-form-field appearance="outline">
+        <mat-label>Variante (SKU)</mat-label>
+        <mat-select [(ngModel)]="varianteId" (selectionChange)="consultarStock()">
+          <mat-option *ngFor="let v of variantes" [value]="v.id">{{ v.sku }} — {{ v.producto }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Bodega origen</mat-label>
+        <mat-select [(ngModel)]="bodegaOrigenId">
+          <mat-option *ngFor="let b of bodegas" [value]="b.id">{{ b.nombre }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Bodega destino</mat-label>
+        <mat-select [(ngModel)]="bodegaDestinoId">
+          <mat-option *ngFor="let b of bodegas" [value]="b.id">{{ b.nombre }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Cantidad</mat-label>
+        <input matInput type="number" min="1" [(ngModel)]="cantidad">
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Observación</mat-label>
+        <input matInput [(ngModel)]="observacion">
+      </mat-form-field>
+    </div>
+    <div class="form-actions">
+      <button class="btn-aplicar" (click)="transferir()" [disabled]="procesando"><mat-icon>swap_horiz</mat-icon> {{ procesando ? 'Transfiriendo…' : 'Transferir' }}</button>
+    </div>
+
+    <!-- Stock actual de la variante en cada bodega -->
+    <div *ngIf="stockVariante.length" style="margin-top:16px;">
+      <span class="stat-chip chip-info" *ngFor="let s of stockVariante" style="margin-right:8px;">
+        {{ s.bodega }}: {{ s.stock_actual }}
+      </span>
+    </div>
+
+    <div class="resultado-box" *ngIf="resultado">
+      <div class="titulo"><mat-icon>check_circle</mat-icon> Transferencia #{{ resultado['id'] }} realizada</div>
+      <div class="dato">SKU: <strong>{{ resultado['sku'] }}</strong> · Cantidad: <strong>{{ resultado['cantidad'] }}</strong></div>
+      <div class="dato">Stock resultante — origen: <strong>{{ resultado['stockOrigen'] }}</strong> · destino: <strong>{{ resultado['stockDestino'] }}</strong></div>
+    </div>
+  </div>
+
+  <div class="op-card">
+    <h3><mat-icon>history</mat-icon> Historial de transferencias ({{ transferencias.length }})</h3>
+    <div class="table-wrapper" *ngIf="transferencias.length; else vacio">
+      <table mat-table [dataSource]="transferencias">
+        <ng-container matColumnDef="id">
+          <th mat-header-cell *matHeaderCellDef>#</th>
+          <td mat-cell *matCellDef="let t">{{ t['id'] }}</td>
+        </ng-container>
+        <ng-container matColumnDef="origen">
+          <th mat-header-cell *matHeaderCellDef>Origen</th>
+          <td mat-cell *matCellDef="let t">{{ t['bodega_origen'] }}</td>
+        </ng-container>
+        <ng-container matColumnDef="destino">
+          <th mat-header-cell *matHeaderCellDef>Destino</th>
+          <td mat-cell *matCellDef="let t">{{ t['bodega_destino'] }}</td>
+        </ng-container>
+        <ng-container matColumnDef="observacion">
+          <th mat-header-cell *matHeaderCellDef>Detalle</th>
+          <td mat-cell *matCellDef="let t">{{ t['observacion'] }}</td>
+        </ng-container>
+        <ng-container matColumnDef="solicitante">
+          <th mat-header-cell *matHeaderCellDef>Solicitado por</th>
+          <td mat-cell *matCellDef="let t">{{ t['solicitado_por'] }}</td>
+        </ng-container>
+        <ng-container matColumnDef="estado">
+          <th mat-header-cell *matHeaderCellDef>Estado</th>
+          <td mat-cell *matCellDef="let t"><span class="estado-chip ok">{{ t['estado'] }}</span></td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="['id','origen','destino','observacion','solicitante','estado']"></tr>
+        <tr mat-row *matRowDef="let t; columns: ['id','origen','destino','observacion','solicitante','estado']"></tr>
+      </table>
+    </div>
+    <ng-template #vacio>
+      <div class="empty-state"><mat-icon>swap_horiz</mat-icon><p>No hay transferencias registradas.</p></div>
+    </ng-template>
+  </div>
+</div>

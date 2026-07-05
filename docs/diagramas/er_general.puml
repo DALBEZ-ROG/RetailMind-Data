@@ -1,0 +1,282 @@
+@startuml er_general
+title Diagrama ER simplificado — Núcleo operativo RetailMind (PostgreSQL "retailmind")
+
+hide circle
+skinparam backgroundColor #FFFFFF
+skinparam shadowing true
+skinparam linetype ortho
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam titleFontSize 16
+skinparam titleFontColor #1F3B5B
+skinparam packageStyle folder
+skinparam packageBorderColor #2E5A88
+skinparam packageFontColor #1F3B5B
+skinparam packageFontStyle bold
+skinparam entity {
+  BackgroundColor #FFFFFF
+  BorderColor #2E5A88
+  FontColor #333333
+}
+skinparam arrowColor #4A6A8A
+skinparam arrowFontColor #555555
+skinparam noteBackgroundColor #FFFBE6
+skinparam noteBorderColor #B7950B
+
+package "Seguridad" #F9E0E0 {
+  entity "usuario" as usuario {
+    * id : bigint <<PK>>
+    --
+    email <<UQ>>
+    password_hash
+    activo
+  }
+  entity "rol" as rol {
+    * id : bigint <<PK>>
+    --
+    codigo <<UQ>>
+    nombre <<UQ>>
+  }
+  entity "usuario_rol" as usuario_rol {
+    * id : bigint <<PK>>
+    --
+    * usuario_id <<FK>>
+    * rol_id <<FK>>
+    <<UQ usuario_id + rol_id>>
+  }
+}
+
+package "Catálogo" #DDEBF7 {
+  entity "marca" as marca {
+    * id : bigint <<PK>>
+    --
+    nombre <<UQ>>
+    slug <<UQ>>
+  }
+  entity "categoria" as categoria {
+    * id : bigint <<PK>>
+    --
+    nombre
+    slug <<UQ>>
+    categoria_padre_id <<FK>>
+  }
+  entity "producto" as producto {
+    * id : bigint <<PK>>
+    --
+    nombre
+    slug <<UQ>>
+    marca_id <<FK>>
+    publicado
+  }
+  entity "producto_categoria" as producto_categoria {
+    * id : bigint <<PK>>
+    --
+    * producto_id <<FK>>
+    * categoria_id <<FK>>
+    <<UQ producto_id + categoria_id>>
+  }
+  entity "producto_variante" as producto_variante {
+    * id : bigint <<PK>>
+    --
+    * producto_id <<FK>>
+    sku <<UQ>>
+    precio
+    costo
+    activo
+  }
+}
+
+package "Proveedores y Compras" #FDEBD0 {
+  entity "proveedor" as proveedor {
+    * id : bigint <<PK>>
+    --
+    razon_social
+    ruc <<UQ>>
+    dias_credito
+  }
+  entity "orden_compra" as orden_compra {
+    * id : bigint <<PK>>
+    --
+    numero <<UQ>>
+    * proveedor_id <<FK>>
+    * bodega_id <<FK>>
+    estado
+    total
+  }
+  entity "orden_compra_detalle" as orden_compra_detalle {
+    * id : bigint <<PK>>
+    --
+    * orden_compra_id <<FK>>
+    * producto_variante_id <<FK>>
+    cantidad
+    precio_unitario
+    subtotal (generada)
+  }
+  entity "recepcion_mercancia" as recepcion_mercancia {
+    * id : bigint <<PK>>
+    --
+    numero <<UQ>>
+    * orden_compra_id <<FK>>
+    * bodega_id <<FK>>
+  }
+  entity "factura_compra" as factura_compra {
+    * id : bigint <<PK>>
+    --
+    * proveedor_id <<FK>>
+    orden_compra_id <<FK>>
+    numero_factura
+    estado
+    total
+  }
+  entity "cuenta_por_pagar" as cuenta_por_pagar {
+    * id : bigint <<PK>>
+    --
+    * factura_compra_id <<FK,UQ>>
+    * proveedor_id <<FK>>
+    saldo_pendiente
+    estado
+  }
+  entity "pago_proveedor" as pago_proveedor {
+    * id : bigint <<PK>>
+    --
+    * cuenta_por_pagar_id <<FK>>
+    monto
+    metodo_pago_id <<FK>>
+  }
+}
+
+package "Inventario y Bodegas" #DFF5E1 {
+  entity "bodega" as bodega {
+    * id : bigint <<PK>>
+    --
+    codigo <<UQ>>
+    nombre
+  }
+  entity "inventario" as inventario {
+    * id : bigint <<PK>>
+    --
+    * producto_variante_id <<FK>>
+    * bodega_id <<FK>>
+    stock_actual
+    <<UQ variante + bodega>>
+  }
+  entity "movimiento_inventario" as movimiento_inventario {
+    * id : bigint <<PK>>
+    --
+    * producto_variante_id <<FK>>
+    * bodega_id <<FK>>
+    tipo_movimiento_id <<FK>>
+    stock_anterior / stock_nuevo
+    referencia (polimórfica)
+  }
+  entity "transferencia_bodega" as transferencia_bodega {
+    * id : bigint <<PK>>
+    --
+    * bodega_origen_id <<FK>>
+    * bodega_destino_id <<FK>>
+    estado
+  }
+}
+
+package "Ventas, Facturación y Logística" #EADCF5 {
+  entity "cliente" as cliente {
+    * id : bigint <<PK>>
+    --
+    usuario_id <<FK,UQ>>
+    razon_social
+    identificación <<UQ>>
+  }
+  entity "pedido" as pedido {
+    * id : bigint <<PK>>
+    --
+    numero <<UQ>>
+    * cliente_id <<FK>>
+    estado_pedido_id <<FK>>
+    total
+  }
+  entity "pedido_detalle" as pedido_detalle {
+    * id : bigint <<PK>>
+    --
+    * pedido_id <<FK>>
+    * producto_variante_id <<FK>>
+    cantidad
+    precio_unitario (snapshot)
+    subtotal (generada)
+  }
+  entity "factura_venta" as factura_venta {
+    * id : bigint <<PK>>
+    --
+    numero <<UQ>>
+    * pedido_id <<FK>>
+    * cliente_id <<FK>>
+    total
+  }
+  entity "envio" as envio {
+    * id : bigint <<PK>>
+    --
+    numero <<UQ>>
+    * pedido_id <<FK>>
+    estado
+  }
+  entity "devolucion" as devolucion {
+    * id : bigint <<PK>>
+    --
+    numero <<UQ>>
+    * pedido_id <<FK>>
+    motivo_devolucion_id <<FK>>
+    total
+  }
+}
+
+' ── Seguridad ──
+usuario ||--o{ usuario_rol
+rol ||--o{ usuario_rol
+usuario |o--o| cliente : usuario_id
+
+' ── Catálogo ──
+marca |o--o{ producto
+categoria |o--o{ categoria : padre
+producto ||--o{ producto_categoria
+categoria ||--o{ producto_categoria
+producto ||--o{ producto_variante
+
+' ── Compras (Procure-to-Pay) ──
+proveedor ||--o{ orden_compra
+bodega ||--o{ orden_compra
+orden_compra ||--|{ orden_compra_detalle
+producto_variante ||--o{ orden_compra_detalle
+orden_compra ||--o{ recepcion_mercancia
+bodega ||--o{ recepcion_mercancia
+proveedor ||--o{ factura_compra
+orden_compra |o--o{ factura_compra
+factura_compra ||--|| cuenta_por_pagar
+proveedor ||--o{ cuenta_por_pagar
+cuenta_por_pagar ||--o{ pago_proveedor
+
+' ── Inventario ──
+producto_variante ||--o{ inventario
+bodega ||--o{ inventario
+producto_variante ||--o{ movimiento_inventario
+bodega ||--o{ movimiento_inventario
+bodega ||--o{ transferencia_bodega : origen
+bodega ||--o{ transferencia_bodega : destino
+
+' ── Ventas (Order-to-Cash) ──
+cliente ||--o{ pedido
+pedido ||--|{ pedido_detalle
+producto_variante ||--o{ pedido_detalle
+pedido ||--o{ factura_venta
+cliente ||--o{ factura_venta
+pedido ||--o{ envio
+pedido ||--o{ devolucion
+
+note bottom
+  Simplificado para legibilidad: se omiten las tablas de detalle de
+  recepción, factura y envío/devolución, los catálogos menores
+  (moneda, ciudad, estado_pedido, tipo_movimiento, metodo_pago...)
+  y las FK de auditoría hacia usuario (usuario_id en orden_compra,
+  movimiento_inventario, recepcion_mercancia, devolucion, etc.).
+  Cardinalidades verificadas contra el esquema real (FK + UNIQUE + NOT NULL).
+end note
+
+@enduml

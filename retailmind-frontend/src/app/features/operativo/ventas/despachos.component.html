@@ -1,0 +1,62 @@
+<div class="op-page">
+  <div class="section-header">
+    <h2><mat-icon>local_shipping</mat-icon> Despachar Pedidos</h2>
+    <p>Asigna transportista, genera la guía y consulta el seguimiento del envío.</p>
+  </div>
+
+  <div class="op-card">
+    <h3><mat-icon>assignment_turned_in</mat-icon> Nuevo despacho</h3>
+    <div class="form-grid">
+      <mat-form-field appearance="outline">
+        <mat-label>Pedido a despachar</mat-label>
+        <mat-select [(ngModel)]="pedidoId">
+          <mat-option *ngFor="let p of pedidos" [value]="p.id">
+            {{ p.numero }} — {{ p.cliente }} ({{ p.estado }})
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Transportista</mat-label>
+        <mat-select [(ngModel)]="transportistaId">
+          <mat-option *ngFor="let t of transportistas" [value]="t.id">{{ t.nombre }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Método de envío</mat-label>
+        <mat-select [(ngModel)]="metodoEnvioId">
+          <mat-option *ngFor="let m of metodosEnvio" [value]="m.id">{{ m.nombre }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Observación</mat-label>
+        <input matInput [(ngModel)]="observacion">
+      </mat-form-field>
+    </div>
+    <div class="form-actions">
+      <button class="btn-aplicar" (click)="despachar()" [disabled]="procesando">
+        <mat-icon>local_shipping</mat-icon> {{ procesando ? 'Despachando…' : 'Despachar' }}
+      </button>
+    </div>
+
+    <div class="resultado-box" *ngIf="envio">
+      <div class="titulo"><mat-icon>check_circle</mat-icon> Pedido despachado</div>
+      <div class="dato">Envío: <strong>{{ envio.numero }}</strong> · Guía: <strong>{{ envio.numero_guia }}</strong> · Estado: <strong>{{ envio.estado }}</strong></div>
+      <div class="dato">Pedido: <strong>{{ envio.numero_pedido }}</strong> · Transportista: <strong>{{ envio.transportista }}</strong> · Método: <strong>{{ envio.metodo_envio }}</strong></div>
+      <div class="dato">Entrega en: <strong>{{ envio.direccion_entrega }}</strong></div>
+    </div>
+  </div>
+
+  <div class="op-card" *ngIf="seguimiento.length">
+    <h3><mat-icon>route</mat-icon> Seguimiento del envío</h3>
+    <div class="timeline">
+      <div class="timeline-item" *ngFor="let s of seguimiento">
+        <mat-icon>place</mat-icon>
+        <div class="t-info">
+          <div class="t-estado">{{ s.estado }}</div>
+          <div class="t-desc">{{ s.descripcion }} — {{ s.ubicacion }}</div>
+          <div class="t-fecha">{{ s.fecha_evento | date:'medium' }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -5,14 +5,14 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import com.retailmind.dto.DashboardResumenDTO;
 import com.retailmind.dto.FactEventoRepository;
 import com.retailmind.dto.GrupoConteoDTO;
 
+// Sin @Transactional: consulta ClickHouse; abrir una transaccion de PostgreSQL
+// alrededor solo consumiria conexiones del pool pg-retailmind.
 @Service
-@Transactional(readOnly = true)
 public class DashboardService {
 
     private static final Logger logger = LoggerFactory.getLogger(DashboardService.class);
@@ -86,7 +86,6 @@ public class DashboardService {
      * En la arquitectura con ClickHouse, los datos se consultan en tiempo real.
      * No se necesitan vistas materializadas.
      */
-    @Transactional
     public String refrescarVistas() {
         return "Datos actualizados correctamente. ClickHouse consulta en tiempo real.";
     }

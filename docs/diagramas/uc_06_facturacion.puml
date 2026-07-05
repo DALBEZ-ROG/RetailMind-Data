@@ -1,0 +1,40 @@
+@startuml uc_06_facturacion
+title Casos de Uso — Paquete 6: Facturación
+
+left to right direction
+skinparam backgroundColor #FFFFFF
+skinparam shadowing true
+skinparam linetype polyline
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam titleFontSize 16
+skinparam titleFontColor #1F3B5B
+skinparam packageStyle folder
+skinparam packageBorderColor #B7950B
+skinparam packageFontColor #1F3B5B
+skinparam packageFontStyle bold
+skinparam actorBackgroundColor #FFFFFF
+skinparam actorBorderColor #1F3B5B
+skinparam actorFontColor #1F3B5B
+skinparam usecaseBackgroundColor #FFFFFF
+skinparam usecaseBorderColor #B7950B
+skinparam usecaseFontColor #333333
+skinparam arrowColor #4A6A8A
+
+actor "Encargado\nde Compras" as compras
+
+package "Facturación" #FCF3CF {
+  usecase "CU-O-21\nRegistrar factura\nde compra" as UC21
+  usecase "CU-O-23\nGenerar PDF\nde factura" as UC23
+  usecase "CU-O-22\nEmitir factura\nde venta" as UC22
+}
+
+actor "Vendedor" as vendedor
+
+compras --> UC21
+compras --> UC23
+
+UC22 <-- vendedor
+UC23 <-- vendedor
+
+@enduml

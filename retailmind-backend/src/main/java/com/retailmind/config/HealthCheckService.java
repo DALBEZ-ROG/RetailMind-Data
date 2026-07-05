@@ -21,29 +21,54 @@ public class HealthCheckService {
     private String pythonPath;
 
     private final JdbcTemplate jdbc;
+    private final JdbcTemplate pgJdbc;
 
-    public HealthCheckService(@Qualifier("jdbcTemplate") JdbcTemplate jdbc) {
+    public HealthCheckService(@Qualifier("jdbcTemplate") JdbcTemplate jdbc,
+                              @Qualifier("pgJdbcTemplate") JdbcTemplate pgJdbc) {
         this.jdbc = jdbc;
+        this.pgJdbc = pgJdbc;
     }
 
     public Map<String, String> checkAll() {
         Map<String, String> status = new LinkedHashMap<>();
-        status.put("database", checkDatabase());
+        status.put("postgres", checkPostgres());
+        status.put("clickhouse", checkClickHouse());
+        status.put("database", status.get("clickhouse")); // compatibilidad con clientes previos
         status.put("python", checkPythonRuntime());
 
-        boolean allUp = status.values().stream().allMatch("UP"::equals);
+        boolean allUp = !"DOWN".equals(status.get("postgres"))
+                && !"DOWN".equals(status.get("clickhouse"))
+                && !"DOWN".equals(status.get("python"));
         status.put("status", allUp ? "UP" : "DOWN");
         return status;
     }
 
-    public String checkDatabase() {
+    /** PostgreSQL transaccional, conectado como retailmind_app. */
+    public String checkPostgres() {
+        try {
+            String user = pgJdbc.queryForObject("SELECT current_user", String.class);
+            return "UP (" + user + ")";
+        } catch (Exception e) {
+            logger.warn("Health check PostgreSQL fallo: {}", e.getMessage());
+            return "DOWN";
+        }
+    }
+
+    /** ClickHouse (solo analytics). */
+    public String checkClickHouse() {
         try {
             jdbc.queryForObject("SELECT 1", Integer.class);
             return "UP";
         } catch (Exception e) {
-            logger.warn("Health check BD fallo: {}", e.getMessage());
+            logger.warn("Health check ClickHouse fallo: {}", e.getMessage());
             return "DOWN";
         }
+    }
+
+    /** @deprecated conservado por compatibilidad; ahora es ClickHouse. */
+    @Deprecated
+    public String checkDatabase() {
+        return checkClickHouse();
     }
 
     public String checkPythonRuntime() {
