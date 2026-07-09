@@ -97,7 +97,7 @@
           <th mat-header-cell *matHeaderCellDef>Estado</th>
           <td mat-cell *matCellDef="let o">
             <span class="estado-chip"
-                  [class.ok]="o.estado === 'recibida'"
+                  [class.ok]="o.estado === 'recibida' || o.estado === 'confirmada'"
                   [class.warn]="o.estado === 'recibida_parcial'">{{ o.estado }}</span>
           </td>
         </ng-container>
@@ -110,6 +110,11 @@
           <td mat-cell *matCellDef="let o">
             <button mat-icon-button (click)="verOrden(o.id)" matTooltip="Ver detalle">
               <mat-icon>visibility</mat-icon>
+            </button>
+            <button mat-icon-button color="primary" *ngIf="puedeAprobar && o.estado === 'enviada'"
+                    (click)="aprobarOrden(o)" [disabled]="procesando"
+                    matTooltip="Aprobar orden (gerencia)">
+              <mat-icon>task_alt</mat-icon>
             </button>
           </td>
         </ng-container>

@@ -73,12 +73,53 @@
                   [class.error]="c.estado === 'pendiente'">{{ c.estado }}</span>
           </td>
         </ng-container>
-        <tr mat-header-row *matHeaderRowDef="['factura','proveedor','monto','saldo','vence','estado']"></tr>
-        <tr mat-row *matRowDef="let c; columns: ['factura','proveedor','monto','saldo','vence','estado']"></tr>
+        <ng-container matColumnDef="acciones">
+          <th mat-header-cell *matHeaderCellDef>Pago</th>
+          <td mat-cell *matCellDef="let c">
+            <button mat-icon-button color="primary" *ngIf="c.estado !== 'pagada'"
+                    (click)="abrirPago(c)" matTooltip="Registrar pago al proveedor">
+              <mat-icon>payments</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="['factura','proveedor','monto','saldo','vence','estado','acciones']"></tr>
+        <tr mat-row *matRowDef="let c; columns: ['factura','proveedor','monto','saldo','vence','estado','acciones']"
+            [class.fila-seleccionada]="cuentaPago?.id === c.id"></tr>
       </table>
     </div>
     <ng-template #vacio>
       <div class="empty-state"><mat-icon>account_balance_wallet</mat-icon><p>Sin cuentas por pagar registradas.</p></div>
     </ng-template>
+
+    <!-- Registrar pago a proveedor (la guardia "no pagar más del saldo" la aplica el backend) -->
+    <div *ngIf="cuentaPago" style="margin-top: 20px;">
+      <h3><mat-icon>payments</mat-icon> Registrar pago — {{ cuentaPago.numero_factura }}</h3>
+      <div style="margin-bottom: 12px;">
+        <span class="stat-chip chip-info">Saldo pendiente: {{ cuentaPago.saldo_pendiente | currency:'USD' }}</span>
+        <span class="stat-chip chip-info" style="margin-left: 8px;">Estado: {{ cuentaPago.estado }}</span>
+      </div>
+      <div class="form-grid">
+        <mat-form-field appearance="outline">
+          <mat-label>Monto a pagar</mat-label>
+          <input matInput type="number" min="0.01" [max]="cuentaPago.saldo_pendiente" [(ngModel)]="montoPago">
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Método de pago</mat-label>
+          <mat-select [(ngModel)]="metodoPagoId">
+            <mat-option *ngFor="let m of metodosPago" [value]="m.id">{{ m.nombre }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Referencia (transferencia, cheque…)</mat-label>
+          <input matInput [(ngModel)]="referenciaPago">
+        </mat-form-field>
+      </div>
+      <div class="form-actions">
+        <button class="btn-aplicar" (click)="registrarPago()" [disabled]="pagando">
+          <mat-icon>payments</mat-icon> {{ pagando ? 'Registrando…' : 'Registrar Pago' }}
+        </button>
+        <button class="btn-limpiar" (click)="cuentaPago = null"><mat-icon>close</mat-icon> Cancelar</button>
+      </div>
+    </div>
   </div>
 </div>

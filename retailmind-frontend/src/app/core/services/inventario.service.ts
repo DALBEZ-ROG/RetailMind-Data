@@ -1,8 +1,8 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { TransferenciaRow } from '../models/operativo.model';
+import { TransferenciaRow, AjusteRow, AjusteResultado, KardexRow } from '../models/operativo.model';
 
 @Injectable({ providedIn: 'root' })
 export class InventarioService {
@@ -19,5 +19,23 @@ export class InventarioService {
 
   transferencias(): Observable<TransferenciaRow[]> {
     return this.http.get<TransferenciaRow[]>(`${this.base}/transferencias`);
+  }
+
+  registrarAjuste(body: {
+    varianteId: number; bodegaId: number; tipo: 'entrada' | 'salida';
+    cantidad: number; motivo: string;
+  }): Observable<AjusteResultado> {
+    return this.http.post<AjusteResultado>(`${this.base}/ajustes`, body);
+  }
+
+  ajustes(): Observable<AjusteRow[]> {
+    return this.http.get<AjusteRow[]>(`${this.base}/ajustes`);
+  }
+
+  kardex(varianteId?: number | null, bodegaId?: number | null): Observable<KardexRow[]> {
+    let params = new HttpParams();
+    if (varianteId != null) params = params.set('varianteId', varianteId);
+    if (bodegaId != null)   params = params.set('bodegaId', bodegaId);
+    return this.http.get<KardexRow[]>(`${this.base}/kardex`, { params });
   }
 }

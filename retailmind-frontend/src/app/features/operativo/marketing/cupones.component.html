@@ -1,0 +1,173 @@
+<div class="op-page">
+  <div class="section-header">
+    <h2><mat-icon>confirmation_number</mat-icon> Cupones de Descuento</h2>
+    <p>Gestión de cupones: código, tipo de descuento, vigencia y límites de uso.</p>
+  </div>
+
+  <div class="op-card" *ngIf="esAdmin">
+    <div class="form-actions">
+      <button class="btn-aplicar" (click)="showForm ? showForm = false : nuevo()">
+        <mat-icon>{{ showForm ? 'close' : 'add' }}</mat-icon>
+        {{ showForm ? 'Cancelar' : 'Nuevo Cupón' }}
+      </button>
+      <button class="btn-limpiar" (click)="cargar()">
+        <mat-icon>refresh</mat-icon> Actualizar
+      </button>
+    </div>
+
+    <div *ngIf="showForm" style="margin-top: 20px;">
+      <h3 *ngIf="editandoId !== null"><mat-icon>edit</mat-icon> Editando cupón #{{ editandoId }}</h3>
+      <div class="form-grid">
+        <mat-form-field appearance="outline">
+          <mat-label>Código</mat-label>
+          <input matInput [(ngModel)]="form.codigo" maxlength="50" style="text-transform: uppercase;">
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Tipo de descuento</mat-label>
+          <mat-select [(ngModel)]="form.tipoDescuento">
+            <mat-option *ngFor="let t of tiposDescuento" [value]="t">{{ t }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Valor {{ form.tipoDescuento === 'porcentaje' ? '(%)' : '(USD)' }}</mat-label>
+          <input matInput type="number" min="0" [(ngModel)]="form.valor">
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Monto mínimo del pedido</mat-label>
+          <input matInput type="number" min="0" [(ngModel)]="form.montoMinimoPedido">
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Usos máximos (vacío = ilimitado)</mat-label>
+          <input matInput type="number" min="1" [(ngModel)]="form.usosMaximos">
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Usos por cliente</mat-label>
+          <input matInput type="number" min="1" [(ngModel)]="form.usosPorCliente">
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Vigente desde</mat-label>
+          <input matInput type="datetime-local" [(ngModel)]="form.fechaInicio">
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Vigente hasta (opcional)</mat-label>
+          <input matInput type="datetime-local" [(ngModel)]="form.fechaFin">
+        </mat-form-field>
+        <mat-form-field appearance="outline" style="grid-column: 1 / -1;">
+          <mat-label>Descripción</mat-label>
+          <input matInput [(ngModel)]="form.descripcion">
+        </mat-form-field>
+      </div>
+      <div class="form-actions">
+        <button class="btn-aplicar" (click)="guardar()">
+          <mat-icon>save</mat-icon> {{ editandoId === null ? 'Crear Cupón' : 'Guardar Cambios' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="op-card">
+    <h3><mat-icon>list</mat-icon> Cupones ({{ cupones.length }})</h3>
+    <div class="table-wrapper" *ngIf="cupones.length; else vacio">
+      <table mat-table [dataSource]="cupones">
+        <ng-container matColumnDef="codigo">
+          <th mat-header-cell *matHeaderCellDef>Código</th>
+          <td mat-cell *matCellDef="let c">
+            <strong>{{ c.codigo }}</strong>
+            <div style="font-size: 11px; opacity: 0.7;">{{ c.descripcion }}</div>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="tipo">
+          <th mat-header-cell *matHeaderCellDef>Tipo</th>
+          <td mat-cell *matCellDef="let c"><span class="stat-chip chip-info">{{ c.tipo_descuento }}</span></td>
+        </ng-container>
+        <ng-container matColumnDef="valor">
+          <th mat-header-cell *matHeaderCellDef>Valor</th>
+          <td mat-cell *matCellDef="let c">
+            {{ c.tipo_descuento === 'porcentaje' ? (c.valor + '%') : (c.valor | currency:'USD') }}
+            <div style="font-size: 11px; opacity: 0.7;" *ngIf="c.monto_minimo_pedido > 0">
+              mín. {{ c.monto_minimo_pedido | currency:'USD' }}
+            </div>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="vigencia">
+          <th mat-header-cell *matHeaderCellDef>Vigencia</th>
+          <td mat-cell *matCellDef="let c">
+            {{ c.fecha_inicio | date:'dd/MM/yy HH:mm' }} —
+            {{ c.fecha_fin ? (c.fecha_fin | date:'dd/MM/yy HH:mm') : 'sin límite' }}
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="usos">
+          <th mat-header-cell *matHeaderCellDef>Usos</th>
+          <td mat-cell *matCellDef="let c">
+            <span class="stat-chip chip-info">
+              {{ c.usos_actuales }} / {{ c.usos_maximos ?? '∞' }}
+            </span>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="activo">
+          <th mat-header-cell *matHeaderCellDef>Activo</th>
+          <td mat-cell *matCellDef="let c">
+            <span class="estado-chip" [class.ok]="c.activo" [class.error]="!c.activo">
+              {{ c.activo ? 'Activo' : 'Inactivo' }}
+            </span>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="acciones">
+          <th mat-header-cell *matHeaderCellDef>Acciones</th>
+          <td mat-cell *matCellDef="let c">
+            <button mat-icon-button matTooltip="Ver usos" (click)="verUsos(c)">
+              <mat-icon>history</mat-icon>
+            </button>
+            <ng-container *ngIf="esAdmin">
+              <button mat-icon-button matTooltip="Editar" (click)="editar(c)">
+                <mat-icon>edit</mat-icon>
+              </button>
+              <button mat-icon-button matTooltip="Activar / desactivar" (click)="toggleActivo(c)">
+                <mat-icon>{{ c.activo ? 'toggle_on' : 'toggle_off' }}</mat-icon>
+              </button>
+            </ng-container>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="columnas"></tr>
+        <tr mat-row *matRowDef="let c; columns: columnas"
+            [class.fila-seleccionada]="usosDe?.id === c.id"></tr>
+      </table>
+    </div>
+    <ng-template #vacio>
+      <div class="empty-state" *ngIf="!loading">
+        <mat-icon>confirmation_number</mat-icon>
+        <p>No hay cupones todavía. Crea el primero.</p>
+      </div>
+    </ng-template>
+  </div>
+
+  <!-- Usos del cupón seleccionado (solo lectura) -->
+  <div class="op-card" *ngIf="usosDe">
+    <h3><mat-icon>history</mat-icon> Usos de «{{ usosDe.codigo }}»</h3>
+    <div class="table-wrapper" *ngIf="usos.length; else sinUsos">
+      <table mat-table [dataSource]="usos">
+        <ng-container matColumnDef="pedido">
+          <th mat-header-cell *matHeaderCellDef>Pedido</th>
+          <td mat-cell *matCellDef="let u">#{{ u.pedido_id }}</td>
+        </ng-container>
+        <ng-container matColumnDef="cliente">
+          <th mat-header-cell *matHeaderCellDef>Cliente</th>
+          <td mat-cell *matCellDef="let u">{{ u.cliente || '—' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="monto">
+          <th mat-header-cell *matHeaderCellDef>Monto descontado</th>
+          <td mat-cell *matCellDef="let u">{{ u.monto_descontado | currency:'USD' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="fecha">
+          <th mat-header-cell *matHeaderCellDef>Fecha</th>
+          <td mat-cell *matCellDef="let u">{{ u.fecha_creacion | date:'dd/MM/yy HH:mm' }}</td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="['pedido','cliente','monto','fecha']"></tr>
+        <tr mat-row *matRowDef="let u; columns: ['pedido','cliente','monto','fecha']"></tr>
+      </table>
+    </div>
+    <ng-template #sinUsos>
+      <div class="empty-state"><mat-icon>history</mat-icon><p>Este cupón aún no se ha usado.</p></div>
+    </ng-template>
+  </div>
+</div>

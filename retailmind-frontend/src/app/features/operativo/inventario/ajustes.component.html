@@ -1,0 +1,97 @@
+<div class="op-page">
+  <div class="section-header">
+    <h2><mat-icon>tune</mat-icon> Ajustes de Inventario</h2>
+    <p>Registra entradas o salidas manuales por conteo físico o merma, con kardex.</p>
+  </div>
+
+  <div class="op-card">
+    <h3><mat-icon>edit_note</mat-icon> Nuevo ajuste</h3>
+    <div class="form-grid">
+      <mat-form-field appearance="outline">
+        <mat-label>Variante (SKU)</mat-label>
+        <mat-select [(ngModel)]="varianteId" (selectionChange)="consultarStock()">
+          <mat-option *ngFor="let v of variantes" [value]="v.id">{{ v.sku }} — {{ v.producto }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Bodega</mat-label>
+        <mat-select [(ngModel)]="bodegaId">
+          <mat-option *ngFor="let b of bodegas" [value]="b.id">{{ b.nombre }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Tipo de ajuste</mat-label>
+        <mat-select [(ngModel)]="tipo">
+          <mat-option value="entrada">Entrada (sobrante de conteo)</mat-option>
+          <mat-option value="salida">Salida (merma / faltante)</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Cantidad</mat-label>
+        <input matInput type="number" min="1" [(ngModel)]="cantidad">
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Motivo (obligatorio)</mat-label>
+        <input matInput [(ngModel)]="motivo" placeholder="Ej.: conteo físico 2026-07, merma por daño">
+      </mat-form-field>
+    </div>
+    <div class="form-actions">
+      <button class="btn-aplicar" (click)="registrarAjuste()" [disabled]="procesando">
+        <mat-icon>tune</mat-icon> {{ procesando ? 'Aplicando…' : 'Aplicar Ajuste' }}
+      </button>
+    </div>
+
+    <!-- Stock actual de la variante en cada bodega -->
+    <div *ngIf="stockVariante.length" style="margin-top:16px;">
+      <span class="stat-chip chip-info" *ngFor="let s of stockVariante" style="margin-right:8px;">
+        {{ s.bodega }}: {{ s.stock_actual }}
+      </span>
+    </div>
+
+    <div class="resultado-box" *ngIf="resultado">
+      <div class="titulo"><mat-icon>check_circle</mat-icon> Ajuste #{{ resultado.id }} aplicado</div>
+      <div class="dato">SKU: <strong>{{ resultado.sku }}</strong> · Tipo: <strong>{{ resultado.tipo }}</strong> · Cantidad: <strong>{{ resultado.cantidad }}</strong></div>
+      <div class="dato">Stock resultante: <strong>{{ resultado.stockResultante }}</strong></div>
+    </div>
+  </div>
+
+  <div class="op-card">
+    <h3><mat-icon>history</mat-icon> Historial de ajustes ({{ ajustes.length }})</h3>
+    <div class="table-wrapper" *ngIf="ajustes.length; else vacio">
+      <table mat-table [dataSource]="ajustes">
+        <ng-container matColumnDef="id">
+          <th mat-header-cell *matHeaderCellDef>#</th>
+          <td mat-cell *matCellDef="let a">{{ a.id }}</td>
+        </ng-container>
+        <ng-container matColumnDef="fecha">
+          <th mat-header-cell *matHeaderCellDef>Fecha</th>
+          <td mat-cell *matCellDef="let a">{{ a.fecha_aplicacion | date:'short' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="bodega">
+          <th mat-header-cell *matHeaderCellDef>Bodega</th>
+          <td mat-cell *matCellDef="let a">{{ a.bodega }}</td>
+        </ng-container>
+        <ng-container matColumnDef="tipo">
+          <th mat-header-cell *matHeaderCellDef>Tipo</th>
+          <td mat-cell *matCellDef="let a">
+            <span class="estado-chip" [class.ok]="a.tipo === 'positivo'"
+                  [class.warn]="a.tipo === 'negativo'">{{ a.tipo }}</span>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="motivo">
+          <th mat-header-cell *matHeaderCellDef>Motivo</th>
+          <td mat-cell *matCellDef="let a">{{ a.motivo }}</td>
+        </ng-container>
+        <ng-container matColumnDef="estado">
+          <th mat-header-cell *matHeaderCellDef>Estado</th>
+          <td mat-cell *matCellDef="let a"><span class="estado-chip ok">{{ a.estado }}</span></td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="['id','fecha','bodega','tipo','motivo','estado']"></tr>
+        <tr mat-row *matRowDef="let a; columns: ['id','fecha','bodega','tipo','motivo','estado']"></tr>
+      </table>
+    </div>
+    <ng-template #vacio>
+      <div class="empty-state"><mat-icon>tune</mat-icon><p>No hay ajustes registrados.</p></div>
+    </ng-template>
+  </div>
+</div>

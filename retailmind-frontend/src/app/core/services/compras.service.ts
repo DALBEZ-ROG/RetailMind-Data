@@ -21,6 +21,12 @@ export class ComprasService {
   }
 
   ordenes(): Observable<OrdenCompraRow[]> { return this.http.get<OrdenCompraRow[]>(`${this.base}/ordenes`); }
+
+  /** CU-O-12: aprobar orden emitida (enviada → confirmada). Solo GERENTE/ADMIN. */
+  aprobarOrden(id: number):
+      Observable<{ id: number; numero: string; estadoAnterior: string; estado: string }> {
+    return this.http.post<any>(`${this.base}/ordenes/${id}/aprobar`, {});
+  }
   orden(id: number): Observable<OrdenCompraDetalle> {
     return this.http.get<OrdenCompraDetalle>(`${this.base}/ordenes/${id}`);
   }

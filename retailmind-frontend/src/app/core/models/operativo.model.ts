@@ -64,6 +64,21 @@ export interface CuentaPorPagarRow {
 export interface TransferenciaRow {
   [key: string]: any; // el backend devuelve el detalle completo de la transferencia
 }
+export interface AjusteRow {
+  id: number; tipo: string; estado: string; motivo: string;
+  fecha_aplicacion: string; bodega: string;
+}
+export interface AjusteResultado {
+  id: number; sku: string; tipo: string; cantidad: number;
+  stockResultante: number; estado: string;
+}
+export interface KardexRow {
+  id: number; fecha_creacion: string; sku: string; producto: string;
+  bodega: string; tipo_movimiento: string; naturaleza: string;
+  cantidad: number; stock_anterior: number; stock_nuevo: number;
+  costo_unitario: number | null; referencia_tipo: string | null;
+  referencia_id: number | null; referencia: string; observacion: string | null;
+}
 
 // ── Ventas ───────────────────────────────────────────────────────────────
 export interface ItemPedidoReq { varianteId: number; cantidad: number; }
@@ -105,4 +120,45 @@ export interface DevolucionDetalle {
 export interface VentanaHoraria {
   id: number; rol_grupo: string; dia_semana: number;
   hora_inicio: string; hora_fin: string; activo: boolean;
+}
+
+// ── Marketing ────────────────────────────────────────────────────────────
+export interface CuponRow {
+  id: number; codigo: string; descripcion: string | null; tipo_descuento: string;
+  valor: number; monto_minimo_pedido: number; usos_maximos: number | null;
+  usos_por_cliente: number; usos_actuales: number;
+  fecha_inicio: string; fecha_fin: string | null; activo: boolean; fecha_creacion: string;
+}
+export interface UsoCuponRow {
+  id: number; pedido_id: number; cliente_id: number | null; cliente: string | null;
+  monto_descontado: number; fecha_creacion: string;
+}
+export interface PromocionRow {
+  id: number; nombre: string; descripcion: string | null; tipo_descuento: string;
+  valor: number; fecha_inicio: string; fecha_fin: string | null;
+  prioridad: number; acumulable: boolean; activo: boolean;
+  fecha_creacion: string; productos: number;
+}
+export interface PromocionDetalle {
+  id: number; nombre: string; descripcion: string | null; tipo_descuento: string;
+  valor: number; fecha_inicio: string; fecha_fin: string | null;
+  prioridad: number; acumulable: boolean; activo: boolean;
+  productos: { id: number; producto_id: number; producto: string; producto_activo: boolean }[];
+}
+export interface ProductoRef { id: number; nombre: string; }
+export interface CampanaRow {
+  id: number; nombre: string; descripcion: string | null; canal: string;
+  presupuesto: number | null; estado: string;
+  fecha_inicio: string | null; fecha_fin: string | null;
+  fecha_creacion: string; banners: number;
+}
+export interface BannerRow {
+  id: number; campana_id: number | null; campana: string | null; titulo: string;
+  imagen_url: string; url_destino: string | null; posicion: string; orden: number;
+  fecha_inicio: string | null; fecha_fin: string | null;
+  activo: boolean; fecha_creacion: string;
+}
+export interface SuscriptorRow {
+  id: number; email: string; cliente_id: number | null; cliente: string | null;
+  confirmado: boolean; fecha_suscripcion: string; fecha_baja: string | null; activo: boolean;
 }

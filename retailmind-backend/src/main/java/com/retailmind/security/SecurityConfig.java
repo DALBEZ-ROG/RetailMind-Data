@@ -54,15 +54,29 @@ public class SecurityConfig {
                 .requestMatchers("/api/init/**").hasAuthority("ADMIN")
                 // Gestion de datos solo para ADMIN
                 .requestMatchers("/api/gestion/**").hasAuthority("ADMIN")
+                // Aprobar orden de compra (CU-O-12): solo gerencia
+                .requestMatchers(HttpMethod.POST, "/api/compras/ordenes/*/aprobar")
+                    .hasAnyAuthority("ADMIN", "GERENTE")
                 // Ciclo de compra: roles operativos (la BD afina por SET LOCAL ROLE)
                 .requestMatchers("/api/compras/**")
                     .hasAnyAuthority("ADMIN", "GERENTE", "COMPRAS", "BODEGA")
                 // Ciclo de venta: vendedor/despacho + cliente (RLS lo aisla a sus filas)
                 .requestMatchers("/api/ventas/**")
                     .hasAnyAuthority("ADMIN", "GERENTE", "VENDEDOR", "DESPACHO", "CLIENTE")
+                // Ajuste de inventario (CU-O-16): solo bodega/admin
+                .requestMatchers("/api/inventario/ajustes/**")
+                    .hasAnyAuthority("ADMIN", "BODEGA")
+                // Kardex (CU-O-17): lectura ampliada a gerencia y analista
+                .requestMatchers(HttpMethod.GET, "/api/inventario/kardex")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "BODEGA", "ANALISTA")
                 // Transferencias de inventario: bodega
                 .requestMatchers("/api/inventario/**")
                     .hasAnyAuthority("ADMIN", "GERENTE", "BODEGA")
+                // Marketing: lectura ADMIN/GERENTE; escritura solo ADMIN
+                // (espeja la BD: grp_gerente solo SELECT en cupon/promocion/campana/banner)
+                .requestMatchers(HttpMethod.GET, "/api/marketing/**")
+                    .hasAnyAuthority("ADMIN", "GERENTE")
+                .requestMatchers("/api/marketing/**").hasAuthority("ADMIN")
                 // Admin usuarios y pedidos solo ADMIN
                 .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
                 .requestMatchers("/api/pedidos/admin/**").hasAuthority("ADMIN")

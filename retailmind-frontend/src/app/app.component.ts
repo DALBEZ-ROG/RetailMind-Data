@@ -58,10 +58,18 @@ export class AppComponent {
     '/operativo/compras/recepciones': 'Recepción de Mercancía',
     '/operativo/compras/facturas': 'Facturas de Compra',
     '/operativo/inventario/transferencias': 'Transferencias de Stock',
+    '/operativo/inventario/ajustes': 'Ajustes de Inventario',
+    '/operativo/inventario/kardex': 'Kardex de Inventario',
     '/operativo/ventas/pedidos': 'Pedidos de Venta',
+    '/operativo/ventas/mis-pedidos': 'Mis Pedidos de Tienda',
     '/operativo/ventas/facturas': 'Facturas de Venta',
     '/operativo/ventas/despachos': 'Despachos',
     '/operativo/ventas/devoluciones': 'Devoluciones',
+    '/operativo/marketing/cupones': 'Cupones de Descuento',
+    '/operativo/marketing/promociones': 'Promociones',
+    '/operativo/marketing/campanas': 'Campañas de Marketing',
+    '/operativo/marketing/banners': 'Banners',
+    '/operativo/marketing/newsletter': 'Newsletter',
     '/operativo/horarios': 'Horarios de Acceso'
   };
 
@@ -100,9 +108,12 @@ export class AppComponent {
   get canCatalogo(): boolean   { return this.hasAnyRole(['ADMIN']); }
   get canCompras(): boolean    { return this.hasAnyRole(['ADMIN', 'GERENTE', 'COMPRAS', 'BODEGA']); }
   get canInventario(): boolean { return this.hasAnyRole(['ADMIN', 'GERENTE', 'BODEGA']); }
+  get canAjustes(): boolean    { return this.hasAnyRole(['ADMIN', 'BODEGA']); }
+  get canKardex(): boolean     { return this.hasAnyRole(['ADMIN', 'GERENTE', 'BODEGA', 'ANALISTA']); }
   get canVentas(): boolean     { return this.hasAnyRole(['ADMIN', 'GERENTE', 'VENDEDOR']); }
   get canLogistica(): boolean  { return this.hasAnyRole(['ADMIN', 'GERENTE', 'VENDEDOR', 'DESPACHO']); }
   get canDespachar(): boolean  { return this.hasAnyRole(['ADMIN', 'GERENTE', 'DESPACHO']); }
+  get canMarketing(): boolean  { return this.hasAnyRole(['ADMIN', 'GERENTE']); }
 
   goToProfile(): void {
     this.router.navigate(['/perfil']);

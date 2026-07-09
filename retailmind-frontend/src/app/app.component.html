@@ -110,7 +110,7 @@
     </ng-container>
 
     <!-- Operación Section (visibilidad por rol, espeja SecurityConfig) -->
-    <ng-container *ngIf="canCatalogo || canCompras || canInventario || canVentas || canLogistica">
+    <ng-container *ngIf="canCatalogo || canCompras || canInventario || canVentas || canLogistica || canKardex">
       <div class="sidebar-section-label">Operación</div>
 
       <ng-container *ngIf="canCatalogo">
@@ -144,6 +144,16 @@
         <mat-icon>swap_horiz</mat-icon>
         <span>Transferir Stock</span>
       </a>
+      <a class="nav-item" *ngIf="canAjustes"
+         routerLink="/operativo/inventario/ajustes" routerLinkActive="active">
+        <mat-icon>tune</mat-icon>
+        <span>Ajustes de Inventario</span>
+      </a>
+      <a class="nav-item" *ngIf="canKardex"
+         routerLink="/operativo/inventario/kardex" routerLinkActive="active">
+        <mat-icon>receipt_long</mat-icon>
+        <span>Kardex</span>
+      </a>
 
       <ng-container *ngIf="canVentas">
         <a class="nav-item" routerLink="/operativo/ventas/pedidos" routerLinkActive="active">
@@ -165,6 +175,32 @@
          routerLink="/operativo/ventas/devoluciones" routerLinkActive="active">
         <mat-icon>assignment_return</mat-icon>
         <span>Devoluciones</span>
+      </a>
+    </ng-container>
+
+    <!-- Marketing Section (lectura ADMIN/GERENTE; escrituras solo ADMIN) -->
+    <ng-container *ngIf="canMarketing">
+      <div class="sidebar-section-label">Marketing</div>
+
+      <a class="nav-item" routerLink="/operativo/marketing/cupones" routerLinkActive="active">
+        <mat-icon>confirmation_number</mat-icon>
+        <span>Cupones</span>
+      </a>
+      <a class="nav-item" routerLink="/operativo/marketing/promociones" routerLinkActive="active">
+        <mat-icon>local_offer</mat-icon>
+        <span>Promociones</span>
+      </a>
+      <a class="nav-item" routerLink="/operativo/marketing/campanas" routerLinkActive="active">
+        <mat-icon>campaign</mat-icon>
+        <span>Campañas</span>
+      </a>
+      <a class="nav-item" routerLink="/operativo/marketing/banners" routerLinkActive="active">
+        <mat-icon>view_carousel</mat-icon>
+        <span>Banners</span>
+      </a>
+      <a class="nav-item" routerLink="/operativo/marketing/newsletter" routerLinkActive="active">
+        <mat-icon>mail</mat-icon>
+        <span>Newsletter</span>
       </a>
     </ng-container>
 
@@ -191,6 +227,11 @@
     <a class="nav-item" routerLink="/mis-pedidos" routerLinkActive="active">
       <mat-icon class="icon-pedidos">local_shipping</mat-icon>
       <span>Mis Pedidos</span>
+    </a>
+    <a class="nav-item" *ngIf="isCliente"
+       routerLink="/operativo/ventas/mis-pedidos" routerLinkActive="active">
+      <mat-icon class="icon-pedidos">shopping_basket</mat-icon>
+      <span>Mis Pedidos de Tienda</span>
     </a>
     <a class="nav-item" routerLink="/perfil" routerLinkActive="active">
       <mat-icon class="icon-perfil">person</mat-icon>

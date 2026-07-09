@@ -52,6 +52,12 @@ public class ComprasController {
     @GetMapping("/ordenes/{id}")
     public Map<String, Object> orden(@PathVariable long id) { return servicio.obtenerOrden(id); }
 
+    /** CU-O-12: aprobar orden emitida. Solo GERENTE/ADMIN (SecurityConfig). */
+    @PostMapping("/ordenes/{id}/aprobar")
+    public Map<String, Object> aprobar(@PathVariable long id) {
+        return servicio.aprobarOrden(id);
+    }
+
     // b) Recepciones
     @PostMapping("/ordenes/{id}/recepciones")
     public ResponseEntity<?> recibir(@PathVariable long id, @RequestBody RecepcionReq r) {

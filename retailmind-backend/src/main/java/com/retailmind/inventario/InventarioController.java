@@ -9,15 +9,22 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Transferencias entre bodegas. Acceso: ADMIN / GERENTE / BODEGA. */
+/**
+ * Inventario: transferencias (ADMIN/GERENTE/BODEGA), ajustes (ADMIN/BODEGA)
+ * y kardex de solo lectura (ADMIN/GERENTE/BODEGA/ANALISTA). Los roles por
+ * ruta los aplica SecurityConfig; la BD afina via SET LOCAL ROLE.
+ */
 @RestController
 @RequestMapping("/api/inventario")
 public class InventarioController {
 
     public record TransferenciaReq(long varianteId, long bodegaOrigenId,
                                    long bodegaDestinoId, int cantidad, String observacion) {}
+    public record AjusteReq(long varianteId, long bodegaId, String tipo,
+                            int cantidad, String motivo) {}
 
     private final InventarioService servicio;
 
@@ -35,5 +42,23 @@ public class InventarioController {
     @GetMapping("/transferencias")
     public List<Map<String, Object>> transferencias() {
         return servicio.listarTransferencias();
+    }
+
+    // CU-O-16: ajuste manual de stock (solo ADMIN/BODEGA)
+    @PostMapping("/ajustes")
+    public ResponseEntity<?> ajustar(@RequestBody AjusteReq r) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                servicio.registrarAjuste(r.varianteId(), r.bodegaId(),
+                        r.tipo(), r.cantidad(), r.motivo()));
+    }
+
+    @GetMapping("/ajustes")
+    public List<Map<String, Object>> ajustes() { return servicio.listarAjustes(); }
+
+    // CU-O-17: kardex de solo lectura, filtrable por variante y/o bodega
+    @GetMapping("/kardex")
+    public List<Map<String, Object>> kardex(@RequestParam(required = false) Long varianteId,
+                                            @RequestParam(required = false) Long bodegaId) {
+        return servicio.kardex(varianteId, bodegaId);
     }
 }

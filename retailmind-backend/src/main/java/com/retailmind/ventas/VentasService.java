@@ -107,11 +107,18 @@ public class VentasService {
         pedido.put("detalles", pg.queryForList("""
                 SELECT id, sku, nombre_producto, cantidad, precio_unitario, subtotal, monto_impuesto
                 FROM pedido_detalle WHERE pedido_id = ? ORDER BY id""", pedidoId));
-        pedido.put("historial", pg.queryForList("""
-                SELECT ep.codigo AS estado, h.comentario, h.fecha_creacion
-                FROM historial_estado_pedido h
-                JOIN estado_pedido ep ON ep.id = h.estado_pedido_id
-                WHERE h.pedido_id = ? ORDER BY h.id""", pedidoId));
+        // grp_cliente no tiene SELECT sobre historial_estado_pedido: consultarlo
+        // provocaria 42501 y abortaria la transaccion. El cliente ve su pedido
+        // (RLS por app.cliente_id) sin la bitacora interna.
+        if ("CLIENTE".equalsIgnoreCase(rolActual())) {
+            pedido.put("historial", List.of());
+        } else {
+            pedido.put("historial", pg.queryForList("""
+                    SELECT ep.codigo AS estado, h.comentario, h.fecha_creacion
+                    FROM historial_estado_pedido h
+                    JOIN estado_pedido ep ON ep.id = h.estado_pedido_id
+                    WHERE h.pedido_id = ? ORDER BY h.id""", pedidoId));
+        }
         return pedido;
     }
 
@@ -409,6 +416,14 @@ public class VentasService {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.getPrincipal() instanceof AppUserPrincipal p) {
             return p.getUsuarioId();
+        }
+        return null;
+    }
+
+    private String rolActual() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof AppUserPrincipal p) {
+            return p.getRolCodigo();
         }
         return null;
     }

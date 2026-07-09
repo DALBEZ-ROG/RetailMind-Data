@@ -73,6 +73,102 @@ public class InventarioService {
                 ORDER BY t.id DESC""");
     }
 
+    // ── Ajuste de inventario (CU-O-16) ───────────────────────────────────
+
+    /**
+     * Ajuste manual por conteo físico o merma (grp_bodega o admin).
+     * ajuste_inventario es SOLO cabecera (como transferencia_bodega): la
+     * variante y la cantidad quedan en el movimiento del kardex con
+     * referencia_tipo='ajuste_inventario' y en el texto del motivo.
+     * tipo de la cabecera: 'positivo' (entrada) / 'negativo' (salida),
+     * según el check constraint de la tabla.
+     */
+    @Transactional
+    public Map<String, Object> registrarAjuste(long varianteId, long bodegaId, String tipo,
+                                               int cantidad, String motivo) {
+        if (motivo == null || motivo.isBlank()) {
+            throw new IllegalArgumentException("El motivo del ajuste es obligatorio");
+        }
+        boolean esEntrada = "entrada".equals(tipo);
+        if (!esEntrada && !"salida".equals(tipo)) {
+            throw new IllegalArgumentException(
+                    "El tipo de ajuste debe ser 'entrada' o 'salida'");
+        }
+        if (cantidad <= 0) {
+            throw new IllegalArgumentException("La cantidad debe ser mayor a cero");
+        }
+        String sku = pg.queryForObject(
+                "SELECT sku FROM producto_variante WHERE id = ?", String.class, varianteId);
+
+        Long ajusteId = pg.queryForObject("""
+                INSERT INTO ajuste_inventario
+                    (bodega_id, usuario_id, tipo, estado, motivo, fecha_aplicacion)
+                VALUES (?, ?, ?, 'aplicado', ?, now())
+                RETURNING id""",
+                Long.class, bodegaId, usuarioActualId(),
+                esEntrada ? "positivo" : "negativo",
+                "[" + sku + " x" + cantidad + "] " + motivo.trim());
+
+        // Kardex + stock (valida stock suficiente en salidas con FOR UPDATE)
+        int stockNuevo = stock.mover(varianteId, bodegaId,
+                esEntrada ? "entrada_ajuste" : "salida_ajuste", cantidad,
+                "ajuste_inventario", ajusteId, null, usuarioActualId(), motivo.trim());
+
+        return Map.of("id", ajusteId, "sku", sku, "tipo", tipo, "cantidad", cantidad,
+                "stockResultante", stockNuevo, "estado", "aplicado");
+    }
+
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> listarAjustes() {
+        // Sin JOIN a usuario: grp_bodega no tiene SELECT sobre esa tabla
+        return pg.queryForList("""
+                SELECT a.id, a.tipo, a.estado, a.motivo, a.fecha_aplicacion,
+                       b.nombre AS bodega
+                FROM ajuste_inventario a
+                JOIN bodega b ON b.id = a.bodega_id
+                ORDER BY a.id DESC""");
+    }
+
+    // ── Kardex (CU-O-17) ─────────────────────────────────────────────────
+
+    /**
+     * Kardex de movimiento_inventario, filtrable por variante y/o bodega.
+     * Solo tablas con SELECT para bodega/gerente/analista/admin: sin JOIN a
+     * usuario ni subconsulta a devolucion (grp_bodega no las ve; un 42501
+     * abortaria la transaccion).
+     */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> kardex(Long varianteId, Long bodegaId) {
+        return pg.queryForList("""
+                SELECT m.id, m.fecha_creacion, pv.sku, pr.nombre AS producto,
+                       b.nombre AS bodega, tm.nombre AS tipo_movimiento, tm.naturaleza,
+                       m.cantidad, m.stock_anterior, m.stock_nuevo, m.costo_unitario,
+                       m.referencia_tipo, m.referencia_id,
+                       CASE m.referencia_tipo
+                           WHEN 'recepcion_mercancia' THEN 'Recepcion ' || COALESCE(
+                               (SELECT r.numero FROM recepcion_mercancia r WHERE r.id = m.referencia_id),
+                               '#' || m.referencia_id)
+                           WHEN 'pedido' THEN 'Pedido ' || COALESCE(
+                               (SELECT p2.numero FROM pedido p2 WHERE p2.id = m.referencia_id),
+                               '#' || m.referencia_id)
+                           WHEN 'devolucion' THEN 'Devolucion #' || m.referencia_id
+                           WHEN 'transferencia_bodega' THEN 'Transferencia #' || m.referencia_id
+                           WHEN 'ajuste_inventario' THEN 'Ajuste #' || m.referencia_id
+                           ELSE COALESCE(m.referencia_tipo || ' #' || m.referencia_id, '—')
+                       END AS referencia,
+                       m.observacion
+                FROM movimiento_inventario m
+                JOIN producto_variante pv ON pv.id = m.producto_variante_id
+                JOIN producto pr ON pr.id = pv.producto_id
+                JOIN bodega b ON b.id = m.bodega_id
+                JOIN tipo_movimiento tm ON tm.id = m.tipo_movimiento_id
+                WHERE (?::bigint IS NULL OR m.producto_variante_id = ?)
+                  AND (?::bigint IS NULL OR m.bodega_id = ?)
+                ORDER BY m.id DESC
+                LIMIT 500""",
+                varianteId, varianteId, bodegaId, bodegaId);
+    }
+
     private Long usuarioActualId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.getPrincipal() instanceof AppUserPrincipal p) {

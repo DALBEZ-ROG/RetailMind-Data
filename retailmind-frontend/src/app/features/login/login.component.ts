@@ -45,7 +45,8 @@ export class LoginComponent {
     this.errorMessage = '';
     const { username, password } = this.loginForm.value;
 
-    this.authService.login(username, password).subscribe({
+    // trim: un espacio pegado junto al email produce 401 aunque la clave sea correcta
+    this.authService.login((username ?? '').trim(), password).subscribe({
       next: () => {
         this.loading = false;
         const user = this.authService.getCurrentUser();

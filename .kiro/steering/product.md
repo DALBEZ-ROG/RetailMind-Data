@@ -1,38 +1,56 @@
 # RetailMind
 
-RetailMind es una **plataforma web de retail analytics con tienda online integrada**. Combina un
-pipeline ETL de datos, un motor de analítica sobre eventos (~2.3M de eventos) y una experiencia de
-e-commerce completa. Es un sistema web (no de escritorio) con aspiración de escalado internacional.
+RetailMind es una **tienda PyME con back-office completo y analítica integrada**. Combina un núcleo
+transaccional de retail (catálogo, compras, inventario, ventas, marketing) con un motor de
+analítica sobre eventos (~2.3M) y una tienda online. Es un sistema web con arquitectura **híbrida
+de dos bases de datos**:
+
+- **PostgreSQL** (BD `retailmind`, ~102 tablas): **base de datos operativa principal**. Todo el
+  núcleo transaccional vive aquí: usuarios/roles, clientes, catálogo, compras, inventario, ventas,
+  facturación, marketing, horarios de acceso.
+- **ClickHouse**: **solo analítica** (esquema estrella `fact_eventos` + dimensiones `dim_*`),
+  alimentado por el pipeline ETL de Python desde PocketBase.
 
 El sistema se organiza en tres niveles empresariales:
 
-- **Operativo (genera ventas)**: autenticación, catálogo, carrito, wishlist, pedidos/checkout,
-  perfil y recomendaciones. Es la prioridad del producto: si no genera órdenes, el negocio no vende.
+- **Operativo (genera ventas)**: catálogo maestro (productos/variantes/atributos), ciclo de compra
+  (orden → aprobación → recepción → factura → pago), inventario (transferencias, ajustes, kardex),
+  ciclo de venta (pedido → factura → despacho → devolución) con PDF imprimible, marketing
+  (cupones, promociones, campañas, banners, newsletter), tienda online (carrito, wishlist,
+  checkout, perfil, recomendaciones) y horarios de acceso por rol.
 - **Táctico (toma de decisiones)**: sesiones, conversiones, funnel, analytics por
-  región/dispositivo/tráfico y reportes (Excel/PDF).
+  región/dispositivo/tráfico y reportes (Excel/PDF). Corre sobre ClickHouse.
 - **Estratégico**: dashboard ejecutivo con KPIs.
 
-Componentes:
+## Módulos operativos construidos
 
-- **ETL Pipeline** (Python): extrae el dataset crudo de PocketBase, lo materializa en archivos
-  Parquet y lo carga en ClickHouse.
-- **Backend API** (Java/Spring Boot): API REST que sirve analítica y operación de tienda, dispara
-  el ETL y gestiona autenticación vía JWT.
-- **Frontend** (Angular): SPA con tienda, dashboards, gráficos, tablas y herramientas de admin.
+| Módulo | Alcance |
+|---|---|
+| Catálogo | CRUD de productos, variantes (SKU), marcas, categorías, atributos |
+| Compras | Orden de compra → aprobación (gerencia) → recepción → factura → cuentas por pagar/pagos |
+| Inventario | Transferencias entre bodegas, ajustes, kardex de movimientos |
+| Ventas | Pedido → factura (PDF) → despacho/seguimiento → devoluciones; vista "mis pedidos" para clientes |
+| Marketing | Cupones (con historial de uso), promociones + productos (N:M), campañas, banners, newsletter |
+| Seguridad | Horarios de acceso por rol de grupo, gestión de usuarios |
 
-## Datos y roles
+**Pendientes**: módulo de soporte, reseñas, aplicación real de descuentos (cupones/promociones a
+pedidos), orquestación del ETL con Airflow.
 
-- **Base de datos operativa**: ClickHouse (esquema estrella). Tabla de hechos `fact_eventos`
-  (~2.3M registros) más dimensiones (`dim_canal`, `dim_region`, `dim_dispositivo`, `dim_categoria`,
-  `dim_fuente_trafico`, `dim_producto`, `dim_usuario`) y tablas de tienda (`productos_catalogo`,
-  `carrito_items`, `wishlist_items`, `ordenes`, `orden_items`, `usuarios_sistema`).
-- **PocketBase**: fuente del dataset crudo de retail (colección `dataset_retail`).
-- **Roles (RBAC)**: `ADMIN` (dashboard, analytics avanzado, ETL, gestión de datos, usuarios,
-  reportes, tienda) y `CLIENTE` (tienda, carrito, wishlist, recomendaciones, pedidos, perfil). El
-  catálogo es público; la analítica avanzada es solo ADMIN; la tienda requiere autenticación.
+## Roles y seguridad
+
+**8 roles de aplicación** espejados en **roles de grupo de PostgreSQL** (`grp_*`): ADMIN
+(administrador), GERENTE, VENDEDOR, COMPRAS, BODEGA, DESPACHO, CLIENTE, ANALISTA.
+
+La seguridad se aplica en **dos capas**:
+1. **Aplicación**: Spring Security JWT (`SecurityConfig` por ruta) + `roleGuard` en Angular.
+2. **Motor de BD**: matriz de privilegios por grupo, RLS (p. ej. cliente solo ve sus pedidos) y
+   restricción por horario. La app asume el rol del usuario en cada transacción con
+   `SET LOCAL ROLE` (aspecto `PgSessionRoleAspect`). El admin está exento de horario.
+
+El catálogo de tienda es público; todo lo demás requiere autenticación.
 
 ## Idioma
 
 El proyecto usa **español** para términos de dominio, comentarios y etiquetas de UI. Los
-identificadores de código mezclan inglés (convenciones de framework) con español (entidades de
-dominio como `sesiones`, `conversiones`, `pedidos`, `carrito`).
+identificadores mezclan inglés (convenciones de framework) con español (entidades de dominio como
+`compras`, `ventas`, `inventario`, `cupon`, `promocion`).

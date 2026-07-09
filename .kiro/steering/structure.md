@@ -1,112 +1,102 @@
 # Project Structure
 
-Monorepo con tres sub-proyectos independientes que comparten **ClickHouse** como base de datos
-operativa, orquestados con Docker Compose.
+Monorepo con tres sub-proyectos. Arquitectura híbrida: **PostgreSQL** (BD `retailmind`, local) es
+la base operativa principal; **ClickHouse** (Docker) sirve solo la analítica.
 
 ```
 1M6DatosCS/
-├── retailmind/                       # Pipeline ETL en Python 3.12
+├── retailmind/                       # Pipeline ETL Python 3.12 + DDL de PostgreSQL
 │   ├── config/
-│   │   └── clickhouse_connection.py  # Conexion ClickHouse + logging
+│   │   └── clickhouse_connection.py  # Conexión ClickHouse + logging
 │   ├── etl/
-│   │   ├── extraccion/
-│   │   │   ├── 08_extract_pocketbase.py   # PocketBase -> data/stage/datos.parquet
-│   │   │   └── 13_create_shop_tables.py   # Tablas de tienda en ClickHouse
-│   │   ├── carga/
-│   │   │   ├── 09_load_clickhouse.py      # Parquet -> ClickHouse
-│   │   │   ├── 10_verify_clickhouse.py    # Verificacion de carga
-│   │   │   └── 11_reset_clickhouse.py     # Reset de datos
-│   │   ├── sinteticos/
-│   │   │   └── 12_generate_synthetic.py   # Generador de datos sinteticos
-│   │   ├── analytics/                # Scripts/notas de analitica
-│   │   └── reportes/                 # Scripts/notas de reportes
-│   ├── data/
-│   │   ├── stage/                    # Capa cruda en Parquet (datos.parquet)
-│   │   └── agg/                      # Capa procesada/agregada (PENDIENTE: vacia)
-│   ├── sql/                          # DDL legacy de PostgreSQL (no usar)
-│   ├── utils/
-│   ├── logs/
-│   ├── requirements.txt
-│   ├── Dockerfile
-│   └── .env                          # Credenciales (no versionado)
+│   │   ├── extraccion/               # PocketBase -> data/stage/datos.parquet
+│   │   ├── carga/                    # Parquet -> ClickHouse (+ verify/reset)
+│   │   ├── sinteticos/               # Generador de datos sintéticos
+│   │   ├── analytics/ y reportes/    # Scripts/notas
+│   ├── data/stage/                   # Capa cruda Parquet
+│   ├── sql/postgres/                 # ★ DDL OPERATIVO VIGENTE: 28 scripts numerados
+│   │                                 #   01-13 módulos (seguridad, clientes, catálogo, ventas,
+│   │                                 #   compras, inventario, marketing, soporte...),
+│   │                                 #   2x seguridad de motor (grp_*, RLS, horarios),
+│   │                                 #   2x seeds demo, 27 usuarios de prueba
+│   ├── requirements.txt / Dockerfile / .env
 │
-├── retailmind-backend/               # API REST Spring Boot 3.5
+├── retailmind-backend/               # API REST Spring Boot 3.5 / Java 17
 │   ├── pom.xml
-│   ├── Dockerfile
 │   └── src/main/java/com/retailmind/
 │       ├── RetailmindApplication.java
-│       ├── auth/                     # Login JWT, ClickHouseUserRepository, DataInitializer
-│       ├── security/                 # SecurityConfig, JwtAuthenticationFilter
-│       ├── config/                   # ClickHouseConfig, CorsConfig, Health
-│       ├── dto/                      # DTOs + repos JdbcTemplate (FactEvento, Dim*, ...)
-│       ├── exception/                # GlobalExceptionHandler
+│       ├── config/                   # PostgresConfig (@Primary tx), ClickHouseConfig, Cors, Health
+│       ├── security/                 # SecurityConfig, JwtAuthenticationFilter,
+│       │                             # PgSessionRoleAspect (SET LOCAL ROLE), DbGroupRole (lista blanca)
+│       ├── auth/                     # AuthService (login vs PostgreSQL), PostgresUserRepository,
+│       │                             # JwtUtil, AppUserPrincipal, DataInitializer
+│       ├── exception/                # GlobalExceptionHandler -> ApiErrorDTO
+│       ├── dto/                      # DTOs compartidos + repos ClickHouse legacy
+│       ├── pdf/                      # Base de documentos PDF (iText 5)
+│       ├── referencias/              # Selects de referencia (proveedores, bodegas...)
 │       │
-│       │   # --- Nivel Operativo (genera ventas) ---
-│       ├── catalogo/                 # Catalogo publico
-│       ├── carrito/                  # Carrito de compras
-│       ├── wishlist/                 # Lista de deseos
-│       ├── pedidos/                  # Ordenes y checkout
-│       ├── perfil/                   # Perfil de usuario
-│       ├── recomendaciones/          # Motor de recomendaciones
+│       │   # --- Núcleo operativo (PostgreSQL, @Transactional + SET LOCAL ROLE) ---
+│       ├── admin/catalogo/           # CRUD catálogo maestro (ADMIN)
+│       ├── admin/horarios/           # Ventanas horarias por rol (ADMIN)
+│       ├── admin/usuarios/           # Gestión de usuarios
+│       ├── compras/                  # Orden -> aprobar -> recepción -> factura -> pago (+PDF)
+│       ├── inventario/               # Transferencias, ajustes, kardex, StockService
+│       ├── ventas/                   # Pedido -> factura -> despacho -> devolución (+PDF)
+│       ├── marketing/                # Cupones, promociones(+productos), campañas, banners, newsletter
 │       │
-│       │   # --- Nivel Tactico + Estrategico ---
-│       ├── analytics/
-│       │   ├── dashboard/            # KPIs ejecutivos (estrategico)
-│       │   ├── sesiones/             # Explorer de sesiones
-│       │   ├── conversiones/         # Analisis de conversion
-│       │   ├── funnel/               # Embudo (solo ADMIN)
-│       │   ├── region/               # Analytics por region (solo ADMIN)
-│       │   ├── dispositivo/          # Analytics por dispositivo (solo ADMIN)
-│       │   └── trafico/              # Analytics por fuente (solo ADMIN)
-│       └── admin/
-│           ├── etl/                  # Disparo de ETL (EtlController/EtlService)
-│           ├── gestion/              # CRUD de dimensiones
-│           ├── usuarios/             # Admin de usuarios
-│           └── reportes/             # Excel + PDF
+│       │   # --- Tienda online (PostgreSQL) ---
+│       ├── catalogo/                 # Catálogo público
+│       ├── carrito/  wishlist/  pedidos/  perfil/  recomendaciones/
+│       │
+│       │   # --- Analítica (ClickHouse, EXCLUIDA del SET LOCAL ROLE) ---
+│       ├── analytics/                # dashboard, sesiones, conversiones, funnel,
+│       │                             # region, dispositivo, trafico
+│       └── admin/                    # etl/ (disparo ETL), gestion/ (dims CH), reportes/ (Excel/PDF)
 │
-├── retailmind-frontend/              # SPA Angular 17 standalone
-│   ├── package.json
-│   ├── angular.json
-│   ├── tsconfig.json
-│   ├── Dockerfile
-│   ├── nginx.conf
+├── retailmind-frontend/              # SPA Angular 17 standalone (diseño "Dubai")
 │   └── src/app/
-│       ├── core/                     # Infraestructura transversal
-│       │   ├── services/             # Servicios API (HttpClient)
-│       │   ├── guards/               # Auth guards
-│       │   ├── interceptors/         # Interceptor JWT
-│       │   └── models/               # Interfaces TypeScript
-│       └── features/                 # Modulos por feature (lazy-loaded)
-│           ├── login/                # Autenticacion
-│           ├── shop/                 # Tienda, carrito, detalle
-│           ├── wishlist/             # Lista de deseos
-│           ├── recomendaciones/      # Productos recomendados
-│           ├── pedidos/              # Mis pedidos
-│           ├── perfil/               # Perfil
-│           ├── analytics/            # Dashboard, funnel, region, etc.
-│           └── admin/                # ETL, gestion, reportes
+│       ├── app.routes.ts             # Rutas lazy con authGuard/adminGuard/roleGuard([...])
+│       ├── app.component.*           # Sidebar por rol + breadcrumbs (routeMap)
+│       ├── core/
+│       │   ├── services/             # Servicios API (~15 líneas, environment.apiUrl),
+│       │   │                         # api-error.util.ts (mensajeError)
+│       │   ├── guards/               # auth.guard, role.guard (roleGuard/adminGuard)
+│       │   ├── interceptors/         # JWT
+│       │   └── models/               # operativo.model.ts (snake_case del backend), etc.
+│       └── features/
+│           ├── login/  shop/  wishlist/  pedidos/  perfil/  recomendaciones/
+│           ├── analytics/            # dashboard, funnel, sesiones, region... (ADMIN)
+│           ├── admin/                # etl, gestión de datos, usuarios, reportes
+│           └── operativo/            # ★ pantallas del back-office (patrón a imitar:
+│               │                     #   tabla + formulario + toggle activo, operativo-shared.scss)
+│               ├── catalogo/         # productos-admin
+│               ├── compras/          # órdenes, recepciones, facturas
+│               ├── inventario/       # transferencias, ajustes, kardex
+│               ├── ventas/           # pedidos, facturas, despachos, devoluciones, mis-pedidos
+│               ├── marketing/        # cupones, promociones, campañas, banners, newsletter
+│               └── horarios/
 │
 ├── docker-compose.yml                # 5 servicios: pocketbase, clickhouse, backend, frontend, etl
-├── clickhouse-data/                  # Volumen persistente ClickHouse
-├── pocketbase-data/                  # Volumen persistente PocketBase
-├── .env                              # Variables de entorno
-└── .kiro/                            # Configuracion Kiro
-    ├── specs/                        # Especificaciones de features
-    └── steering/                     # Reglas de steering (este archivo)
+│                                     # (PostgreSQL corre LOCAL, fuera de compose)
+├── .kiro/steering/                   # Este steering
+└── .specify/ / openspec/             # Spec Kit
 ```
 
 ## Architecture Patterns
 
-- **Niveles empresariales**: el dominio se separa en operativo (ventas), táctico (decisión) y
-  estratégico (KPIs). Cada módulo nuevo debe declararse dentro de un nivel.
-- **ETL**: scripts numerados organizados por fase (`extraccion`, `carga`, `sinteticos`). El flujo
-  canónico es PocketBase → `data/stage/*.parquet` → (`data/agg/`) → ClickHouse. La capa `data/agg/`
-  está prevista pero aún vacía.
-- **Backend**: arquitectura por capas Controller → Service → acceso a datos con `JdbcTemplate`
-  (sin JPA). El esquema es propiedad del ETL; el backend no genera DDL vía ORM. Resiliencia del ETL
-  con Spring Retry.
-- **Frontend**: componentes standalone Angular con estructura por features lazy-loaded. `core/`
-  agrupa lo transversal (guards, interceptors, services, models).
-- **Seguridad**: JWT STATELESS + RBAC (ADMIN/CLIENTE). Catálogo público; analítica avanzada, ETL,
-  gestión, reportes y admin solo ADMIN; tienda y datos de usuario requieren autenticación.
-- **Flujo de datos**: PocketBase → Python ETL (Parquet) → ClickHouse ← Spring Boot API ← Angular.
+- **Backend por capas**: Controller → Service (`@Transactional`, guardias de estado) →
+  `pgJdbcTemplate` con SQL parametrizado. DTOs de entrada como `record` anidados en el controller;
+  respuestas como `List<Map<String,Object>>` (snake_case) que el frontend tipa en
+  `operativo.model.ts`.
+- **Seguridad en dos capas**: `SecurityConfig` autoriza por ruta/rol; dentro de la transacción,
+  `PgSessionRoleAspect` ejecuta `SET LOCAL ROLE grp_*` y la BD aplica privilegios + RLS + horario.
+  El paquete `analytics/` queda excluido del aspecto (es ClickHouse).
+- **La BD es dueña de la integridad**: totales y columnas GENERATED los calculan triggers; el
+  código nunca los escribe. Los CHECKs se espejan con listas blancas en los services para dar
+  mensajes claros antes del 400 genérico.
+- **Pantalla operativa canónica** (imitar siempre): tabla Material + formulario colapsable +
+  toggle activo + snackbar con `mensajeError`; estilos de `operativo-shared.scss`.
+- **Ruta nueva** = SecurityConfig + `roleGuard` + sidebar (`app.component.html`, visibilidad por
+  getters `canX`) + `routeMap` de breadcrumbs.
+- **Flujo analítico**: PocketBase → Python ETL (Parquet) → ClickHouse ← `analytics/` ← Angular.
+- **Flujo operativo**: Angular ← API Spring ← PostgreSQL (retailmind_app + SET LOCAL ROLE).

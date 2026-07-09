@@ -165,10 +165,28 @@ export const routes: Routes = [
       import('./features/operativo/inventario/transferencias.component').then(m => m.TransferenciasComponent)
   },
   {
+    path: 'operativo/inventario/ajustes',
+    canActivate: [authGuard, roleGuard(['ADMIN', 'BODEGA'])],
+    loadComponent: () =>
+      import('./features/operativo/inventario/ajustes.component').then(m => m.AjustesComponent)
+  },
+  {
+    path: 'operativo/inventario/kardex',
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'BODEGA', 'ANALISTA'])],
+    loadComponent: () =>
+      import('./features/operativo/inventario/kardex.component').then(m => m.KardexComponent)
+  },
+  {
     path: 'operativo/ventas/pedidos',
     canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'VENDEDOR'])],
     loadComponent: () =>
       import('./features/operativo/ventas/pedidos-venta.component').then(m => m.PedidosVentaComponent)
+  },
+  {
+    path: 'operativo/ventas/mis-pedidos',
+    canActivate: [authGuard, roleGuard(['CLIENTE'])],
+    loadComponent: () =>
+      import('./features/operativo/ventas/mis-pedidos-tienda.component').then(m => m.MisPedidosTiendaComponent)
   },
   {
     path: 'operativo/ventas/facturas',
@@ -187,6 +205,37 @@ export const routes: Routes = [
     canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'VENDEDOR', 'DESPACHO'])],
     loadComponent: () =>
       import('./features/operativo/ventas/devoluciones.component').then(m => m.DevolucionesComponent)
+  },
+  // ── Módulo marketing (lectura ADMIN/GERENTE; escrituras solo ADMIN, espeja SecurityConfig)
+  {
+    path: 'operativo/marketing/cupones',
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE'])],
+    loadComponent: () =>
+      import('./features/operativo/marketing/cupones.component').then(m => m.CuponesComponent)
+  },
+  {
+    path: 'operativo/marketing/promociones',
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE'])],
+    loadComponent: () =>
+      import('./features/operativo/marketing/promociones.component').then(m => m.PromocionesComponent)
+  },
+  {
+    path: 'operativo/marketing/campanas',
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE'])],
+    loadComponent: () =>
+      import('./features/operativo/marketing/campanas.component').then(m => m.CampanasComponent)
+  },
+  {
+    path: 'operativo/marketing/banners',
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE'])],
+    loadComponent: () =>
+      import('./features/operativo/marketing/banners.component').then(m => m.BannersComponent)
+  },
+  {
+    path: 'operativo/marketing/newsletter',
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE'])],
+    loadComponent: () =>
+      import('./features/operativo/marketing/newsletter.component').then(m => m.NewsletterComponent)
   },
   {
     path: 'operativo/horarios',

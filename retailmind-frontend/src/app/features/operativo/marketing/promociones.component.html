@@ -1,0 +1,182 @@
+<div class="op-page">
+  <div class="section-header">
+    <h2><mat-icon>local_offer</mat-icon> Promociones</h2>
+    <p>Descuentos por producto con vigencia, prioridad y asociación N:M a productos.</p>
+  </div>
+
+  <div class="op-card" *ngIf="esAdmin">
+    <div class="form-actions">
+      <button class="btn-aplicar" (click)="showForm ? showForm = false : nuevo()">
+        <mat-icon>{{ showForm ? 'close' : 'add' }}</mat-icon>
+        {{ showForm ? 'Cancelar' : 'Nueva Promoción' }}
+      </button>
+      <button class="btn-limpiar" (click)="cargar()">
+        <mat-icon>refresh</mat-icon> Actualizar
+      </button>
+    </div>
+
+    <div *ngIf="showForm" style="margin-top: 20px;">
+      <h3 *ngIf="editandoId !== null"><mat-icon>edit</mat-icon> Editando promoción #{{ editandoId }}</h3>
+      <div class="form-grid">
+        <mat-form-field appearance="outline">
+          <mat-label>Nombre</mat-label>
+          <input matInput [(ngModel)]="form.nombre" maxlength="150">
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Tipo de descuento</mat-label>
+          <mat-select [(ngModel)]="form.tipoDescuento">
+            <mat-option *ngFor="let t of tiposDescuento" [value]="t">{{ t }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Valor {{ form.tipoDescuento === 'porcentaje' ? '(%)' : '(USD)' }}</mat-label>
+          <input matInput type="number" min="0" [(ngModel)]="form.valor">
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Prioridad</mat-label>
+          <input matInput type="number" min="0" [(ngModel)]="form.prioridad">
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Vigente desde</mat-label>
+          <input matInput type="datetime-local" [(ngModel)]="form.fechaInicio">
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Vigente hasta (opcional)</mat-label>
+          <input matInput type="datetime-local" [(ngModel)]="form.fechaFin">
+        </mat-form-field>
+        <mat-form-field appearance="outline" style="grid-column: 1 / -1;">
+          <mat-label>Descripción</mat-label>
+          <input matInput [(ngModel)]="form.descripcion">
+        </mat-form-field>
+      </div>
+      <div class="form-actions">
+        <mat-checkbox [(ngModel)]="form.acumulable">Acumulable con otras promociones</mat-checkbox>
+        <button class="btn-aplicar" (click)="guardar()">
+          <mat-icon>save</mat-icon> {{ editandoId === null ? 'Crear Promoción' : 'Guardar Cambios' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="op-card">
+    <h3><mat-icon>list</mat-icon> Promociones ({{ promociones.length }})</h3>
+    <div class="table-wrapper" *ngIf="promociones.length; else vacio">
+      <table mat-table [dataSource]="promociones">
+        <ng-container matColumnDef="nombre">
+          <th mat-header-cell *matHeaderCellDef>Promoción</th>
+          <td mat-cell *matCellDef="let p">
+            <strong>{{ p.nombre }}</strong>
+            <div style="font-size: 11px; opacity: 0.7;">{{ p.descripcion }}</div>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="tipo">
+          <th mat-header-cell *matHeaderCellDef>Tipo</th>
+          <td mat-cell *matCellDef="let p"><span class="stat-chip chip-info">{{ p.tipo_descuento }}</span></td>
+        </ng-container>
+        <ng-container matColumnDef="valor">
+          <th mat-header-cell *matHeaderCellDef>Valor</th>
+          <td mat-cell *matCellDef="let p">
+            {{ p.tipo_descuento === 'porcentaje' ? (p.valor + '%') : (p.valor | currency:'USD') }}
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="vigencia">
+          <th mat-header-cell *matHeaderCellDef>Vigencia</th>
+          <td mat-cell *matCellDef="let p">
+            {{ p.fecha_inicio | date:'dd/MM/yy HH:mm' }} —
+            {{ p.fecha_fin ? (p.fecha_fin | date:'dd/MM/yy HH:mm') : 'sin límite' }}
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="productos">
+          <th mat-header-cell *matHeaderCellDef>Productos</th>
+          <td mat-cell *matCellDef="let p"><span class="stat-chip chip-info">{{ p.productos }}</span></td>
+        </ng-container>
+        <ng-container matColumnDef="activo">
+          <th mat-header-cell *matHeaderCellDef>Activa</th>
+          <td mat-cell *matCellDef="let p">
+            <span class="estado-chip" [class.ok]="p.activo" [class.error]="!p.activo">
+              {{ p.activo ? 'Activa' : 'Inactiva' }}
+            </span>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="acciones">
+          <th mat-header-cell *matHeaderCellDef>Acciones</th>
+          <td mat-cell *matCellDef="let p">
+            <button mat-icon-button matTooltip="Ver productos" (click)="verDetalle(p.id)">
+              <mat-icon>visibility</mat-icon>
+            </button>
+            <ng-container *ngIf="esAdmin">
+              <button mat-icon-button matTooltip="Editar" (click)="editar(p)">
+                <mat-icon>edit</mat-icon>
+              </button>
+              <button mat-icon-button matTooltip="Activar / desactivar" (click)="toggleActivo(p)">
+                <mat-icon>{{ p.activo ? 'toggle_on' : 'toggle_off' }}</mat-icon>
+              </button>
+            </ng-container>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="columnas"></tr>
+        <tr mat-row *matRowDef="let p; columns: columnas"
+            [class.fila-seleccionada]="seleccionada?.id === p.id"></tr>
+      </table>
+    </div>
+    <ng-template #vacio>
+      <div class="empty-state" *ngIf="!loading">
+        <mat-icon>local_offer</mat-icon>
+        <p>No hay promociones todavía. Crea la primera.</p>
+      </div>
+    </ng-template>
+  </div>
+
+  <!-- Productos de la promoción seleccionada -->
+  <div class="op-card" *ngIf="seleccionada">
+    <h3><mat-icon>inventory_2</mat-icon> Productos de «{{ seleccionada.nombre }}»</h3>
+
+    <div class="table-wrapper" *ngIf="seleccionada.productos.length; else sinProductos">
+      <table mat-table [dataSource]="seleccionada.productos">
+        <ng-container matColumnDef="producto">
+          <th mat-header-cell *matHeaderCellDef>Producto</th>
+          <td mat-cell *matCellDef="let pp"><strong>{{ pp.producto }}</strong></td>
+        </ng-container>
+        <ng-container matColumnDef="estado">
+          <th mat-header-cell *matHeaderCellDef>Estado del producto</th>
+          <td mat-cell *matCellDef="let pp">
+            <span class="estado-chip" [class.ok]="pp.producto_activo" [class.error]="!pp.producto_activo">
+              {{ pp.producto_activo ? 'Activo' : 'Inactivo' }}
+            </span>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="acciones">
+          <th mat-header-cell *matHeaderCellDef>Acciones</th>
+          <td mat-cell *matCellDef="let pp">
+            <button mat-icon-button matTooltip="Quitar de la promoción" *ngIf="esAdmin"
+                    (click)="quitar(pp.producto_id)">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="['producto','estado','acciones']"></tr>
+        <tr mat-row *matRowDef="let pp; columns: ['producto','estado','acciones']"></tr>
+      </table>
+    </div>
+    <ng-template #sinProductos>
+      <div class="empty-state">
+        <mat-icon>inventory_2</mat-icon>
+        <p>Esta promoción aún no tiene productos asociados.</p>
+      </div>
+    </ng-template>
+
+    <div class="form-grid" style="margin-top:16px;" *ngIf="esAdmin">
+      <mat-form-field appearance="outline">
+        <mat-label>Producto a asociar</mat-label>
+        <mat-select [(ngModel)]="productoAsociar">
+          <mat-option *ngFor="let pr of productosRef" [value]="pr.id">{{ pr.nombre }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+    <div class="form-actions" *ngIf="esAdmin">
+      <button class="btn-aplicar" (click)="asociar()" [disabled]="productoAsociar === null">
+        <mat-icon>add_link</mat-icon> Asociar Producto
+      </button>
+    </div>
+  </div>
+</div>

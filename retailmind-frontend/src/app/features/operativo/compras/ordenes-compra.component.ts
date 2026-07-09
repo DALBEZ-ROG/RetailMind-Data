@@ -11,6 +11,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ComprasService } from '../../../core/services/compras.service';
 import { ReferenciasService } from '../../../core/services/referencias.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { mensajeError } from '../../../core/services/api-error.util';
 import {
   ProveedorRef, BodegaRef, VarianteRef, OrdenCompraRow, OrdenCompraDetalle
@@ -47,7 +48,13 @@ export class OrdenesCompraComponent implements OnInit {
   columnas = ['numero', 'proveedor', 'bodega', 'estado', 'total', 'acciones'];
 
   constructor(private compras: ComprasService, private referencias: ReferenciasService,
-              private snackBar: MatSnackBar) {}
+              private auth: AuthService, private snackBar: MatSnackBar) {}
+
+  /** El botón Aprobar solo aplica a GERENTE/ADMIN (espeja SecurityConfig). */
+  get puedeAprobar(): boolean {
+    const user = this.auth.getCurrentUser();
+    return !!user && ['ADMIN', 'GERENTE'].includes(user.rol);
+  }
 
   ngOnInit(): void {
     this.cargarOrdenes();
@@ -111,6 +118,22 @@ export class OrdenesCompraComponent implements OnInit {
     this.compras.orden(id).subscribe({
       next: o => this.detalleOrden = o,
       error: () => this.snackBar.open('No se pudo cargar la orden', 'Cerrar', { duration: 3000 })
+    });
+  }
+
+  aprobarOrden(o: OrdenCompraRow): void {
+    this.procesando = true;
+    this.compras.aprobarOrden(o.id).subscribe({
+      next: r => {
+        this.procesando = false;
+        this.snackBar.open(`Orden ${r.numero} aprobada (${r.estadoAnterior} → ${r.estado})`, 'OK',
+          { duration: 3500, panelClass: ['snack-success'] });
+        this.cargarOrdenes();
+      },
+      error: e => {
+        this.procesando = false;
+        this.snackBar.open(mensajeError(e, 'No se pudo aprobar la orden'), 'Cerrar', { duration: 5000 });
+      }
     });
   }
 }

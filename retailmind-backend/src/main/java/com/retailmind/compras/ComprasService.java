@@ -116,6 +116,47 @@ public class ComprasService {
                 ORDER BY oc.id DESC""");
     }
 
+    // ── a.2) Aprobar orden de compra (CU-O-12) ───────────────────────────
+
+    /**
+     * GERENTE/ADMIN aprueban una orden emitida: enviada -> confirmada
+     * ('confirmada' es el estado de aprobación del check de orden_compra;
+     * no existe un estado 'aprobada' en el esquema).
+     */
+    @Transactional
+    public Map<String, Object> aprobarOrden(long ordenId) {
+        Map<String, Object> orden = pg.queryForMap(
+                "SELECT id, numero, estado FROM orden_compra WHERE id = ? FOR UPDATE", ordenId);
+        String estado = (String) orden.get("estado");
+        String numero = (String) orden.get("numero");
+        switch (estado) {
+            case "confirmada" -> throw new IllegalStateException(
+                    "La orden " + numero + " ya fue aprobada; no se puede aprobar de nuevo");
+            case "recibida", "recibida_parcial" -> throw new IllegalStateException(
+                    "La orden " + numero + " ya fue recibida (" + estado
+                            + "); no admite aprobacion");
+            case "cancelada" -> throw new IllegalStateException(
+                    "La orden " + numero + " esta cancelada; no se puede aprobar");
+            default -> { } // borrador / enviada: aprobables
+        }
+        pg.update("UPDATE orden_compra SET estado = 'confirmada' WHERE id = ?", ordenId);
+
+        // log_auditoria solo concede INSERT a grp_administrador: si aprueba un
+        // GERENTE se omite (la BD rechazaria el INSERT y abortaria la tx).
+        // estadoAnterior sale del check constraint de la BD (lista blanca).
+        if ("ADMIN".equalsIgnoreCase(rolActual())) {
+            pg.update("""
+                    INSERT INTO log_auditoria
+                        (usuario_id, tabla, registro_id, accion, datos_anteriores, datos_nuevos)
+                    VALUES (?, 'orden_compra', ?, 'UPDATE', ?::jsonb, ?::jsonb)""",
+                    usuarioActualId(), ordenId,
+                    "{\"estado\": \"" + estado + "\"}",
+                    "{\"estado\": \"confirmada\"}");
+        }
+        return Map.of("id", ordenId, "numero", numero,
+                "estadoAnterior", estado, "estado", "confirmada");
+    }
+
     // ── b) Recepción de mercancía (stock + kardex) ───────────────────────
 
     public record ItemRecepcion(long ordenCompraDetalleId, int cantidadRecibida,
@@ -363,6 +404,14 @@ public class ComprasService {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.getPrincipal() instanceof AppUserPrincipal p) {
             return p.getUsuarioId();
+        }
+        return null;
+    }
+
+    private String rolActual() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof AppUserPrincipal p) {
+            return p.getRolCodigo();
         }
         return null;
     }
