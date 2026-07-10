@@ -102,6 +102,21 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/soporte/**")
                     .hasAnyAuthority("ADMIN", "GERENTE")
                 .requestMatchers("/api/soporte/**").hasAuthority("ADMIN")
+                // Reseñas y preguntas de producto: el CLIENTE crea/vota/reporta;
+                // el listado público por producto y las referencias también son
+                // suyos; la moderación y las bandejas quedan en ADMIN/GERENTE
+                .requestMatchers(HttpMethod.GET,
+                        "/api/resenas/productos-ref", "/api/resenas/producto/*",
+                        "/api/resenas/preguntas/producto/*")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "CLIENTE")
+                .requestMatchers(HttpMethod.GET, "/api/resenas/mias").hasAuthority("CLIENTE")
+                .requestMatchers(HttpMethod.POST,
+                        "/api/resenas/*/voto", "/api/resenas/*/reporte",
+                        "/api/resenas/preguntas", "/api/resenas")
+                    .hasAuthority("CLIENTE")
+                .requestMatchers(HttpMethod.POST, "/api/resenas/preguntas/*/respuestas")
+                    .hasAnyAuthority("ADMIN", "GERENTE")
+                .requestMatchers("/api/resenas/**").hasAnyAuthority("ADMIN", "GERENTE")
                 // Admin usuarios y pedidos solo ADMIN
                 .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
                 .requestMatchers("/api/pedidos/admin/**").hasAuthority("ADMIN")

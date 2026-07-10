@@ -73,6 +73,8 @@ export class AppComponent {
     '/operativo/soporte/tickets': 'Tickets de Soporte',
     '/operativo/soporte/categorias': 'Categorías de Ticket',
     '/operativo/soporte/faq': 'Preguntas Frecuentes',
+    '/operativo/resenas': 'Reseñas de Productos',
+    '/operativo/resenas/preguntas': 'Preguntas de Productos',
     '/operativo/horarios': 'Horarios de Acceso'
   };
 
@@ -120,6 +122,7 @@ export class AppComponent {
   get canTickets(): boolean    { return this.hasAnyRole(['ADMIN', 'GERENTE', 'CLIENTE']); }
   get canCategoriasTicket(): boolean { return this.hasAnyRole(['ADMIN']); }
   get canFaq(): boolean        { return this.hasAnyRole(['ADMIN', 'GERENTE', 'ANALISTA', 'CLIENTE']); }
+  get canResenas(): boolean    { return this.hasAnyRole(['ADMIN', 'GERENTE', 'CLIENTE']); }
 
   goToProfile(): void {
     this.router.navigate(['/perfil']);

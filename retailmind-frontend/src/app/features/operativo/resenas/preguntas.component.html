@@ -1,0 +1,123 @@
+<div class="op-page">
+  <div class="section-header">
+    <h2><mat-icon>question_answer</mat-icon> Preguntas de Productos</h2>
+    <p *ngIf="esCliente">Pregunta sobre un producto y consulta las respuestas oficiales.</p>
+    <p *ngIf="!esCliente">Responde y modera las preguntas de los clientes sobre el catálogo.</p>
+  </div>
+
+  <!-- Cliente: crear pregunta -->
+  <div class="op-card" *ngIf="esCliente">
+    <div class="form-actions">
+      <button class="btn-aplicar" (click)="showForm = !showForm">
+        <mat-icon>{{ showForm ? 'close' : 'add' }}</mat-icon>
+        {{ showForm ? 'Cancelar' : 'Nueva Pregunta' }}
+      </button>
+    </div>
+    <div *ngIf="showForm" style="margin-top: 20px;">
+      <div class="form-grid">
+        <mat-form-field appearance="outline">
+          <mat-label>Producto</mat-label>
+          <mat-select [(ngModel)]="form.productoId">
+            <mat-option *ngFor="let p of productosRef" [value]="p.id">{{ p.nombre }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline" style="grid-column: 1 / -1;">
+          <mat-label>Tu pregunta</mat-label>
+          <textarea matInput rows="2" [(ngModel)]="form.pregunta"></textarea>
+        </mat-form-field>
+      </div>
+      <div class="form-actions">
+        <button class="btn-aplicar" (click)="guardar()">
+          <mat-icon>send</mat-icon> Enviar Pregunta
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="op-card">
+    <!-- Filtros -->
+    <div class="form-grid">
+      <mat-form-field appearance="outline" *ngIf="esCliente">
+        <mat-label>Producto</mat-label>
+        <mat-select [(ngModel)]="productoSel" (selectionChange)="cargar()">
+          <mat-option *ngFor="let p of productosRef" [value]="p.id">{{ p.nombre }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline" *ngIf="!esCliente">
+        <mat-label>Filtrar por estado</mat-label>
+        <mat-select [(ngModel)]="filtroEstado" (selectionChange)="cargar()">
+          <mat-option value="">— Todos —</mat-option>
+          <mat-option *ngFor="let e of estados" [value]="e">{{ e }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <div class="form-actions" style="align-self: center;">
+        <button class="btn-limpiar" (click)="cargar()">
+          <mat-icon>refresh</mat-icon> Actualizar
+        </button>
+      </div>
+    </div>
+
+    <h3><mat-icon>forum</mat-icon> Preguntas ({{ preguntas.length }})</h3>
+    <div *ngIf="!preguntas.length && !loading" class="empty-state">
+      <mat-icon>question_answer</mat-icon>
+      <p *ngIf="esCliente">{{ productoSel ? 'Este producto no tiene preguntas todavía.' : 'Elige un producto para ver sus preguntas.' }}</p>
+      <p *ngIf="!esCliente">No hay preguntas {{ filtroEstado ? 'en estado "' + filtroEstado + '"' : 'todavía' }}.</p>
+    </div>
+
+    <div *ngFor="let q of preguntas"
+         style="border-radius: 12px; padding: 12px 16px; margin-bottom: 10px;
+                background: rgba(128, 128, 128, 0.08);">
+      <div style="font-size: 12px; opacity: 0.75;">
+        <strong *ngIf="!esCliente">{{ q.cliente || 'Cliente' }}</strong>
+        <span class="stat-chip chip-warning" *ngIf="q.es_mia">tu pregunta</span>
+        <span *ngIf="!esCliente && q.producto"> · {{ q.producto }}</span>
+        · {{ q.fecha_creacion | date:'dd/MM/yy HH:mm' }}
+        <span class="estado-chip" [ngClass]="claseEstado(q.estado)"
+              *ngIf="!esCliente || q.es_mia">{{ q.estado }}</span>
+      </div>
+      <div style="margin: 6px 0; font-weight: 500;">{{ q.pregunta }}</div>
+
+      <!-- Respuestas -->
+      <div *ngFor="let a of q.respuestas"
+           style="margin: 6px 0 6px 16px; padding: 8px 12px; border-radius: 10px;
+                  background: rgba(63, 81, 181, 0.10);">
+        <div style="font-size: 11px; opacity: 0.7;">
+          <strong>{{ a.autor || '—' }}</strong>
+          <span class="stat-chip chip-info" *ngIf="a.es_oficial">oficial</span>
+          · {{ a.fecha_creacion | date:'dd/MM/yy HH:mm' }}
+        </div>
+        <div style="white-space: pre-wrap;">{{ a.respuesta }}</div>
+      </div>
+      <div *ngIf="!q.respuestas.length" style="font-size: 12px; opacity: 0.6; margin-left: 16px;">
+        Sin respuestas todavía.
+      </div>
+
+      <!-- Moderación y respuesta (personal) -->
+      <div class="form-actions" *ngIf="!esCliente" style="margin-top: 8px;">
+        <button class="btn-aplicar" *ngIf="q.estado !== 'rechazada'"
+                (click)="respondiendo = respondiendo?.id === q.id ? null : q; nuevaRespuesta = ''">
+          <mat-icon>reply</mat-icon> Responder
+        </button>
+        <button class="btn-limpiar" *ngIf="transiciones(q.estado).includes('publicada')"
+                (click)="moderar(q, 'publicada')">
+          <mat-icon>visibility</mat-icon> Publicar
+        </button>
+        <button class="btn-limpiar" *ngIf="transiciones(q.estado).includes('rechazada')"
+                (click)="moderar(q, 'rechazada')">
+          <mat-icon>visibility_off</mat-icon> Rechazar
+        </button>
+      </div>
+      <div *ngIf="!esCliente && respondiendo?.id === q.id" style="margin-top: 8px;">
+        <mat-form-field appearance="outline" style="width: 100%;">
+          <mat-label>Respuesta oficial…</mat-label>
+          <textarea matInput rows="2" [(ngModel)]="nuevaRespuesta"></textarea>
+        </mat-form-field>
+        <div class="form-actions">
+          <button class="btn-aplicar" [disabled]="!nuevaRespuesta.trim()" (click)="responder()">
+            <mat-icon>send</mat-icon> Publicar respuesta
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

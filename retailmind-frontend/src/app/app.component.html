@@ -225,6 +225,21 @@
       </a>
     </ng-container>
 
+    <!-- Opiniones Section (reseñas y preguntas: CLIENTE crea, ADMIN/GERENTE modera) -->
+    <ng-container *ngIf="canResenas">
+      <div class="sidebar-section-label">Opiniones</div>
+
+      <a class="nav-item" routerLink="/operativo/resenas" routerLinkActive="active"
+         [routerLinkActiveOptions]="{ exact: true }">
+        <mat-icon>rate_review</mat-icon>
+        <span>{{ isCliente ? 'Mis Reseñas' : 'Reseñas de Productos' }}</span>
+      </a>
+      <a class="nav-item" routerLink="/operativo/resenas/preguntas" routerLinkActive="active">
+        <mat-icon>question_answer</mat-icon>
+        <span>Preguntas de Productos</span>
+      </a>
+    </ng-container>
+
     <!-- Tienda Section -->
     <div class="sidebar-section-label">Tienda</div>
 

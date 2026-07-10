@@ -257,6 +257,19 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/operativo/soporte/faq.component').then(m => m.FaqComponent)
   },
+  // ── Módulo reseñas (cliente crea/vota/reporta/pregunta; ADMIN/GERENTE modera)
+  {
+    path: 'operativo/resenas',
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'CLIENTE'])],
+    loadComponent: () =>
+      import('./features/operativo/resenas/resenas.component').then(m => m.ResenasComponent)
+  },
+  {
+    path: 'operativo/resenas/preguntas',
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'CLIENTE'])],
+    loadComponent: () =>
+      import('./features/operativo/resenas/preguntas.component').then(m => m.PreguntasComponent)
+  },
   {
     path: 'operativo/horarios',
     canActivate: [authGuard, roleGuard(['ADMIN'])],

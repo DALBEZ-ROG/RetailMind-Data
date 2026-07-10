@@ -206,3 +206,34 @@ export interface FaqRow {
 export interface FaqActiva {
   id: number; categoria: string | null; pregunta: string; respuesta: string; orden: number;
 }
+
+// ── Reseñas y preguntas de producto ──────────────────────────────────────
+export interface ProductoResenaRef { id: number; nombre: string; }
+export interface ResenaRow {
+  id: number; producto_id: number; producto: string; calificacion: number;
+  titulo: string | null; comentario: string | null; compra_verificada: boolean;
+  estado: string; fecha_creacion: string; utiles: number;
+  cliente_id?: number; cliente?: string | null;
+  no_utiles?: number; reportes_pendientes?: number;
+}
+export interface ResenaPublica {
+  id: number; calificacion: number; titulo: string | null; comentario: string | null;
+  compra_verificada: boolean; fecha_creacion: string; cliente: string;
+  es_mia: boolean | null; utiles: number; no_utiles: number; mi_voto: boolean | null;
+}
+export interface ReporteResenaRow {
+  id: number; resena_id: number; motivo: string; comentario: string | null;
+  estado: string; fecha_creacion: string; reportado_por: string | null;
+  resena_titulo: string | null; resena_comentario: string | null;
+  calificacion: number; resena_estado: string; producto: string;
+}
+export interface RespuestaPreguntaRow {
+  id: number; respuesta: string; es_oficial: boolean; fecha_creacion: string;
+  autor: string | null;
+}
+export interface PreguntaProductoRow {
+  id: number; pregunta: string; estado: string; fecha_creacion: string;
+  respuestas: RespuestaPreguntaRow[];
+  producto_id?: number; producto?: string;
+  cliente_id?: number; cliente?: string | null; es_mia?: boolean;
+}
