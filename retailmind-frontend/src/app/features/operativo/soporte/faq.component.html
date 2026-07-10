@@ -1,0 +1,124 @@
+<div class="op-page">
+  <div class="section-header">
+    <h2><mat-icon>quiz</mat-icon> Preguntas Frecuentes</h2>
+    <p *ngIf="esGestion">Gestión del centro de ayuda: pregunta, respuesta, categoría y orden.</p>
+    <p *ngIf="!esGestion">Respuestas a las dudas más comunes. Si no encuentras la tuya, crea un ticket de soporte.</p>
+  </div>
+
+  <!-- Gestión (ADMIN edita; GERENTE consulta) -->
+  <ng-container *ngIf="esGestion">
+    <div class="op-card" *ngIf="esAdmin">
+      <div class="form-actions">
+        <button class="btn-aplicar" (click)="showForm ? showForm = false : nuevo()">
+          <mat-icon>{{ showForm ? 'close' : 'add' }}</mat-icon>
+          {{ showForm ? 'Cancelar' : 'Nueva FAQ' }}
+        </button>
+        <button class="btn-limpiar" (click)="cargar()">
+          <mat-icon>refresh</mat-icon> Actualizar
+        </button>
+      </div>
+
+      <div *ngIf="showForm" style="margin-top: 20px;">
+        <h3 *ngIf="editandoId !== null"><mat-icon>edit</mat-icon> Editando FAQ #{{ editandoId }}</h3>
+        <div class="form-grid">
+          <mat-form-field appearance="outline">
+            <mat-label>Categoría (opcional)</mat-label>
+            <mat-select [(ngModel)]="form.categoriaId">
+              <mat-option [value]="null">— Sin categoría —</mat-option>
+              <mat-option *ngFor="let c of categoriasRef" [value]="c.id">{{ c.nombre }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Orden</mat-label>
+            <input matInput type="number" min="0" [(ngModel)]="form.orden">
+          </mat-form-field>
+          <mat-form-field appearance="outline" style="grid-column: 1 / -1;">
+            <mat-label>Pregunta</mat-label>
+            <input matInput [(ngModel)]="form.pregunta" maxlength="300">
+          </mat-form-field>
+          <mat-form-field appearance="outline" style="grid-column: 1 / -1;">
+            <mat-label>Respuesta</mat-label>
+            <textarea matInput rows="3" [(ngModel)]="form.respuesta"></textarea>
+          </mat-form-field>
+        </div>
+        <div class="form-actions">
+          <button class="btn-aplicar" (click)="guardar()">
+            <mat-icon>save</mat-icon> {{ editandoId === null ? 'Crear FAQ' : 'Guardar Cambios' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="op-card">
+      <h3><mat-icon>list</mat-icon> FAQ ({{ faqs.length }})</h3>
+      <div class="table-wrapper" *ngIf="faqs.length; else vacioGestion">
+        <table mat-table [dataSource]="faqs">
+          <ng-container matColumnDef="pregunta">
+            <th mat-header-cell *matHeaderCellDef>Pregunta</th>
+            <td mat-cell *matCellDef="let f">
+              <strong>{{ f.pregunta }}</strong>
+              <div style="font-size: 11px; opacity: 0.7; white-space: pre-wrap;">{{ f.respuesta }}</div>
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="categoria">
+            <th mat-header-cell *matHeaderCellDef>Categoría</th>
+            <td mat-cell *matCellDef="let f">{{ f.categoria || '—' }}</td>
+          </ng-container>
+          <ng-container matColumnDef="orden">
+            <th mat-header-cell *matHeaderCellDef>Orden</th>
+            <td mat-cell *matCellDef="let f"><span class="stat-chip chip-info">{{ f.orden }}</span></td>
+          </ng-container>
+          <ng-container matColumnDef="activo">
+            <th mat-header-cell *matHeaderCellDef>Activa</th>
+            <td mat-cell *matCellDef="let f">
+              <span class="estado-chip" [class.ok]="f.activo" [class.error]="!f.activo">
+                {{ f.activo ? 'Activa' : 'Inactiva' }}
+              </span>
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="acciones">
+            <th mat-header-cell *matHeaderCellDef>Acciones</th>
+            <td mat-cell *matCellDef="let f">
+              <ng-container *ngIf="esAdmin">
+                <button mat-icon-button matTooltip="Editar" (click)="editar(f)">
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button mat-icon-button matTooltip="Activar / desactivar" (click)="toggleActivo(f)">
+                  <mat-icon>{{ f.activo ? 'toggle_on' : 'toggle_off' }}</mat-icon>
+                </button>
+              </ng-container>
+            </td>
+          </ng-container>
+          <tr mat-header-row *matHeaderRowDef="columnas"></tr>
+          <tr mat-row *matRowDef="let f; columns: columnas"></tr>
+        </table>
+      </div>
+      <ng-template #vacioGestion>
+        <div class="empty-state" *ngIf="!loading">
+          <mat-icon>quiz</mat-icon>
+          <p>No hay preguntas frecuentes todavía. Crea la primera.</p>
+        </div>
+      </ng-template>
+    </div>
+  </ng-container>
+
+  <!-- Centro de ayuda (solo lectura: FAQ activas) -->
+  <div class="op-card" *ngIf="!esGestion">
+    <h3><mat-icon>help_center</mat-icon> Centro de ayuda ({{ faqsActivas.length }})</h3>
+    <mat-accordion *ngIf="faqsActivas.length; else vacioAyuda">
+      <mat-expansion-panel *ngFor="let f of faqsActivas">
+        <mat-expansion-panel-header>
+          <mat-panel-title>{{ f.pregunta }}</mat-panel-title>
+          <mat-panel-description *ngIf="f.categoria">{{ f.categoria }}</mat-panel-description>
+        </mat-expansion-panel-header>
+        <p style="white-space: pre-wrap;">{{ f.respuesta }}</p>
+      </mat-expansion-panel>
+    </mat-accordion>
+    <ng-template #vacioAyuda>
+      <div class="empty-state" *ngIf="!loading">
+        <mat-icon>help_center</mat-icon>
+        <p>Aún no hay preguntas frecuentes publicadas.</p>
+      </div>
+    </ng-template>
+  </div>
+</div>

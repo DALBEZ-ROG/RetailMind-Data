@@ -204,6 +204,27 @@
       </a>
     </ng-container>
 
+    <!-- Soporte Section (tickets ADMIN/GERENTE/CLIENTE; categorías ADMIN; FAQ según SELECT en BD) -->
+    <ng-container *ngIf="canTickets || canFaq">
+      <div class="sidebar-section-label">Soporte</div>
+
+      <a class="nav-item" *ngIf="canTickets"
+         routerLink="/operativo/soporte/tickets" routerLinkActive="active">
+        <mat-icon>support_agent</mat-icon>
+        <span>{{ isCliente ? 'Mis Tickets' : 'Tickets de Soporte' }}</span>
+      </a>
+      <a class="nav-item" *ngIf="canCategoriasTicket"
+         routerLink="/operativo/soporte/categorias" routerLinkActive="active">
+        <mat-icon>category</mat-icon>
+        <span>Categorías de Ticket</span>
+      </a>
+      <a class="nav-item" *ngIf="canFaq"
+         routerLink="/operativo/soporte/faq" routerLinkActive="active">
+        <mat-icon>quiz</mat-icon>
+        <span>Preguntas Frecuentes</span>
+      </a>
+    </ng-container>
+
     <!-- Tienda Section -->
     <div class="sidebar-section-label">Tienda</div>
 

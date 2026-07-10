@@ -8,6 +8,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { InventarioService } from '../../../core/services/inventario.service';
 import { ReferenciasService } from '../../../core/services/referencias.service';
 import { mensajeError } from '../../../core/services/api-error.util';
@@ -20,7 +21,7 @@ import {
   selector: 'app-ajustes',
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
-    MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule],
+    MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule, MatTooltipModule],
   templateUrl: './ajustes.component.html',
   styleUrl: '../operativo-shared.scss'
 })
@@ -39,6 +40,9 @@ export class AjustesComponent implements OnInit {
   stockVariante: StockRow[] = [];
   resultado: AjusteResultado | null = null;
   procesando = false;
+
+  anulando: AjusteRow | null = null;
+  motivoAnulacion = '';
 
   constructor(private inventario: InventarioService, private referencias: ReferenciasService,
               private snackBar: MatSnackBar) {}
@@ -85,6 +89,26 @@ export class AjustesComponent implements OnInit {
         this.procesando = false;
         this.snackBar.open(mensajeError(e, 'No se pudo registrar el ajuste'), 'Cerrar', { duration: 5000 });
       }
+    });
+  }
+
+  anularAjuste(): void {
+    if (!this.anulando) return;
+    if (!this.motivoAnulacion.trim()) {
+      this.snackBar.open('El motivo de la anulación es obligatorio', 'Cerrar', { duration: 3500 });
+      return;
+    }
+    this.inventario.anularAjuste(this.anulando.id, this.motivoAnulacion.trim()).subscribe({
+      next: () => {
+        this.snackBar.open(`Ajuste #${this.anulando!.id} anulado — stock revertido`, 'OK',
+          { duration: 3500, panelClass: ['snack-success'] });
+        this.anulando = null;
+        this.motivoAnulacion = '';
+        this.consultarStock();
+        this.cargarAjustes();
+      },
+      error: e => this.snackBar.open(mensajeError(e, 'No se pudo anular el ajuste'),
+        'Cerrar', { duration: 5000 })
     });
   }
 }

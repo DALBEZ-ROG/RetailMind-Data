@@ -7,6 +7,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { VentasService } from '../../../core/services/ventas.service';
@@ -22,7 +23,8 @@ interface LineaPedido { varianteId: number | null; cantidad: number; }
   selector: 'app-pedidos-venta',
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
-    MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule, MatTooltipModule],
+    MatFormFieldModule, MatInputModule, MatSelectModule, MatCheckboxModule,
+    MatSnackBarModule, MatTooltipModule],
   templateUrl: './pedidos-venta.component.html',
   styleUrl: '../operativo-shared.scss'
 })
@@ -43,6 +45,9 @@ export class PedidosVentaComponent implements OnInit {
   pedidoCreado: PedidoVentaDetalle | null = null;
   detallePedido: PedidoVentaDetalle | null = null;
   procesando = false;
+
+  nuevaNota = '';
+  notaVisibleCliente = false;
 
   columnas = ['numero', 'cliente', 'estado', 'fecha', 'total', 'acciones'];
 
@@ -107,8 +112,24 @@ export class PedidosVentaComponent implements OnInit {
 
   verPedido(id: number): void {
     this.ventas.pedido(id).subscribe({
-      next: p => this.detallePedido = p,
+      next: p => {
+        this.detallePedido = p;
+        this.nuevaNota = '';
+        this.notaVisibleCliente = false;
+      },
       error: () => this.snackBar.open('No se pudo cargar el pedido', 'Cerrar', { duration: 3000 })
+    });
+  }
+
+  agregarNota(): void {
+    if (!this.detallePedido || !this.nuevaNota.trim()) return;
+    this.ventas.crearNota(this.detallePedido.id, this.nuevaNota, this.notaVisibleCliente).subscribe({
+      next: () => {
+        this.snackBar.open('Nota agregada', 'OK', { duration: 2000, panelClass: ['snack-success'] });
+        this.verPedido(this.detallePedido!.id);
+      },
+      error: e => this.snackBar.open(mensajeError(e, 'No se pudo agregar la nota'),
+        'Cerrar', { duration: 4000 })
     });
   }
 }

@@ -60,6 +60,10 @@ public class SecurityConfig {
                 // Ciclo de compra: roles operativos (la BD afina por SET LOCAL ROLE)
                 .requestMatchers("/api/compras/**")
                     .hasAnyAuthority("ADMIN", "GERENTE", "COMPRAS", "BODEGA")
+                // Notas de pedido: solo personal del ciclo de venta las CREA
+                // (el cliente las lee vía GET, filtradas por RLS a las visibles)
+                .requestMatchers(HttpMethod.POST, "/api/ventas/pedidos/*/notas")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "VENDEDOR", "DESPACHO")
                 // Ciclo de venta: vendedor/despacho + cliente (RLS lo aisla a sus filas)
                 .requestMatchers("/api/ventas/**")
                     .hasAnyAuthority("ADMIN", "GERENTE", "VENDEDOR", "DESPACHO", "CLIENTE")
@@ -77,6 +81,27 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/marketing/**")
                     .hasAnyAuthority("ADMIN", "GERENTE")
                 .requestMatchers("/api/marketing/**").hasAuthority("ADMIN")
+                // Soporte: referencia (categorías activas / FAQ activas) espeja el SELECT
+                // de la BD (grp_admin/gerente/analista/cliente)
+                .requestMatchers(HttpMethod.GET,
+                        "/api/soporte/categorias-ref", "/api/soporte/faqs-activas")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "ANALISTA", "CLIENTE")
+                // Selector "pedido relacionado" del ticket: personal + cliente
+                // (CLIENTE queda aislado a sus pedidos por RLS)
+                .requestMatchers(HttpMethod.GET, "/api/soporte/pedidos-ref")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "CLIENTE")
+                // Estado y asignación de tickets: solo personal de gestión
+                .requestMatchers(HttpMethod.PATCH,
+                        "/api/soporte/tickets/*/estado", "/api/soporte/tickets/*/asignar")
+                    .hasAnyAuthority("ADMIN", "GERENTE")
+                // Tickets: personal ve todos; CLIENTE solo los suyos (RLS pol_cliente_propio
+                // sobre ticket_soporte/mensaje_ticket, script 29)
+                .requestMatchers("/api/soporte/tickets", "/api/soporte/tickets/**")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "CLIENTE")
+                // Resto de soporte: lectura ADMIN/GERENTE; gestión de categorías/FAQ solo ADMIN
+                .requestMatchers(HttpMethod.GET, "/api/soporte/**")
+                    .hasAnyAuthority("ADMIN", "GERENTE")
+                .requestMatchers("/api/soporte/**").hasAuthority("ADMIN")
                 // Admin usuarios y pedidos solo ADMIN
                 .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
                 .requestMatchers("/api/pedidos/admin/**").hasAuthority("ADMIN")
@@ -105,7 +130,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(List.of("http://localhost:4200"));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
 

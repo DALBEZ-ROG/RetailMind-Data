@@ -2,6 +2,7 @@ package com.retailmind.inventario;
 
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -127,6 +128,62 @@ public class InventarioService {
                 FROM ajuste_inventario a
                 JOIN bodega b ON b.id = a.bodega_id
                 ORDER BY a.id DESC""");
+    }
+
+    /**
+     * Anula un ajuste APLICADO revirtiendo su movimiento de kardex con un
+     * contramovimiento (entrada⇄salida). El CHECK de la tabla ya contemplaba
+     * 'anulado' pero no existía flujo. El estado 'borrador' sigue sin flujo:
+     * la cabecera no persiste variante/cantidad (viven solo en el kardex),
+     * así que aplicar un borrador exigiría una tabla de detalle que el
+     * esquema no tiene — queda como mejora futura documentada.
+     */
+    @Transactional
+    public Map<String, Object> anularAjuste(long ajusteId, String motivo) {
+        if (motivo == null || motivo.isBlank()) {
+            throw new IllegalArgumentException("El motivo de la anulación es obligatorio");
+        }
+        List<Map<String, Object>> filas = pg.queryForList(
+                "SELECT estado FROM ajuste_inventario WHERE id = ? FOR UPDATE", ajusteId);
+        if (filas.isEmpty()) {
+            throw new NoSuchElementException("No existe el ajuste " + ajusteId);
+        }
+        String estado = (String) filas.get(0).get("estado");
+        if (!"aplicado".equals(estado)) {
+            throw new IllegalStateException("Solo se puede anular un ajuste en estado "
+                    + "'aplicado' (estado actual: '" + estado + "')");
+        }
+        // Contramovimiento de cada movimiento original del ajuste. El estado
+        // 'anulado' (guardia de arriba) garantiza que esto corre UNA sola vez,
+        // por lo que aquí solo existen los movimientos originales.
+        List<Map<String, Object>> movimientos = pg.queryForList("""
+                SELECT m.producto_variante_id, m.bodega_id, m.cantidad,
+                       m.costo_unitario, tm.codigo
+                FROM movimiento_inventario m
+                JOIN tipo_movimiento tm ON tm.id = m.tipo_movimiento_id
+                WHERE m.referencia_tipo = 'ajuste_inventario' AND m.referencia_id = ?""",
+                ajusteId);
+        if (movimientos.isEmpty()) {
+            throw new IllegalStateException(
+                    "El ajuste " + ajusteId + " no tiene movimientos de kardex que revertir");
+        }
+        for (Map<String, Object> m : movimientos) {
+            boolean fueEntrada = "entrada_ajuste".equals(m.get("codigo"));
+            // La reversión de una entrada valida stock suficiente (FOR UPDATE)
+            stock.mover(((Number) m.get("producto_variante_id")).longValue(),
+                    ((Number) m.get("bodega_id")).longValue(),
+                    fueEntrada ? "salida_ajuste" : "entrada_ajuste",
+                    ((Number) m.get("cantidad")).intValue(),
+                    "ajuste_inventario", ajusteId,
+                    (java.math.BigDecimal) m.get("costo_unitario"),
+                    usuarioActualId(), "Anulación del ajuste #" + ajusteId + ": " + motivo.trim());
+        }
+        pg.update("""
+                UPDATE ajuste_inventario
+                SET estado = 'anulado', motivo = motivo || ' · ANULADO: ' || ?
+                WHERE id = ?""", motivo.trim(), ajusteId);
+        return Map.of("id", ajusteId, "estado", "anulado",
+                "movimientosRevertidos", movimientos.size());
     }
 
     // ── Kardex (CU-O-17) ─────────────────────────────────────────────────

@@ -107,19 +107,53 @@ public class VentasService {
         pedido.put("detalles", pg.queryForList("""
                 SELECT id, sku, nombre_producto, cantidad, precio_unitario, subtotal, monto_impuesto
                 FROM pedido_detalle WHERE pedido_id = ? ORDER BY id""", pedidoId));
-        // grp_cliente no tiene SELECT sobre historial_estado_pedido: consultarlo
-        // provocaria 42501 y abortaria la transaccion. El cliente ve su pedido
-        // (RLS por app.cliente_id) sin la bitacora interna.
-        if ("CLIENTE".equalsIgnoreCase(rolActual())) {
-            pedido.put("historial", List.of());
-        } else {
-            pedido.put("historial", pg.queryForList("""
-                    SELECT ep.codigo AS estado, h.comentario, h.fecha_creacion
-                    FROM historial_estado_pedido h
-                    JOIN estado_pedido ep ON ep.id = h.estado_pedido_id
-                    WHERE h.pedido_id = ? ORDER BY h.id""", pedidoId));
-        }
+        // grp_cliente ya tiene SELECT sobre historial_estado_pedido con RLS de
+        // propiedad (script 30): la misma consulta sirve para todos los roles y
+        // al cliente el motor lo limita al historial de SUS pedidos.
+        pedido.put("historial", pg.queryForList("""
+                SELECT ep.codigo AS estado, h.comentario, h.fecha_creacion
+                FROM historial_estado_pedido h
+                JOIN estado_pedido ep ON ep.id = h.estado_pedido_id
+                WHERE h.pedido_id = ? ORDER BY h.id""", pedidoId));
+        pedido.put("notas", listarNotas(pedidoId));
         return pedido;
+    }
+
+    // ── Notas / observaciones del pedido (nota_pedido, script 31) ────────
+
+    /**
+     * CLIENTE: solo notas de sus pedidos marcadas es_visible_cliente (RLS lo
+     * refuerza) y sin autor (grp_cliente no lee usuario). Personal: todas,
+     * con autor.
+     */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> listarNotas(long pedidoId) {
+        if ("CLIENTE".equalsIgnoreCase(rolActual())) {
+            return pg.queryForList("""
+                    SELECT id, nota, fecha_creacion
+                    FROM nota_pedido
+                    WHERE pedido_id = ? AND es_visible_cliente ORDER BY id""", pedidoId);
+        }
+        return pg.queryForList("""
+                SELECT n.id, n.nota, n.es_visible_cliente, n.fecha_creacion,
+                       trim(concat(u.nombre, ' ', COALESCE(u.apellido, ''))) AS autor
+                FROM nota_pedido n
+                LEFT JOIN usuario u ON u.id = n.usuario_id
+                WHERE n.pedido_id = ? ORDER BY n.id""", pedidoId);
+    }
+
+    /** Nota de bitácora del personal sobre un pedido; el autor sale del JWT. */
+    @Transactional
+    public Map<String, Object> crearNota(long pedidoId, String nota, boolean esVisibleCliente) {
+        if (nota == null || nota.isBlank()) {
+            throw new IllegalArgumentException("La nota no puede estar vacía");
+        }
+        estadoPedido(pedidoId); // 400 con mensaje claro si el pedido no existe
+        Long id = pg.queryForObject("""
+                INSERT INTO nota_pedido (pedido_id, usuario_id, nota, es_visible_cliente)
+                VALUES (?, ?, ?, ?) RETURNING id""",
+                Long.class, pedidoId, usuarioActualId(), nota.trim(), esVisibleCliente);
+        return Map.of("id", id);
     }
 
     @Transactional(readOnly = true)

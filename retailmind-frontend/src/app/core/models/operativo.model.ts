@@ -93,6 +93,12 @@ export interface PedidoVentaDetalle extends PedidoVentaRow {
     precio_unitario: number; subtotal: number;
   }[];
   historial: { estado: string; comentario: string; fecha_creacion: string }[];
+  notas: NotaPedidoRow[];
+}
+export interface NotaPedidoRow {
+  id: number; nota: string; fecha_creacion: string;
+  // solo en la vista del personal
+  es_visible_cliente?: boolean; autor?: string | null;
 }
 export interface FacturaVenta {
   id: number; numero: string; estado: string; fecha_emision: string;
@@ -161,4 +167,42 @@ export interface BannerRow {
 export interface SuscriptorRow {
   id: number; email: string; cliente_id: number | null; cliente: string | null;
   confirmado: boolean; fecha_suscripcion: string; fecha_baja: string | null; activo: boolean;
+}
+
+// ── Soporte ──────────────────────────────────────────────────────────────
+export interface CategoriaTicketRow {
+  id: number; nombre: string; descripcion: string | null; activo: boolean;
+  fecha_creacion: string; tickets: number; faqs: number;
+}
+export interface CategoriaTicketRef { id: number; nombre: string; }
+export interface TicketRow {
+  id: number; numero: string; asunto: string; prioridad: string; estado: string;
+  pedido_id: number | null; fecha_creacion: string; fecha_cierre: string | null;
+  categoria: string | null; mensajes: number;
+  // solo en la vista del personal
+  cliente_id?: number; cliente?: string | null;
+  asignado_usuario_id?: number | null; asignado?: string | null;
+}
+export interface MensajeTicketRow {
+  id: number; mensaje: string; fecha_creacion: string; de_cliente: boolean;
+  autor: string | null; es_interno?: boolean;
+}
+export interface TicketDetalle {
+  id: number; numero: string; asunto: string; descripcion: string | null;
+  prioridad: string; estado: string; pedido_id: number | null;
+  fecha_creacion: string; fecha_cierre: string | null; categoria: string | null;
+  cliente_id?: number; cliente?: string | null;
+  asignado_usuario_id?: number | null; asignado?: string | null;
+  mensajes: MensajeTicketRow[];
+}
+export interface UsuarioSoporteRef { id: number; nombre: string; rol: string; }
+export interface PedidoSoporteRef {
+  id: number; numero: string; total: number; fecha_pedido: string; estado: string;
+}
+export interface FaqRow {
+  id: number; categoria_ticket_id: number | null; categoria: string | null;
+  pregunta: string; respuesta: string; orden: number; activo: boolean; fecha_creacion: string;
+}
+export interface FaqActiva {
+  id: number; categoria: string | null; pregunta: string; respuesta: string; orden: number;
 }

@@ -6,6 +6,7 @@ import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -25,6 +26,7 @@ public class InventarioController {
                                    long bodegaDestinoId, int cantidad, String observacion) {}
     public record AjusteReq(long varianteId, long bodegaId, String tipo,
                             int cantidad, String motivo) {}
+    public record AnularAjusteReq(String motivo) {}
 
     private final InventarioService servicio;
 
@@ -54,6 +56,13 @@ public class InventarioController {
 
     @GetMapping("/ajustes")
     public List<Map<String, Object>> ajustes() { return servicio.listarAjustes(); }
+
+    /** Anula un ajuste aplicado revirtiendo su movimiento de kardex. */
+    @PostMapping("/ajustes/{id}/anular")
+    public ResponseEntity<?> anularAjuste(@PathVariable long id,
+                                          @RequestBody AnularAjusteReq r) {
+        return ResponseEntity.ok(servicio.anularAjuste(id, r.motivo()));
+    }
 
     // CU-O-17: kardex de solo lectura, filtrable por variante y/o bodega
     @GetMapping("/kardex")

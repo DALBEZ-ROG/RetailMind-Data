@@ -68,8 +68,8 @@ esquema usa el MCP `retailmind` (solo lectura) o psycopg2 (`postgres/1250143656@
 
 - Admin: `admin@retailmind.com` / `Admin2026!`
 - Resto de roles (`gerente@`, `vendedor@`, `compras@`, `bodega@`, `despacho@`,
-  `analista@retailmind.com`) y clientes demo (`maria.lopez@demo.com`, `carlos.vera@demo.com`):
-  `Retail2026!`
+  `analista@retailmind.com`): `Retail2026!` (script 27)
+- Clientes demo (`maria.lopez@demo.com`, `carlos.vera@demo.com`): `Cliente2026!` (script 26)
 
 ## Qué está hecho / qué falta
 
@@ -77,10 +77,24 @@ esquema usa el MCP `retailmind` (solo lectura) o psycopg2 (`postgres/1250143656@
 (transferencias, ajustes, kardex); ciclo de venta (pedido→factura→despacho→devolución) con PDF;
 horarios de acceso; marketing (cupones, promociones+productos, campañas, banners, newsletter —
 solo gestión); tienda online (carrito, wishlist, checkout, perfil, recomendaciones); analítica
-ClickHouse (dashboard, funnel, sesiones, región/dispositivo/tráfico, reportes).
+ClickHouse (dashboard, funnel, sesiones, región/dispositivo/tráfico, reportes); soporte (tickets,
+categorías, FAQ) con RLS de cliente; notas de pedido (`nota_pedido`, bitácora con nota interna vs.
+visible al cliente); anulación de ajuste de inventario por contramovimiento de kardex.
 
 **Pendiente**: aplicación real de descuentos (cupones/promociones a pedidos, alimenta `uso_cupon`);
-módulos de soporte y reseñas; orquestación ETL con Airflow.
+módulo de reseñas; orquestación ETL con Airflow.
+
+**Deuda técnica conocida** (tablas huérfanas, requieren bloque dedicado):
+
+- `lote` (0 filas): trazabilidad por lote/vencimiento. La FK ya existe desde
+  `movimiento_inventario.lote_id` y `recepcion_detalle.lote_id`, así que darle uso obliga a tocar
+  recepción de compra (capturar lote), kardex (arrastrar `lote_id`) y salida FEFO en el despacho —
+  no es un CRUD suelto.
+- `ajuste_inventario.estado = 'borrador'`: el CHECK lo admite y `'anulado'` ya tiene flujo, pero un
+  borrador aplicable exigiría una tabla de detalle de líneas del ajuste, que hoy no existe (el
+  ajuste escribe el movimiento de kardex directo al aplicarse).
+- `devolucion_proveedor` **no existe** en la BD: la única devolución modelada es al cliente
+  (`devolucion` / `devolucion_detalle`), ya implementada. No hay nada huérfano que conectar.
 
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,

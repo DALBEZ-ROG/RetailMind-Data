@@ -28,6 +28,9 @@ public class MarketingService {
     private static final Set<String> TIPOS_PROMOCION = Set.of("porcentaje", "monto_fijo");
     private static final Set<String> CANALES_CAMPANA = Set.of("email", "redes", "web", "sms", "mixto");
     private static final Set<String> ESTADOS_CAMPANA = Set.of("borrador", "activa", "pausada", "finalizada");
+    /** banner.posicion no tiene CHECK en la BD: los valores curados los cuida la app. */
+    private static final Set<String> POSICIONES_BANNER =
+            Set.of("home_principal", "home_secundario", "categoria", "checkout");
 
     private final JdbcTemplate pg;
 
@@ -280,6 +283,9 @@ public class MarketingService {
                             Integer orden, Long campanaId, String fechaInicio, String fechaFin) {
         exigirTexto(titulo, "El título del banner es requerido");
         exigirTexto(imagenUrl, "La URL de la imagen es requerida");
+        if (posicion != null && !posicion.isBlank()) {
+            validarEnLista(posicion, POSICIONES_BANNER, "posición del banner");
+        }
         return idDe(pg.queryForObject("""
                 INSERT INTO banner (titulo, imagen_url, url_destino, posicion, orden, campana_id,
                                     fecha_inicio, fecha_fin)
@@ -296,6 +302,9 @@ public class MarketingService {
                              String fechaInicio, String fechaFin) {
         exigirTexto(titulo, "El título del banner es requerido");
         exigirTexto(imagenUrl, "La URL de la imagen es requerida");
+        if (posicion != null && !posicion.isBlank()) {
+            validarEnLista(posicion, POSICIONES_BANNER, "posición del banner");
+        }
         exigir(pg.update("""
                 UPDATE banner
                 SET titulo = ?, imagen_url = ?, url_destino = ?,

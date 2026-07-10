@@ -70,6 +70,9 @@ export class AppComponent {
     '/operativo/marketing/campanas': 'Campañas de Marketing',
     '/operativo/marketing/banners': 'Banners',
     '/operativo/marketing/newsletter': 'Newsletter',
+    '/operativo/soporte/tickets': 'Tickets de Soporte',
+    '/operativo/soporte/categorias': 'Categorías de Ticket',
+    '/operativo/soporte/faq': 'Preguntas Frecuentes',
     '/operativo/horarios': 'Horarios de Acceso'
   };
 
@@ -114,6 +117,9 @@ export class AppComponent {
   get canLogistica(): boolean  { return this.hasAnyRole(['ADMIN', 'GERENTE', 'VENDEDOR', 'DESPACHO']); }
   get canDespachar(): boolean  { return this.hasAnyRole(['ADMIN', 'GERENTE', 'DESPACHO']); }
   get canMarketing(): boolean  { return this.hasAnyRole(['ADMIN', 'GERENTE']); }
+  get canTickets(): boolean    { return this.hasAnyRole(['ADMIN', 'GERENTE', 'CLIENTE']); }
+  get canCategoriasTicket(): boolean { return this.hasAnyRole(['ADMIN']); }
+  get canFaq(): boolean        { return this.hasAnyRole(['ADMIN', 'GERENTE', 'ANALISTA', 'CLIENTE']); }
 
   goToProfile(): void {
     this.router.navigate(['/perfil']);

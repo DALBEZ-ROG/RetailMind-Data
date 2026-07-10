@@ -1,0 +1,244 @@
+<div class="op-page">
+  <div class="section-header">
+    <h2><mat-icon>support_agent</mat-icon> Tickets de Soporte</h2>
+    <p *ngIf="esCliente">Crea un ticket y conversa con el equipo de soporte.</p>
+    <p *ngIf="!esCliente">Atención al cliente: hilo de mensajes, estados y asignación de agentes.</p>
+  </div>
+
+  <div class="op-card">
+    <div class="form-actions">
+      <button class="btn-aplicar" (click)="showForm ? showForm = false : nuevo()">
+        <mat-icon>{{ showForm ? 'close' : 'add' }}</mat-icon>
+        {{ showForm ? 'Cancelar' : 'Nuevo Ticket' }}
+      </button>
+      <button class="btn-limpiar" (click)="cargar()">
+        <mat-icon>refresh</mat-icon> Actualizar
+      </button>
+    </div>
+
+    <div *ngIf="showForm" style="margin-top: 20px;">
+      <div class="form-grid">
+        <mat-form-field appearance="outline" *ngIf="esGestion">
+          <mat-label>Cliente</mat-label>
+          <mat-select [(ngModel)]="form.clienteId" (selectionChange)="clienteCambiado()">
+            <mat-option *ngFor="let c of clientesRef" [value]="c.id">{{ c.nombre }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Categoría (opcional)</mat-label>
+          <mat-select [(ngModel)]="form.categoriaId">
+            <mat-option [value]="null">— Sin categoría —</mat-option>
+            <mat-option *ngFor="let c of categoriasRef" [value]="c.id">{{ c.nombre }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Prioridad</mat-label>
+          <mat-select [(ngModel)]="form.prioridad">
+            <mat-option *ngFor="let p of prioridades" [value]="p">{{ p }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Pedido relacionado (opcional)</mat-label>
+          <mat-select [(ngModel)]="form.pedidoId"
+                      [disabled]="esGestion && !form.clienteId">
+            <mat-option [value]="null">— Sin pedido —</mat-option>
+            <mat-option *ngFor="let p of pedidosRef" [value]="p.id">
+              {{ p.numero }} · {{ p.fecha_pedido | date:'dd/MM/yy' }} · {{ p.total | currency:'USD' }}
+            </mat-option>
+          </mat-select>
+          <mat-hint *ngIf="esGestion && !form.clienteId">Elige primero el cliente</mat-hint>
+        </mat-form-field>
+        <mat-form-field appearance="outline" style="grid-column: 1 / -1;">
+          <mat-label>Asunto</mat-label>
+          <input matInput [(ngModel)]="form.asunto" maxlength="200">
+        </mat-form-field>
+        <mat-form-field appearance="outline" style="grid-column: 1 / -1;">
+          <mat-label>Descripción del problema</mat-label>
+          <textarea matInput rows="3" [(ngModel)]="form.descripcion"></textarea>
+        </mat-form-field>
+      </div>
+      <div class="form-actions">
+        <button class="btn-aplicar" (click)="guardar()">
+          <mat-icon>save</mat-icon> Crear Ticket
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="op-card">
+    <h3><mat-icon>list</mat-icon> {{ esCliente ? 'Mis tickets' : 'Tickets' }} ({{ tickets.length }})</h3>
+    <div class="table-wrapper" *ngIf="tickets.length; else vacio">
+      <table mat-table [dataSource]="tickets">
+        <ng-container matColumnDef="numero">
+          <th mat-header-cell *matHeaderCellDef>Ticket</th>
+          <td mat-cell *matCellDef="let t">
+            <strong>{{ t.numero }}</strong>
+            <div style="font-size: 11px; opacity: 0.7;">{{ t.asunto }}</div>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="cliente">
+          <th mat-header-cell *matHeaderCellDef>Cliente</th>
+          <td mat-cell *matCellDef="let t">{{ t.cliente || '—' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="categoria">
+          <th mat-header-cell *matHeaderCellDef>Categoría</th>
+          <td mat-cell *matCellDef="let t">{{ t.categoria || '—' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="prioridad">
+          <th mat-header-cell *matHeaderCellDef>Prioridad</th>
+          <td mat-cell *matCellDef="let t">
+            <span class="stat-chip" [class.chip-warning]="t.prioridad === 'alta' || t.prioridad === 'urgente'"
+                  [class.chip-info]="t.prioridad === 'baja' || t.prioridad === 'media'">
+              {{ t.prioridad }}
+            </span>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="estado">
+          <th mat-header-cell *matHeaderCellDef>Estado</th>
+          <td mat-cell *matCellDef="let t">
+            <span class="estado-chip" [class.ok]="t.estado === 'resuelto'"
+                  [class.error]="t.estado === 'cerrado'">
+              {{ t.estado.replaceAll('_', ' ') }}
+            </span>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="asignado">
+          <th mat-header-cell *matHeaderCellDef>Asignado</th>
+          <td mat-cell *matCellDef="let t">{{ t.asignado || '—' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="mensajes">
+          <th mat-header-cell *matHeaderCellDef>Mensajes</th>
+          <td mat-cell *matCellDef="let t">
+            <span class="stat-chip chip-info">{{ t.mensajes }}</span>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="fecha">
+          <th mat-header-cell *matHeaderCellDef>Creado</th>
+          <td mat-cell *matCellDef="let t">{{ t.fecha_creacion | date:'dd/MM/yy HH:mm' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="acciones">
+          <th mat-header-cell *matHeaderCellDef>Acciones</th>
+          <td mat-cell *matCellDef="let t">
+            <button mat-icon-button matTooltip="Ver conversación" (click)="ver(t.id)">
+              <mat-icon>forum</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="columnas"></tr>
+        <tr mat-row *matRowDef="let t; columns: columnas"
+            [class.fila-seleccionada]="detalle?.id === t.id"></tr>
+      </table>
+    </div>
+    <ng-template #vacio>
+      <div class="empty-state" *ngIf="!loading">
+        <mat-icon>support_agent</mat-icon>
+        <p>No hay tickets todavía. Crea el primero.</p>
+      </div>
+    </ng-template>
+  </div>
+
+  <!-- Detalle del ticket + hilo de conversación -->
+  <div class="op-card" *ngIf="detalle">
+    <h3>
+      <mat-icon>forum</mat-icon> {{ detalle.numero }} — {{ detalle.asunto }}
+      <button mat-icon-button matTooltip="Cerrar detalle" style="float: right;"
+              (click)="detalle = null">
+        <mat-icon>close</mat-icon>
+      </button>
+    </h3>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;">
+      <span class="estado-chip" [class.ok]="detalle.estado === 'resuelto'"
+            [class.error]="detalle.estado === 'cerrado'">
+        {{ detalle.estado.replaceAll('_', ' ') }}
+      </span>
+      <span class="stat-chip chip-info">prioridad: {{ detalle.prioridad }}</span>
+      <span class="stat-chip chip-info" *ngIf="detalle.categoria">{{ detalle.categoria }}</span>
+      <span class="stat-chip chip-info" *ngIf="detalle.pedido_id">pedido #{{ detalle.pedido_id }}</span>
+      <span class="stat-chip chip-info" *ngIf="!esCliente && detalle.cliente">cliente: {{ detalle.cliente }}</span>
+      <span class="stat-chip chip-info" *ngIf="!esCliente">
+        agente: {{ detalle.asignado || 'sin asignar' }}
+      </span>
+      <span class="stat-chip chip-info" *ngIf="detalle.fecha_cierre">
+        cerrado el {{ detalle.fecha_cierre | date:'dd/MM/yy HH:mm' }}
+      </span>
+    </div>
+
+    <p *ngIf="detalle.descripcion" style="white-space: pre-wrap; opacity: 0.85;">
+      {{ detalle.descripcion }}
+    </p>
+
+    <!-- Controles de gestión (estado + asignación) -->
+    <div class="form-grid" *ngIf="esGestion && estadosSiguientes.length">
+      <mat-form-field appearance="outline">
+        <mat-label>Cambiar estado a…</mat-label>
+        <mat-select [(ngModel)]="estadoSel">
+          <mat-option *ngFor="let e of estadosSiguientes" [value]="e">
+            {{ e.replaceAll('_', ' ') }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+      <div class="form-actions" style="align-self: center;">
+        <button class="btn-aplicar" [disabled]="!estadoSel" (click)="cambiarEstado()">
+          <mat-icon>sync_alt</mat-icon> Aplicar estado
+        </button>
+      </div>
+      <mat-form-field appearance="outline">
+        <mat-label>Asignar agente</mat-label>
+        <mat-select [(ngModel)]="asignarSel">
+          <mat-option [value]="null">— Sin asignar —</mat-option>
+          <mat-option *ngFor="let u of usuariosRef" [value]="u.id">
+            {{ u.nombre }} ({{ u.rol }})
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+      <div class="form-actions" style="align-self: center;">
+        <button class="btn-limpiar" (click)="asignar()">
+          <mat-icon>person_add</mat-icon> Asignar
+        </button>
+      </div>
+    </div>
+
+    <!-- Hilo de mensajes -->
+    <h3 style="margin-top: 8px;"><mat-icon>chat</mat-icon> Conversación ({{ detalle.mensajes.length }})</h3>
+    <div style="display: flex; flex-direction: column; gap: 10px; margin: 12px 0;">
+      <div *ngFor="let m of detalle.mensajes"
+           [style.align-self]="esPropio(m) ? 'flex-end' : 'flex-start'"
+           [style.background]="m.es_interno ? 'rgba(255, 193, 7, 0.15)'
+             : (esPropio(m) ? 'rgba(63, 81, 181, 0.12)' : 'rgba(128, 128, 128, 0.12)')"
+           style="max-width: 75%; border-radius: 12px; padding: 10px 14px;">
+        <div style="font-size: 11px; opacity: 0.7; margin-bottom: 4px;">
+          <strong>{{ m.autor || '—' }}</strong> · {{ m.fecha_creacion | date:'dd/MM/yy HH:mm' }}
+          <span *ngIf="m.es_interno"> · <mat-icon style="font-size: 12px; height: 12px; width: 12px;">lock</mat-icon> nota interna</span>
+        </div>
+        <div style="white-space: pre-wrap;">{{ m.mensaje }}</div>
+      </div>
+      <div class="empty-state" *ngIf="!detalle.mensajes.length">
+        <mat-icon>chat</mat-icon>
+        <p>Aún no hay mensajes en este ticket.</p>
+      </div>
+    </div>
+
+    <!-- Responder -->
+    <div *ngIf="detalle.estado !== 'cerrado'; else cerrado">
+      <mat-form-field appearance="outline" style="width: 100%;">
+        <mat-label>Escribe una respuesta…</mat-label>
+        <textarea matInput rows="3" [(ngModel)]="nuevoMensaje"></textarea>
+      </mat-form-field>
+      <div class="form-actions">
+        <mat-checkbox *ngIf="!esCliente" [(ngModel)]="esInterno">
+          Nota interna (no visible para el cliente)
+        </mat-checkbox>
+        <button class="btn-aplicar" [disabled]="!nuevoMensaje.trim()" (click)="responder()">
+          <mat-icon>send</mat-icon> Enviar
+        </button>
+      </div>
+    </div>
+    <ng-template #cerrado>
+      <div class="empty-state">
+        <mat-icon>lock</mat-icon>
+        <p>El ticket está cerrado: no admite nuevos mensajes.</p>
+      </div>
+    </ng-template>
+  </div>
+</div>

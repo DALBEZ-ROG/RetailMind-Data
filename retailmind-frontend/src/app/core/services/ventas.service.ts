@@ -21,6 +21,10 @@ export class VentasService {
   pedido(id: number): Observable<PedidoVentaDetalle> {
     return this.http.get<PedidoVentaDetalle>(`${this.base}/pedidos/${id}`);
   }
+  crearNota(pedidoId: number, nota: string, esVisibleCliente: boolean): Observable<{ id: number }> {
+    return this.http.post<{ id: number }>(`${this.base}/pedidos/${pedidoId}/notas`,
+      { nota, esVisibleCliente });
+  }
 
   emitirFactura(pedidoId: number): Observable<FacturaVenta> {
     return this.http.post<FacturaVenta>(`${this.base}/pedidos/${pedidoId}/factura`, {});

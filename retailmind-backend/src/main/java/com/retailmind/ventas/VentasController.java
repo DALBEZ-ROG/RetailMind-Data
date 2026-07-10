@@ -29,6 +29,7 @@ public class VentasController {
                               Long bodegaId, String observacion) {}
     public record DevolucionReq(String motivoCodigo, long bodegaId, String descripcion,
                                 List<VentasService.ItemDevolucion> items) {}
+    public record NotaReq(String nota, Boolean esVisibleCliente) {}
 
     private final VentasService servicio;
     private final FacturaVentaPdfService pdfService;
@@ -50,6 +51,18 @@ public class VentasController {
 
     @GetMapping("/pedidos/{id}")
     public Map<String, Object> pedido(@PathVariable long id) { return servicio.obtenerPedido(id); }
+
+    // Notas / observaciones del pedido (bitácora del personal)
+    @GetMapping("/pedidos/{id}/notas")
+    public List<Map<String, Object>> notas(@PathVariable long id) {
+        return servicio.listarNotas(id);
+    }
+
+    @PostMapping("/pedidos/{id}/notas")
+    public ResponseEntity<?> crearNota(@PathVariable long id, @RequestBody NotaReq r) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                servicio.crearNota(id, r.nota(), Boolean.TRUE.equals(r.esVisibleCliente())));
+    }
 
     // Caso 8: factura de venta + PDF
     @PostMapping("/pedidos/{id}/factura")

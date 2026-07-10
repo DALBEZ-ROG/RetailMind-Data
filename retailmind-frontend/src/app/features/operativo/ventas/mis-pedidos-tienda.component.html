@@ -88,12 +88,20 @@
       <div class="total-item"><div class="lbl">Total</div><div class="val">{{ detalle.total | currency:'USD' }}</div></div>
     </div>
 
-    <!-- El historial interno solo llega para roles internos; para CLIENTE viene vacío -->
+    <!-- Historial de estados: el CLIENTE ve el de SUS pedidos (RLS, script 30) -->
     <div *ngIf="detalle.historial?.length" style="margin-top: 16px;">
       <h3><mat-icon>history</mat-icon> Historial</h3>
       <div class="dato" *ngFor="let h of detalle.historial">
         <span class="estado-chip ok">{{ h.estado }}</span>
         {{ h.comentario }} · {{ h.fecha_creacion | date:'short' }}
+      </div>
+    </div>
+
+    <!-- Notas del pedido marcadas visibles para el cliente (RLS, script 31) -->
+    <div *ngIf="detalle.notas?.length" style="margin-top: 16px;">
+      <h3><mat-icon>sticky_note_2</mat-icon> Notas de la tienda</h3>
+      <div class="dato" *ngFor="let n of detalle.notas">
+        {{ n.nota }} · {{ n.fecha_creacion | date:'short' }}
       </div>
     </div>
   </div>

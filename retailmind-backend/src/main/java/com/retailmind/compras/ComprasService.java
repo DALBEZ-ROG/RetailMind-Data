@@ -141,18 +141,16 @@ public class ComprasService {
         }
         pg.update("UPDATE orden_compra SET estado = 'confirmada' WHERE id = ?", ordenId);
 
-        // log_auditoria solo concede INSERT a grp_administrador: si aprueba un
-        // GERENTE se omite (la BD rechazaria el INSERT y abortaria la tx).
-        // estadoAnterior sale del check constraint de la BD (lista blanca).
-        if ("ADMIN".equalsIgnoreCase(rolActual())) {
-            pg.update("""
-                    INSERT INTO log_auditoria
-                        (usuario_id, tabla, registro_id, accion, datos_anteriores, datos_nuevos)
-                    VALUES (?, 'orden_compra', ?, 'UPDATE', ?::jsonb, ?::jsonb)""",
-                    usuarioActualId(), ordenId,
-                    "{\"estado\": \"" + estado + "\"}",
-                    "{\"estado\": \"confirmada\"}");
-        }
+        // Auditoría de la aprobación. Solo llegan aquí ADMIN y GERENTE
+        // (SecurityConfig) y ambos grupos tienen INSERT sobre log_auditoria
+        // (scripts 19 y 30). estadoAnterior sale del check de la BD (lista blanca).
+        pg.update("""
+                INSERT INTO log_auditoria
+                    (usuario_id, tabla, registro_id, accion, datos_anteriores, datos_nuevos)
+                VALUES (?, 'orden_compra', ?, 'UPDATE', ?::jsonb, ?::jsonb)""",
+                usuarioActualId(), ordenId,
+                "{\"estado\": \"" + estado + "\"}",
+                "{\"estado\": \"confirmada\"}");
         return Map.of("id", ordenId, "numero", numero,
                 "estadoAnterior", estado, "estado", "confirmada");
     }
@@ -408,11 +406,4 @@ public class ComprasService {
         return null;
     }
 
-    private String rolActual() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null && auth.getPrincipal() instanceof AppUserPrincipal p) {
-            return p.getRolCodigo();
-        }
-        return null;
-    }
 }

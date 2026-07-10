@@ -161,5 +161,32 @@
         </div>
       </div>
     </div>
+
+    <!-- Notas / observaciones del pedido -->
+    <h3 style="margin-top: 16px;"><mat-icon>sticky_note_2</mat-icon> Notas ({{ detallePedido.notas.length || 0 }})</h3>
+    <div style="display: flex; flex-direction: column; gap: 8px; margin: 12px 0;">
+      <div *ngFor="let n of detallePedido.notas"
+           style="border-radius: 10px; padding: 8px 12px; background: rgba(128, 128, 128, 0.1);">
+        <div style="font-size: 11px; opacity: 0.7; margin-bottom: 2px;">
+          <strong>{{ n.autor || '—' }}</strong> · {{ n.fecha_creacion | date:'dd/MM/yy HH:mm' }}
+          <span *ngIf="n.es_visible_cliente"> · <mat-icon style="font-size: 12px; height: 12px; width: 12px;">visibility</mat-icon> visible para el cliente</span>
+        </div>
+        <div style="white-space: pre-wrap;">{{ n.nota }}</div>
+      </div>
+      <div class="empty-state" *ngIf="!detallePedido.notas.length">
+        <mat-icon>sticky_note_2</mat-icon>
+        <p>Este pedido no tiene notas.</p>
+      </div>
+    </div>
+    <mat-form-field appearance="outline" style="width: 100%;">
+      <mat-label>Agregar una nota u observación…</mat-label>
+      <textarea matInput rows="2" [(ngModel)]="nuevaNota"></textarea>
+    </mat-form-field>
+    <div class="form-actions">
+      <mat-checkbox [(ngModel)]="notaVisibleCliente">Visible para el cliente</mat-checkbox>
+      <button class="btn-aplicar" [disabled]="!nuevaNota.trim()" (click)="agregarNota()">
+        <mat-icon>note_add</mat-icon> Agregar nota
+      </button>
+    </div>
   </div>
 </div>

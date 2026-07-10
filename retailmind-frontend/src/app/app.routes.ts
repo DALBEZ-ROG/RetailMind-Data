@@ -237,6 +237,26 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/operativo/marketing/newsletter.component').then(m => m.NewsletterComponent)
   },
+  // ── Módulo soporte (tickets ADMIN/GERENTE/CLIENTE; categorías solo ADMIN;
+  //    FAQ: gestión ADMIN, lectura para roles con SELECT en la BD)
+  {
+    path: 'operativo/soporte/tickets',
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'CLIENTE'])],
+    loadComponent: () =>
+      import('./features/operativo/soporte/tickets.component').then(m => m.TicketsComponent)
+  },
+  {
+    path: 'operativo/soporte/categorias',
+    canActivate: [authGuard, roleGuard(['ADMIN'])],
+    loadComponent: () =>
+      import('./features/operativo/soporte/categorias-ticket.component').then(m => m.CategoriasTicketComponent)
+  },
+  {
+    path: 'operativo/soporte/faq',
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'ANALISTA', 'CLIENTE'])],
+    loadComponent: () =>
+      import('./features/operativo/soporte/faq.component').then(m => m.FaqComponent)
+  },
   {
     path: 'operativo/horarios',
     canActivate: [authGuard, roleGuard(['ADMIN'])],

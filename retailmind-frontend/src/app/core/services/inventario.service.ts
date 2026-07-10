@@ -32,6 +32,10 @@ export class InventarioService {
     return this.http.get<AjusteRow[]>(`${this.base}/ajustes`);
   }
 
+  anularAjuste(id: number, motivo: string): Observable<{ id: number; estado: string }> {
+    return this.http.post<{ id: number; estado: string }>(`${this.base}/ajustes/${id}/anular`, { motivo });
+  }
+
   kardex(varianteId?: number | null, bodegaId?: number | null): Observable<KardexRow[]> {
     let params = new HttpParams();
     if (varianteId != null) params = params.set('varianteId', varianteId);
