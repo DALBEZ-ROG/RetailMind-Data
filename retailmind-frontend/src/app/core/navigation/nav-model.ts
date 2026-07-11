@@ -43,6 +43,36 @@ export const ROLES_POR_PERMISO: Record<PermisoNav, readonly string[]> = {
   resenas:          ['ADMIN', 'GERENTE', 'CLIENTE']
 };
 
+/**
+ * Permisos de DATOS (no de navegación): espejan la matriz de GRANTs de la BD
+ * (19_privilegios.sql y addenda) y SecurityConfig para los endpoints de
+ * referencia/consulta que las pantallas cargan en ngOnInit. Se evalúan ANTES
+ * de disparar la petición: si el rol no puede leer esa tabla, el frontend no
+ * llama al endpoint y así no ensucia la consola con 403 (la BD igual negaría).
+ */
+export type PermisoDato =
+  | 'refClientes'          // tabla cliente
+  | 'refBodegas'           // tabla bodega
+  | 'refProveedores'       // tabla proveedor
+  | 'refVariantes'         // producto_variante + producto
+  | 'refMetodosPago'       // metodo_pago
+  | 'refMetodosEnvio'      // metodo_envio
+  | 'refTransportistas'    // transportista
+  | 'refMotivosDevolucion' // motivo_devolucion
+  | 'cuentasPorPagar';     // cuenta_por_pagar (facturas de compra / pagos)
+
+export const ROLES_POR_DATO: Record<PermisoDato, readonly string[]> = {
+  refClientes:          ['ADMIN', 'GERENTE', 'VENDEDOR', 'DESPACHO', 'ANALISTA'],
+  refBodegas:           ['ADMIN', 'GERENTE', 'COMPRAS', 'BODEGA', 'ANALISTA'],
+  refProveedores:       ['ADMIN', 'GERENTE', 'COMPRAS', 'BODEGA', 'ANALISTA'],
+  refVariantes:         ['ADMIN', 'GERENTE', 'VENDEDOR', 'COMPRAS', 'BODEGA', 'CLIENTE', 'ANALISTA'],
+  refMetodosPago:       ['ADMIN', 'GERENTE', 'VENDEDOR', 'CLIENTE', 'ANALISTA'],
+  refMetodosEnvio:      ['ADMIN', 'GERENTE', 'VENDEDOR', 'DESPACHO', 'CLIENTE', 'ANALISTA'],
+  refTransportistas:    ['ADMIN', 'GERENTE', 'DESPACHO', 'ANALISTA'],
+  refMotivosDevolucion: ['ADMIN', 'GERENTE', 'ANALISTA'],
+  cuentasPorPagar:      ['ADMIN', 'GERENTE', 'COMPRAS', 'ANALISTA']
+};
+
 export interface AccionNav {
   titulo: string;
   /** Etiqueta alternativa cuando el usuario es CLIENTE (ej. "Mis Tickets"). */
@@ -74,7 +104,11 @@ export const DASHBOARD_AREAS: AreaNav[] = [
     gradiente: 'linear-gradient(135deg, #1a237e, #5c6bc0)',
     acciones: [
       { titulo: 'Productos y Variantes', descripcion: 'Alta y gestión del catálogo maestro',
-        icono: 'inventory_2', ruta: '/operativo/productos', permiso: 'catalogo' }
+        icono: 'inventory_2', ruta: '/operativo/productos', permiso: 'catalogo' },
+      { titulo: 'Marcas', descripcion: 'Marcas del catálogo',
+        icono: 'sell', ruta: '/operativo/catalogo/marcas', permiso: 'catalogo' },
+      { titulo: 'Categorías', descripcion: 'Árbol de categorías del catálogo',
+        icono: 'category', ruta: '/operativo/catalogo/categorias', permiso: 'catalogo' }
     ]
   },
   {

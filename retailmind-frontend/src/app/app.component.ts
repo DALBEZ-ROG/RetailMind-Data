@@ -58,6 +58,8 @@ export class AppComponent {
     '/gestion-datos': 'Gestion de Datos',
     '/inicializacion': 'Inicializacion del Sistema',
     '/operativo/productos': 'Productos y Variantes',
+    '/operativo/catalogo/marcas': 'Marcas',
+    '/operativo/catalogo/categorias': 'Categorías',
     '/operativo/compras/ordenes': 'Órdenes de Compra',
     '/operativo/compras/recepciones': 'Recepción de Mercancía',
     '/operativo/compras/facturas': 'Facturas de Compra',

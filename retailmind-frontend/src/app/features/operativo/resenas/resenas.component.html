@@ -20,12 +20,8 @@
 
       <div *ngIf="showForm" style="margin-top: 20px;">
         <div class="form-grid">
-          <mat-form-field appearance="outline">
-            <mat-label>Producto</mat-label>
-            <mat-select [(ngModel)]="form.productoId">
-              <mat-option *ngFor="let p of productosRef" [value]="p.id">{{ p.nombre }}</mat-option>
-            </mat-select>
-          </mat-form-field>
+          <app-select-buscable label="Producto" [opciones]="productosOpc"
+                               [(value)]="form.productoId"></app-select-buscable>
           <mat-form-field appearance="outline">
             <mat-label>Calificación</mat-label>
             <mat-select [(ngModel)]="form.calificacion">
@@ -101,12 +97,10 @@
     <div class="op-card">
       <h3><mat-icon>reviews</mat-icon> Opiniones de un producto</h3>
       <div class="form-grid">
-        <mat-form-field appearance="outline">
-          <mat-label>Producto</mat-label>
-          <mat-select [(ngModel)]="productoSel" (selectionChange)="verProducto()">
-            <mat-option *ngFor="let p of productosRef" [value]="p.id">{{ p.nombre }}</mat-option>
-          </mat-select>
-        </mat-form-field>
+        <app-select-buscable label="Producto" [opciones]="productosOpc"
+                             [value]="productoSel"
+                             (valueChange)="productoSel = $event; verProducto()">
+        </app-select-buscable>
       </div>
       <div *ngIf="productoSel && !publicas.length" class="empty-state">
         <mat-icon>reviews</mat-icon>

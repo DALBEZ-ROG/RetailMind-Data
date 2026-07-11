@@ -531,3 +531,37 @@ select.select-premium,
   border-color: #1a237e !important;
   box-shadow: 0 0 0 4px rgba(26, 35, 126, 0.08) !important;
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DIÁLOGOS "DUBAI" (panelClass: dubai-dialog) — glass card sobre el overlay
+// ══════════════════════════════════════════════════════════════════════════════
+.dubai-dialog .mat-mdc-dialog-surface {
+  border-radius: var(--border-radius) !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: var(--shadow-strong) !important;
+}
+
+.dubai-dialog .mat-mdc-dialog-title {
+  color: var(--text-primary);
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  mat-icon {
+    background: var(--primary-gradient);
+    color: white;
+    border-radius: 10px;
+    padding: 6px;
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+  }
+}
+
+.dubai-dialog .mat-mdc-dialog-content {
+  padding-top: 8px !important;
+}

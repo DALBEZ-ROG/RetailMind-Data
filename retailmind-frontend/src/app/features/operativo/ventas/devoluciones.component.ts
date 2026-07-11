@@ -10,6 +10,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { VentasService } from '../../../core/services/ventas.service';
 import { ReferenciasService } from '../../../core/services/referencias.service';
+import { NavPermissionsService } from '../../../core/navigation/nav-permissions.service';
 import { mensajeError } from '../../../core/services/api-error.util';
 import {
   PedidoVentaRow, PedidoVentaDetalle, BodegaRef, CatalogoRef,
@@ -48,13 +49,19 @@ export class DevolucionesComponent implements OnInit {
   procesando = false;
 
   constructor(private ventas: VentasService, private referencias: ReferenciasService,
-              private snackBar: MatSnackBar) {}
+              private nav: NavPermissionsService, private snackBar: MatSnackBar) {}
 
   ngOnInit(): void {
     this.ventas.pedidos().subscribe(p =>
       this.pedidos = p.filter(x => x.estado !== 'devuelto' && x.estado !== 'cancelado'));
-    this.referencias.bodegas().subscribe(b => this.bodegas = b);
-    this.referencias.motivosDevolucion().subscribe(m => this.motivos = m);
+    // VENDEDOR/DESPACHO no tienen SELECT sobre bodega ni motivo_devolucion en
+    // la BD: no se disparan esas peticiones (evita 403 en consola).
+    if (this.nav.canDato('refBodegas')) {
+      this.referencias.bodegas().subscribe(b => this.bodegas = b);
+    }
+    if (this.nav.canDato('refMotivosDevolucion')) {
+      this.referencias.motivosDevolucion().subscribe(m => this.motivos = m);
+    }
   }
 
   cargarPedido(): void {

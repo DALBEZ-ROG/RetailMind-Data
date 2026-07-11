@@ -12,6 +12,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MarketingService } from '../../../core/services/marketing.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { SelectBuscableComponent, OpcionBuscable } from '../../../core/components/select-buscable/select-buscable.component';
 import { mensajeError } from '../../../core/services/api-error.util';
 import { PromocionRow, PromocionDetalle, ProductoRef } from '../../../core/models/operativo.model';
 
@@ -20,7 +21,7 @@ import { PromocionRow, PromocionDetalle, ProductoRef } from '../../../core/model
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatCheckboxModule,
-    MatSnackBarModule, MatTooltipModule],
+    MatSnackBarModule, MatTooltipModule, SelectBuscableComponent],
   templateUrl: './promociones.component.html',
   styleUrl: '../operativo-shared.scss'
 })
@@ -28,6 +29,7 @@ export class PromocionesComponent implements OnInit {
 
   promociones: PromocionRow[] = [];
   productosRef: ProductoRef[] = [];
+  productosOpc: OpcionBuscable[] = [];
   loading = true;
 
   showForm = false;
@@ -47,7 +49,10 @@ export class PromocionesComponent implements OnInit {
 
   ngOnInit(): void {
     this.cargar();
-    this.marketing.productosRef().subscribe(p => this.productosRef = p);
+    this.marketing.productosRef().subscribe(p => {
+      this.productosRef = p;
+      this.productosOpc = p.map(x => ({ id: x.id, texto: x.nombre }));
+    });
   }
 
   private formVacio() {

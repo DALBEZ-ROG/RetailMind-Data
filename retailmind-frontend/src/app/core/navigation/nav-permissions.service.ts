@@ -1,6 +1,9 @@
 import { Injectable } from '@angular/core';
 import { AuthService } from '../services/auth.service';
-import { AccionNav, AreaNav, DASHBOARD_AREAS, PermisoNav, ROLES_POR_PERMISO } from './nav-model';
+import {
+  AccionNav, AreaNav, DASHBOARD_AREAS, PermisoDato, PermisoNav,
+  ROLES_POR_DATO, ROLES_POR_PERMISO
+} from './nav-model';
 
 /**
  * Evalúa la matriz ROLES_POR_PERMISO contra el usuario autenticado.
@@ -15,6 +18,12 @@ export class NavPermissionsService {
   can(permiso: PermisoNav): boolean {
     const user = this.auth.getCurrentUser();
     return !!user && ROLES_POR_PERMISO[permiso].includes(user.rol);
+  }
+
+  /** Permiso de DATOS: ¿el rol actual puede leer esa referencia en la BD? */
+  canDato(permiso: PermisoDato): boolean {
+    const user = this.auth.getCurrentUser();
+    return !!user && ROLES_POR_DATO[permiso].includes(user.rol);
   }
 
   /** Áreas del dashboard con al menos una acción visible para el rol actual. */

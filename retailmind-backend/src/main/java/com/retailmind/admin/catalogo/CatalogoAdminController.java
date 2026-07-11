@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -87,6 +88,17 @@ public class CatalogoAdminController {
     // ── Productos ────────────────────────────────────────────────────────
     @GetMapping("/productos")
     public List<Map<String, Object>> productos() { return servicio.listarProductos(); }
+
+    /** Búsqueda paginada: q busca en nombre/slug/marca/SKU de variante. */
+    @GetMapping("/productos/buscar")
+    public Map<String, Object> buscarProductos(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) Long marcaId,
+            @RequestParam(required = false) Long categoriaId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size) {
+        return servicio.buscarProductos(q, marcaId, categoriaId, page, size);
+    }
 
     @GetMapping("/productos/{id}")
     public Map<String, Object> producto(@PathVariable long id) { return servicio.obtenerProducto(id); }

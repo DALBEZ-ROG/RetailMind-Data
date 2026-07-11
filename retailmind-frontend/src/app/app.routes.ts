@@ -156,6 +156,18 @@ export const routes: Routes = [
       import('./features/operativo/catalogo/productos-admin.component').then(m => m.ProductosAdminComponent)
   },
   {
+    path: 'operativo/catalogo/marcas',
+    canActivate: [authGuard, roleGuard(['ADMIN'])],
+    loadComponent: () =>
+      import('./features/operativo/catalogo/marcas-admin.component').then(m => m.MarcasAdminComponent)
+  },
+  {
+    path: 'operativo/catalogo/categorias',
+    canActivate: [authGuard, roleGuard(['ADMIN'])],
+    loadComponent: () =>
+      import('./features/operativo/catalogo/categorias-admin.component').then(m => m.CategoriasAdminComponent)
+  },
+  {
     path: 'operativo/compras/ordenes',
     canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'COMPRAS', 'BODEGA'])],
     loadComponent: () =>

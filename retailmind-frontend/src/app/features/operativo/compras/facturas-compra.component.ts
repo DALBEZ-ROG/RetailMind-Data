@@ -11,6 +11,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ComprasService } from '../../../core/services/compras.service';
 import { ReferenciasService } from '../../../core/services/referencias.service';
+import { NavPermissionsService } from '../../../core/navigation/nav-permissions.service';
 import { mensajeError } from '../../../core/services/api-error.util';
 import {
   OrdenCompraRow, FacturaCompra, CuentaPorPagarRow, CatalogoRef
@@ -42,15 +43,22 @@ export class FacturasCompraComponent implements OnInit {
   pagando = false;
 
   constructor(private compras: ComprasService, private referencias: ReferenciasService,
-              private snackBar: MatSnackBar) {}
+              private nav: NavPermissionsService, private snackBar: MatSnackBar) {}
+
+  // BODEGA puede registrar facturas pero NO leer cuenta_por_pagar ni
+  // metodo_pago en la BD: no se disparan esas peticiones (evita 403 en consola).
+  get puedeVerCuentas(): boolean { return this.nav.canDato('cuentasPorPagar'); }
 
   ngOnInit(): void {
     this.compras.ordenes().subscribe(o => this.ordenes = o);
-    this.referencias.metodosPago().subscribe(m => this.metodosPago = m);
+    if (this.nav.canDato('refMetodosPago')) {
+      this.referencias.metodosPago().subscribe(m => this.metodosPago = m);
+    }
     this.cargarCuentas();
   }
 
   cargarCuentas(): void {
+    if (!this.puedeVerCuentas) return;
     this.compras.cuentasPorPagar().subscribe(c => this.cuentas = c);
   }
 

@@ -166,12 +166,8 @@
     </ng-template>
 
     <div class="form-grid" style="margin-top:16px;" *ngIf="esAdmin">
-      <mat-form-field appearance="outline">
-        <mat-label>Producto a asociar</mat-label>
-        <mat-select [(ngModel)]="productoAsociar">
-          <mat-option *ngFor="let pr of productosRef" [value]="pr.id">{{ pr.nombre }}</mat-option>
-        </mat-select>
-      </mat-form-field>
+      <app-select-buscable label="Producto a asociar" [opciones]="productosOpc"
+                           [(value)]="productoAsociar"></app-select-buscable>
     </div>
     <div class="form-actions" *ngIf="esAdmin">
       <button class="btn-aplicar" (click)="asociar()" [disabled]="productoAsociar === null">

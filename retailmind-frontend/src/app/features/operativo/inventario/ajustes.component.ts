@@ -11,6 +11,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { InventarioService } from '../../../core/services/inventario.service';
 import { ReferenciasService } from '../../../core/services/referencias.service';
+import { SelectBuscableComponent, OpcionBuscable } from '../../../core/components/select-buscable/select-buscable.component';
 import { mensajeError } from '../../../core/services/api-error.util';
 import {
   BodegaRef, VarianteRef, StockRow, AjusteRow, AjusteResultado
@@ -21,7 +22,8 @@ import {
   selector: 'app-ajustes',
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
-    MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule, MatTooltipModule],
+    MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule, MatTooltipModule,
+    SelectBuscableComponent],
   templateUrl: './ajustes.component.html',
   styleUrl: '../operativo-shared.scss'
 })
@@ -29,6 +31,7 @@ export class AjustesComponent implements OnInit {
 
   bodegas: BodegaRef[] = [];
   variantes: VarianteRef[] = [];
+  variantesOpc: OpcionBuscable[] = [];
   ajustes: AjusteRow[] = [];
 
   varianteId: number | null = null;
@@ -49,7 +52,10 @@ export class AjustesComponent implements OnInit {
 
   ngOnInit(): void {
     this.referencias.bodegas().subscribe(b => this.bodegas = b);
-    this.referencias.variantes().subscribe(v => this.variantes = v);
+    this.referencias.variantes().subscribe(v => {
+      this.variantes = v;
+      this.variantesOpc = v.map(x => ({ id: x.id, texto: `${x.sku} — ${x.producto}` }));
+    });
     this.cargarAjustes();
   }
 

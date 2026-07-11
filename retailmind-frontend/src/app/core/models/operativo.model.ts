@@ -18,17 +18,26 @@ export interface ProductoAdmin {
   publicado: boolean; activo: boolean; marca: string | null; variantes: number;
 }
 export interface ProductoDetalleAdmin {
-  id: number; nombre: string; slug: string; marca: string | null;
-  publicado: boolean; activo: boolean;
+  id: number; nombre: string; slug: string; marca: string | null; marca_id: number | null;
+  descripcion_corta: string | null; descripcion: string | null;
+  publicado: boolean; destacado: boolean; activo: boolean;
   variantes: VarianteAdmin[];
   categorias: { id: number; nombre: string; es_principal: boolean }[];
+}
+export interface PaginaProductos {
+  items: ProductoAdmin[]; total: number; page: number; size: number;
 }
 export interface VarianteAdmin {
   id: number; sku: string; precio: number; costo: number;
   es_predeterminada: boolean; activo: boolean; atributos: string;
 }
-export interface MarcaAdmin    { id: number; nombre: string; slug: string; activo: boolean; }
-export interface CategoriaAdmin { id: number; nombre: string; slug: string; activo: boolean; }
+export interface MarcaAdmin {
+  id: number; nombre: string; slug: string; descripcion: string | null; activo: boolean;
+}
+export interface CategoriaAdmin {
+  id: number; nombre: string; slug: string; descripcion: string | null;
+  categoria_padre_id: number | null; orden: number; activo: boolean;
+}
 
 // ── Compras ──────────────────────────────────────────────────────────────
 export interface ItemOrdenReq { varianteId: number; cantidad: number; precioUnitario: number; ivaPorcentaje?: number; }

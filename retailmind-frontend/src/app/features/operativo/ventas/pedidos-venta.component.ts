@@ -10,8 +10,11 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { VentasService } from '../../../core/services/ventas.service';
 import { ReferenciasService } from '../../../core/services/referencias.service';
+import { NavPermissionsService } from '../../../core/navigation/nav-permissions.service';
+import { SelectBuscableComponent, OpcionBuscable } from '../../../core/components/select-buscable/select-buscable.component';
 import { mensajeError } from '../../../core/services/api-error.util';
 import {
   ClienteRef, BodegaRef, VarianteRef, PedidoVentaRow, PedidoVentaDetalle
@@ -24,7 +27,7 @@ interface LineaPedido { varianteId: number | null; cantidad: number; }
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatCheckboxModule,
-    MatSnackBarModule, MatTooltipModule],
+    MatSnackBarModule, MatTooltipModule, MatPaginatorModule, SelectBuscableComponent],
   templateUrl: './pedidos-venta.component.html',
   styleUrl: '../operativo-shared.scss'
 })
@@ -34,7 +37,14 @@ export class PedidosVentaComponent implements OnInit {
   clientes: ClienteRef[] = [];
   bodegas: BodegaRef[] = [];
   variantes: VarianteRef[] = [];
+  clientesOpc: OpcionBuscable[] = [];
+  variantesOpc: OpcionBuscable[] = [];
   loading = true;
+
+  // Paginación client-side de la tabla de pedidos
+  pagina = 0;
+  tamPagina = 25;
+  readonly tamanos = [25, 50, 100];
 
   showForm = false;
   clienteId: number | null = null;
@@ -52,21 +62,47 @@ export class PedidosVentaComponent implements OnInit {
   columnas = ['numero', 'cliente', 'estado', 'fecha', 'total', 'acciones'];
 
   constructor(private ventas: VentasService, private referencias: ReferenciasService,
-              private snackBar: MatSnackBar) {}
+              private nav: NavPermissionsService, private snackBar: MatSnackBar) {}
+
+  // La BD no concede bodega a grp_vendedor: no se dispara la petición (403).
+  get puedeVerBodegas(): boolean { return this.nav.canDato('refBodegas'); }
 
   ngOnInit(): void {
     this.cargarPedidos();
-    this.referencias.clientes().subscribe(c => this.clientes = c);
-    this.referencias.bodegas().subscribe(b => this.bodegas = b);
-    this.referencias.variantes().subscribe(v => this.variantes = v);
+    if (this.nav.canDato('refClientes')) {
+      this.referencias.clientes().subscribe(c => {
+        this.clientes = c;
+        this.clientesOpc = c.map(x => ({ id: x.id, texto: `${x.nombre} (${x.email})` }));
+      });
+    }
+    if (this.puedeVerBodegas) {
+      this.referencias.bodegas().subscribe(b => this.bodegas = b);
+    }
+    if (this.nav.canDato('refVariantes')) {
+      this.referencias.variantes().subscribe(v => {
+        this.variantes = v;
+        this.variantesOpc = v.map(x =>
+          ({ id: x.id, texto: `${x.sku} — ${x.producto} ($${Number(x.precio).toFixed(2)})` }));
+      });
+    }
   }
 
   cargarPedidos(): void {
     this.loading = true;
     this.ventas.pedidos().subscribe({
-      next: data => { this.pedidos = data; this.loading = false; },
+      next: data => { this.pedidos = data; this.pagina = 0; this.loading = false; },
       error: () => this.loading = false
     });
+  }
+
+  get pedidosPagina(): PedidoVentaRow[] {
+    const inicio = this.pagina * this.tamPagina;
+    return this.pedidos.slice(inicio, inicio + this.tamPagina);
+  }
+
+  alPaginar(e: PageEvent): void {
+    this.pagina = e.pageIndex;
+    this.tamPagina = e.pageSize;
   }
 
   agregarLinea(): void { this.lineas.push({ varianteId: null, cantidad: 1 }); }

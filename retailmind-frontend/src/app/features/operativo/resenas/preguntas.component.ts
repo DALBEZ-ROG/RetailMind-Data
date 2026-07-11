@@ -10,6 +10,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ResenasService } from '../../../core/services/resenas.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { SelectBuscableComponent, OpcionBuscable } from '../../../core/components/select-buscable/select-buscable.component';
 import { mensajeError } from '../../../core/services/api-error.util';
 import { PreguntaProductoRow, ProductoResenaRef } from '../../../core/models/operativo.model';
 
@@ -24,7 +25,8 @@ const TRANSICIONES: Record<string, string[]> = {
   selector: 'app-preguntas-producto',
   standalone: true,
   imports: [CommonModule, FormsModule, MatIconModule, MatButtonModule,
-    MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule, MatTooltipModule],
+    MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule, MatTooltipModule,
+    SelectBuscableComponent],
   templateUrl: './preguntas.component.html',
   styleUrl: '../operativo-shared.scss'
 })
@@ -41,6 +43,7 @@ export class PreguntasComponent implements OnInit {
   nuevaRespuesta = '';
 
   productosRef: ProductoResenaRef[] = [];
+  productosOpc: OpcionBuscable[] = [];
   loading = true;
   estados = ['pendiente', 'publicada', 'rechazada'];
 
@@ -50,7 +53,13 @@ export class PreguntasComponent implements OnInit {
   get esCliente(): boolean { return this.auth.hasRole('CLIENTE'); }
 
   ngOnInit(): void {
-    this.servicio.productosRef().subscribe({ next: p => this.productosRef = p, error: () => {} });
+    this.servicio.productosRef().subscribe({
+      next: p => {
+        this.productosRef = p;
+        this.productosOpc = p.map(x => ({ id: x.id, texto: x.nombre }));
+      },
+      error: () => {}
+    });
     this.cargar();
   }
 

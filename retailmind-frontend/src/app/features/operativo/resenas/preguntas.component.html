@@ -15,12 +15,8 @@
     </div>
     <div *ngIf="showForm" style="margin-top: 20px;">
       <div class="form-grid">
-        <mat-form-field appearance="outline">
-          <mat-label>Producto</mat-label>
-          <mat-select [(ngModel)]="form.productoId">
-            <mat-option *ngFor="let p of productosRef" [value]="p.id">{{ p.nombre }}</mat-option>
-          </mat-select>
-        </mat-form-field>
+        <app-select-buscable label="Producto" [opciones]="productosOpc"
+                             [(value)]="form.productoId"></app-select-buscable>
         <mat-form-field appearance="outline" style="grid-column: 1 / -1;">
           <mat-label>Tu pregunta</mat-label>
           <textarea matInput rows="2" [(ngModel)]="form.pregunta"></textarea>
@@ -37,12 +33,10 @@
   <div class="op-card">
     <!-- Filtros -->
     <div class="form-grid">
-      <mat-form-field appearance="outline" *ngIf="esCliente">
-        <mat-label>Producto</mat-label>
-        <mat-select [(ngModel)]="productoSel" (selectionChange)="cargar()">
-          <mat-option *ngFor="let p of productosRef" [value]="p.id">{{ p.nombre }}</mat-option>
-        </mat-select>
-      </mat-form-field>
+      <app-select-buscable *ngIf="esCliente" label="Producto" [opciones]="productosOpc"
+                           [value]="productoSel"
+                           (valueChange)="productoSel = $event; cargar()">
+      </app-select-buscable>
       <mat-form-field appearance="outline" *ngIf="!esCliente">
         <mat-label>Filtrar por estado</mat-label>
         <mat-select [(ngModel)]="filtroEstado" (selectionChange)="cargar()">

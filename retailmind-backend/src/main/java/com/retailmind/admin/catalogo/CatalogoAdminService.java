@@ -92,6 +92,52 @@ public class CatalogoAdminService {
                 ORDER BY p.nombre""");
     }
 
+    /**
+     * Búsqueda paginada del catálogo (LIMIT/OFFSET). El listado completo
+     * ({@link #listarProductos()}) se mantiene para compatibilidad, pero la
+     * pantalla de productos usa esta variante: con ~1.200 productos el
+     * frontend ya no puede renderizar todo de una vez.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> buscarProductos(String q, Long marcaId, Long categoriaId,
+                                               int page, int size) {
+        int limit = Math.min(Math.max(size, 1), 100);
+        int offset = Math.max(page, 0) * limit;
+        String filtro = (q == null || q.isBlank()) ? null : "%" + q.trim() + "%";
+        String where = """
+                WHERE (?::text IS NULL OR p.nombre ILIKE ?::text OR p.slug ILIKE ?::text
+                       OR m.nombre ILIKE ?::text
+                       OR EXISTS (SELECT 1 FROM producto_variante pv
+                                  WHERE pv.producto_id = p.id AND pv.sku ILIKE ?::text))
+                  AND (?::bigint IS NULL OR p.marca_id = ?::bigint)
+                  AND (?::bigint IS NULL OR EXISTS (SELECT 1 FROM producto_categoria pc
+                                                    WHERE pc.producto_id = p.id
+                                                      AND pc.categoria_id = ?::bigint))""";
+        Object[] filtros = { filtro, filtro, filtro, filtro, filtro,
+                             marcaId, marcaId, categoriaId, categoriaId };
+
+        Long total = pg.queryForObject(
+                "SELECT count(*) FROM producto p LEFT JOIN marca m ON m.id = p.marca_id " + where,
+                Long.class, filtros);
+
+        Object[] args = new Object[filtros.length + 2];
+        System.arraycopy(filtros, 0, args, 0, filtros.length);
+        args[filtros.length] = limit;
+        args[filtros.length + 1] = offset;
+        List<Map<String, Object>> items = pg.queryForList("""
+                SELECT p.id, p.nombre, p.slug, p.descripcion_corta, p.publicado, p.activo,
+                       m.nombre AS marca,
+                       (SELECT count(*) FROM producto_variante pv WHERE pv.producto_id = p.id) AS variantes
+                FROM producto p LEFT JOIN marca m ON m.id = p.marca_id
+                """ + where + """
+
+                ORDER BY p.nombre
+                LIMIT ? OFFSET ?""", args);
+
+        return Map.of("items", items, "total", total == null ? 0 : total,
+                      "page", Math.max(page, 0), "size", limit);
+    }
+
     @Transactional(readOnly = true)
     public Map<String, Object> obtenerProducto(long id) {
         Map<String, Object> producto = pg.queryForMap("""

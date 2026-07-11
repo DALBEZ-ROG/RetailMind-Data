@@ -11,6 +11,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ResenasService } from '../../../core/services/resenas.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { SelectBuscableComponent, OpcionBuscable } from '../../../core/components/select-buscable/select-buscable.component';
 import { mensajeError } from '../../../core/services/api-error.util';
 import {
   ResenaRow, ResenaPublica, ReporteResenaRow, ProductoResenaRef
@@ -27,7 +28,8 @@ const TRANSICIONES: Record<string, string[]> = {
   selector: 'app-resenas',
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
-    MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule, MatTooltipModule],
+    MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule, MatTooltipModule,
+    SelectBuscableComponent],
   templateUrl: './resenas.component.html',
   styleUrl: '../operativo-shared.scss'
 })
@@ -49,6 +51,7 @@ export class ResenasComponent implements OnInit {
   reporteForm = { motivo: 'ofensivo', comentario: '' };
 
   productosRef: ProductoResenaRef[] = [];
+  productosOpc: OpcionBuscable[] = [];
   loading = true;
 
   estados = ['pendiente', 'aprobada', 'rechazada'];
@@ -66,7 +69,13 @@ export class ResenasComponent implements OnInit {
   get esCliente(): boolean { return this.auth.hasRole('CLIENTE'); }
 
   ngOnInit(): void {
-    this.servicio.productosRef().subscribe({ next: p => this.productosRef = p, error: () => {} });
+    this.servicio.productosRef().subscribe({
+      next: p => {
+        this.productosRef = p;
+        this.productosOpc = p.map(x => ({ id: x.id, texto: x.nombre }));
+      },
+      error: () => {}
+    });
     this.cargar();
   }
 

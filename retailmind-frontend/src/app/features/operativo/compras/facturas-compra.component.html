@@ -40,7 +40,7 @@
     </div>
   </div>
 
-  <div class="op-card">
+  <div class="op-card" *ngIf="puedeVerCuentas; else sinAccesoCuentas">
     <h3><mat-icon>account_balance_wallet</mat-icon> Cuentas por pagar ({{ cuentas.length }})</h3>
     <div class="table-wrapper" *ngIf="cuentas.length; else vacio">
       <table mat-table [dataSource]="cuentas">
@@ -122,4 +122,13 @@
       </div>
     </div>
   </div>
+
+  <ng-template #sinAccesoCuentas>
+    <div class="op-card">
+      <div class="empty-state">
+        <mat-icon>lock</mat-icon>
+        <p>Tu rol no tiene acceso a las cuentas por pagar.</p>
+      </div>
+    </div>
+  </ng-template>
 </div>

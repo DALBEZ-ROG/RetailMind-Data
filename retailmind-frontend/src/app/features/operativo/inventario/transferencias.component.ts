@@ -10,6 +10,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { InventarioService } from '../../../core/services/inventario.service';
 import { ReferenciasService } from '../../../core/services/referencias.service';
+import { SelectBuscableComponent, OpcionBuscable } from '../../../core/components/select-buscable/select-buscable.component';
 import { mensajeError } from '../../../core/services/api-error.util';
 import {
   BodegaRef, VarianteRef, StockRow, TransferenciaRow
@@ -19,7 +20,8 @@ import {
   selector: 'app-transferencias',
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
-    MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule],
+    MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule,
+    SelectBuscableComponent],
   templateUrl: './transferencias.component.html',
   styleUrl: '../operativo-shared.scss'
 })
@@ -27,6 +29,7 @@ export class TransferenciasComponent implements OnInit {
 
   bodegas: BodegaRef[] = [];
   variantes: VarianteRef[] = [];
+  variantesOpc: OpcionBuscable[] = [];
   transferencias: TransferenciaRow[] = [];
 
   varianteId: number | null = null;
@@ -44,7 +47,10 @@ export class TransferenciasComponent implements OnInit {
 
   ngOnInit(): void {
     this.referencias.bodegas().subscribe(b => this.bodegas = b);
-    this.referencias.variantes().subscribe(v => this.variantes = v);
+    this.referencias.variantes().subscribe(v => {
+      this.variantes = v;
+      this.variantesOpc = v.map(x => ({ id: x.id, texto: `${x.sku} — ${x.producto}` }));
+    });
     this.cargarTransferencias();
   }
 

@@ -35,14 +35,10 @@
 
       <h3><mat-icon>playlist_add</mat-icon> Líneas de la orden</h3>
       <div class="linea-item" *ngFor="let l of lineas; let i = index">
-        <mat-form-field appearance="outline">
-          <mat-label>Variante (SKU)</mat-label>
-          <mat-select [(ngModel)]="l.varianteId" (selectionChange)="alSeleccionarVariante(l)">
-            <mat-option *ngFor="let v of variantes" [value]="v.id">
-              {{ v.sku }} — {{ v.producto }}
-            </mat-option>
-          </mat-select>
-        </mat-form-field>
+        <app-select-buscable label="Variante (SKU)" [opciones]="variantesOpc"
+                             [value]="l.varianteId"
+                             (valueChange)="l.varianteId = $event; alSeleccionarVariante(l)">
+        </app-select-buscable>
         <mat-form-field appearance="outline">
           <mat-label>Cantidad</mat-label>
           <input matInput type="number" min="1" [(ngModel)]="l.cantidad">

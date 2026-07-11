@@ -12,6 +12,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { ComprasService } from '../../../core/services/compras.service';
 import { ReferenciasService } from '../../../core/services/referencias.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { SelectBuscableComponent, OpcionBuscable } from '../../../core/components/select-buscable/select-buscable.component';
 import { mensajeError } from '../../../core/services/api-error.util';
 import {
   ProveedorRef, BodegaRef, VarianteRef, OrdenCompraRow, OrdenCompraDetalle
@@ -23,7 +24,8 @@ interface LineaOrden { varianteId: number | null; cantidad: number; precioUnitar
   selector: 'app-ordenes-compra',
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
-    MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule, MatTooltipModule],
+    MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule, MatTooltipModule,
+    SelectBuscableComponent],
   templateUrl: './ordenes-compra.component.html',
   styleUrl: '../operativo-shared.scss'
 })
@@ -33,6 +35,7 @@ export class OrdenesCompraComponent implements OnInit {
   proveedores: ProveedorRef[] = [];
   bodegas: BodegaRef[] = [];
   variantes: VarianteRef[] = [];
+  variantesOpc: OpcionBuscable[] = [];
   loading = true;
 
   showForm = false;
@@ -60,7 +63,11 @@ export class OrdenesCompraComponent implements OnInit {
     this.cargarOrdenes();
     this.referencias.proveedores().subscribe(p => this.proveedores = p);
     this.referencias.bodegas().subscribe(b => this.bodegas = b);
-    this.referencias.variantes().subscribe(v => this.variantes = v);
+    this.referencias.variantes().subscribe(v => {
+      this.variantes = v;
+      this.variantesOpc = v.map(x =>
+        ({ id: x.id, texto: `${x.sku} — ${x.producto} (costo $${Number(x.costo ?? 0).toFixed(2)})` }));
+    });
   }
 
   cargarOrdenes(): void {

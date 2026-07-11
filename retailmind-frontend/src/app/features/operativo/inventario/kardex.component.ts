@@ -8,8 +8,10 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { InventarioService } from '../../../core/services/inventario.service';
 import { ReferenciasService } from '../../../core/services/referencias.service';
+import { SelectBuscableComponent, OpcionBuscable } from '../../../core/components/select-buscable/select-buscable.component';
 import { mensajeError } from '../../../core/services/api-error.util';
 import { BodegaRef, VarianteRef, KardexRow } from '../../../core/models/operativo.model';
 
@@ -18,7 +20,8 @@ import { BodegaRef, VarianteRef, KardexRow } from '../../../core/models/operativ
   selector: 'app-kardex',
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
-    MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule],
+    MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule,
+    MatPaginatorModule, SelectBuscableComponent],
   templateUrl: './kardex.component.html',
   styleUrl: '../operativo-shared.scss'
 })
@@ -26,11 +29,17 @@ export class KardexComponent implements OnInit {
 
   bodegas: BodegaRef[] = [];
   variantes: VarianteRef[] = [];
+  variantesOpc: OpcionBuscable[] = [];
   movimientos: KardexRow[] = [];
 
   varianteId: number | null = null;
   bodegaId: number | null = null;
   loading = false;
+
+  // Paginación client-side (el backend limita a 500 movimientos)
+  pagina = 0;
+  tamPagina = 25;
+  readonly tamanos = [25, 50, 100];
 
   columnas = ['fecha', 'sku', 'bodega', 'tipo', 'entrada', 'salida', 'stock', 'referencia'];
 
@@ -39,19 +48,32 @@ export class KardexComponent implements OnInit {
 
   ngOnInit(): void {
     this.referencias.bodegas().subscribe(b => this.bodegas = b);
-    this.referencias.variantes().subscribe(v => this.variantes = v);
+    this.referencias.variantes().subscribe(v => {
+      this.variantes = v;
+      this.variantesOpc = v.map(x => ({ id: x.id, texto: `${x.sku} — ${x.producto}` }));
+    });
     this.consultar();
   }
 
   consultar(): void {
     this.loading = true;
     this.inventario.kardex(this.varianteId, this.bodegaId).subscribe({
-      next: data => { this.movimientos = data; this.loading = false; },
+      next: data => { this.movimientos = data; this.pagina = 0; this.loading = false; },
       error: e => {
         this.loading = false;
         this.snackBar.open(mensajeError(e, 'No se pudo consultar el kardex'), 'Cerrar', { duration: 5000 });
       }
     });
+  }
+
+  get movimientosPagina(): KardexRow[] {
+    const inicio = this.pagina * this.tamPagina;
+    return this.movimientos.slice(inicio, inicio + this.tamPagina);
+  }
+
+  alPaginar(e: PageEvent): void {
+    this.pagina = e.pageIndex;
+    this.tamPagina = e.pageSize;
   }
 
   limpiar(): void {
