@@ -10,8 +10,23 @@ export const routes: Routes = [
   },
   {
     path: '',
-    redirectTo: 'shop',
+    redirectTo: 'inicio',
     pathMatch: 'full'
+  },
+  // Dashboard de inicio (landing post-login): nivel 1 áreas, nivel 2 acciones.
+  // Sin roleGuard: el propio componente filtra áreas/acciones con la misma
+  // matriz de permisos (NavPermissionsService) que protege cada ruta destino.
+  {
+    path: 'inicio',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/inicio/inicio.component').then(m => m.InicioComponent)
+  },
+  {
+    path: 'inicio/:area',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/inicio/inicio.component').then(m => m.InicioComponent)
   },
   {
     path: 'shop',
@@ -278,6 +293,6 @@ export const routes: Routes = [
   },
   {
     path: '**',
-    redirectTo: 'shop'
+    redirectTo: 'inicio'
   }
 ];

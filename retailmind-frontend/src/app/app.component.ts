@@ -13,6 +13,7 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { filter } from 'rxjs';
 import { AuthService } from './core/services/auth.service';
+import { NavPermissionsService } from './core/navigation/nav-permissions.service';
 import { ServerStatusComponent } from './core/components/server-status/server-status.component';
 
 @Component({
@@ -40,11 +41,14 @@ import { ServerStatusComponent } from './core/components/server-status/server-st
 })
 export class AppComponent {
   title = 'RetailMind Shop';
-  sidenavOpened = true;
-  breadcrumb = 'Tienda';
+  // El dashboard de inicio es la entrada principal: el sidebar queda como
+  // navegación secundaria, colapsado por defecto.
+  sidebarOpen = false;
+  breadcrumb = 'Inicio';
   configExpanded = true;
 
   private routeMap: Record<string, string> = {
+    '/inicio': 'Inicio',
     '/shop': 'Tienda',
     '/shop/carrito': 'Mi Carrito',
     '/dashboard': 'Dashboard',
@@ -78,13 +82,23 @@ export class AppComponent {
     '/operativo/horarios': 'Horarios de Acceso'
   };
 
-  constructor(public authService: AuthService, private router: Router) {
+  constructor(
+    public authService: AuthService,
+    private nav: NavPermissionsService,
+    private router: Router
+  ) {
     this.router.events.pipe(
       filter(e => e instanceof NavigationEnd)
     ).subscribe((e: any) => {
       const url = e.urlAfterRedirects;
-      this.breadcrumb = this.routeMap[url] || (url.includes('/shop/producto') ? 'Detalle Producto' : 'Tienda');
+      this.breadcrumb = this.routeMap[url]
+        || (url.startsWith('/inicio/') ? (this.nav.area(url.split('/')[2])?.titulo || 'Inicio') : null)
+        || (url.includes('/shop/producto') ? 'Detalle Producto' : 'Inicio');
     });
+  }
+
+  toggleSidebar(): void {
+    this.sidebarOpen = !this.sidebarOpen;
   }
 
   get isLoginPage(): boolean {
@@ -103,26 +117,22 @@ export class AppComponent {
     return this.authService.hasRole('CLIENTE');
   }
 
-  /** true si el usuario actual tiene alguno de los roles indicados. */
-  hasAnyRole(roles: string[]): boolean {
-    const user = this.authService.getCurrentUser();
-    return !!user && roles.includes(user.rol);
-  }
-
-  // Visibilidad de las secciones operativas del sidebar (espeja SecurityConfig)
-  get canCatalogo(): boolean   { return this.hasAnyRole(['ADMIN']); }
-  get canCompras(): boolean    { return this.hasAnyRole(['ADMIN', 'GERENTE', 'COMPRAS', 'BODEGA']); }
-  get canInventario(): boolean { return this.hasAnyRole(['ADMIN', 'GERENTE', 'BODEGA']); }
-  get canAjustes(): boolean    { return this.hasAnyRole(['ADMIN', 'BODEGA']); }
-  get canKardex(): boolean     { return this.hasAnyRole(['ADMIN', 'GERENTE', 'BODEGA', 'ANALISTA']); }
-  get canVentas(): boolean     { return this.hasAnyRole(['ADMIN', 'GERENTE', 'VENDEDOR']); }
-  get canLogistica(): boolean  { return this.hasAnyRole(['ADMIN', 'GERENTE', 'VENDEDOR', 'DESPACHO']); }
-  get canDespachar(): boolean  { return this.hasAnyRole(['ADMIN', 'GERENTE', 'DESPACHO']); }
-  get canMarketing(): boolean  { return this.hasAnyRole(['ADMIN', 'GERENTE']); }
-  get canTickets(): boolean    { return this.hasAnyRole(['ADMIN', 'GERENTE', 'CLIENTE']); }
-  get canCategoriasTicket(): boolean { return this.hasAnyRole(['ADMIN']); }
-  get canFaq(): boolean        { return this.hasAnyRole(['ADMIN', 'GERENTE', 'ANALISTA', 'CLIENTE']); }
-  get canResenas(): boolean    { return this.hasAnyRole(['ADMIN', 'GERENTE', 'CLIENTE']); }
+  // Visibilidad de las secciones operativas del sidebar. Delegan en
+  // NavPermissionsService (matriz ROLES_POR_PERMISO de core/navigation):
+  // el mismo punto único de verdad que usa el dashboard de inicio.
+  get canCatalogo(): boolean   { return this.nav.can('catalogo'); }
+  get canCompras(): boolean    { return this.nav.can('compras'); }
+  get canInventario(): boolean { return this.nav.can('inventario'); }
+  get canAjustes(): boolean    { return this.nav.can('ajustes'); }
+  get canKardex(): boolean     { return this.nav.can('kardex'); }
+  get canVentas(): boolean     { return this.nav.can('ventas'); }
+  get canLogistica(): boolean  { return this.nav.can('logistica'); }
+  get canDespachar(): boolean  { return this.nav.can('despachar'); }
+  get canMarketing(): boolean  { return this.nav.can('marketing'); }
+  get canTickets(): boolean    { return this.nav.can('tickets'); }
+  get canCategoriasTicket(): boolean { return this.nav.can('categoriasTicket'); }
+  get canFaq(): boolean        { return this.nav.can('faq'); }
+  get canResenas(): boolean    { return this.nav.can('resenas'); }
 
   goToProfile(): void {
     this.router.navigate(['/perfil']);

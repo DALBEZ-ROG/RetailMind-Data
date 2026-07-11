@@ -37,6 +37,39 @@
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   letter-spacing: -0.5px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: var(--transition);
+
+  &:hover {
+    opacity: 0.8;
+  }
+}
+
+.sidebar-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin-right: 12px;
+  border: none;
+  border-radius: 12px;
+  background: rgba(26, 35, 126, 0.06);
+  color: var(--primary);
+  cursor: pointer;
+  transition: var(--transition);
+
+  &:hover {
+    background: rgba(26, 35, 126, 0.12);
+    transform: scale(1.05);
+  }
+
+  mat-icon {
+    font-size: 22px;
+    width: 22px;
+    height: 22px;
+  }
 }
 
 .navbar-spacer {
@@ -104,6 +137,13 @@
   overflow-x: hidden;
   padding-top: 88px;
   z-index: 999;
+  // Colapsado por defecto: el dashboard de inicio es la entrada principal
+  transform: translateX(-100%);
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+
+  &.open {
+    transform: translateX(0);
+  }
 
   &::before {
     content: '';
@@ -171,7 +211,15 @@
   }
 }
 
+// Enlace "Inicio" destacado al tope del sidebar
+.nav-inicio {
+  margin-top: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 // Icon colors per module
+.nav-item .icon-inicio { color: #80deea; }
 .nav-item .icon-tienda { color: #64b5f6; }
 .nav-item .icon-carrito { color: #81c784; }
 .nav-item .icon-wishlist { color: #f48fb1; }
@@ -237,10 +285,22 @@
 // MAIN CONTENT
 // ══════════════════════════════════════════════════════════════════════════════
 .main-content {
-  margin-left: 280px;
+  margin-left: 0;
   padding: 92px 32px 32px;
   min-height: 100vh;
   background: var(--bg-main);
+  transition: margin-left 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+
+  &.with-sidebar {
+    margin-left: 280px;
+  }
+}
+
+// En pantallas pequeñas el sidebar flota como overlay: no empuja el contenido
+@media (max-width: 900px) {
+  .main-content.with-sidebar {
+    margin-left: 0;
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

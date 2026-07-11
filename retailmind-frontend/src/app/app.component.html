@@ -5,7 +5,11 @@
 <ng-template #mainLayout>
   <!-- Navbar flotante glassmorphism -->
   <nav class="navbar">
-    <span class="navbar-logo">RetailMind</span>
+    <button class="sidebar-toggle" (click)="toggleSidebar()"
+            [matTooltip]="sidebarOpen ? 'Ocultar menú' : 'Mostrar menú'">
+      <mat-icon>{{ sidebarOpen ? 'menu_open' : 'menu' }}</mat-icon>
+    </button>
+    <a class="navbar-logo" routerLink="/inicio" matTooltip="Ir al inicio">RetailMind</a>
     <span class="navbar-spacer"></span>
 
     <div class="navbar-actions" *ngIf="currentUser">
@@ -38,8 +42,14 @@
     </div>
   </nav>
 
-  <!-- Sidebar premium -->
-  <aside class="sidebar">
+  <!-- Sidebar premium (navegación secundaria, colapsado por defecto) -->
+  <aside class="sidebar" [class.open]="sidebarOpen">
+    <a class="nav-item nav-inicio" routerLink="/inicio" routerLinkActive="active"
+       [routerLinkActiveOptions]="{ exact: true }">
+      <mat-icon class="icon-inicio">home</mat-icon>
+      <span>Inicio</span>
+    </a>
+
     <!-- Admin Section FIRST -->
     <ng-container *ngIf="isAdmin">
       <div class="sidebar-section-label">Administración</div>
@@ -276,7 +286,7 @@
   </aside>
 
   <!-- Main content -->
-  <main class="main-content">
+  <main class="main-content" [class.with-sidebar]="sidebarOpen">
     <router-outlet />
   </main>
 </ng-template>

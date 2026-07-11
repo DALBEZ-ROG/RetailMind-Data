@@ -1,0 +1,292 @@
+// ══════════════════════════════════════════════════════════════════════════════
+// DASHBOARD DE INICIO — lenguaje Dubai (glassmorphism + gradientes de la paleta)
+// ══════════════════════════════════════════════════════════════════════════════
+.inicio-page {
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+// ── Hero ─────────────────────────────────────────────────────────────────────
+.inicio-hero {
+  position: relative;
+  overflow: hidden;
+  background: var(--primary-gradient);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-medium);
+  color: white;
+  padding: 32px 36px;
+  margin-bottom: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+
+  .hero-glow {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+
+    &::before {
+      content: '';
+      position: absolute;
+      top: -60%;
+      right: -5%;
+      width: 260px;
+      height: 260px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 50%;
+    }
+
+    &::after {
+      content: '';
+      position: absolute;
+      bottom: -70%;
+      right: 18%;
+      width: 180px;
+      height: 180px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 50%;
+    }
+  }
+
+  .hero-saludo {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.65);
+    margin-bottom: 6px;
+  }
+
+  h1 {
+    font-size: 30px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    line-height: 1.15;
+  }
+
+  .hero-nombre {
+    background: linear-gradient(135deg, #80deea, #b2ebf2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .hero-sub {
+    margin-top: 8px;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.75);
+  }
+
+  .hero-rol {
+    position: relative;
+    padding: 6px 18px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    backdrop-filter: var(--blur);
+    -webkit-backdrop-filter: var(--blur);
+    white-space: nowrap;
+  }
+}
+
+// Hero del nivel 2: fondo claro glass con acento del área
+.area-hero {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: var(--shadow-glass);
+  color: var(--text-primary);
+  flex-direction: column;
+  align-items: flex-start;
+
+  .hero-glow::before { background: color-mix(in srgb, var(--acento) 8%, transparent); }
+  .hero-glow::after  { background: color-mix(in srgb, var(--acento) 5%, transparent); }
+
+  .hero-back {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px 6px 10px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    color: var(--text-secondary);
+    background: rgba(26, 35, 126, 0.05);
+    transition: var(--transition);
+    margin-bottom: 18px;
+
+    mat-icon { font-size: 18px; width: 18px; height: 18px; }
+
+    &:hover {
+      color: var(--text-primary);
+      background: rgba(26, 35, 126, 0.1);
+      transform: translateX(-3px);
+    }
+  }
+
+  .hero-area {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+  }
+
+  .hero-area-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 24px color-mix(in srgb, var(--acento) 35%, transparent);
+    flex-shrink: 0;
+
+    mat-icon { color: white; font-size: 30px; width: 30px; height: 30px; }
+  }
+
+  h1 { font-size: 26px; }
+
+  .hero-sub { color: var(--text-secondary); }
+}
+
+// ── Grid responsive ──────────────────────────────────────────────────────────
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+// ── Cards (glassmorphism + acento por área) ──────────────────────────────────
+.dash-card {
+  --acento: var(--primary);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 24px;
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-glass);
+  transition: var(--transition);
+  overflow: hidden;
+  opacity: 0;
+  animation: fadeInUp 0.5s ease forwards;
+
+  // filo superior con el acento del área
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--acento);
+    opacity: 0;
+    transition: var(--transition);
+  }
+
+  &:hover {
+    transform: translateY(-6px);
+    border-color: color-mix(in srgb, var(--acento) 30%, white);
+    box-shadow:
+      0 16px 40px color-mix(in srgb, var(--acento) 22%, transparent),
+      var(--shadow-glass);
+
+    &::before { opacity: 1; }
+
+    .card-icon { transform: scale(1.08) rotate(-3deg); }
+
+    .card-arrow {
+      transform: translateX(4px);
+      color: var(--acento);
+    }
+  }
+}
+
+.card-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--acento) 30%, transparent);
+  transition: var(--transition);
+  flex-shrink: 0;
+
+  mat-icon { color: white; font-size: 26px; width: 26px; height: 26px; }
+}
+
+.card-body {
+  h3 {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.2px;
+    margin-bottom: 4px;
+  }
+
+  p {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+}
+
+.card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+}
+
+.card-count {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--acento);
+  background: color-mix(in srgb, var(--acento) 10%, white);
+  border: 1px solid color-mix(in srgb, var(--acento) 25%, white);
+}
+
+.card-arrow {
+  color: var(--text-light);
+  transition: var(--transition);
+}
+
+// Cards de acción (nivel 2): flecha abajo a la derecha
+.accion-card {
+  .card-arrow {
+    align-self: flex-end;
+    margin-top: auto;
+  }
+}
+
+// ── Responsive ───────────────────────────────────────────────────────────────
+@media (max-width: 700px) {
+  .inicio-hero {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 24px;
+
+    h1 { font-size: 24px; }
+  }
+
+  .cards-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+}

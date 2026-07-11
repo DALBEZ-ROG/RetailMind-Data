@@ -49,12 +49,9 @@ export class LoginComponent {
     this.authService.login((username ?? '').trim(), password).subscribe({
       next: () => {
         this.loading = false;
-        const user = this.authService.getCurrentUser();
-        if (user?.rol === 'ADMIN') {
-          this.router.navigate(['/dashboard']);
-        } else {
-          this.router.navigate(['/shop']);
-        }
+        // Todos los roles aterrizan en el dashboard de inicio; el propio
+        // dashboard filtra las áreas visibles según el rol.
+        this.router.navigate(['/inicio']);
       },
       error: () => {
         this.loading = false;

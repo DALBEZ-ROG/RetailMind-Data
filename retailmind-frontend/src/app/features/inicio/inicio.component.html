@@ -1,0 +1,72 @@
+<!-- ═══════════ NIVEL 1 — Áreas ═══════════ -->
+<div class="inicio-page" *ngIf="!area">
+  <header class="inicio-hero animate-fade-up">
+    <div class="hero-glow"></div>
+    <div class="hero-text">
+      <p class="hero-saludo">Bienvenido de nuevo</p>
+      <h1>Hola, <span class="hero-nombre">{{ nombre }}</span></h1>
+      <p class="hero-sub">Estas son tus áreas de trabajo en RetailMind.</p>
+    </div>
+    <span class="hero-rol">{{ rol }}</span>
+  </header>
+
+  <div class="cards-grid">
+    <a class="dash-card area-card"
+       *ngFor="let a of areas; let i = index"
+       [routerLink]="['/inicio', a.id]"
+       [style.--acento]="a.acento"
+       [style.animation-delay]="(i * 55) + 'ms'">
+      <div class="card-icon" [style.background]="a.gradiente">
+        <mat-icon>{{ a.icono }}</mat-icon>
+      </div>
+      <div class="card-body">
+        <h3>{{ a.titulo }}</h3>
+        <p>{{ a.descripcion }}</p>
+      </div>
+      <div class="card-foot">
+        <span class="card-count">
+          {{ contarAcciones(a) }} {{ contarAcciones(a) === 1 ? 'módulo' : 'módulos' }}
+        </span>
+        <mat-icon class="card-arrow">arrow_forward</mat-icon>
+      </div>
+    </a>
+  </div>
+</div>
+
+<!-- ═══════════ NIVEL 2 — Acciones del área ═══════════ -->
+<div class="inicio-page" *ngIf="area">
+  <header class="inicio-hero area-hero animate-fade-up"
+          [style.--acento]="area.acento">
+    <div class="hero-glow"></div>
+    <a class="hero-back" routerLink="/inicio">
+      <mat-icon>arrow_back</mat-icon>
+      <span>Inicio</span>
+    </a>
+    <div class="hero-area">
+      <div class="hero-area-icon" [style.background]="area.gradiente">
+        <mat-icon>{{ area.icono }}</mat-icon>
+      </div>
+      <div class="hero-text">
+        <h1>{{ area.titulo }}</h1>
+        <p class="hero-sub">{{ area.descripcion }}</p>
+      </div>
+    </div>
+  </header>
+
+  <div class="cards-grid">
+    <a class="dash-card accion-card"
+       *ngFor="let ac of acciones; let i = index"
+       [routerLink]="ac.ruta"
+       [style.--acento]="area.acento"
+       [style.animation-delay]="(i * 55) + 'ms'">
+      <div class="card-icon" [style.background]="area.gradiente">
+        <mat-icon>{{ ac.icono }}</mat-icon>
+      </div>
+      <div class="card-body">
+        <h3>{{ tituloAccion(ac) }}</h3>
+        <p>{{ ac.descripcion }}</p>
+      </div>
+      <mat-icon class="card-arrow">arrow_forward</mat-icon>
+    </a>
+  </div>
+</div>
