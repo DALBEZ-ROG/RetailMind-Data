@@ -6,15 +6,15 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ShopService } from '../shop/shop.service';
-import { AuthService } from '../../core/services/auth.service';
-import { HttpClient } from '@angular/common/http';
-import { environment } from '../../../environments/environment';
+import { mensajeError } from '../../core/services/api-error.util';
 
 const CATEGORY_ICONS: Record<number, string> = {
   1: 'devices', 2: 'shopping_basket', 3: 'sports_soccer', 4: 'watch',
-  5: 'spa', 6: 'home', 7: 'directions_walk', 8: 'checkroom'
+  5: 'spa', 6: 'home', 7: 'directions_walk', 8: 'checkroom',
+  9: 'checkroom', 10: 'checkroom', 11: 'category'
 };
 
+/** Wishlist del cliente sobre PostgreSQL (wishlist/wishlist_item, RLS propio). */
 @Component({
   selector: 'app-wishlist',
   standalone: true,
@@ -28,9 +28,7 @@ export class WishlistComponent implements OnInit {
   loading = true;
 
   constructor(
-    private http: HttpClient,
     private shopService: ShopService,
-    private authService: AuthService,
     private router: Router,
     private snackBar: MatSnackBar
   ) {}
@@ -40,37 +38,36 @@ export class WishlistComponent implements OnInit {
   }
 
   loadWishlist(): void {
-    const user = this.authService.getCurrentUser();
-    if (!user) return;
     this.loading = true;
-    this.http.get<any[]>(`${environment.apiUrl}/api/wishlist/${user.username}`).subscribe({
+    this.shopService.getWishlist().subscribe({
       next: (items) => { this.items = items; this.loading = false; },
-      error: () => { this.items = []; this.loading = false; }
+      error: (e) => {
+        this.items = [];
+        this.loading = false;
+        this.snackBar.open(mensajeError(e, 'No se pudo cargar la wishlist'), 'Cerrar', { duration: 4000 });
+      }
     });
   }
 
   agregarAlCarrito(item: any): void {
-    const user = this.authService.getCurrentUser();
-    if (!user) return;
-    this.shopService.agregarAlCarrito(user.username, item.productoId, 1).subscribe({
-      next: () => this.snackBar.open('Agregado al carrito ✓', 'OK', { duration: 2000, panelClass: ['snack-success'] }),
-      error: () => this.snackBar.open('Error al agregar', 'Cerrar', { duration: 3000 })
+    this.shopService.agregarAlCarrito(item.productoId, 1).subscribe({
+      next: () => this.snackBar.open('Agregado al carrito ✓', 'OK',
+        { duration: 2000, panelClass: ['snack-success'] }),
+      error: (e) => this.snackBar.open(mensajeError(e, 'Error al agregar'), 'Cerrar', { duration: 3000 })
     });
   }
 
-  eliminarDeWishlist(productoId: string): void {
-    const user = this.authService.getCurrentUser();
-    if (!user) return;
-    this.http.delete(`${environment.apiUrl}/api/wishlist/${user.username}/${productoId}`).subscribe({
+  eliminarDeWishlist(productoId: number): void {
+    this.shopService.eliminarDeWishlist(productoId).subscribe({
       next: () => {
         this.items = this.items.filter(i => i.productoId !== productoId);
         this.snackBar.open('Eliminado de wishlist', 'OK', { duration: 2000 });
       },
-      error: () => this.snackBar.open('Error al eliminar', 'Cerrar', { duration: 3000 })
+      error: (e) => this.snackBar.open(mensajeError(e, 'Error al eliminar'), 'Cerrar', { duration: 3000 })
     });
   }
 
-  verProducto(productoId: string): void {
+  verProducto(productoId: number): void {
     this.router.navigate(['/shop/producto', productoId]);
   }
 

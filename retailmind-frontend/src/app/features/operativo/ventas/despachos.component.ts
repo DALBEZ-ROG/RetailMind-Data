@@ -26,6 +26,7 @@ import {
 export class DespachosComponent implements OnInit {
 
   pedidos: PedidoVentaRow[] = [];
+  pedidosEnTransito: PedidoVentaRow[] = [];
   transportistas: CatalogoRef[] = [];
   metodosEnvio: CatalogoRef[] = [];
 
@@ -33,6 +34,11 @@ export class DespachosComponent implements OnInit {
   transportistaId: number | null = null;
   metodoEnvioId: number | null = null;
   observacion = '';
+
+  // Entrega (despachado -> entregado)
+  pedidoEntregaId: number | null = null;
+  observacionEntrega = '';
+  entregando = false;
 
   envio: EnvioDetalle | null = null;
   seguimiento: SeguimientoRow[] = [];
@@ -48,9 +54,37 @@ export class DespachosComponent implements OnInit {
   }
 
   cargarPedidos(): void {
-    // Despachables: aún no despachados ni devueltos
-    this.ventas.pedidos().subscribe(p =>
-      this.pedidos = p.filter(x => ['confirmado', 'pagado', 'en_preparacion'].includes(x.estado)));
+    this.ventas.pedidos().subscribe(p => {
+      // Despachables: PAGADOS y con factura emitida (compuertas del backend)
+      this.pedidos = p.filter(x =>
+        ['pagado', 'en_preparacion'].includes(x.estado) && !!x.tiene_factura);
+      // Entregables: en tránsito
+      this.pedidosEnTransito = p.filter(x => x.estado === 'despachado');
+    });
+  }
+
+  entregar(): void {
+    if (!this.pedidoEntregaId) {
+      this.snackBar.open('Selecciona el pedido a entregar', 'Cerrar', { duration: 3000 });
+      return;
+    }
+    this.entregando = true;
+    this.ventas.entregar(this.pedidoEntregaId, this.observacionEntrega).subscribe({
+      next: p => {
+        this.entregando = false;
+        this.pedidoEntregaId = null;
+        this.observacionEntrega = '';
+        this.snackBar.open(`Pedido ${p.numero} ENTREGADO`, 'OK',
+          { duration: 3500, panelClass: ['snack-success'] });
+        if (p.envio) this.cargarSeguimiento(p.envio.id);
+        this.cargarPedidos();
+      },
+      error: e => {
+        this.entregando = false;
+        this.snackBar.open(mensajeError(e, 'No se pudo registrar la entrega'), 'Cerrar', { duration: 5000 });
+        this.cargarPedidos();
+      }
+    });
   }
 
   despachar(): void {

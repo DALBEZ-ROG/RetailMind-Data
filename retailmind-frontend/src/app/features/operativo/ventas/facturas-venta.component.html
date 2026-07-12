@@ -1,7 +1,7 @@
 <div class="op-page">
   <div class="section-header">
     <h2><mat-icon>receipt</mat-icon> Facturas de Venta</h2>
-    <p>Emite la factura de un pedido y descarga su PDF imprimible.</p>
+    <p>Emite la factura de un pedido pagado y consulta las facturas emitidas con su PDF.</p>
   </div>
 
   <div class="op-card">
@@ -14,6 +14,7 @@
             {{ p.numero }} — {{ p.cliente }} ({{ p.total | currency:'USD' }} · {{ p.estado }})
           </mat-option>
         </mat-select>
+        <mat-hint>Solo pedidos pagados y aún sin factura</mat-hint>
       </mat-form-field>
     </div>
     <div class="form-actions">
@@ -26,41 +27,116 @@
       <div class="titulo"><mat-icon>check_circle</mat-icon> Factura emitida</div>
       <div class="dato">Número: <strong>{{ factura.numero }}</strong> · Pedido: <strong>{{ factura.numero_pedido }}</strong></div>
       <div class="dato">Cliente: <strong>{{ factura.razon_social }}</strong> · Identificación: <strong>{{ factura.identificacion }}</strong></div>
-
-      <div class="table-wrapper" style="margin-top:12px;">
-        <table mat-table [dataSource]="factura.detalles">
-          <ng-container matColumnDef="descripcion">
-            <th mat-header-cell *matHeaderCellDef>Descripción</th>
-            <td mat-cell *matCellDef="let d">{{ d.descripcion }}</td>
-          </ng-container>
-          <ng-container matColumnDef="cantidad">
-            <th mat-header-cell *matHeaderCellDef>Cant.</th>
-            <td mat-cell *matCellDef="let d">{{ d.cantidad }}</td>
-          </ng-container>
-          <ng-container matColumnDef="precio">
-            <th mat-header-cell *matHeaderCellDef>P. Unit.</th>
-            <td mat-cell *matCellDef="let d">{{ d.precio_unitario | currency:'USD' }}</td>
-          </ng-container>
-          <ng-container matColumnDef="subtotal">
-            <th mat-header-cell *matHeaderCellDef>Subtotal</th>
-            <td mat-cell *matCellDef="let d">{{ d.subtotal | currency:'USD' }}</td>
-          </ng-container>
-          <tr mat-header-row *matHeaderRowDef="['descripcion','cantidad','precio','subtotal']"></tr>
-          <tr mat-row *matRowDef="let d; columns: ['descripcion','cantidad','precio','subtotal']"></tr>
-        </table>
-      </div>
-
       <div class="total-banner">
         <div class="total-item"><div class="lbl">Subtotal</div><div class="val">{{ factura.subtotal | currency:'USD' }}</div></div>
         <div class="total-item"><div class="lbl">IVA</div><div class="val">{{ factura.monto_impuesto | currency:'USD' }}</div></div>
         <div class="total-item"><div class="lbl">Total</div><div class="val">{{ factura.total | currency:'USD' }}</div></div>
       </div>
-
       <div class="form-actions" style="margin-top:16px;">
         <button class="btn-aplicar" (click)="verPdf(factura.id)">
           <mat-icon>picture_as_pdf</mat-icon> Ver PDF
         </button>
       </div>
+    </div>
+  </div>
+
+  <div class="op-card">
+    <h3><mat-icon>list_alt</mat-icon> Facturas emitidas ({{ total }})</h3>
+    <div class="form-grid">
+      <mat-form-field appearance="outline">
+        <mat-label>Buscar (número, cliente o pedido)</mat-label>
+        <input matInput [(ngModel)]="q" (ngModelChange)="alBuscar()" placeholder="FV-… / nombre / PED-…">
+      </mat-form-field>
+    </div>
+    <div class="table-wrapper" *ngIf="facturas.length; else vacio">
+      <table mat-table [dataSource]="facturas">
+        <ng-container matColumnDef="numero">
+          <th mat-header-cell *matHeaderCellDef>Número</th>
+          <td mat-cell *matCellDef="let f"><strong>{{ f.numero }}</strong></td>
+        </ng-container>
+        <ng-container matColumnDef="pedido">
+          <th mat-header-cell *matHeaderCellDef>Pedido</th>
+          <td mat-cell *matCellDef="let f">{{ f.numero_pedido }}</td>
+        </ng-container>
+        <ng-container matColumnDef="cliente">
+          <th mat-header-cell *matHeaderCellDef>Cliente</th>
+          <td mat-cell *matCellDef="let f">{{ f.cliente }}</td>
+        </ng-container>
+        <ng-container matColumnDef="fecha">
+          <th mat-header-cell *matHeaderCellDef>Emitida</th>
+          <td mat-cell *matCellDef="let f">{{ f.fecha_emision | date:'short' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="total">
+          <th mat-header-cell *matHeaderCellDef>Total</th>
+          <td mat-cell *matCellDef="let f">{{ f.total | currency:'USD' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="estado">
+          <th mat-header-cell *matHeaderCellDef>Estado</th>
+          <td mat-cell *matCellDef="let f">
+            <span class="estado-chip"
+                  [class.ok]="f.estado === 'emitida' || f.estado === 'autorizada'"
+                  [class.error]="f.estado === 'anulada'">{{ f.estado }}</span>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="acciones">
+          <th mat-header-cell *matHeaderCellDef>Acciones</th>
+          <td mat-cell *matCellDef="let f">
+            <button mat-icon-button (click)="verDetalle(f.id)" matTooltip="Ver detalle">
+              <mat-icon>visibility</mat-icon>
+            </button>
+            <button mat-icon-button (click)="verPdf(f.id)" matTooltip="Ver PDF">
+              <mat-icon>picture_as_pdf</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="columnas"></tr>
+        <tr mat-row *matRowDef="let f; columns: columnas"
+            [class.fila-seleccionada]="detalle?.id === f.id"></tr>
+      </table>
+    </div>
+    <mat-paginator *ngIf="total" [length]="total" [pageIndex]="pagina"
+                   [pageSize]="tamPagina" [pageSizeOptions]="tamanos"
+                   (page)="alPaginar($event)" showFirstLastButtons></mat-paginator>
+    <ng-template #vacio>
+      <div class="empty-state" *ngIf="!loading"><mat-icon>receipt</mat-icon><p>No hay facturas emitidas.</p></div>
+    </ng-template>
+  </div>
+
+  <div class="op-card" *ngIf="detalle">
+    <h3><mat-icon>receipt_long</mat-icon> Detalle de {{ detalle.numero }}</h3>
+    <div class="dato">Pedido: <strong>{{ detalle.numero_pedido }}</strong> · Cliente: <strong>{{ detalle.razon_social }}</strong> · CI/RUC: <strong>{{ detalle.identificacion }}</strong></div>
+    <div class="table-wrapper" style="margin-top:12px;">
+      <table mat-table [dataSource]="detalle.detalles">
+        <ng-container matColumnDef="descripcion">
+          <th mat-header-cell *matHeaderCellDef>Descripción</th>
+          <td mat-cell *matCellDef="let d">{{ d.descripcion }}</td>
+        </ng-container>
+        <ng-container matColumnDef="cantidad">
+          <th mat-header-cell *matHeaderCellDef>Cant.</th>
+          <td mat-cell *matCellDef="let d">{{ d.cantidad }}</td>
+        </ng-container>
+        <ng-container matColumnDef="precio">
+          <th mat-header-cell *matHeaderCellDef>P. Unit.</th>
+          <td mat-cell *matCellDef="let d">{{ d.precio_unitario | currency:'USD' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="subtotal">
+          <th mat-header-cell *matHeaderCellDef>Subtotal</th>
+          <td mat-cell *matCellDef="let d">{{ d.subtotal | currency:'USD' }}</td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="['descripcion','cantidad','precio','subtotal']"></tr>
+        <tr mat-row *matRowDef="let d; columns: ['descripcion','cantidad','precio','subtotal']"></tr>
+      </table>
+    </div>
+    <div class="total-banner">
+      <div class="total-item"><div class="lbl">Subtotal</div><div class="val">{{ detalle.subtotal | currency:'USD' }}</div></div>
+      <div class="total-item"><div class="lbl">IVA</div><div class="val">{{ detalle.monto_impuesto | currency:'USD' }}</div></div>
+      <div class="total-item"><div class="lbl">Total</div><div class="val">{{ detalle.total | currency:'USD' }}</div></div>
+    </div>
+    <div class="form-actions" style="margin-top:16px;">
+      <button class="btn-aplicar" (click)="verPdf(detalle.id)">
+        <mat-icon>picture_as_pdf</mat-icon> Ver PDF
+      </button>
+      <button class="btn-limpiar" (click)="detalle = null"><mat-icon>close</mat-icon> Cerrar</button>
     </div>
   </div>
 </div>

@@ -119,6 +119,103 @@
 
   <div class="op-card" *ngIf="detallePedido">
     <h3><mat-icon>receipt_long</mat-icon> Detalle de {{ detallePedido.numero }}</h3>
+
+    <!-- Estado actual + documentos del proceso -->
+    <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:14px;">
+      <span class="estado-chip"
+            [class.ok]="['pagado','entregado'].includes(detallePedido.estado)"
+            [class.warn]="['despachado','en_preparacion'].includes(detallePedido.estado)"
+            [class.error]="['devuelto','cancelado'].includes(detallePedido.estado)">
+        Estado: {{ detallePedido.estado }}
+      </span>
+      <span class="stat-chip chip-info" *ngIf="detallePedido.saldo_pendiente != null">
+        Pagado: {{ detallePedido.total_pagado | currency:'USD' }} ·
+        Saldo: {{ detallePedido.saldo_pendiente | currency:'USD' }}
+      </span>
+      <span class="stat-chip chip-info" *ngIf="detallePedido.factura">
+        <mat-icon style="font-size:14px;height:14px;width:14px;">receipt</mat-icon>
+        Factura {{ detallePedido.factura.numero }}
+      </span>
+      <span class="stat-chip chip-info" *ngIf="detallePedido.envio">
+        <mat-icon style="font-size:14px;height:14px;width:14px;">local_shipping</mat-icon>
+        Guía {{ detallePedido.envio.numero_guia }} ({{ detallePedido.envio.estado }})
+      </span>
+    </div>
+
+    <!-- Acciones siguientes disponibles (las compuertas reales las valida el backend) -->
+    <div class="form-actions" style="margin-bottom:14px;">
+      <button class="btn-aplicar" *ngIf="esCobrable && puedeCobrar"
+              (click)="mostrarCobro = !mostrarCobro">
+        <mat-icon>payments</mat-icon> Registrar pago del cliente
+      </button>
+      <button class="btn-aplicar" *ngIf="esFacturable && puedeFacturar"
+              (click)="facturar()" [disabled]="procesando">
+        <mat-icon>receipt</mat-icon> Emitir factura
+      </button>
+      <button class="btn-aplicar" *ngIf="esDespachable && puedeIrADespachos"
+              (click)="irADespachos()">
+        <mat-icon>local_shipping</mat-icon> Ir a despachar
+      </button>
+      <span class="stat-chip chip-info" *ngIf="esDespachable && !puedeIrADespachos">
+        Listo para despacho (lo gestiona Despacho)
+      </span>
+      <button class="btn-aplicar" *ngIf="esEntregable && puedeEntregar"
+              (click)="entregar()" [disabled]="procesando">
+        <mat-icon>task_alt</mat-icon> Marcar entregado
+      </button>
+      <span class="stat-chip chip-info" *ngIf="esEntregable && !puedeEntregar">
+        En tránsito (la entrega la confirma Despacho)
+      </span>
+      <button class="btn-limpiar" *ngIf="esDevolvible" (click)="irADevoluciones()">
+        <mat-icon>assignment_return</mat-icon> Registrar devolución
+      </button>
+      <button class="btn-limpiar" *ngIf="detallePedido.factura" (click)="verFacturaPdf()">
+        <mat-icon>picture_as_pdf</mat-icon> PDF factura
+      </button>
+      <span class="stat-chip chip-info" *ngIf="esCobrable && !puedeCobrar">
+        Pendiente de cobro (lo registra el vendedor)
+      </span>
+      <span class="stat-chip chip-info" *ngIf="esFacturable && !puedeFacturar">
+        Pagado — pendiente de factura (la emite el vendedor)
+      </span>
+    </div>
+
+    <!-- Cobro inline: método + monto (vacío = saldo completo) + referencia -->
+    <div *ngIf="mostrarCobro && esCobrable && puedeCobrar" style="margin-bottom:14px;">
+      <div class="form-grid">
+        <mat-form-field appearance="outline">
+          <mat-label>Método de pago</mat-label>
+          <mat-select [(ngModel)]="metodoPagoId">
+            <mat-option *ngFor="let m of metodosPago" [value]="m.id">{{ m.nombre }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Monto (vacío = saldo completo)</mat-label>
+          <input matInput type="number" min="0.01" [(ngModel)]="montoCobro">
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Referencia (transferencia, voucher…)</mat-label>
+          <input matInput [(ngModel)]="referenciaCobro">
+        </mat-form-field>
+      </div>
+      <div class="form-actions">
+        <button class="btn-aplicar" (click)="cobrar()" [disabled]="cobrando">
+          <mat-icon>payments</mat-icon> {{ cobrando ? 'Registrando…' : 'Confirmar pago' }}
+        </button>
+        <button class="btn-limpiar" (click)="mostrarCobro = false"><mat-icon>close</mat-icon> Cancelar</button>
+      </div>
+    </div>
+
+    <!-- Pagos registrados -->
+    <div *ngIf="detallePedido.pagos.length" style="margin-bottom:14px;">
+      <h3><mat-icon>payments</mat-icon> Pagos ({{ detallePedido.pagos.length }})</h3>
+      <div class="dato" *ngFor="let pg of detallePedido.pagos">
+        {{ pg.fecha_pago | date:'short' }} · <strong>{{ pg.monto | currency:'USD' }}</strong>
+        · {{ pg.metodo }} ({{ pg.estado }})
+        <span *ngIf="pg.referencia_externa"> · ref. {{ pg.referencia_externa }}</span>
+      </div>
+    </div>
+
     <div class="table-wrapper">
       <table mat-table [dataSource]="detallePedido.detalles">
         <ng-container matColumnDef="sku">

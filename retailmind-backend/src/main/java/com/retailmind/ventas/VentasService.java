@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -16,8 +17,13 @@ import com.retailmind.auth.AppUserPrincipal;
 import com.retailmind.inventario.StockService;
 
 /**
- * Ciclo de venta (Order-to-Cash): pedido -> factura -> despacho -> devolución.
- * Réplica del patrón de compras/:
+ * Ciclo de venta (Order-to-Cash) con compuertas enforzadas en backend:
+ *
+ *   confirmado -> [pago(s) del cliente] -> pagado -> [factura] -> [despacho]
+ *   -> despachado -> [entrega] -> entregado -> [devolución] -> devuelto
+ *
+ * Cada paso valida el estado anterior (mensajes claros vía IllegalState/
+ * IllegalArgument -> GlobalExceptionHandler). Réplica del patrón de compras/:
  *  - subtotales de detalle GENERATED y totales de cabecera por trigger: la app
  *    inserta sin ellos y LEE el total después.
  *  - stock via StockService (upsert + FOR UPDATE + kardex + update).
@@ -116,6 +122,34 @@ public class VentasService {
                 JOIN estado_pedido ep ON ep.id = h.estado_pedido_id
                 WHERE h.pedido_id = ? ORDER BY h.id""", pedidoId));
         pedido.put("notas", listarNotas(pedidoId));
+
+        // Documentos encadenados: factura y envío del pedido (si existen), para
+        // que el detalle muestre el proceso completo y las acciones siguientes.
+        List<Map<String, Object>> facturas = pg.queryForList("""
+                SELECT id, numero, estado FROM factura_venta
+                WHERE pedido_id = ? ORDER BY id DESC""", pedidoId);
+        pedido.put("factura", facturas.isEmpty() ? null : facturas.get(0));
+        List<Map<String, Object>> envios = pg.queryForList("""
+                SELECT id, numero, numero_guia, estado, fecha_despacho, fecha_entrega_real
+                FROM envio WHERE pedido_id = ? ORDER BY id DESC""", pedidoId);
+        pedido.put("envio", envios.isEmpty() ? null : envios.get(0));
+
+        // Pagos del cliente: solo personal (grp_cliente no tiene SELECT sobre
+        // pago; su vista del proceso es el historial + factura + envío)
+        if (!"CLIENTE".equalsIgnoreCase(rolActual())) {
+            List<Map<String, Object>> pagos = pg.queryForList("""
+                    SELECT pa.id, pa.monto, pa.estado, pa.referencia_externa, pa.fecha_pago,
+                           mp.nombre AS metodo
+                    FROM pago pa JOIN metodo_pago mp ON mp.id = pa.metodo_pago_id
+                    WHERE pa.pedido_id = ? ORDER BY pa.id""", pedidoId);
+            pedido.put("pagos", pagos);
+            BigDecimal total = (BigDecimal) pedido.get("total");
+            BigDecimal pagado = totalPagado(pedidoId);
+            pedido.put("total_pagado", pagado);
+            pedido.put("saldo_pendiente", total.subtract(pagado));
+        } else {
+            pedido.put("pagos", List.of());
+        }
         return pedido;
     }
 
@@ -158,13 +192,93 @@ public class VentasService {
 
     @Transactional(readOnly = true)
     public List<Map<String, Object>> listarPedidos() {
+        // tiene_factura permite a los selectores ofrecer solo pedidos válidos
         return pg.queryForList("""
                 SELECT p.id, p.numero, ep.codigo AS estado, p.total, p.fecha_pedido,
-                       c.nombre || ' ' || COALESCE(c.apellido,'') AS cliente
+                       c.nombre || ' ' || COALESCE(c.apellido,'') AS cliente,
+                       EXISTS (SELECT 1 FROM factura_venta fv
+                               WHERE fv.pedido_id = p.id) AS tiene_factura
                 FROM pedido p
                 JOIN estado_pedido ep ON ep.id = p.estado_pedido_id
                 JOIN cliente c ON c.id = p.cliente_id
                 ORDER BY p.id DESC""");
+    }
+
+    // ── Pago del cliente (pago + transaccion_pago) ───────────────────────
+
+    /**
+     * Registra el cobro de un pedido (efectivo/transferencia). Compuerta:
+     * solo pedidos pendientes/confirmados con saldo; al cubrir el total el
+     * pedido pasa a 'pagado' (lo que habilita facturar y despachar).
+     * Admite abonos parciales; monto null = saldo completo.
+     */
+    @Transactional
+    public Map<String, Object> registrarPago(long pedidoId, long metodoPagoId,
+                                             BigDecimal monto, String referencia) {
+        List<Map<String, Object>> filas = pg.queryForList("""
+                SELECT p.id, p.numero, p.total, p.moneda_id, ep.codigo AS estado
+                FROM pedido p JOIN estado_pedido ep ON ep.id = p.estado_pedido_id
+                WHERE p.id = ? FOR UPDATE OF p""", pedidoId);
+        if (filas.isEmpty()) {
+            throw new NoSuchElementException("No existe el pedido " + pedidoId);
+        }
+        Map<String, Object> ped = filas.get(0);
+        String estado = (String) ped.get("estado");
+        String numero = (String) ped.get("numero");
+        switch (estado) {
+            case "pagado", "en_preparacion", "despachado", "entregado" ->
+                    throw new IllegalStateException("El pedido " + numero
+                            + " ya esta pagado; no admite mas cobros");
+            case "cancelado", "devuelto" -> throw new IllegalStateException(
+                    "No se puede cobrar un pedido en estado '" + estado + "'");
+            default -> { } // pendiente / confirmado: cobrables
+        }
+        List<String> metodos = pg.queryForList(
+                "SELECT nombre FROM metodo_pago WHERE id = ? AND activo", String.class, metodoPagoId);
+        if (metodos.isEmpty()) {
+            throw new IllegalArgumentException("El metodo de pago no existe o esta inactivo");
+        }
+
+        BigDecimal total = (BigDecimal) ped.get("total");
+        BigDecimal saldo = total.subtract(totalPagado(pedidoId));
+        if (monto == null) monto = saldo;
+        if (monto.signum() <= 0) {
+            throw new IllegalArgumentException("El monto del pago debe ser mayor a cero");
+        }
+        if (monto.compareTo(saldo) > 0) {
+            throw new IllegalArgumentException("El pago (" + monto
+                    + ") excede el saldo pendiente del pedido (" + saldo + ")");
+        }
+
+        Long pagoId = pg.queryForObject("""
+                INSERT INTO pago (pedido_id, metodo_pago_id, moneda_id, monto, estado,
+                                  referencia_externa, fecha_pago)
+                VALUES (?, ?, ?, ?, 'completado', NULLIF(?, ''), now())
+                RETURNING id""",
+                Long.class, pedidoId, metodoPagoId,
+                ((Number) ped.get("moneda_id")).longValue(), monto, referencia);
+        pg.update("""
+                INSERT INTO transaccion_pago (pago_id, tipo, estado, monto)
+                VALUES (?, 'captura', 'exitosa', ?)""", pagoId, monto);
+
+        BigDecimal nuevoSaldo = saldo.subtract(monto);
+        boolean cubierto = nuevoSaldo.signum() == 0;
+        if (cubierto) {
+            cambiarEstadoPedido(pedidoId, "pagado",
+                    "Pago del cliente registrado (" + metodos.get(0) + ") — total cubierto");
+        } else {
+            registrarHistorial(pedidoId, estado, "Abono del cliente por " + monto
+                    + " (" + metodos.get(0) + ") — saldo pendiente " + nuevoSaldo);
+        }
+        return Map.of("pagoId", pagoId, "totalPagado", total.subtract(nuevoSaldo),
+                "saldoPendiente", nuevoSaldo, "estadoPedido", cubierto ? "pagado" : estado);
+    }
+
+    /** Suma de pagos completados del pedido. */
+    private BigDecimal totalPagado(long pedidoId) {
+        return pg.queryForObject("""
+                SELECT COALESCE(SUM(monto), 0) FROM pago
+                WHERE pedido_id = ? AND estado = 'completado'""", BigDecimal.class, pedidoId);
     }
 
     // ── Caso 8: factura de venta ─────────────────────────────────────────
@@ -175,6 +289,12 @@ public class VentasService {
         if (List.of("cancelado", "devuelto").contains(estado)) {
             throw new IllegalStateException(
                     "No se puede facturar un pedido en estado '" + estado + "'");
+        }
+        // Compuerta: la factura se emite sobre un pedido ya COBRADO
+        if (List.of("pendiente", "confirmado").contains(estado)) {
+            throw new IllegalStateException(
+                    "El pedido debe estar pagado antes de emitir la factura; "
+                    + "registra primero el pago del cliente (estado actual: '" + estado + "')");
         }
         // Guardia de idempotencia: un pedido se factura una sola vez
         List<String> existentes = pg.queryForList(
@@ -216,8 +336,32 @@ public class VentasService {
                        cantidad, precio_unitario, monto_impuesto
                 FROM pedido_detalle WHERE pedido_id = ?""", facturaId, pedidoId);
 
-        registrarHistorial(pedidoId, "pagado", "Factura de venta " + numero + " emitida");
+        // El estado NO cambia al facturar (el pago ya lo puso en 'pagado');
+        // se deja constancia en la línea de tiempo del pedido.
+        registrarHistorial(pedidoId, estado, "Factura de venta " + numero + " emitida");
         return obtenerFactura(facturaId); // totales ya recalculados por el trigger
+    }
+
+    /** Listado de facturas de venta emitidas, con búsqueda y paginación. */
+    @Transactional(readOnly = true)
+    public Map<String, Object> listarFacturas(String q, int page, int size) {
+        int tam = Math.min(Math.max(size, 1), 100);
+        int pagina = Math.max(page, 0);
+        String filtro = "%" + (q == null ? "" : q.trim()) + "%";
+        Long total = pg.queryForObject("""
+                SELECT COUNT(*) FROM factura_venta fv
+                JOIN pedido p ON p.id = fv.pedido_id
+                WHERE fv.numero ILIKE ? OR fv.razon_social ILIKE ? OR p.numero ILIKE ?""",
+                Long.class, filtro, filtro, filtro);
+        List<Map<String, Object>> items = pg.queryForList("""
+                SELECT fv.id, fv.numero, fv.estado, fv.fecha_emision, fv.total,
+                       fv.razon_social AS cliente, fv.pedido_id, p.numero AS numero_pedido
+                FROM factura_venta fv
+                JOIN pedido p ON p.id = fv.pedido_id
+                WHERE fv.numero ILIKE ? OR fv.razon_social ILIKE ? OR p.numero ILIKE ?
+                ORDER BY fv.id DESC LIMIT ? OFFSET ?""",
+                filtro, filtro, filtro, tam, pagina * tam);
+        return Map.of("items", items, "total", total, "page", pagina, "size", tam);
     }
 
     @Transactional(readOnly = true)
@@ -250,9 +394,21 @@ public class VentasService {
                     + (guias.isEmpty() ? "" : " (guia " + guias.get(0) + ")")
                     + "; no se puede despachar de nuevo");
         }
-        if (!List.of("confirmado", "pagado", "en_preparacion").contains(estado)) {
+        // Compuertas: pagado -> facturado -> despachable
+        if (List.of("pendiente", "confirmado").contains(estado)) {
+            throw new IllegalStateException(
+                    "El pedido debe estar pagado antes de despachar; "
+                    + "registra primero el pago del cliente (estado actual: '" + estado + "')");
+        }
+        if (!List.of("pagado", "en_preparacion").contains(estado)) {
             throw new IllegalStateException(
                     "No se puede despachar un pedido en estado '" + estado + "'");
+        }
+        List<String> facturas = pg.queryForList(
+                "SELECT numero FROM factura_venta WHERE pedido_id = ?", String.class, pedidoId);
+        if (facturas.isEmpty()) {
+            throw new IllegalStateException(
+                    "El pedido debe tener factura de venta emitida antes del despacho");
         }
 
         String direccion = pg.queryForObject("""
@@ -313,6 +469,43 @@ public class VentasService {
                 FROM seguimiento_envio WHERE envio_id = ? ORDER BY id""", envioId);
     }
 
+    // ── Entrega del pedido (cierra la logística) ─────────────────────────
+
+    /** Compuerta: solo un pedido despachado puede marcarse entregado. */
+    @Transactional
+    public Map<String, Object> entregar(long pedidoId, String observacion) {
+        String estado = estadoPedido(pedidoId);
+        if ("entregado".equals(estado)) {
+            throw new IllegalStateException(
+                    "El pedido ya fue marcado como entregado; no se puede entregar de nuevo");
+        }
+        if (!"despachado".equals(estado)) {
+            throw new IllegalStateException(
+                    "Solo se puede marcar la entrega de un pedido despachado "
+                    + "(estado actual: '" + estado + "')");
+        }
+        // Cierra el envío vigente (el más reciente) y deja rastro de seguimiento
+        List<Map<String, Object>> envios = pg.queryForList(
+                "SELECT id, numero_guia FROM envio WHERE pedido_id = ? ORDER BY id DESC", pedidoId);
+        String guia = null;
+        if (!envios.isEmpty()) {
+            long envioId = ((Number) envios.get(0).get("id")).longValue();
+            guia = (String) envios.get(0).get("numero_guia");
+            pg.update("""
+                    UPDATE envio SET estado = 'entregado', fecha_entrega_real = now()
+                    WHERE id = ?""", envioId);
+            pg.update("""
+                    INSERT INTO seguimiento_envio (envio_id, estado, descripcion, ubicacion)
+                    VALUES (?, 'entregado', ?, 'Domicilio del cliente')""",
+                    envioId, "Paquete entregado al cliente"
+                            + (observacion != null && !observacion.isBlank()
+                               ? " · " + observacion : ""));
+        }
+        cambiarEstadoPedido(pedidoId, "entregado",
+                "Pedido entregado al cliente" + (guia != null ? " (guia " + guia + ")" : ""));
+        return obtenerPedido(pedidoId);
+    }
+
     // ── Caso 10: devolución (RMA) ────────────────────────────────────────
 
     public record ItemDevolucion(long pedidoDetalleId, int cantidad,
@@ -325,10 +518,13 @@ public class VentasService {
         if (items == null || items.isEmpty()) {
             throw new IllegalArgumentException("La devolucion requiere al menos un item");
         }
+        // Compuerta: la devolución (RMA) aplica a mercancía ya ENTREGADA;
+        // 'devuelto' sigue admitiendo devoluciones parciales adicionales.
         String estado = estadoPedido(pedidoId);
-        if (List.of("cancelado", "pendiente").contains(estado)) {
+        if (!List.of("entregado", "devuelto").contains(estado)) {
             throw new IllegalStateException(
-                    "No se puede devolver un pedido en estado '" + estado + "'");
+                    "Solo se puede registrar la devolucion de un pedido entregado "
+                    + "(estado actual: '" + estado + "')");
         }
         Long motivoOk = pg.queryForObject(
                 "SELECT COUNT(*) FROM motivo_devolucion WHERE codigo = ? AND activo",

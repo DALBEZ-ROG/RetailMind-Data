@@ -1,9 +1,12 @@
 # RetailMind — contexto para Claude Code
 
-Tienda PyME con back-office completo. **Arquitectura híbrida**: PostgreSQL (BD `retailmind`,
-~102 tablas) es la **base operativa principal**; ClickHouse es **solo analítica** (paquete
-`analytics/`, no tocar desde lo operativo). Si algún documento viejo dice "PostgreSQL eliminado",
-está desactualizado: ignóralo.
+Tienda PyME con back-office completo. **PostgreSQL (BD `retailmind`, ~102 tablas) es la ÚNICA
+base transaccional** — incluida la TIENDA DEL CLIENTE (catálogo `/api/catalogo`, carrito,
+wishlist, perfil/direcciones, checkout y mis pedidos, migrados 2026-07-11). ClickHouse es **solo
+analítica** (paquete `analytics/` + señal de eventos para recomendaciones): con ClickHouse
+apagado TODO el sistema funciona; solo analytics/recomendaciones se degradan con aviso. Si algún
+documento viejo dice "PostgreSQL eliminado" o describe la tienda sobre ClickHouse, está
+desactualizado: ignóralo.
 
 ## Stack
 
@@ -15,7 +18,14 @@ está desactualizado: ignóralo.
   Pantallas operativas en `features/operativo/` (incluye `marketing/`); estilos compartidos
   `operativo-shared.scss`; errores con `core/services/api-error.util.ts`.
 - **ETL** `retailmind/`: Python 3.12, PocketBase → Parquet → ClickHouse. El DDL operativo vigente
-  de PostgreSQL está en `retailmind/sql/postgres/` (28 scripts numerados).
+  de PostgreSQL está en `retailmind/sql/postgres/` (scripts numerados 01-35 + 99).
+- **Tienda del cliente** (solo rol CLIENTE, guard + SecurityConfig): backend en paquetes
+  `catalogo/`, `carrito/`, `wishlist/`, `perfil/`, `recomendaciones/` contra `pgJdbcTemplate`;
+  el id público de producto es el de la VARIANTE. El checkout llama a `VentasService.crearPedido`
+  (mismo pedido que el back-office, stock vía `StockService`). El script
+  `34_grants_tienda_cliente.sql` da a `grp_cliente` lo que el checkout necesita (inventario,
+  movimiento_inventario, tipo_movimiento, bodega, historial_estado_pedido + políticas RLS de
+  horario). Eventos a ClickHouse solo best-effort (`EventoTiendaService`).
 
 ## Seguridad a nivel de BD (lo más importante)
 
@@ -73,10 +83,20 @@ esquema usa el MCP `retailmind` (solo lectura) o psycopg2 (`postgres/1250143656@
 
 ## Qué está hecho / qué falta
 
-**Hecho**: catálogo maestro; ciclo de compra (orden→aprobar→recepción→factura→pago); inventario
-(transferencias, ajustes, kardex); ciclo de venta (pedido→factura→despacho→devolución) con PDF;
+**Hecho**: catálogo maestro; ciclo de compra con compuertas ENFORZADAS en backend
+(orden→aprobación de GERENTE/ADMIN→recepción completa→factura→pago; sin aprobar no se recibe ni
+factura, sin recibir completo no se factura, sin factura no hay CxP ni pago); inventario
+(transferencias, ajustes, kardex); ciclo de venta completo con compuertas (pedido confirmado→
+PAGO del cliente [tabla pago+transaccion_pago, abonos parciales]→pagado→factura→despacho con guía→
+entregado→devolución solo tras entrega) con PDF, listado de facturas de venta con búsqueda/
+paginación, timeline (historial_estado_pedido) y acciones encadenadas en el detalle del pedido;
+el checkout del cliente entra al MISMO flujo (el back-office lo cobra/factura/despacha) y el
+cliente ve estado/guía/seguimiento/factura PDF en Mis Pedidos (RLS, script 35);
 horarios de acceso; marketing (cupones, promociones+productos, campañas, banners, newsletter —
-solo gestión); tienda online (carrito, wishlist, checkout, perfil, recomendaciones); analítica
+solo gestión); tienda online 100% PostgreSQL (catálogo real con búsqueda/paginación, carrito,
+wishlist, checkout → pedido del ciclo de venta, perfil + CRUD de direcciones, un solo
+"Mis Pedidos" en `/operativo/ventas/mis-pedidos`; recomendaciones con señal ClickHouse y
+productos PG, degradan a destacados); analítica
 ClickHouse (dashboard, funnel, sesiones, región/dispositivo/tráfico, reportes); soporte (tickets,
 categorías, FAQ) con RLS de cliente; notas de pedido (`nota_pedido`, bitácora con nota interna vs.
 visible al cliente); anulación de ajuste de inventario por contramovimiento de kardex.

@@ -11,13 +11,15 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
+import { Router } from '@angular/router';
 import { VentasService } from '../../../core/services/ventas.service';
 import { ReferenciasService } from '../../../core/services/referencias.service';
 import { NavPermissionsService } from '../../../core/navigation/nav-permissions.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { SelectBuscableComponent, OpcionBuscable } from '../../../core/components/select-buscable/select-buscable.component';
 import { mensajeError } from '../../../core/services/api-error.util';
 import {
-  ClienteRef, BodegaRef, VarianteRef, PedidoVentaRow, PedidoVentaDetalle
+  ClienteRef, BodegaRef, VarianteRef, CatalogoRef, PedidoVentaRow, PedidoVentaDetalle
 } from '../../../core/models/operativo.model';
 
 interface LineaPedido { varianteId: number | null; cantidad: number; }
@@ -59,13 +61,49 @@ export class PedidosVentaComponent implements OnInit {
   nuevaNota = '';
   notaVisibleCliente = false;
 
+  // Cobro del pedido (compuerta: pago -> factura -> despacho -> entrega)
+  metodosPago: CatalogoRef[] = [];
+  cobrando = false;
+  mostrarCobro = false;
+  metodoPagoId: number | null = null;
+  montoCobro: number | null = null;
+  referenciaCobro = '';
+
   columnas = ['numero', 'cliente', 'estado', 'fecha', 'total', 'acciones'];
 
   constructor(private ventas: VentasService, private referencias: ReferenciasService,
-              private nav: NavPermissionsService, private snackBar: MatSnackBar) {}
+              private nav: NavPermissionsService, private auth: AuthService,
+              private router: Router, private snackBar: MatSnackBar) {}
 
   // La BD no concede bodega a grp_vendedor: no se dispara la petición (403).
   get puedeVerBodegas(): boolean { return this.nav.canDato('refBodegas'); }
+
+  // ── Acciones del proceso según rol (espejan SecurityConfig + GRANTs) ────
+  private get rol(): string { return this.auth.getCurrentUser()?.rol ?? ''; }
+  get puedeCobrar(): boolean { return ['ADMIN', 'VENDEDOR'].includes(this.rol); }
+  get puedeFacturar(): boolean { return ['ADMIN', 'VENDEDOR'].includes(this.rol); }
+  get puedeIrADespachos(): boolean { return ['ADMIN', 'GERENTE'].includes(this.rol); }
+  get puedeEntregar(): boolean { return this.rol === 'ADMIN'; }
+
+  // ── Estado del pedido seleccionado → qué acción sigue ───────────────────
+  get esCobrable(): boolean {
+    return !!this.detallePedido
+      && ['pendiente', 'confirmado'].includes(this.detallePedido.estado);
+  }
+  get esFacturable(): boolean {
+    return !!this.detallePedido && !this.detallePedido.factura
+      && ['pagado', 'en_preparacion', 'despachado', 'entregado'].includes(this.detallePedido.estado);
+  }
+  get esDespachable(): boolean {
+    return !!this.detallePedido && !!this.detallePedido.factura
+      && ['pagado', 'en_preparacion'].includes(this.detallePedido.estado);
+  }
+  get esEntregable(): boolean {
+    return this.detallePedido?.estado === 'despachado';
+  }
+  get esDevolvible(): boolean {
+    return this.detallePedido?.estado === 'entregado';
+  }
 
   ngOnInit(): void {
     this.cargarPedidos();
@@ -84,6 +122,9 @@ export class PedidosVentaComponent implements OnInit {
         this.variantesOpc = v.map(x =>
           ({ id: x.id, texto: `${x.sku} — ${x.producto} ($${Number(x.precio).toFixed(2)})` }));
       });
+    }
+    if (this.puedeCobrar && this.nav.canDato('refMetodosPago')) {
+      this.referencias.metodosPago().subscribe(m => this.metodosPago = m);
     }
   }
 
@@ -152,10 +193,92 @@ export class PedidosVentaComponent implements OnInit {
         this.detallePedido = p;
         this.nuevaNota = '';
         this.notaVisibleCliente = false;
+        this.mostrarCobro = false;
+        this.metodoPagoId = null;
+        this.montoCobro = p.saldo_pendiente != null ? Number(p.saldo_pendiente) : null;
+        this.referenciaCobro = '';
       },
       error: () => this.snackBar.open('No se pudo cargar el pedido', 'Cerrar', { duration: 3000 })
     });
   }
+
+  // ── Acciones encadenadas del proceso ─────────────────────────────────────
+
+  cobrar(): void {
+    if (!this.detallePedido || !this.metodoPagoId) {
+      this.snackBar.open('Selecciona el método de pago', 'Cerrar', { duration: 3000 });
+      return;
+    }
+    this.cobrando = true;
+    this.ventas.registrarPago(this.detallePedido.id, {
+      metodoPagoId: this.metodoPagoId, monto: this.montoCobro,
+      referencia: this.referenciaCobro
+    }).subscribe({
+      next: r => {
+        this.cobrando = false;
+        this.snackBar.open(r.saldoPendiente > 0
+          ? `Abono registrado — saldo pendiente ${r.saldoPendiente}`
+          : 'Pago registrado — pedido PAGADO', 'OK',
+          { duration: 3500, panelClass: ['snack-success'] });
+        this.verPedido(this.detallePedido!.id);
+        this.cargarPedidos();
+      },
+      error: e => {
+        this.cobrando = false;
+        this.snackBar.open(mensajeError(e, 'No se pudo registrar el pago'), 'Cerrar', { duration: 5000 });
+      }
+    });
+  }
+
+  facturar(): void {
+    if (!this.detallePedido) return;
+    this.procesando = true;
+    this.ventas.emitirFactura(this.detallePedido.id).subscribe({
+      next: f => {
+        this.procesando = false;
+        this.snackBar.open(`Factura ${f.numero} emitida`, 'OK',
+          { duration: 3500, panelClass: ['snack-success'] });
+        this.verPedido(this.detallePedido!.id);
+      },
+      error: e => {
+        this.procesando = false;
+        this.snackBar.open(mensajeError(e, 'No se pudo emitir la factura'), 'Cerrar', { duration: 5000 });
+      }
+    });
+  }
+
+  entregar(): void {
+    if (!this.detallePedido) return;
+    this.procesando = true;
+    this.ventas.entregar(this.detallePedido.id).subscribe({
+      next: p => {
+        this.procesando = false;
+        this.detallePedido = p;
+        this.snackBar.open(`Pedido ${p.numero} marcado como ENTREGADO`, 'OK',
+          { duration: 3500, panelClass: ['snack-success'] });
+        this.cargarPedidos();
+      },
+      error: e => {
+        this.procesando = false;
+        this.snackBar.open(mensajeError(e, 'No se pudo registrar la entrega'), 'Cerrar', { duration: 5000 });
+      }
+    });
+  }
+
+  verFacturaPdf(): void {
+    if (!this.detallePedido?.factura) return;
+    this.ventas.facturaPdf(this.detallePedido.factura.id).subscribe({
+      next: blob => {
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      },
+      error: () => this.snackBar.open('No se pudo generar el PDF', 'Cerrar', { duration: 3000 })
+    });
+  }
+
+  irADespachos(): void { this.router.navigate(['/operativo/ventas/despachos']); }
+  irADevoluciones(): void { this.router.navigate(['/operativo/ventas/devoluciones']); }
 
   agregarNota(): void {
     if (!this.detallePedido || !this.nuevaNota.trim()) return;

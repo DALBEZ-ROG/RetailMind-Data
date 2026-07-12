@@ -2,9 +2,11 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { HttpParams } from '@angular/common/http';
 import {
   ItemPedidoReq, ItemDevolucionReq, PedidoVentaRow, PedidoVentaDetalle,
-  FacturaVenta, EnvioDetalle, SeguimientoRow, DevolucionDetalle
+  FacturaVenta, PaginaFacturasVenta, PagoClienteRes, EnvioDetalle,
+  SeguimientoRow, DevolucionDetalle
 } from '../models/operativo.model';
 
 @Injectable({ providedIn: 'root' })
@@ -26,8 +28,19 @@ export class VentasService {
       { nota, esVisibleCliente });
   }
 
+  /** Cobro del pedido: compuerta previa a facturar/despachar (monto null = saldo). */
+  registrarPago(pedidoId: number, body: {
+    metodoPagoId: number; monto?: number | null; referencia?: string;
+  }): Observable<PagoClienteRes> {
+    return this.http.post<PagoClienteRes>(`${this.base}/pedidos/${pedidoId}/pagos`, body);
+  }
+
   emitirFactura(pedidoId: number): Observable<FacturaVenta> {
     return this.http.post<FacturaVenta>(`${this.base}/pedidos/${pedidoId}/factura`, {});
+  }
+  facturas(q: string, page: number, size: number): Observable<PaginaFacturasVenta> {
+    const params = new HttpParams().set('q', q).set('page', page).set('size', size);
+    return this.http.get<PaginaFacturasVenta>(`${this.base}/facturas`, { params });
   }
   factura(id: number): Observable<FacturaVenta> {
     return this.http.get<FacturaVenta>(`${this.base}/facturas/${id}`);
@@ -40,6 +53,11 @@ export class VentasService {
     transportistaId: number; metodoEnvioId: number; bodegaId?: number | null; observacion?: string;
   }): Observable<EnvioDetalle> {
     return this.http.post<EnvioDetalle>(`${this.base}/pedidos/${pedidoId}/despacho`, body);
+  }
+  /** Marca la entrega del pedido despachado (cierra la logística). */
+  entregar(pedidoId: number, observacion?: string): Observable<PedidoVentaDetalle> {
+    return this.http.post<PedidoVentaDetalle>(
+      `${this.base}/pedidos/${pedidoId}/entrega`, { observacion });
   }
   envio(id: number): Observable<EnvioDetalle> {
     return this.http.get<EnvioDetalle>(`${this.base}/envios/${id}`);

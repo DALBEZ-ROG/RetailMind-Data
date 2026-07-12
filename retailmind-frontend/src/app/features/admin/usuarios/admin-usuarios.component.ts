@@ -35,9 +35,10 @@ export class AdminUsuariosComponent implements OnInit {
 
   ngOnInit(): void { this.loadUsuarios(); }
 
+  // Gestión de usuarios contra PostgreSQL (tabla usuario, endpoints /api/auth)
   loadUsuarios(): void {
     this.loading = true;
-    this.http.get<any[]>(`${environment.apiUrl}/api/admin/usuarios`).subscribe({
+    this.http.get<any[]>(`${environment.apiUrl}/api/auth/usuarios`).subscribe({
       next: (data) => { this.usuarios = data; this.loading = false; },
       error: () => { this.loading = false; }
     });
@@ -45,9 +46,9 @@ export class AdminUsuariosComponent implements OnInit {
 
   crearUsuario(): void {
     if (!this.newUsername || !this.newPassword) return;
-    this.http.post(`${environment.apiUrl}/api/admin/usuarios`, {
-      username: this.newUsername, password: this.newPassword,
-      email: this.newEmail, rol: this.newRol
+    this.http.post(`${environment.apiUrl}/api/auth/register`, {
+      email: this.newUsername, password: this.newPassword,
+      nombre: this.newEmail || this.newUsername, rol: this.newRol
     }).subscribe({
       next: () => {
         this.snackBar.open('Usuario creado', 'OK', { duration: 2000, panelClass: ['snack-success'] });
@@ -58,16 +59,9 @@ export class AdminUsuariosComponent implements OnInit {
     });
   }
 
-  toggleActivo(username: string): void {
-    this.http.put(`${environment.apiUrl}/api/admin/usuarios/${username}/toggle-activo`, {}).subscribe({
-      next: () => { this.snackBar.open('Estado actualizado', 'OK', { duration: 2000 }); this.loadUsuarios(); },
-      error: (e) => this.snackBar.open(e.error?.error || 'Error', 'Cerrar', { duration: 3000 })
-    });
-  }
-
   eliminarUsuario(username: string): void {
     if (!confirm('Eliminar usuario ' + username + '?')) return;
-    this.http.delete(`${environment.apiUrl}/api/admin/usuarios/${username}`).subscribe({
+    this.http.delete(`${environment.apiUrl}/api/auth/usuarios/${username}`).subscribe({
       next: () => { this.snackBar.open('Usuario eliminado', 'OK', { duration: 2000 }); this.loadUsuarios(); },
       error: (e) => this.snackBar.open(e.error?.error || 'Error', 'Cerrar', { duration: 3000 })
     });

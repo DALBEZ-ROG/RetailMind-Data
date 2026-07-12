@@ -11,14 +11,13 @@ import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatBadgeModule } from '@angular/material/badge';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { HttpClient } from '@angular/common/http';
 import { ShopService } from './shop.service';
-import { AuthService } from '../../core/services/auth.service';
-import { environment } from '../../../environments/environment';
+import { mensajeError } from '../../core/services/api-error.util';
 
 const CATEGORY_ICONS: Record<number, string> = {
   1: 'devices', 2: 'shopping_basket', 3: 'sports_soccer', 4: 'watch',
-  5: 'spa', 6: 'home', 7: 'directions_walk', 8: 'checkroom'
+  5: 'spa', 6: 'home', 7: 'directions_walk', 8: 'checkroom',
+  9: 'checkroom', 10: 'checkroom', 11: 'category'
 };
 
 const CATEGORY_COLORS: Record<number, { bg: string; border: string; icon: string }> = {
@@ -32,6 +31,11 @@ const CATEGORY_COLORS: Record<number, { bg: string; border: string; icon: string
   8: { bg: '#e8eaf6', border: '#9fa8da', icon: '#1a237e' }
 };
 
+/**
+ * Catálogo de la tienda del cliente: productos REALES de PostgreSQL
+ * (producto/producto_variante con stock de inventario), con búsqueda y
+ * paginación en servidor (~1.200 productos). Solo rol CLIENTE (roleGuard).
+ */
 @Component({
   selector: 'app-shop',
   standalone: true,
@@ -52,7 +56,7 @@ export class ShopComponent implements OnInit {
   size = 12;
   loading = false;
 
-  // Filtros
+  // Filtros (se aplican en el servidor)
   categoriaSeleccionada: number | null = null;
   busqueda = '';
 
@@ -60,15 +64,13 @@ export class ShopComponent implements OnInit {
   carritoCount = 0;
 
   // Wishlist
-  productosEnWishlist = new Set<string>();
+  productosEnWishlist = new Set<number>();
 
   // Color de categoría activa
   categoriaColorActiva: { bg: string; border: string; icon: string } | null = null;
 
   constructor(
     private shopService: ShopService,
-    private authService: AuthService,
-    private http: HttpClient,
     private router: Router,
     private snackBar: MatSnackBar
   ) {}
@@ -84,6 +86,7 @@ export class ShopComponent implements OnInit {
     this.loading = true;
     const filters: any = {};
     if (this.categoriaSeleccionada) filters.categoria_id = this.categoriaSeleccionada;
+    if (this.busqueda.trim()) filters.q = this.busqueda.trim();
 
     this.shopService.getProductos(this.page, this.size, filters).subscribe({
       next: (res) => {
@@ -91,8 +94,23 @@ export class ShopComponent implements OnInit {
         this.totalProductos = res.totalElements;
         this.loading = false;
       },
-      error: () => { this.loading = false; this.productos = []; }
+      error: (e) => {
+        this.loading = false;
+        this.productos = [];
+        this.snackBar.open(mensajeError(e, 'No se pudo cargar el catálogo'), 'Cerrar', { duration: 4000 });
+      }
     });
+  }
+
+  buscar(): void {
+    this.page = 0;
+    this.loadProductos();
+  }
+
+  limpiarBusqueda(): void {
+    if (!this.busqueda) return;
+    this.busqueda = '';
+    this.buscar();
   }
 
   loadCategorias(): void {
@@ -103,28 +121,21 @@ export class ShopComponent implements OnInit {
   }
 
   loadCarritoCount(): void {
-    const user = this.authService.getCurrentUser();
-    if (user) {
-      this.shopService.getCarrito(user.username).subscribe({
-        next: (items) => this.carritoCount = items.length,
-        error: () => {}
-      });
-    }
-  }
-
-  loadWishlistIds(): void {
-    const user = this.authService.getCurrentUser();
-    if (!user) return;
-    this.http.get<any[]>(`${environment.apiUrl}/api/wishlist/${user.username}`).subscribe({
-      next: (items) => {
-        this.productosEnWishlist = new Set(items.map(i => i.productoId));
-      },
+    this.shopService.getCarrito().subscribe({
+      next: (items) => this.carritoCount = items.length,
       error: () => {}
     });
   }
 
-  isInWishlist(productoId: string): boolean {
-    return this.productosEnWishlist.has(productoId);
+  loadWishlistIds(): void {
+    this.shopService.getWishlist().subscribe({
+      next: (items) => this.productosEnWishlist = new Set(items.map(i => Number(i.productoId))),
+      error: () => {}
+    });
+  }
+
+  isInWishlist(productoId: number): boolean {
+    return this.productosEnWishlist.has(Number(productoId));
   }
 
   filtrarCategoria(catId: number | null): void {
@@ -142,46 +153,41 @@ export class ShopComponent implements OnInit {
     this.loadProductos();
   }
 
-  verProducto(productoId: string): void {
+  verProducto(productoId: number): void {
     this.router.navigate(['/shop/producto', productoId]);
   }
 
   agregarAlCarrito(producto: any, event: Event): void {
     event.stopPropagation();
-    const user = this.authService.getCurrentUser();
-    if (!user) return;
-
-    this.shopService.agregarAlCarrito(user.username, producto.productoId, 1).subscribe({
+    this.shopService.agregarAlCarrito(producto.productoId, 1).subscribe({
       next: () => {
         this.carritoCount++;
         this.snackBar.open('Agregado al carrito', 'OK', { duration: 2000, panelClass: ['snack-success'] });
       },
-      error: () => this.snackBar.open('Error al agregar', 'Cerrar', { duration: 3000, panelClass: ['snack-error'] })
+      error: (e) => this.snackBar.open(mensajeError(e, 'Error al agregar'), 'Cerrar',
+        { duration: 3000, panelClass: ['snack-error'] })
     });
   }
 
   toggleWishlist(producto: any, event: Event): void {
     event.stopPropagation();
-    const user = this.authService.getCurrentUser();
-    if (!user) return;
-
-    const productoId = producto.productoId;
+    const productoId = Number(producto.productoId);
 
     if (this.productosEnWishlist.has(productoId)) {
-      this.http.delete(`${environment.apiUrl}/api/wishlist/${user.username}/${productoId}`).subscribe({
+      this.shopService.eliminarDeWishlist(productoId).subscribe({
         next: () => {
           this.productosEnWishlist.delete(productoId);
           this.snackBar.open('Eliminado de wishlist', 'OK', { duration: 2000 });
         },
-        error: () => this.snackBar.open('Error', 'Cerrar', { duration: 2000 })
+        error: (e) => this.snackBar.open(mensajeError(e, 'Error'), 'Cerrar', { duration: 2000 })
       });
     } else {
-      this.shopService.agregarAWishlist(user.username, productoId).subscribe({
+      this.shopService.agregarAWishlist(productoId).subscribe({
         next: () => {
           this.productosEnWishlist.add(productoId);
           this.snackBar.open('Agregado a wishlist ❤️', 'OK', { duration: 2000 });
         },
-        error: (e: any) => this.snackBar.open(e.error?.error || 'Ya esta en wishlist', 'OK', { duration: 2000 })
+        error: (e) => this.snackBar.open(mensajeError(e, 'Ya esta en wishlist'), 'OK', { duration: 2000 })
       });
     }
   }

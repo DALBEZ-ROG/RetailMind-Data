@@ -52,8 +52,9 @@ export class DevolucionesComponent implements OnInit {
               private nav: NavPermissionsService, private snackBar: MatSnackBar) {}
 
   ngOnInit(): void {
+    // Devolvibles: entregados (o con devolución parcial previa) — compuerta del backend
     this.ventas.pedidos().subscribe(p =>
-      this.pedidos = p.filter(x => x.estado !== 'devuelto' && x.estado !== 'cancelado'));
+      this.pedidos = p.filter(x => ['entregado', 'devuelto'].includes(x.estado)));
     // VENDEDOR/DESPACHO no tienen SELECT sobre bodega ni motivo_devolucion en
     // la BD: no se disparan esas peticiones (evita 403 en consola).
     if (this.nav.canDato('refBodegas')) {

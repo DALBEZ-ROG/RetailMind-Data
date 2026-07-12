@@ -83,10 +83,6 @@
             <mat-icon class="icon-gestion">dataset</mat-icon>
             <span>Gestion de Datos</span>
           </a>
-          <a class="nav-item" routerLink="/admin-pedidos" routerLinkActive="active">
-            <mat-icon class="icon-pedidos-admin">receipt_long</mat-icon>
-            <span>Pedidos</span>
-          </a>
           <a class="nav-item" routerLink="/admin-usuarios" routerLinkActive="active">
             <mat-icon class="icon-usuarios">group</mat-icon>
             <span>Usuarios</span>
@@ -258,35 +254,33 @@
       </a>
     </ng-container>
 
-    <!-- Tienda Section -->
-    <div class="sidebar-section-label">Tienda</div>
+    <!-- Tienda Section (solo CLIENTE: los roles operativos no entran a la tienda) -->
+    <ng-container *ngIf="isCliente">
+      <div class="sidebar-section-label">Tienda</div>
 
-    <a class="nav-item" routerLink="/shop" routerLinkActive="active"
-       [routerLinkActiveOptions]="{ exact: true }">
-      <mat-icon class="icon-tienda">storefront</mat-icon>
-      <span>Tienda</span>
-    </a>
-    <a class="nav-item" routerLink="/shop/carrito" routerLinkActive="active">
-      <mat-icon class="icon-carrito">shopping_bag</mat-icon>
-      <span>Mi Carrito</span>
-    </a>
-    <a class="nav-item" routerLink="/wishlist" routerLinkActive="active">
-      <mat-icon class="icon-wishlist">favorite</mat-icon>
-      <span>Mi Wishlist</span>
-    </a>
-    <a class="nav-item" routerLink="/recomendaciones" routerLinkActive="active">
-      <mat-icon class="icon-recomendaciones">local_fire_department</mat-icon>
-      <span>Recomendaciones</span>
-    </a>
-    <a class="nav-item" routerLink="/mis-pedidos" routerLinkActive="active">
-      <mat-icon class="icon-pedidos">local_shipping</mat-icon>
-      <span>Mis Pedidos</span>
-    </a>
-    <a class="nav-item" *ngIf="isCliente"
-       routerLink="/operativo/ventas/mis-pedidos" routerLinkActive="active">
-      <mat-icon class="icon-pedidos">shopping_basket</mat-icon>
-      <span>Mis Pedidos de Tienda</span>
-    </a>
+      <a class="nav-item" routerLink="/shop" routerLinkActive="active"
+         [routerLinkActiveOptions]="{ exact: true }">
+        <mat-icon class="icon-tienda">storefront</mat-icon>
+        <span>Tienda</span>
+      </a>
+      <a class="nav-item" routerLink="/shop/carrito" routerLinkActive="active">
+        <mat-icon class="icon-carrito">shopping_bag</mat-icon>
+        <span>Mi Carrito</span>
+      </a>
+      <a class="nav-item" routerLink="/wishlist" routerLinkActive="active">
+        <mat-icon class="icon-wishlist">favorite</mat-icon>
+        <span>Mi Wishlist</span>
+      </a>
+      <a class="nav-item" routerLink="/recomendaciones" routerLinkActive="active">
+        <mat-icon class="icon-recomendaciones">local_fire_department</mat-icon>
+        <span>Recomendaciones</span>
+      </a>
+      <a class="nav-item" routerLink="/operativo/ventas/mis-pedidos" routerLinkActive="active">
+        <mat-icon class="icon-pedidos">shopping_basket</mat-icon>
+        <span>Mis Pedidos</span>
+      </a>
+    </ng-container>
+
     <a class="nav-item" routerLink="/perfil" routerLinkActive="active">
       <mat-icon class="icon-perfil">person</mat-icon>
       <span>Mi Perfil</span>

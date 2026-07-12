@@ -3,137 +3,228 @@ package com.retailmind.perfil;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import com.retailmind.auth.ClickHouseUserRepository;
-import com.retailmind.auth.UsuarioSistema;
+import com.retailmind.auth.AppUserPrincipal;
 
+/**
+ * Perfil del usuario autenticado sobre PostgreSQL.
+ *
+ * - CLIENTE: datos de la tabla cliente (RLS: solo su fila) + estadísticas de
+ *   compra reales (pedido/wishlist) + CRUD de direcciones (tabla direccion,
+ *   RLS por usuario_id; baja lógica con activo=false).
+ * - Roles operativos: ficha básica derivada del JWT, sin tocar tablas de
+ *   tienda (no tienen fila en cliente).
+ */
 @Service
-@SuppressWarnings("null")
 public class PerfilService {
 
-    private final JdbcTemplate ch;
-    private final ClickHouseUserRepository usuarioRepo;
-    private final PasswordEncoder passwordEncoder;
+    private static final List<String> TIPOS_DIRECCION = List.of("envio", "facturacion", "ambas");
 
-    public PerfilService(@Qualifier("clickHouseJdbc") JdbcTemplate ch,
-                         ClickHouseUserRepository usuarioRepo,
-                         PasswordEncoder passwordEncoder) {
-        this.ch = ch;
-        this.usuarioRepo = usuarioRepo;
-        this.passwordEncoder = passwordEncoder;
+    private final JdbcTemplate pg;
+
+    public PerfilService(@Qualifier("pgJdbcTemplate") JdbcTemplate pg) {
+        this.pg = pg;
     }
 
-    public Map<String, Object> getPerfil(String username) {
-        UsuarioSistema usuario = usuarioRepo.findByUsername(username)
-                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado: " + username));
-
+    @Transactional(readOnly = true)
+    public Map<String, Object> getPerfil() {
+        AppUserPrincipal p = principal();
         Map<String, Object> perfil = new LinkedHashMap<>();
-        perfil.put("username", usuario.getUsername());
-        perfil.put("email", usuario.getNombre()); // nombre almacena el email
-        perfil.put("rol", usuario.getRol().name());
-        perfil.put("activo", usuario.getActivo());
-        perfil.put("fechaCreacion", usuario.getFechaCreacion());
+        perfil.put("username", p.getUsername());
+        perfil.put("rol", p.getRolCodigo());
+        perfil.put("esCliente", p.getClienteId() != null);
 
-        // Total compras
-        Long totalCompras = queryLong(
-                "SELECT count() FROM retailmind.ordenes WHERE user_id = '" + username + "'");
-        perfil.put("totalCompras", totalCompras);
+        if (p.getClienteId() == null) {
+            perfil.put("nombre", p.getNombre());
+            return perfil;
+        }
 
-        // Total gastado
-        Double totalGastado = queryDouble(
-                "SELECT sum(total) FROM retailmind.ordenes WHERE user_id = '" + username + "'");
-        perfil.put("totalGastado", totalGastado != null ? totalGastado : 0.0);
+        Map<String, Object> cliente = pg.queryForMap("""
+                SELECT nombre, apellido, email, telefono, fecha_nacimiento, genero,
+                       acepta_marketing, fecha_creacion
+                FROM cliente WHERE id = ?""", p.getClienteId());
+        perfil.put("nombre", cliente.get("nombre"));
+        perfil.put("apellido", cliente.get("apellido"));
+        perfil.put("email", cliente.get("email"));
+        perfil.put("telefono", cliente.get("telefono"));
+        perfil.put("fechaNacimiento", cliente.get("fecha_nacimiento"));
+        perfil.put("genero", cliente.get("genero"));
+        perfil.put("aceptaMarketing", cliente.get("acepta_marketing"));
+        perfil.put("fechaCreacion", cliente.get("fecha_creacion"));
 
-        // Productos en wishlist
-        Long productosWishlist = queryLong(
-                "SELECT count() FROM retailmind.wishlist_items WHERE user_id = '" + username + "'");
-        perfil.put("productosWishlist", productosWishlist);
-
-        // Total eventos
-        Long totalEventos = queryLong(
-                "SELECT count() FROM retailmind.fact_eventos WHERE user_id = '" + username + "'");
-        perfil.put("totalEventos", totalEventos);
-
-        // Categoría favorita
-        String categoriaFavorita = getCategoriaFavorita(username);
-        perfil.put("categoriaFavorita", categoriaFavorita != null ? categoriaFavorita : "Sin datos");
-
-        // Canal preferido
-        String canalPreferido = getCanalPreferido(username);
-        perfil.put("canalPreferido", canalPreferido != null ? canalPreferido : "Sin datos");
-
+        // Estadísticas reales del ciclo de venta (RLS limita a SUS pedidos)
+        perfil.put("totalCompras", pg.queryForObject(
+                "SELECT count(*) FROM pedido", Long.class));
+        perfil.put("totalGastado", pg.queryForObject(
+                "SELECT COALESCE(SUM(total), 0) FROM pedido", Double.class));
+        perfil.put("productosWishlist", pg.queryForObject(
+                "SELECT count(*) FROM wishlist_item", Long.class));
+        perfil.put("direcciones", pg.queryForObject(
+                "SELECT count(*) FROM direccion WHERE activo", Long.class));
         return perfil;
     }
 
-    private String getCategoriaFavorita(String username) {
+    @Transactional
+    public void actualizarDatos(Map<String, Object> body) {
+        AppUserPrincipal p = clienteObligatorio();
+        String nombre = str(body.get("nombre"));
+        if (nombre == null || nombre.isBlank()) {
+            throw new IllegalArgumentException("El nombre es requerido");
+        }
+        int filas = pg.update("""
+                UPDATE cliente SET
+                    nombre = ?, apellido = NULLIF(?, ''), telefono = NULLIF(?, ''),
+                    genero = NULLIF(?, ''),
+                    fecha_nacimiento = NULLIF(?, '')::date,
+                    acepta_marketing = COALESCE(?::boolean, acepta_marketing)
+                WHERE id = ?""",
+                nombre.trim(), str(body.get("apellido")), str(body.get("telefono")),
+                str(body.get("genero")), str(body.get("fechaNacimiento")),
+                body.get("aceptaMarketing") != null ? body.get("aceptaMarketing").toString() : null,
+                p.getClienteId());
+        if (filas == 0) {
+            throw new NoSuchElementException("No se encontró el perfil del cliente");
+        }
+    }
+
+    // ── Direcciones ──────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> listarDirecciones() {
+        clienteObligatorio();
+        return pg.queryForList("""
+                SELECT d.id, d.tipo, d.alias, d.destinatario, d.calle_principal AS "callePrincipal",
+                       d.calle_secundaria AS "calleSecundaria", d.numero, d.referencia,
+                       d.codigo_postal AS "codigoPostal", d.telefono,
+                       d.es_predeterminada AS "esPredeterminada",
+                       d.ciudad_id AS "ciudadId", c.nombre AS ciudad
+                FROM direccion d
+                JOIN ciudad c ON c.id = d.ciudad_id
+                WHERE d.activo
+                ORDER BY d.es_predeterminada DESC, d.id""");
+    }
+
+    @Transactional
+    public Map<String, Object> crearDireccion(Map<String, Object> body) {
+        AppUserPrincipal p = clienteObligatorio();
+        validarDireccion(body);
+        boolean predeterminada = Boolean.parseBoolean(String.valueOf(body.get("esPredeterminada")));
+        if (predeterminada) {
+            pg.update("UPDATE direccion SET es_predeterminada = false WHERE es_predeterminada");
+        }
+        Long id = pg.queryForObject("""
+                INSERT INTO direccion (usuario_id, ciudad_id, tipo, alias, destinatario,
+                    calle_principal, calle_secundaria, numero, referencia, codigo_postal,
+                    telefono, es_predeterminada)
+                VALUES (?, ?, ?, NULLIF(?, ''), ?, ?, NULLIF(?, ''), NULLIF(?, ''),
+                        NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), ?)
+                RETURNING id""",
+                Long.class,
+                p.getUsuarioId(), longVal(body.get("ciudadId")), tipoDireccion(body),
+                str(body.get("alias")), str(body.get("destinatario")),
+                str(body.get("callePrincipal")), str(body.get("calleSecundaria")),
+                str(body.get("numero")), str(body.get("referencia")),
+                str(body.get("codigoPostal")), str(body.get("telefono")),
+                predeterminada);
+        return Map.of("id", id);
+    }
+
+    @Transactional
+    public void actualizarDireccion(long id, Map<String, Object> body) {
+        clienteObligatorio();
+        validarDireccion(body);
+        boolean predeterminada = Boolean.parseBoolean(String.valueOf(body.get("esPredeterminada")));
+        if (predeterminada) {
+            pg.update("UPDATE direccion SET es_predeterminada = false WHERE es_predeterminada AND id <> ?", id);
+        }
+        int filas = pg.update("""
+                UPDATE direccion SET
+                    ciudad_id = ?, tipo = ?, alias = NULLIF(?, ''), destinatario = ?,
+                    calle_principal = ?, calle_secundaria = NULLIF(?, ''),
+                    numero = NULLIF(?, ''), referencia = NULLIF(?, ''),
+                    codigo_postal = NULLIF(?, ''), telefono = NULLIF(?, ''),
+                    es_predeterminada = ?
+                WHERE id = ? AND activo""",
+                longVal(body.get("ciudadId")), tipoDireccion(body),
+                str(body.get("alias")), str(body.get("destinatario")),
+                str(body.get("callePrincipal")), str(body.get("calleSecundaria")),
+                str(body.get("numero")), str(body.get("referencia")),
+                str(body.get("codigoPostal")), str(body.get("telefono")),
+                predeterminada, id);
+        if (filas == 0) {
+            throw new NoSuchElementException("La dirección no existe o no es tuya");
+        }
+    }
+
+    /** Baja lógica: grp_cliente no tiene DELETE sobre direccion (por diseño). */
+    @Transactional
+    public void eliminarDireccion(long id) {
+        clienteObligatorio();
+        int filas = pg.update(
+                "UPDATE direccion SET activo = false, es_predeterminada = false WHERE id = ? AND activo", id);
+        if (filas == 0) {
+            throw new NoSuchElementException("La dirección no existe o no es tuya");
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> ciudades() {
+        return pg.queryForList("SELECT id, nombre FROM ciudad ORDER BY nombre");
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────────
+
+    private void validarDireccion(Map<String, Object> body) {
+        if (str(body.get("destinatario")) == null || str(body.get("destinatario")).isBlank()) {
+            throw new IllegalArgumentException("El destinatario es requerido");
+        }
+        if (str(body.get("callePrincipal")) == null || str(body.get("callePrincipal")).isBlank()) {
+            throw new IllegalArgumentException("La calle principal es requerida");
+        }
+        if (longVal(body.get("ciudadId")) == null) {
+            throw new IllegalArgumentException("La ciudad es requerida");
+        }
+    }
+
+    private String tipoDireccion(Map<String, Object> body) {
+        String tipo = str(body.get("tipo"));
+        return tipo != null && TIPOS_DIRECCION.contains(tipo) ? tipo : "envio";
+    }
+
+    private AppUserPrincipal clienteObligatorio() {
+        AppUserPrincipal p = principal();
+        if (p.getClienteId() == null) {
+            throw new IllegalStateException("Esta operación es solo para clientes de la tienda");
+        }
+        return p;
+    }
+
+    private AppUserPrincipal principal() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof AppUserPrincipal p) {
+            return p;
+        }
+        throw new IllegalStateException("No hay usuario autenticado");
+    }
+
+    private static String str(Object o) {
+        return o != null ? String.valueOf(o) : null;
+    }
+
+    private static Long longVal(Object o) {
+        if (o == null || String.valueOf(o).isBlank()) return null;
         try {
-            List<String> result = ch.query(
-                    "SELECT c.categoria_nombre " +
-                    "FROM retailmind.fact_eventos fe " +
-                    "JOIN retailmind.dim_producto p ON fe.product_id = p.producto_id " +
-                    "JOIN retailmind.dim_categoria c ON p.categoria_id = c.categoria_id " +
-                    "WHERE fe.user_id = '" + username + "' " +
-                    "GROUP BY p.categoria_id, c.categoria_nombre " +
-                    "ORDER BY count() DESC LIMIT 1",
-                    (rs, rn) -> rs.getString("categoria_nombre"));
-            return result.isEmpty() ? null : result.get(0);
-        } catch (RuntimeException e) {
-            return null;
-        }
-    }
-
-    private String getCanalPreferido(String username) {
-        try {
-            List<String> result = ch.query(
-                    "SELECT channel FROM retailmind.fact_eventos " +
-                    "WHERE user_id = '" + username + "' " +
-                    "GROUP BY channel ORDER BY count() DESC LIMIT 1",
-                    (rs, rn) -> rs.getString("channel"));
-            return result.isEmpty() ? null : result.get(0);
-        } catch (RuntimeException e) {
-            return null;
-        }
-    }
-
-    public void actualizarEmail(String username, String email) {
-        if (!usuarioRepo.existsByUsername(username)) {
-            throw new IllegalArgumentException("Usuario no encontrado: " + username);
-        }
-        ch.execute("ALTER TABLE retailmind.usuarios_sistema UPDATE nombre = '" + email +
-                "' WHERE username = '" + username + "' SETTINGS mutations_sync = 1");
-    }
-
-    public void cambiarPassword(String username, String passwordActual, String passwordNuevo) {
-        UsuarioSistema usuario = usuarioRepo.findByUsername(username)
-                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado: " + username));
-
-        if (!passwordEncoder.matches(passwordActual, usuario.getPassword())) {
-            throw new IllegalStateException("La contraseña actual es incorrecta");
-        }
-
-        String nuevoHash = passwordEncoder.encode(passwordNuevo);
-        ch.execute("ALTER TABLE retailmind.usuarios_sistema UPDATE password = '" + nuevoHash +
-                "' WHERE username = '" + username + "' SETTINGS mutations_sync = 1");
-    }
-
-    private Long queryLong(String sql) {
-        try {
-            return ch.queryForObject(sql, Long.class);
-        } catch (RuntimeException e) {
-            return 0L;
-        }
-    }
-
-    private Double queryDouble(String sql) {
-        try {
-            return ch.queryForObject(sql, Double.class);
-        } catch (RuntimeException e) {
-            return 0.0;
+            return Long.valueOf(String.valueOf(o));
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Identificador inválido: " + o);
         }
     }
 }

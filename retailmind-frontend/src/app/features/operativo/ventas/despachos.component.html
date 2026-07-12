@@ -14,6 +14,7 @@
             {{ p.numero }} — {{ p.cliente }} ({{ p.estado }})
           </mat-option>
         </mat-select>
+        <mat-hint>Solo pedidos pagados y con factura emitida</mat-hint>
       </mat-form-field>
       <mat-form-field appearance="outline">
         <mat-label>Transportista</mat-label>
@@ -43,6 +44,30 @@
       <div class="dato">Envío: <strong>{{ envio.numero }}</strong> · Guía: <strong>{{ envio.numero_guia }}</strong> · Estado: <strong>{{ envio.estado }}</strong></div>
       <div class="dato">Pedido: <strong>{{ envio.numero_pedido }}</strong> · Transportista: <strong>{{ envio.transportista }}</strong> · Método: <strong>{{ envio.metodo_envio }}</strong></div>
       <div class="dato">Entrega en: <strong>{{ envio.direccion_entrega }}</strong></div>
+    </div>
+  </div>
+
+  <div class="op-card">
+    <h3><mat-icon>task_alt</mat-icon> Confirmar entrega</h3>
+    <div class="form-grid">
+      <mat-form-field appearance="outline">
+        <mat-label>Pedido en tránsito</mat-label>
+        <mat-select [(ngModel)]="pedidoEntregaId">
+          <mat-option *ngFor="let p of pedidosEnTransito" [value]="p.id">
+            {{ p.numero }} — {{ p.cliente }}
+          </mat-option>
+        </mat-select>
+        <mat-hint>Solo pedidos despachados pendientes de entrega</mat-hint>
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Observación de la entrega</mat-label>
+        <input matInput [(ngModel)]="observacionEntrega">
+      </mat-form-field>
+    </div>
+    <div class="form-actions">
+      <button class="btn-aplicar" (click)="entregar()" [disabled]="entregando">
+        <mat-icon>task_alt</mat-icon> {{ entregando ? 'Registrando…' : 'Marcar Entregado' }}
+      </button>
     </div>
   </div>
 

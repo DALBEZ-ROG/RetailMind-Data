@@ -9,17 +9,22 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { HttpClient } from '@angular/common/http';
 import { Subscription } from 'rxjs';
 import { ShopService } from './shop.service';
 import { AuthService } from '../../core/services/auth.service';
-import { environment } from '../../../environments/environment';
+import { mensajeError } from '../../core/services/api-error.util';
 
 const CATEGORY_ICONS: Record<number, string> = {
   1: 'devices', 2: 'shopping_basket', 3: 'sports_soccer', 4: 'watch',
-  5: 'spa', 6: 'home', 7: 'directions_walk', 8: 'checkroom'
+  5: 'spa', 6: 'home', 7: 'directions_walk', 8: 'checkroom',
+  9: 'checkroom', 10: 'checkroom', 11: 'category'
 };
 
+/**
+ * Detalle de producto de la tienda (PostgreSQL). El id de la ruta es el id
+ * de la VARIANTE. Los similares salen del catálogo PG (misma categoría y
+ * rango de precio); el evento "view" va a ClickHouse best-effort.
+ */
 @Component({
   selector: 'app-producto-detalle',
   standalone: true,
@@ -49,7 +54,6 @@ export class ProductoDetalleComponent implements OnInit, OnDestroy {
     private router: Router,
     private shopService: ShopService,
     private authService: AuthService,
-    private http: HttpClient,
     private snackBar: MatSnackBar
   ) {}
 
@@ -84,7 +88,7 @@ export class ProductoDetalleComponent implements OnInit, OnDestroy {
         this.producto = p;
         this.loading = false;
         this.registrarView(id);
-        this.checkWishlist(id);
+        this.checkWishlist(p.productoId);
         this.cargarSimilares(id);
       },
       error: () => { this.loading = false; }
@@ -92,13 +96,9 @@ export class ProductoDetalleComponent implements OnInit, OnDestroy {
   }
 
   private cargarSimilares(productoId: string): void {
-    const user = this.authService.getCurrentUser();
-    if (!user) return;
     this.loadingSimilares = true;
     const t0 = Date.now();
-    this.http.get<any[]>(
-      `${environment.apiUrl}/api/recomendaciones/${user.username}/similares/${productoId}`
-    ).subscribe({
+    this.shopService.getSimilares(productoId).subscribe({
       next: (items) => {
         this.similares = items;
         this.similaresMsLabel = `⚡ ${Date.now() - t0} ms`;
@@ -108,19 +108,16 @@ export class ProductoDetalleComponent implements OnInit, OnDestroy {
     });
   }
 
-  agregarSimilarAlCarrito(productoId: string, event: Event): void {
+  agregarSimilarAlCarrito(productoId: number, event: Event): void {
     event.stopPropagation();
-    const user = this.authService.getCurrentUser();
-    if (!user) return;
-    this.http.post(`${environment.apiUrl}/api/carrito/agregar`, {
-      user_id: user.username, producto_id: productoId, cantidad: 1
-    }).subscribe({
-      next: () => this.snackBar.open('Agregado al carrito ✓', 'OK', { duration: 2000, panelClass: ['snack-success'] }),
-      error: () => this.snackBar.open('Error al agregar', 'Cerrar', { duration: 2000 })
+    this.shopService.agregarAlCarrito(productoId, 1).subscribe({
+      next: () => this.snackBar.open('Agregado al carrito ✓', 'OK',
+        { duration: 2000, panelClass: ['snack-success'] }),
+      error: (e) => this.snackBar.open(mensajeError(e, 'Error al agregar'), 'Cerrar', { duration: 2000 })
     });
   }
 
-  verSimilar(productoId: string): void {
+  verSimilar(productoId: number): void {
     this.router.navigate(['/shop/producto', productoId]);
   }
 
@@ -132,51 +129,45 @@ export class ProductoDetalleComponent implements OnInit, OnDestroy {
       user_action: 'view',
       channel: 'web',
       price: this.producto?.price
-    }).subscribe();
+    }).subscribe({ next: () => {}, error: () => {} });
   }
 
-  private checkWishlist(productoId: string): void {
-    const user = this.authService.getCurrentUser();
-    if (!user) return;
-    this.http.get<any[]>(`${environment.apiUrl}/api/wishlist/${user.username}`).subscribe({
-      next: (items) => {
-        this.enWishlist = items.some(i => i.productoId === productoId);
-      },
+  private checkWishlist(productoId: number): void {
+    this.shopService.getWishlist().subscribe({
+      next: (items) => this.enWishlist = items.some(i => Number(i.productoId) === Number(productoId)),
       error: () => {}
     });
   }
 
   agregarAlCarrito(): void {
-    const user = this.authService.getCurrentUser();
-    if (!user || !this.producto) return;
-
-    this.shopService.agregarAlCarrito(user.username, this.producto.productoId, this.cantidad).subscribe({
-      next: () => this.snackBar.open('Agregado al carrito ✓', 'OK', { duration: 2000, panelClass: ['snack-success'] }),
-      error: () => this.snackBar.open('Error al agregar', 'Cerrar', { duration: 3000, panelClass: ['snack-error'] })
+    if (!this.producto) return;
+    this.shopService.agregarAlCarrito(this.producto.productoId, this.cantidad).subscribe({
+      next: () => this.snackBar.open('Agregado al carrito ✓', 'OK',
+        { duration: 2000, panelClass: ['snack-success'] }),
+      error: (e) => this.snackBar.open(mensajeError(e, 'Error al agregar'), 'Cerrar',
+        { duration: 3000, panelClass: ['snack-error'] })
     });
   }
 
   toggleWishlist(): void {
-    const user = this.authService.getCurrentUser();
-    if (!user || !this.producto) return;
-
+    if (!this.producto) return;
     const productoId = this.producto.productoId;
 
     if (this.enWishlist) {
-      this.http.delete(`${environment.apiUrl}/api/wishlist/${user.username}/${productoId}`).subscribe({
+      this.shopService.eliminarDeWishlist(productoId).subscribe({
         next: () => {
           this.enWishlist = false;
           this.snackBar.open('Eliminado de wishlist', 'OK', { duration: 2000 });
         },
-        error: () => this.snackBar.open('Error', 'Cerrar', { duration: 2000 })
+        error: (e) => this.snackBar.open(mensajeError(e, 'Error'), 'Cerrar', { duration: 2000 })
       });
     } else {
-      this.shopService.agregarAWishlist(user.username, productoId).subscribe({
+      this.shopService.agregarAWishlist(productoId).subscribe({
         next: () => {
           this.enWishlist = true;
           this.snackBar.open('Agregado a wishlist ❤️', 'OK', { duration: 2000 });
         },
-        error: (e: any) => this.snackBar.open(e.error?.error || 'Error', 'OK', { duration: 2000 })
+        error: (e) => this.snackBar.open(mensajeError(e, 'Error'), 'OK', { duration: 2000 })
       });
     }
   }

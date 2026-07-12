@@ -42,8 +42,10 @@ export class RecepcionesComponent implements OnInit {
               private snackBar: MatSnackBar) {}
 
   ngOnInit(): void {
+    // Solo ordenes aprobadas por Gerencia (confirmada) o con recepcion parcial:
+    // el backend rechaza recibir una orden no aprobada (compuerta CU-O-12)
     this.compras.ordenes().subscribe(o =>
-      this.ordenes = o.filter(x => x.estado !== 'recibida'));
+      this.ordenes = o.filter(x => ['confirmada', 'recibida_parcial'].includes(x.estado)));
   }
 
   cargarOrden(): void {
@@ -88,7 +90,8 @@ export class RecepcionesComponent implements OnInit {
         this.verificarStock();
         this.cargarOrden();
         this.compras.ordenes().subscribe(o =>
-          this.ordenes = o.filter(x => x.estado !== 'recibida' || x.id === this.ordenId));
+          this.ordenes = o.filter(x =>
+            ['confirmada', 'recibida_parcial'].includes(x.estado) || x.id === this.ordenId));
       },
       error: e => {
         this.procesando = false;

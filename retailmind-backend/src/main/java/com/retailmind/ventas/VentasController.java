@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -30,6 +31,8 @@ public class VentasController {
     public record DevolucionReq(String motivoCodigo, long bodegaId, String descripcion,
                                 List<VentasService.ItemDevolucion> items) {}
     public record NotaReq(String nota, Boolean esVisibleCliente) {}
+    public record PagoClienteReq(long metodoPagoId, java.math.BigDecimal monto, String referencia) {}
+    public record EntregaReq(String observacion) {}
 
     private final VentasService servicio;
     private final FacturaVentaPdfService pdfService;
@@ -64,10 +67,25 @@ public class VentasController {
                 servicio.crearNota(id, r.nota(), Boolean.TRUE.equals(r.esVisibleCliente())));
     }
 
+    // Pago del cliente: compuerta previa a facturar/despachar (ADMIN/VENDEDOR)
+    @PostMapping("/pedidos/{id}/pagos")
+    public ResponseEntity<?> cobrar(@PathVariable long id, @RequestBody PagoClienteReq r) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                servicio.registrarPago(id, r.metodoPagoId(), r.monto(), r.referencia()));
+    }
+
     // Caso 8: factura de venta + PDF
     @PostMapping("/pedidos/{id}/factura")
     public ResponseEntity<?> facturar(@PathVariable long id) {
         return ResponseEntity.status(HttpStatus.CREATED).body(servicio.emitirFactura(id));
+    }
+
+    /** Listado de facturas de venta emitidas (búsqueda + paginación). */
+    @GetMapping("/facturas")
+    public Map<String, Object> facturas(@RequestParam(defaultValue = "") String q,
+                                        @RequestParam(defaultValue = "0") int page,
+                                        @RequestParam(defaultValue = "25") int size) {
+        return servicio.listarFacturas(q, page, size);
     }
 
     @GetMapping("/facturas/{id}")
@@ -89,6 +107,13 @@ public class VentasController {
         return ResponseEntity.status(HttpStatus.CREATED).body(
                 servicio.despachar(id, r.transportistaId(), r.metodoEnvioId(),
                         r.bodegaId(), r.observacion()));
+    }
+
+    // Entrega: cierra la logística (ADMIN/DESPACHO)
+    @PostMapping("/pedidos/{id}/entrega")
+    public Map<String, Object> entregar(@PathVariable long id,
+                                        @RequestBody(required = false) EntregaReq r) {
+        return servicio.entregar(id, r != null ? r.observacion() : null);
     }
 
     @GetMapping("/envios/{id}")

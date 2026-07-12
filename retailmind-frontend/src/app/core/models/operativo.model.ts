@@ -43,7 +43,7 @@ export interface CategoriaAdmin {
 export interface ItemOrdenReq { varianteId: number; cantidad: number; precioUnitario: number; ivaPorcentaje?: number; }
 export interface OrdenCompraRow {
   id: number; numero: string; estado: string; fecha_emision: string;
-  total: number; proveedor: string; bodega: string;
+  total: number; proveedor: string; bodega: string; tiene_factura?: boolean;
 }
 export interface OrdenCompraDetalle extends OrdenCompraRow {
   subtotal: number; monto_impuesto: number; fecha_entrega_esperada: string;
@@ -93,7 +93,7 @@ export interface KardexRow {
 export interface ItemPedidoReq { varianteId: number; cantidad: number; }
 export interface PedidoVentaRow {
   id: number; numero: string; estado: string; total: number;
-  fecha_pedido: string; cliente: string;
+  fecha_pedido: string; cliente: string; tiene_factura?: boolean;
 }
 export interface PedidoVentaDetalle extends PedidoVentaRow {
   subtotal: number; monto_impuesto: number; canal: string;
@@ -103,6 +103,21 @@ export interface PedidoVentaDetalle extends PedidoVentaRow {
   }[];
   historial: { estado: string; comentario: string; fecha_creacion: string }[];
   notas: NotaPedidoRow[];
+  // Proceso encadenado (pago -> factura -> envío)
+  factura: { id: number; numero: string; estado: string } | null;
+  envio: {
+    id: number; numero: string; numero_guia: string; estado: string;
+    fecha_despacho: string; fecha_entrega_real: string | null;
+  } | null;
+  pagos: PagoVentaRow[];
+  total_pagado?: number; saldo_pendiente?: number; // solo personal
+}
+export interface PagoVentaRow {
+  id: number; monto: number; estado: string; referencia_externa: string | null;
+  fecha_pago: string; metodo: string;
+}
+export interface PagoClienteRes {
+  pagoId: number; totalPagado: number; saldoPendiente: number; estadoPedido: string;
 }
 export interface NotaPedidoRow {
   id: number; nota: string; fecha_creacion: string;
@@ -114,6 +129,13 @@ export interface FacturaVenta {
   razon_social: string; identificacion: string; pedido_id: number;
   subtotal: number; monto_impuesto: number; total: number; numero_pedido: string;
   detalles: { descripcion: string; cantidad: number; precio_unitario: number; subtotal: number }[];
+}
+export interface FacturaVentaRow {
+  id: number; numero: string; estado: string; fecha_emision: string;
+  total: number; cliente: string; pedido_id: number; numero_pedido: string;
+}
+export interface PaginaFacturasVenta {
+  items: FacturaVentaRow[]; total: number; page: number; size: number;
 }
 export interface EnvioDetalle {
   id: number; numero: string; numero_guia: string; estado: string;

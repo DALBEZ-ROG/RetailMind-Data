@@ -1,43 +1,38 @@
 package com.retailmind.recomendaciones;
 
+import java.util.List;
 import java.util.Map;
 
-import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * Recomendaciones para el cliente autenticado. La señal viene de ClickHouse
+ * (eventos) y los productos de PostgreSQL; si ClickHouse está apagado, se
+ * degrada a destacados del catálogo sin romper la tienda.
+ */
 @RestController
 @RequestMapping("/api/recomendaciones")
 public class RecomendacionesController {
 
-    private final RecomendacionesService recomendacionesService;
+    private final RecomendacionesService service;
 
-    public RecomendacionesController(RecomendacionesService recomendacionesService) {
-        this.recomendacionesService = recomendacionesService;
+    public RecomendacionesController(RecomendacionesService service) {
+        this.service = service;
     }
 
-    /** GET /api/recomendaciones/{username} */
-    @GetMapping("/{username}")
-    public ResponseEntity<?> getRecomendaciones(@PathVariable String username) {
-        try {
-            return ResponseEntity.ok(recomendacionesService.getRecomendaciones(username));
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError()
-                    .body(Map.of("error", "Error al obtener recomendaciones: " + e.getMessage()));
-        }
+    @GetMapping
+    public Map<String, Object> getRecomendaciones() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return service.getRecomendaciones(auth != null ? auth.getName() : "anonymous");
     }
 
-    /** GET /api/recomendaciones/{username}/similares/{productoId} */
-    @GetMapping("/{username}/similares/{productoId}")
-    public ResponseEntity<?> getSimilares(@PathVariable String username,
-                                           @PathVariable String productoId) {
-        try {
-            return ResponseEntity.ok(recomendacionesService.getSimilares(username, productoId));
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError()
-                    .body(Map.of("error", "Error al obtener similares: " + e.getMessage()));
-        }
+    @GetMapping("/similares/{varianteId}")
+    public List<Map<String, Object>> getSimilares(@PathVariable long varianteId) {
+        return service.getSimilares(varianteId);
     }
 }

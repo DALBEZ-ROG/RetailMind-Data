@@ -8,29 +8,83 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
+import { Subject } from 'rxjs';
+import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 import { VentasService } from '../../../core/services/ventas.service';
 import { mensajeError } from '../../../core/services/api-error.util';
-import { PedidoVentaRow, FacturaVenta } from '../../../core/models/operativo.model';
+import { PedidoVentaRow, FacturaVenta, FacturaVentaRow } from '../../../core/models/operativo.model';
 
 @Component({
   selector: 'app-facturas-venta',
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
-    MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule],
+    MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule,
+    MatTooltipModule, MatPaginatorModule],
   templateUrl: './facturas-venta.component.html',
   styleUrl: '../operativo-shared.scss'
 })
 export class FacturasVentaComponent implements OnInit {
 
+  // Emisión: solo pedidos PAGADOS sin factura (compuerta del backend)
   pedidos: PedidoVentaRow[] = [];
   pedidoId: number | null = null;
   factura: FacturaVenta | null = null;
   procesando = false;
 
+  // Listado de facturas emitidas (búsqueda + paginación server-side)
+  facturas: FacturaVentaRow[] = [];
+  total = 0;
+  pagina = 0;
+  tamPagina = 25;
+  readonly tamanos = [25, 50, 100];
+  q = '';
+  private busqueda$ = new Subject<string>();
+  loading = true;
+
+  detalle: FacturaVenta | null = null;
+
+  columnas = ['numero', 'pedido', 'cliente', 'fecha', 'total', 'estado', 'acciones'];
+
   constructor(private ventas: VentasService, private snackBar: MatSnackBar) {}
 
   ngOnInit(): void {
-    this.ventas.pedidos().subscribe(p => this.pedidos = p);
+    this.cargarPedidos();
+    this.cargarFacturas();
+    this.busqueda$.pipe(debounceTime(350), distinctUntilChanged()).subscribe(() => {
+      this.pagina = 0;
+      this.cargarFacturas();
+    });
+  }
+
+  cargarPedidos(): void {
+    this.ventas.pedidos().subscribe(p => this.pedidos = p.filter(x =>
+      ['pagado', 'en_preparacion', 'despachado', 'entregado'].includes(x.estado)
+      && !x.tiene_factura));
+  }
+
+  cargarFacturas(): void {
+    this.loading = true;
+    this.ventas.facturas(this.q, this.pagina, this.tamPagina).subscribe({
+      next: pg => {
+        this.facturas = pg.items;
+        this.total = pg.total;
+        this.loading = false;
+      },
+      error: e => {
+        this.loading = false;
+        this.snackBar.open(mensajeError(e, 'No se pudieron cargar las facturas'), 'Cerrar', { duration: 5000 });
+      }
+    });
+  }
+
+  alBuscar(): void { this.busqueda$.next(this.q); }
+
+  alPaginar(e: PageEvent): void {
+    this.pagina = e.pageIndex;
+    this.tamPagina = e.pageSize;
+    this.cargarFacturas();
   }
 
   emitirFactura(): void {
@@ -43,14 +97,23 @@ export class FacturasVentaComponent implements OnInit {
       next: f => {
         this.procesando = false;
         this.factura = f;
+        this.pedidoId = null;
         this.snackBar.open(`Factura ${f.numero} emitida — total ${f.total}`, 'OK',
           { duration: 3500, panelClass: ['snack-success'] });
-        this.ventas.pedidos().subscribe(p => this.pedidos = p);
+        this.cargarPedidos();
+        this.cargarFacturas();
       },
       error: e => {
         this.procesando = false;
         this.snackBar.open(mensajeError(e, 'No se pudo emitir la factura'), 'Cerrar', { duration: 5000 });
       }
+    });
+  }
+
+  verDetalle(id: number): void {
+    this.ventas.factura(id).subscribe({
+      next: f => this.detalle = f,
+      error: e => this.snackBar.open(mensajeError(e, 'No se pudo cargar la factura'), 'Cerrar', { duration: 4000 })
     });
   }
 

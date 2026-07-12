@@ -1,6 +1,6 @@
 <div class="op-page">
   <div class="section-header">
-    <h2><mat-icon>shopping_basket</mat-icon> Mis Pedidos de Tienda</h2>
+    <h2><mat-icon>shopping_basket</mat-icon> Mis Pedidos</h2>
     <p>Consulta tus pedidos y su detalle. Solo ves tus propios pedidos.</p>
   </div>
 
@@ -52,9 +52,19 @@
 
   <div class="op-card" *ngIf="detalle">
     <h3><mat-icon>receipt_long</mat-icon> Detalle de {{ detalle.numero }}</h3>
-    <div style="margin-bottom: 12px;">
-      <span class="estado-chip ok">{{ detalle.estado }}</span>
-      <span class="stat-chip chip-info" style="margin-left: 8px;">Canal: {{ detalle.canal }}</span>
+    <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom: 12px;">
+      <span class="estado-chip"
+            [class.ok]="['pagado','entregado'].includes(detalle.estado)"
+            [class.warn]="['despachado','en_preparacion'].includes(detalle.estado)"
+            [class.error]="['devuelto','cancelado'].includes(detalle.estado)">{{ detalle.estado }}</span>
+      <span class="stat-chip chip-info">Canal: {{ detalle.canal }}</span>
+      <span class="stat-chip chip-info" *ngIf="detalle.envio">
+        <mat-icon style="font-size:14px;height:14px;width:14px;">local_shipping</mat-icon>
+        Guía {{ detalle.envio.numero_guia }} ({{ detalle.envio.estado }})
+      </span>
+      <button class="btn-limpiar" *ngIf="detalle.factura" (click)="verFacturaPdf()">
+        <mat-icon>picture_as_pdf</mat-icon> Factura {{ detalle.factura.numero }}
+      </button>
     </div>
     <div class="table-wrapper">
       <table mat-table [dataSource]="detalle.detalles">
@@ -94,6 +104,16 @@
       <div class="dato" *ngFor="let h of detalle.historial">
         <span class="estado-chip ok">{{ h.estado }}</span>
         {{ h.comentario }} · {{ h.fecha_creacion | date:'short' }}
+      </div>
+    </div>
+
+    <!-- Seguimiento del envío (RLS: solo envíos de SUS pedidos, script 35) -->
+    <div *ngIf="seguimiento.length" style="margin-top: 16px;">
+      <h3><mat-icon>route</mat-icon> Seguimiento del envío</h3>
+      <div class="dato" *ngFor="let s of seguimiento">
+        <span class="estado-chip" [class.ok]="s.estado === 'entregado'"
+              [class.warn]="s.estado !== 'entregado'">{{ s.estado }}</span>
+        {{ s.descripcion }} — {{ s.ubicacion }} · {{ s.fecha_evento | date:'short' }}
       </div>
     </div>
 

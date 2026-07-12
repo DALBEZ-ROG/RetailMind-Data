@@ -107,9 +107,12 @@ public class ComprasService {
 
     @Transactional(readOnly = true)
     public List<Map<String, Object>> listarOrdenes() {
+        // tiene_factura permite al frontend ofrecer solo ordenes facturables
         return pg.queryForList("""
                 SELECT oc.id, oc.numero, oc.estado, oc.fecha_emision, oc.total,
-                       p.razon_social AS proveedor, b.nombre AS bodega
+                       p.razon_social AS proveedor, b.nombre AS bodega,
+                       EXISTS (SELECT 1 FROM factura_compra fc
+                               WHERE fc.orden_compra_id = oc.id) AS tiene_factura
                 FROM orden_compra oc
                 JOIN proveedor p ON p.id = oc.proveedor_id
                 JOIN bodega b ON b.id = oc.bodega_id
@@ -167,8 +170,15 @@ public class ComprasService {
             throw new IllegalArgumentException("La recepcion requiere al menos un item");
         }
         Map<String, Object> orden = pg.queryForMap(
-                "SELECT id, numero, bodega_id, estado FROM orden_compra WHERE id = ?", ordenId);
+                "SELECT id, numero, bodega_id, estado FROM orden_compra WHERE id = ? FOR UPDATE",
+                ordenId);
         String estadoOrden = (String) orden.get("estado");
+        // Compuerta de control interno: sin aprobación de Gerencia no hay recepción
+        if ("borrador".equals(estadoOrden) || "enviada".equals(estadoOrden)) {
+            throw new IllegalStateException("La orden " + orden.get("numero")
+                    + " debe estar aprobada por Gerencia antes de registrar la recepcion"
+                    + " (estado actual: " + estadoOrden + ")");
+        }
         if ("recibida".equals(estadoOrden)) {
             throw new IllegalStateException("La orden " + orden.get("numero")
                     + " ya fue recibida completamente; no admite otra recepcion");
@@ -267,11 +277,30 @@ public class ComprasService {
     @Transactional
     public Map<String, Object> registrarFactura(long ordenId) {
         Map<String, Object> orden = pg.queryForMap("""
-                SELECT oc.numero, oc.proveedor_id, oc.moneda_id, p.dias_credito
+                SELECT oc.numero, oc.estado, oc.proveedor_id, oc.moneda_id, p.dias_credito
                 FROM orden_compra oc JOIN proveedor p ON p.id = oc.proveedor_id
-                WHERE oc.id = ?""", ordenId);
+                WHERE oc.id = ? FOR UPDATE OF oc""", ordenId);
         long proveedorId = ((Number) orden.get("proveedor_id")).longValue();
         int diasCredito = ((Number) orden.get("dias_credito")).intValue();
+
+        // Compuertas: aprobada -> recibida COMPLETA -> factura (el detalle de la
+        // factura copia las cantidades pedidas, por eso exige recepcion total)
+        String estadoOrden = (String) orden.get("estado");
+        switch (estadoOrden) {
+            case "borrador", "enviada" -> throw new IllegalStateException(
+                    "La orden " + orden.get("numero")
+                    + " debe estar aprobada por Gerencia antes de registrar la factura"
+                    + " (estado actual: " + estadoOrden + ")");
+            case "confirmada" -> throw new IllegalStateException(
+                    "La orden " + orden.get("numero")
+                    + " aun no registra recepcion de mercancia; debe recibirse antes de facturar");
+            case "recibida_parcial" -> throw new IllegalStateException(
+                    "La orden " + orden.get("numero")
+                    + " esta recibida parcialmente; debe recibirse completa antes de facturar");
+            case "cancelada" -> throw new IllegalStateException(
+                    "La orden " + orden.get("numero") + " esta cancelada; no se puede facturar");
+            default -> { } // recibida: facturable
+        }
 
         // Guardia de idempotencia: una orden se factura una sola vez
         List<String> existentes = pg.queryForList(

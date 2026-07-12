@@ -8,6 +8,10 @@ export interface HealthStatus {
   database: string;
   python:   string;
   status:   string;
+  postgres?:   string;
+  clickhouse?: string;
+  /** UP | DEGRADED — ClickHouse apagado degrada analítica sin tumbar el sistema */
+  analytics?:  string;
 }
 
 @Injectable({ providedIn: 'root' })

@@ -9,10 +9,14 @@
     <mat-card-content>
       <mat-icon class="success-icon">check_circle</mat-icon>
       <h3>Compra realizada con exito!</h3>
-      <p>Orden: <strong>{{ ordenId }}</strong></p>
+      <p>Pedido: <strong>{{ ordenId }}</strong></p>
       <button mat-raised-button color="primary" (click)="seguirComprando()">
         <mat-icon>storefront</mat-icon> Seguir comprando
       </button>
+      <a mat-stroked-button color="primary" routerLink="/operativo/ventas/mis-pedidos"
+         style="margin-left: 8px;">
+        <mat-icon>shopping_basket</mat-icon> Ver mis pedidos
+      </a>
     </mat-card-content>
   </mat-card>
 
@@ -32,7 +36,17 @@
         <div class="item-info">
           <h4 class="item-name">{{ item.nombre }}</h4>
           <p class="item-brand">{{ item.brand }}</p>
-          <p class="item-qty">Cantidad: {{ item.cantidad }}</p>
+          <div class="item-qty" style="display: flex; align-items: center; gap: 4px;">
+            <button mat-icon-button (click)="cambiarCantidad(item, -1)" aria-label="Menos">
+              <mat-icon>remove_circle_outline</mat-icon>
+            </button>
+            <span><strong>{{ item.cantidad }}</strong></span>
+            <button mat-icon-button (click)="cambiarCantidad(item, 1)"
+                    [disabled]="item.stock !== undefined && item.cantidad >= item.stock"
+                    aria-label="Más">
+              <mat-icon>add_circle_outline</mat-icon>
+            </button>
+          </div>
         </div>
         <div class="item-price">
           <span class="price">${{ item.precioUnitario * item.cantidad | number:'1.2-2' }}</span>
@@ -52,9 +66,10 @@
         <span class="total-label">Total:</span>
         <span class="total-amount">${{ total | number:'1.2-2' }}</span>
       </div>
-      <button mat-raised-button color="accent" class="btn-checkout" (click)="finalizarCompra()">
+      <button mat-raised-button color="accent" class="btn-checkout"
+              [disabled]="procesando" (click)="finalizarCompra()">
         <mat-icon>payment</mat-icon>
-        Finalizar Compra
+        {{ procesando ? 'Procesando...' : 'Finalizar Compra' }}
       </button>
     </div>
   </div>

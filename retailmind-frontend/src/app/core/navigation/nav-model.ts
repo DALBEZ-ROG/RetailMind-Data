@@ -63,7 +63,8 @@ export type PermisoDato =
 
 export const ROLES_POR_DATO: Record<PermisoDato, readonly string[]> = {
   refClientes:          ['ADMIN', 'GERENTE', 'VENDEDOR', 'DESPACHO', 'ANALISTA'],
-  refBodegas:           ['ADMIN', 'GERENTE', 'COMPRAS', 'BODEGA', 'ANALISTA'],
+  // VENDEDOR: script 35 le dio bodega (el pedido descuenta stock de una bodega)
+  refBodegas:           ['ADMIN', 'GERENTE', 'VENDEDOR', 'COMPRAS', 'BODEGA', 'ANALISTA'],
   refProveedores:       ['ADMIN', 'GERENTE', 'COMPRAS', 'BODEGA', 'ANALISTA'],
   refVariantes:         ['ADMIN', 'GERENTE', 'VENDEDOR', 'COMPRAS', 'BODEGA', 'CLIENTE', 'ANALISTA'],
   refMetodosPago:       ['ADMIN', 'GERENTE', 'VENDEDOR', 'CLIENTE', 'ANALISTA'],
@@ -257,8 +258,6 @@ export const DASHBOARD_AREAS: AreaNav[] = [
         icono: 'sync', ruta: '/admin-etl', permiso: 'admin' },
       { titulo: 'Gestión de Datos', descripcion: 'Mantenimiento de datos del sistema',
         icono: 'dataset', ruta: '/gestion-datos', permiso: 'admin' },
-      { titulo: 'Pedidos', descripcion: 'Pedidos de la tienda online',
-        icono: 'receipt_long', ruta: '/admin-pedidos', permiso: 'admin' },
       { titulo: 'Usuarios', descripcion: 'Cuentas y roles del sistema',
         icono: 'group', ruta: '/admin-usuarios', permiso: 'admin' },
       { titulo: 'Inicialización', descripcion: 'Puesta a punto del sistema',
@@ -298,21 +297,21 @@ export const DASHBOARD_AREAS: AreaNav[] = [
     icono: 'storefront',
     acento: '#00bcd4',
     gradiente: 'var(--accent-gradient)',
+    // Tienda del cliente (PostgreSQL): SOLO rol CLIENTE. Los roles operativos
+    // no entran a la tienda (evita 500 de carrito/bodega@... y duplicados).
     acciones: [
       { titulo: 'Tienda', descripcion: 'Explorar el catálogo online',
-        icono: 'storefront', ruta: '/shop', permiso: 'autenticado' },
+        icono: 'storefront', ruta: '/shop', permiso: 'cliente' },
       { titulo: 'Mi Carrito', descripcion: 'Productos listos para el checkout',
-        icono: 'shopping_bag', ruta: '/shop/carrito', permiso: 'autenticado' },
+        icono: 'shopping_bag', ruta: '/shop/carrito', permiso: 'cliente' },
       { titulo: 'Mi Wishlist', descripcion: 'Tus productos favoritos',
-        icono: 'favorite', ruta: '/wishlist', permiso: 'autenticado' },
+        icono: 'favorite', ruta: '/wishlist', permiso: 'cliente' },
       { titulo: 'Recomendaciones', descripcion: 'Sugerencias personalizadas',
-        icono: 'local_fire_department', ruta: '/recomendaciones', permiso: 'autenticado' },
+        icono: 'local_fire_department', ruta: '/recomendaciones', permiso: 'cliente' },
       { titulo: 'Mis Pedidos', descripcion: 'Historial de compras online',
-        icono: 'local_shipping', ruta: '/mis-pedidos', permiso: 'autenticado' },
-      { titulo: 'Mis Pedidos de Tienda', descripcion: 'Pedidos del módulo operativo',
         icono: 'shopping_basket', ruta: '/operativo/ventas/mis-pedidos', permiso: 'cliente' },
       { titulo: 'Mi Perfil', descripcion: 'Datos personales y direcciones',
-        icono: 'person', ruta: '/perfil', permiso: 'autenticado' }
+        icono: 'person', ruta: '/perfil', permiso: 'cliente' }
     ]
   }
 ];

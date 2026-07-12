@@ -23,6 +23,15 @@
     }
   }
 
+  &.status-degraded {
+    background-color: #fff8e1;
+    color: #f57f17;
+
+    .status-dot {
+      background-color: #ffb300;
+    }
+  }
+
   &.status-down {
     background-color: #ffebee;
     color: #c62828;

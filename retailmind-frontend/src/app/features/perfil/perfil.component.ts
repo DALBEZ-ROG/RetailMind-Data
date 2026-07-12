@@ -1,29 +1,35 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { Router } from '@angular/router';
+import { FormsModule } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { MatChipsModule } from '@angular/material/chips';
-import { MatExpansionModule } from '@angular/material/expansion';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { HttpClient } from '@angular/common/http';
-import { AuthService } from '../../core/services/auth.service';
 import { environment } from '../../../environments/environment';
+import { mensajeError } from '../../core/services/api-error.util';
 
+/**
+ * Perfil sobre PostgreSQL. Para el CLIENTE: datos de la tabla cliente
+ * (RLS: su fila), estadísticas reales de pedidos/wishlist y CRUD de
+ * direcciones (tabla direccion, baja lógica). Para roles operativos:
+ * ficha básica del JWT, sin datos de tienda.
+ */
 @Component({
   selector: 'app-perfil',
   standalone: true,
   imports: [
-    CommonModule, ReactiveFormsModule,
+    CommonModule, FormsModule,
     MatCardModule, MatButtonModule, MatIconModule,
-    MatFormFieldModule, MatInputModule, MatChipsModule,
-    MatExpansionModule, MatProgressSpinnerModule,
+    MatFormFieldModule, MatInputModule, MatSelectModule,
+    MatChipsModule, MatCheckboxModule, MatProgressSpinnerModule,
     MatSnackBarModule, MatTooltipModule
   ],
   templateUrl: './perfil.component.html',
@@ -31,117 +37,181 @@ import { environment } from '../../../environments/environment';
 })
 export class PerfilComponent implements OnInit {
 
-  perfil: any = null;
-  loading = true;
-  queryMs = 0;
-
-  emailForm!: FormGroup;
-  passwordForm!: FormGroup;
-  savingEmail = false;
-  savingPassword = false;
-
   private readonly base = `${environment.apiUrl}/api/perfil`;
 
-  constructor(
-    private http: HttpClient,
-    private authService: AuthService,
-    private fb: FormBuilder,
-    private snackBar: MatSnackBar,
-    private router: Router
-  ) {}
+  perfil: any = null;
+  loading = true;
+
+  // Formulario de datos personales (solo cliente)
+  datos = { nombre: '', apellido: '', telefono: '', genero: '', aceptaMarketing: false };
+  guardandoDatos = false;
+
+  // Direcciones
+  direcciones: any[] = [];
+  ciudades: any[] = [];
+  mostrarFormDireccion = false;
+  editandoId: number | null = null;
+  guardandoDireccion = false;
+  dir = this.direccionVacia();
+
+  constructor(private http: HttpClient, private snackBar: MatSnackBar) {}
 
   ngOnInit(): void {
-    const user = this.authService.getCurrentUser();
-    if (!user) { this.router.navigate(['/login']); return; }
-
-    this.emailForm = this.fb.group({
-      email: ['', [Validators.required, Validators.email]]
-    });
-
-    this.passwordForm = this.fb.group({
-      passwordActual: ['', Validators.required],
-      passwordNuevo: ['', [Validators.required, Validators.minLength(6)]],
-      confirmarPassword: ['', Validators.required]
-    }, { validators: this.passwordsMatch });
-
-    this.cargarPerfil(user.username);
+    this.cargarPerfil();
   }
 
-  private passwordsMatch(group: FormGroup) {
-    const nuevo = group.get('passwordNuevo')?.value;
-    const confirmar = group.get('confirmarPassword')?.value;
-    const actual = group.get('passwordActual')?.value;
-    if (nuevo && confirmar && nuevo !== confirmar) {
-      return { noCoinciden: true };
-    }
-    if (nuevo && actual && nuevo === actual) {
-      return { mismaPassword: true };
-    }
-    return null;
+  get esCliente(): boolean {
+    return !!this.perfil?.esCliente;
   }
 
-  private cargarPerfil(username: string): void {
-    const t0 = Date.now();
-    this.http.get<any>(`${this.base}/${username}`).subscribe({
+  private cargarPerfil(): void {
+    this.loading = true;
+    this.http.get<any>(this.base).subscribe({
       next: (data) => {
         this.perfil = data;
-        this.queryMs = Date.now() - t0;
-        this.emailForm.patchValue({ email: data.email });
         this.loading = false;
+        if (data.esCliente) {
+          this.datos = {
+            nombre: data.nombre || '',
+            apellido: data.apellido || '',
+            telefono: data.telefono || '',
+            genero: data.genero || '',
+            aceptaMarketing: !!data.aceptaMarketing
+          };
+          this.cargarDirecciones();
+          this.cargarCiudades();
+        }
       },
-      error: () => {
+      error: (e) => {
         this.loading = false;
-        this.snackBar.open('Error al cargar el perfil', 'Cerrar', { duration: 3000 });
+        this.snackBar.open(mensajeError(e, 'Error al cargar el perfil'), 'Cerrar', { duration: 4000 });
       }
     });
   }
 
-  guardarEmail(): void {
-    if (this.emailForm.invalid) return;
-    const user = this.authService.getCurrentUser();
-    if (!user) return;
-    this.savingEmail = true;
-    this.http.put(`${this.base}/${user.username}/email`, this.emailForm.value).subscribe({
+  guardarDatos(): void {
+    if (!this.datos.nombre.trim()) {
+      this.snackBar.open('El nombre es requerido', 'OK', { duration: 2500 });
+      return;
+    }
+    this.guardandoDatos = true;
+    this.http.put(this.base, this.datos).subscribe({
       next: () => {
-        this.perfil.email = this.emailForm.value.email;
-        this.savingEmail = false;
-        this.snackBar.open('Email actualizado ✓', 'OK', { duration: 2500, panelClass: ['snack-success'] });
+        this.guardandoDatos = false;
+        this.snackBar.open('Datos actualizados ✓', 'OK', { duration: 2500, panelClass: ['snack-success'] });
+        this.cargarPerfil();
       },
-      error: (e: any) => {
-        this.savingEmail = false;
-        this.snackBar.open(e.error?.error || 'Error al actualizar email', 'Cerrar', { duration: 3000 });
+      error: (e) => {
+        this.guardandoDatos = false;
+        this.snackBar.open(mensajeError(e, 'Error al actualizar datos'), 'Cerrar', { duration: 4000 });
       }
     });
   }
 
-  cambiarPassword(): void {
-    if (this.passwordForm.invalid) return;
-    const user = this.authService.getCurrentUser();
-    if (!user) return;
-    this.savingPassword = true;
-    const { passwordActual, passwordNuevo } = this.passwordForm.value;
-    this.http.put(`${this.base}/${user.username}/password`, { passwordActual, passwordNuevo }).subscribe({
+  // ── Direcciones ───────────────────────────────────────────────────────
+
+  cargarDirecciones(): void {
+    this.http.get<any[]>(`${this.base}/direcciones`).subscribe({
+      next: (d) => this.direcciones = d,
+      error: () => this.direcciones = []
+    });
+  }
+
+  cargarCiudades(): void {
+    this.http.get<any[]>(`${this.base}/ciudades`).subscribe({
+      next: (c) => this.ciudades = c,
+      error: () => this.ciudades = []
+    });
+  }
+
+  nuevaDireccion(): void {
+    this.editandoId = null;
+    this.dir = this.direccionVacia();
+    this.mostrarFormDireccion = true;
+  }
+
+  editarDireccion(d: any): void {
+    this.editandoId = d.id;
+    this.dir = {
+      alias: d.alias || '', destinatario: d.destinatario || '',
+      callePrincipal: d.callePrincipal || '', calleSecundaria: d.calleSecundaria || '',
+      numero: d.numero || '', referencia: d.referencia || '',
+      codigoPostal: d.codigoPostal || '', telefono: d.telefono || '',
+      ciudadId: d.ciudadId, tipo: d.tipo || 'envio',
+      esPredeterminada: !!d.esPredeterminada
+    };
+    this.mostrarFormDireccion = true;
+  }
+
+  cancelarDireccion(): void {
+    this.mostrarFormDireccion = false;
+    this.editandoId = null;
+  }
+
+  guardarDireccion(): void {
+    if (!this.dir.destinatario.trim() || !this.dir.callePrincipal.trim() || !this.dir.ciudadId) {
+      this.snackBar.open('Destinatario, calle principal y ciudad son requeridos', 'OK', { duration: 3000 });
+      return;
+    }
+    this.guardandoDireccion = true;
+    const req = this.editandoId
+      ? this.http.put(`${this.base}/direcciones/${this.editandoId}`, this.dir)
+      : this.http.post(`${this.base}/direcciones`, this.dir);
+    req.subscribe({
       next: () => {
-        this.savingPassword = false;
-        this.passwordForm.reset();
-        this.snackBar.open('Contraseña actualizada ✓', 'OK', { duration: 2500, panelClass: ['snack-success'] });
+        this.guardandoDireccion = false;
+        this.mostrarFormDireccion = false;
+        this.editandoId = null;
+        this.snackBar.open('Dirección guardada ✓', 'OK', { duration: 2500, panelClass: ['snack-success'] });
+        this.cargarDirecciones();
       },
-      error: (e: any) => {
-        this.savingPassword = false;
-        this.snackBar.open(e.error?.error || 'Error al cambiar contraseña', 'Cerrar', { duration: 3000 });
+      error: (e) => {
+        this.guardandoDireccion = false;
+        this.snackBar.open(mensajeError(e, 'Error al guardar la dirección'), 'Cerrar', { duration: 4000 });
       }
     });
   }
 
-  getAvatarColor(): string {
-    return '#3f51b5';
+  eliminarDireccion(d: any): void {
+    if (!confirm(`¿Eliminar la dirección "${d.alias || d.callePrincipal}"?`)) return;
+    this.http.delete(`${this.base}/direcciones/${d.id}`).subscribe({
+      next: () => {
+        this.snackBar.open('Dirección eliminada', 'OK', { duration: 2000 });
+        this.cargarDirecciones();
+      },
+      error: (e) => this.snackBar.open(mensajeError(e, 'Error al eliminar'), 'Cerrar', { duration: 4000 })
+    });
+  }
+
+  marcarPredeterminada(d: any): void {
+    this.http.put(`${this.base}/direcciones/${d.id}`, {
+      alias: d.alias, destinatario: d.destinatario,
+      callePrincipal: d.callePrincipal, calleSecundaria: d.calleSecundaria,
+      numero: d.numero, referencia: d.referencia,
+      codigoPostal: d.codigoPostal, telefono: d.telefono,
+      ciudadId: d.ciudadId, tipo: d.tipo, esPredeterminada: true
+    }).subscribe({
+      next: () => {
+        this.snackBar.open('Dirección predeterminada ✓', 'OK', { duration: 2000 });
+        this.cargarDirecciones();
+      },
+      error: (e) => this.snackBar.open(mensajeError(e, 'Error'), 'Cerrar', { duration: 3000 })
+    });
+  }
+
+  private direccionVacia() {
+    return {
+      alias: '', destinatario: '', callePrincipal: '', calleSecundaria: '',
+      numero: '', referencia: '', codigoPostal: '', telefono: '',
+      ciudadId: null as number | null, tipo: 'envio', esPredeterminada: false
+    };
   }
 
   getInitial(): string {
-    return this.perfil?.username?.charAt(0)?.toUpperCase() || '?';
+    return (this.perfil?.nombre || this.perfil?.username || '?').charAt(0).toUpperCase();
   }
 
-  isAdmin(): boolean {
-    return this.perfil?.rol === 'ADMIN';
+  getAvatarColor(): string {
+    return this.esCliente ? '#00897b' : '#3f51b5';
   }
 }

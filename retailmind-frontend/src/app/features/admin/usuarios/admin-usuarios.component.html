@@ -27,6 +27,12 @@
           <mat-label>Rol</mat-label>
           <mat-select [(ngModel)]="newRol">
             <mat-option value="ADMIN">ADMIN</mat-option>
+            <mat-option value="GERENTE">GERENTE</mat-option>
+            <mat-option value="VENDEDOR">VENDEDOR</mat-option>
+            <mat-option value="COMPRAS">COMPRAS</mat-option>
+            <mat-option value="BODEGA">BODEGA</mat-option>
+            <mat-option value="DESPACHO">DESPACHO</mat-option>
+            <mat-option value="ANALISTA">ANALISTA</mat-option>
             <mat-option value="CLIENTE">CLIENTE</mat-option>
           </mat-select>
         </mat-form-field>
@@ -67,12 +73,8 @@
       <ng-container matColumnDef="acciones">
         <th mat-header-cell *matHeaderCellDef>Acciones</th>
         <td mat-cell *matCellDef="let r">
-          <button mat-icon-button (click)="toggleActivo(r.username)" matTooltip="Toggle activo"
-                  *ngIf="r.username !== 'admin'">
-            <mat-icon>{{ r.activo ? 'toggle_on' : 'toggle_off' }}</mat-icon>
-          </button>
           <button mat-icon-button color="warn" (click)="eliminarUsuario(r.username)"
-                  *ngIf="r.username !== 'admin'" matTooltip="Eliminar">
+                  *ngIf="r.username !== 'admin@retailmind.com'" matTooltip="Eliminar">
             <mat-icon>delete</mat-icon>
           </button>
         </td>

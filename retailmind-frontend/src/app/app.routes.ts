@@ -28,42 +28,33 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/inicio/inicio.component').then(m => m.InicioComponent)
   },
+  // ── Tienda del cliente (PostgreSQL; solo rol CLIENTE) ───────────────────
   {
     path: 'shop',
-    canActivate: [authGuard],
+    canActivate: [authGuard, roleGuard(['CLIENTE'])],
     loadComponent: () =>
       import('./features/shop/shop.component').then(m => m.ShopComponent)
   },
   {
     path: 'shop/producto/:id',
-    canActivate: [authGuard],
+    canActivate: [authGuard, roleGuard(['CLIENTE'])],
     loadComponent: () =>
       import('./features/shop/producto-detalle.component').then(m => m.ProductoDetalleComponent)
   },
   {
     path: 'shop/carrito',
-    canActivate: [authGuard],
+    canActivate: [authGuard, roleGuard(['CLIENTE'])],
     loadComponent: () =>
       import('./features/shop/carrito.component').then(m => m.CarritoComponent)
   },
   {
     path: 'wishlist',
-    canActivate: [authGuard],
+    canActivate: [authGuard, roleGuard(['CLIENTE'])],
     loadComponent: () =>
       import('./features/wishlist/wishlist.component').then(m => m.WishlistComponent)
   },
-  {
-    path: 'mis-pedidos',
-    canActivate: [authGuard],
-    loadComponent: () =>
-      import('./features/pedidos/mis-pedidos.component').then(m => m.MisPedidosComponent)
-  },
-  {
-    path: 'admin-pedidos',
-    canActivate: [authGuard, adminGuard],
-    loadComponent: () =>
-      import('./features/admin/pedidos/admin-pedidos.component').then(m => m.AdminPedidosComponent)
-  },
+  // 'Mis Pedidos' del cliente es /operativo/ventas/mis-pedidos (PostgreSQL);
+  // las rutas legacy /mis-pedidos y /admin-pedidos (ClickHouse) se eliminaron.
   {
     path: 'admin-usuarios',
     canActivate: [authGuard, adminGuard],
@@ -144,7 +135,7 @@ export const routes: Routes = [
   },
   {
     path: 'recomendaciones',
-    canActivate: [authGuard],
+    canActivate: [authGuard, roleGuard(['CLIENTE'])],
     loadComponent: () =>
       import('./features/recomendaciones/recomendaciones.component').then(m => m.RecomendacionesComponent)
   },

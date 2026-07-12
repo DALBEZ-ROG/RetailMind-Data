@@ -50,7 +50,7 @@ export class FacturasCompraComponent implements OnInit {
   get puedeVerCuentas(): boolean { return this.nav.canDato('cuentasPorPagar'); }
 
   ngOnInit(): void {
-    this.compras.ordenes().subscribe(o => this.ordenes = o);
+    this.cargarOrdenes();
     if (this.nav.canDato('refMetodosPago')) {
       this.referencias.metodosPago().subscribe(m => this.metodosPago = m);
     }
@@ -60,6 +60,12 @@ export class FacturasCompraComponent implements OnInit {
   cargarCuentas(): void {
     if (!this.puedeVerCuentas) return;
     this.compras.cuentasPorPagar().subscribe(c => this.cuentas = c);
+  }
+
+  /** Facturables: recibidas COMPLETAS y sin factura previa (compuertas del backend). */
+  cargarOrdenes(): void {
+    this.compras.ordenes().subscribe(o =>
+      this.ordenes = o.filter(x => x.estado === 'recibida' && !x.tiene_factura));
   }
 
   abrirPago(c: CuentaPorPagarRow): void {
@@ -105,6 +111,8 @@ export class FacturasCompraComponent implements OnInit {
         this.factura = f;
         this.snackBar.open(`Factura ${f.numero_factura} registrada — total ${f.total}`, 'OK',
           { duration: 3500, panelClass: ['snack-success'] });
+        this.ordenId = null; // la orden facturada deja de ser facturable
+        this.cargarOrdenes();
         this.cargarCuentas();
       },
       error: e => {

@@ -36,10 +36,11 @@ public class HealthCheckService {
         status.put("database", status.get("clickhouse")); // compatibilidad con clientes previos
         status.put("python", checkPythonRuntime());
 
-        boolean allUp = !"DOWN".equals(status.get("postgres"))
-                && !"DOWN".equals(status.get("clickhouse"))
-                && !"DOWN".equals(status.get("python"));
-        status.put("status", allUp ? "UP" : "DOWN");
+        // El sistema operativo vive en PostgreSQL: ClickHouse apagado NO tumba
+        // el estado global, solo degrada la analítica (y python es solo ETL).
+        boolean operativo = !"DOWN".equals(status.get("postgres"));
+        status.put("status", operativo ? "UP" : "DOWN");
+        status.put("analytics", "DOWN".equals(status.get("clickhouse")) ? "DEGRADED" : "UP");
         return status;
     }
 

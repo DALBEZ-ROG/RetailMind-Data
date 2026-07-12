@@ -1,19 +1,24 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ShopService } from './shop.service';
-import { AuthService } from '../../core/services/auth.service';
+import { mensajeError } from '../../core/services/api-error.util';
 
+/**
+ * Carrito del cliente sobre PostgreSQL (carrito/carrito_item, RLS propio).
+ * El checkout crea un PEDIDO REAL del ciclo de venta: el mismo que ven
+ * vendedor/despacho/admin en el back-office.
+ */
 @Component({
   selector: 'app-carrito',
   standalone: true,
   imports: [
-    CommonModule, MatCardModule, MatButtonModule,
+    CommonModule, RouterLink, MatCardModule, MatButtonModule,
     MatIconModule, MatDividerModule, MatSnackBarModule
   ],
   templateUrl: './carrito.component.html',
@@ -24,11 +29,12 @@ export class CarritoComponent implements OnInit {
   items: any[] = [];
   loading = true;
   checkoutExitoso = false;
+  procesando = false;
   ordenId = '';
+  pedidoId: number | null = null;
 
   constructor(
     private shopService: ShopService,
-    private authService: AuthService,
     private router: Router,
     private snackBar: MatSnackBar
   ) {}
@@ -38,13 +44,14 @@ export class CarritoComponent implements OnInit {
   }
 
   loadCarrito(): void {
-    const user = this.authService.getCurrentUser();
-    if (!user) return;
-
     this.loading = true;
-    this.shopService.getCarrito(user.username).subscribe({
+    this.shopService.getCarrito().subscribe({
       next: (items) => { this.items = items; this.loading = false; },
-      error: () => { this.items = []; this.loading = false; }
+      error: (e) => {
+        this.items = [];
+        this.loading = false;
+        this.snackBar.open(mensajeError(e, 'No se pudo cargar el carrito'), 'Cerrar', { duration: 4000 });
+      }
     });
   }
 
@@ -52,32 +59,43 @@ export class CarritoComponent implements OnInit {
     return this.items.reduce((sum, item) => sum + (item.precioUnitario * item.cantidad), 0);
   }
 
-  eliminarItem(productoId: string): void {
-    const user = this.authService.getCurrentUser();
-    if (!user) return;
+  cambiarCantidad(item: any, delta: number): void {
+    const nueva = item.cantidad + delta;
+    if (nueva <= 0) { this.eliminarItem(item.productoId); return; }
+    this.shopService.cambiarCantidad(item.productoId, nueva).subscribe({
+      next: () => item.cantidad = nueva,
+      error: (e) => this.snackBar.open(mensajeError(e, 'No se pudo actualizar la cantidad'),
+        'Cerrar', { duration: 3000 })
+    });
+  }
 
-    this.shopService.eliminarDelCarrito(user.username, productoId).subscribe({
+  eliminarItem(productoId: number): void {
+    this.shopService.eliminarDelCarrito(productoId).subscribe({
       next: () => {
         this.items = this.items.filter(i => i.productoId !== productoId);
         this.snackBar.open('Producto eliminado', 'OK', { duration: 2000 });
       },
-      error: () => this.snackBar.open('Error al eliminar', 'Cerrar', { duration: 3000 })
+      error: (e) => this.snackBar.open(mensajeError(e, 'Error al eliminar'), 'Cerrar', { duration: 3000 })
     });
   }
 
   finalizarCompra(): void {
-    const user = this.authService.getCurrentUser();
-    if (!user) return;
-
-    this.shopService.checkout(user.username).subscribe({
+    if (this.procesando) return;
+    this.procesando = true;
+    this.shopService.checkout().subscribe({
       next: (res) => {
+        this.procesando = false;
         this.checkoutExitoso = true;
         this.ordenId = res.ordenId;
+        this.pedidoId = res.pedidoId;
         this.items = [];
-        this.snackBar.open('Compra realizada con exito!', 'OK', { duration: 4000, panelClass: ['snack-success'] });
+        this.snackBar.open('Compra realizada con exito!', 'OK',
+          { duration: 4000, panelClass: ['snack-success'] });
       },
       error: (e) => {
-        this.snackBar.open(e.error?.error || 'Error en checkout', 'Cerrar', { duration: 4000, panelClass: ['snack-error'] });
+        this.procesando = false;
+        this.snackBar.open(mensajeError(e, 'Error en checkout'), 'Cerrar',
+          { duration: 5000, panelClass: ['snack-error'] });
       }
     });
   }

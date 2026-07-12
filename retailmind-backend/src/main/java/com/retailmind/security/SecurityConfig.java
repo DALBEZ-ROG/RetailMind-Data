@@ -41,9 +41,18 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/health").permitAll()
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                // Catalogo publico (sin auth)
-                .requestMatchers(HttpMethod.GET, "/api/catalogo/**").permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/catalogo/eventos").permitAll()
+                // Tienda del cliente (PostgreSQL): catalogo para CLIENTE
+                // (+ADMIN demo); carrito/wishlist/direcciones solo CLIENTE
+                // (RLS por app.cliente_id los aisla a sus filas)
+                .requestMatchers(HttpMethod.POST, "/api/catalogo/eventos").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/catalogo/**")
+                    .hasAnyAuthority("ADMIN", "CLIENTE")
+                .requestMatchers("/api/carrito/**").hasAuthority("CLIENTE")
+                .requestMatchers("/api/wishlist/**").hasAuthority("CLIENTE")
+                .requestMatchers("/api/perfil/direcciones/**", "/api/perfil/ciudades")
+                    .hasAuthority("CLIENTE")
+                .requestMatchers(HttpMethod.PUT, "/api/perfil").hasAuthority("CLIENTE")
+                .requestMatchers("/api/recomendaciones/**").hasAuthority("CLIENTE")
                 // Gestion de usuarios solo ADMIN
                 .requestMatchers(HttpMethod.POST, "/api/auth/register").hasAuthority("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/auth/usuarios").hasAuthority("ADMIN")
@@ -64,6 +73,16 @@ public class SecurityConfig {
                 // (el cliente las lee vía GET, filtradas por RLS a las visibles)
                 .requestMatchers(HttpMethod.POST, "/api/ventas/pedidos/*/notas")
                     .hasAnyAuthority("ADMIN", "GERENTE", "VENDEDOR", "DESPACHO")
+                // Cobro del pedido (espeja la BD: INSERT en pago = admin/vendedor)
+                .requestMatchers(HttpMethod.POST, "/api/ventas/pedidos/*/pagos")
+                    .hasAnyAuthority("ADMIN", "VENDEDOR")
+                // Entrega: cierra la logística (espeja UPDATE envio = admin/despacho)
+                .requestMatchers(HttpMethod.POST, "/api/ventas/pedidos/*/entrega")
+                    .hasAnyAuthority("ADMIN", "DESPACHO")
+                // Listado de facturas de venta: solo personal (el CLIENTE llega a
+                // SU factura por el detalle del pedido, aislado por RLS)
+                .requestMatchers(HttpMethod.GET, "/api/ventas/facturas")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "VENDEDOR")
                 // Ciclo de venta: vendedor/despacho + cliente (RLS lo aisla a sus filas)
                 .requestMatchers("/api/ventas/**")
                     .hasAnyAuthority("ADMIN", "GERENTE", "VENDEDOR", "DESPACHO", "CLIENTE")
@@ -117,9 +136,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/resenas/preguntas/*/respuestas")
                     .hasAnyAuthority("ADMIN", "GERENTE")
                 .requestMatchers("/api/resenas/**").hasAnyAuthority("ADMIN", "GERENTE")
-                // Admin usuarios y pedidos solo ADMIN
+                // Admin solo ADMIN
                 .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
-                .requestMatchers("/api/pedidos/admin/**").hasAuthority("ADMIN")
                 // Funnel solo ADMIN
                 .requestMatchers("/api/funnel/**").hasAuthority("ADMIN")
                 // Analytics avanzado solo ADMIN
@@ -130,9 +148,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/reportes/**").hasAuthority("ADMIN")
                 // Dashboard refrescar vistas solo ADMIN
                 .requestMatchers(HttpMethod.POST, "/api/dashboard/refrescar-vistas").hasAuthority("ADMIN")
-                // Perfil y recomendaciones — usuario autenticado (cualquier rol)
+                // Perfil (ficha básica) — usuario autenticado (cualquier rol)
                 .requestMatchers("/api/perfil/**").authenticated()
-                .requestMatchers("/api/recomendaciones/**").authenticated()
                 // Todo lo demas requiere autenticacion
                 .anyRequest().authenticated()
             )

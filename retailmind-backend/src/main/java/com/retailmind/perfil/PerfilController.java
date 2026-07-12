@@ -1,83 +1,72 @@
 package com.retailmind.perfil;
 
+import java.util.List;
 import java.util.Map;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * Perfil del usuario autenticado (PostgreSQL). El usuario sale del JWT.
+ * GET /api/perfil es para cualquier rol; los datos de cliente y las
+ * direcciones son solo CLIENTE (SecurityConfig + RLS).
+ */
 @RestController
 @RequestMapping("/api/perfil")
 public class PerfilController {
 
-    private final PerfilService perfilService;
+    private final PerfilService service;
 
-    public PerfilController(PerfilService perfilService) {
-        this.perfilService = perfilService;
+    public PerfilController(PerfilService service) {
+        this.service = service;
     }
 
-    /** GET /api/perfil/{username} */
-    @GetMapping("/{username}")
-    public ResponseEntity<?> getPerfil(@PathVariable String username) {
-        try {
-            return ResponseEntity.ok(perfilService.getPerfil(username));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError()
-                    .body(Map.of("error", "Error al obtener perfil: " + e.getMessage()));
-        }
+    @GetMapping
+    public Map<String, Object> getPerfil() {
+        return service.getPerfil();
     }
 
-    /** PUT /api/perfil/{username}/email */
-    @PutMapping("/{username}/email")
-    public ResponseEntity<?> actualizarEmail(@PathVariable String username,
-                                              @RequestBody Map<String, String> body) {
-        try {
-            String email = body.get("email");
-            if (email == null || email.isBlank()) {
-                return ResponseEntity.badRequest()
-                        .body(Map.of("error", "El email es requerido"));
-            }
-            perfilService.actualizarEmail(username, email);
-            return ResponseEntity.ok(Map.of("success", true, "mensaje", "Email actualizado correctamente"));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError()
-                    .body(Map.of("error", "Error al actualizar email: " + e.getMessage()));
-        }
+    @PutMapping
+    public Map<String, Object> actualizarDatos(@RequestBody Map<String, Object> body) {
+        service.actualizarDatos(body);
+        return Map.of("success", true, "mensaje", "Datos actualizados correctamente");
     }
 
-    /** PUT /api/perfil/{username}/password */
-    @PutMapping("/{username}/password")
-    public ResponseEntity<?> cambiarPassword(@PathVariable String username,
-                                              @RequestBody Map<String, String> body) {
-        try {
-            String passwordActual = body.get("passwordActual");
-            String passwordNuevo = body.get("passwordNuevo");
+    // ── Direcciones del cliente ──────────────────────────────────────────
 
-            if (passwordActual == null || passwordNuevo == null) {
-                return ResponseEntity.badRequest()
-                        .body(Map.of("error", "passwordActual y passwordNuevo son requeridos"));
-            }
-            if (passwordNuevo.equals(passwordActual)) {
-                return ResponseEntity.badRequest()
-                        .body(Map.of("error", "La nueva contraseña debe ser diferente a la actual"));
-            }
-            perfilService.cambiarPassword(username, passwordActual, passwordNuevo);
-            return ResponseEntity.ok(Map.of("success", true, "mensaje", "Contraseña actualizada correctamente"));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.notFound().build();
-        } catch (IllegalStateException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError()
-                    .body(Map.of("error", "Error al cambiar contraseña: " + e.getMessage()));
-        }
+    @GetMapping("/direcciones")
+    public List<Map<String, Object>> direcciones() {
+        return service.listarDirecciones();
+    }
+
+    @PostMapping("/direcciones")
+    public ResponseEntity<?> crearDireccion(@RequestBody Map<String, Object> body) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.crearDireccion(body));
+    }
+
+    @PutMapping("/direcciones/{id}")
+    public Map<String, Object> actualizarDireccion(@PathVariable long id,
+                                                   @RequestBody Map<String, Object> body) {
+        service.actualizarDireccion(id, body);
+        return Map.of("success", true);
+    }
+
+    @DeleteMapping("/direcciones/{id}")
+    public Map<String, Object> eliminarDireccion(@PathVariable long id) {
+        service.eliminarDireccion(id);
+        return Map.of("success", true);
+    }
+
+    @GetMapping("/ciudades")
+    public List<Map<String, Object>> ciudades() {
+        return service.ciudades();
     }
 }

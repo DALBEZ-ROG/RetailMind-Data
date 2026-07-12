@@ -14,157 +14,223 @@
           {{ getInitial() }}
         </div>
         <div class="perfil-info">
-          <h2 class="perfil-username">{{ perfil.username }}</h2>
-          <p class="perfil-email">{{ perfil.email }}</p>
+          <h2 class="perfil-username">
+            {{ perfil.nombre }} {{ perfil.apellido || '' }}
+          </h2>
+          <p class="perfil-email">{{ perfil.email || perfil.username }}</p>
           <div class="perfil-badges">
-            <mat-chip [class.chip-admin]="isAdmin()" [class.chip-cliente]="!isAdmin()">
-              <mat-icon>{{ isAdmin() ? 'admin_panel_settings' : 'person' }}</mat-icon>
+            <mat-chip [class.chip-admin]="!esCliente" [class.chip-cliente]="esCliente">
+              <mat-icon>{{ esCliente ? 'person' : 'badge' }}</mat-icon>
               {{ perfil.rol }}
             </mat-chip>
-            <mat-chip [class.chip-activo]="perfil.activo" [class.chip-inactivo]="!perfil.activo">
-              <mat-icon>{{ perfil.activo ? 'check_circle' : 'cancel' }}</mat-icon>
-              {{ perfil.activo ? 'Activo' : 'Inactivo' }}
-            </mat-chip>
           </div>
-          <p class="perfil-fecha">Miembro desde: {{ perfil.fechaCreacion | date:'mediumDate' }}</p>
+          <p class="perfil-fecha" *ngIf="perfil.fechaCreacion">
+            Cliente desde: {{ perfil.fechaCreacion | date:'mediumDate' }}
+          </p>
         </div>
       </div>
-      <div class="query-badge">⚡ {{ queryMs }} ms</div>
     </mat-card>
 
-    <!-- SECCIÓN 2: Estadísticas -->
-    <h3 class="section-title">
-      <mat-icon>bar_chart</mat-icon>
-      Tu actividad en RetailMind
-    </h3>
-    <div class="stats-grid">
+    <!-- Roles operativos: solo la ficha básica -->
+    <mat-card *ngIf="!esCliente" class="section-card">
+      <mat-card-content>
+        <p>
+          <mat-icon style="vertical-align: middle;">info</mat-icon>
+          Este perfil corresponde a un usuario del back-office. Los datos de
+          tienda (direcciones, pedidos, wishlist) son exclusivos de los clientes.
+        </p>
+      </mat-card-content>
+    </mat-card>
 
-      <mat-card class="stat-card">
-        <mat-icon class="stat-icon icon-compras">shopping_bag</mat-icon>
-        <div class="stat-value">{{ perfil.totalCompras }}</div>
-        <div class="stat-label">Total Compras</div>
-      </mat-card>
+    <ng-container *ngIf="esCliente">
 
-      <mat-card class="stat-card">
-        <mat-icon class="stat-icon icon-gastado">payments</mat-icon>
-        <div class="stat-value">${{ perfil.totalGastado | number:'1.2-2' }}</div>
-        <div class="stat-label">Total Gastado</div>
-      </mat-card>
+      <!-- SECCIÓN 2: Estadísticas reales (PostgreSQL) -->
+      <h3 class="section-title">
+        <mat-icon>bar_chart</mat-icon>
+        Tu actividad en RetailMind
+      </h3>
+      <div class="stats-grid">
+        <mat-card class="stat-card">
+          <mat-icon class="stat-icon">shopping_basket</mat-icon>
+          <div class="stat-value">{{ perfil.totalCompras }}</div>
+          <div class="stat-label">Pedidos</div>
+        </mat-card>
+        <mat-card class="stat-card">
+          <mat-icon class="stat-icon">payments</mat-icon>
+          <div class="stat-value">${{ perfil.totalGastado | number:'1.2-2' }}</div>
+          <div class="stat-label">Total gastado</div>
+        </mat-card>
+        <mat-card class="stat-card">
+          <mat-icon class="stat-icon">favorite</mat-icon>
+          <div class="stat-value">{{ perfil.productosWishlist }}</div>
+          <div class="stat-label">En wishlist</div>
+        </mat-card>
+        <mat-card class="stat-card">
+          <mat-icon class="stat-icon">location_on</mat-icon>
+          <div class="stat-value">{{ perfil.direcciones }}</div>
+          <div class="stat-label">Direcciones</div>
+        </mat-card>
+      </div>
 
-      <mat-card class="stat-card">
-        <mat-icon class="stat-icon icon-wishlist">favorite</mat-icon>
-        <div class="stat-value">{{ perfil.productosWishlist }}</div>
-        <div class="stat-label">En Wishlist</div>
-      </mat-card>
-
-      <mat-card class="stat-card">
-        <mat-icon class="stat-icon icon-eventos">analytics</mat-icon>
-        <div class="stat-value">{{ perfil.totalEventos }}</div>
-        <div class="stat-label">Total Eventos</div>
-      </mat-card>
-
-      <mat-card class="stat-card">
-        <mat-icon class="stat-icon icon-categoria">category</mat-icon>
-        <div class="stat-value stat-text">{{ perfil.categoriaFavorita }}</div>
-        <div class="stat-label">Categoría Favorita</div>
-      </mat-card>
-
-      <mat-card class="stat-card">
-        <mat-icon class="stat-icon icon-canal">devices</mat-icon>
-        <div class="stat-value stat-text">{{ perfil.canalPreferido }}</div>
-        <div class="stat-label">Canal Preferido</div>
-      </mat-card>
-
-    </div>
-
-    <!-- SECCIÓN 3: Editar perfil -->
-    <h3 class="section-title">
-      <mat-icon>edit</mat-icon>
-      Configuración de cuenta
-    </h3>
-
-    <mat-accordion class="edit-accordion">
-
-      <!-- Panel email -->
-      <mat-expansion-panel>
-        <mat-expansion-panel-header>
-          <mat-panel-title>
-            <mat-icon>email</mat-icon>
-            Editar información
-          </mat-panel-title>
-          <mat-panel-description>Actualizar email</mat-panel-description>
-        </mat-expansion-panel-header>
-
-        <form [formGroup]="emailForm" (ngSubmit)="guardarEmail()" class="edit-form">
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Email</mat-label>
-            <input matInput formControlName="email" type="email" placeholder="correo@ejemplo.com">
-            <mat-icon matPrefix>email</mat-icon>
-            <mat-error *ngIf="emailForm.get('email')?.hasError('required')">El email es requerido</mat-error>
-            <mat-error *ngIf="emailForm.get('email')?.hasError('email')">Formato de email inválido</mat-error>
-          </mat-form-field>
-          <div class="form-actions">
-            <button mat-raised-button color="primary" type="submit"
-                    [disabled]="emailForm.invalid || savingEmail">
+      <!-- SECCIÓN 3: Datos personales -->
+      <h3 class="section-title">
+        <mat-icon>manage_accounts</mat-icon>
+        Datos personales
+      </h3>
+      <mat-card class="section-card">
+        <mat-card-content>
+          <div class="form-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>Nombre</mat-label>
+              <input matInput [(ngModel)]="datos.nombre" required>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Apellido</mat-label>
+              <input matInput [(ngModel)]="datos.apellido">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Teléfono</mat-label>
+              <input matInput [(ngModel)]="datos.telefono">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Género</mat-label>
+              <mat-select [(ngModel)]="datos.genero">
+                <mat-option value="">Sin especificar</mat-option>
+                <mat-option value="F">Femenino</mat-option>
+                <mat-option value="M">Masculino</mat-option>
+                <mat-option value="O">Otro</mat-option>
+              </mat-select>
+            </mat-form-field>
+          </div>
+          <mat-checkbox [(ngModel)]="datos.aceptaMarketing">
+            Quiero recibir promociones y novedades
+          </mat-checkbox>
+          <div class="actions-row">
+            <button mat-raised-button color="primary"
+                    [disabled]="guardandoDatos" (click)="guardarDatos()">
               <mat-icon>save</mat-icon>
-              {{ savingEmail ? 'Guardando...' : 'Guardar email' }}
+              {{ guardandoDatos ? 'Guardando...' : 'Guardar cambios' }}
             </button>
           </div>
-        </form>
-      </mat-expansion-panel>
+        </mat-card-content>
+      </mat-card>
 
-      <!-- Panel password -->
-      <mat-expansion-panel>
-        <mat-expansion-panel-header>
-          <mat-panel-title>
-            <mat-icon>lock</mat-icon>
-            Cambiar contraseña
-          </mat-panel-title>
-          <mat-panel-description>Actualizar tu contraseña de acceso</mat-panel-description>
-        </mat-expansion-panel-header>
+      <!-- SECCIÓN 4: Direcciones -->
+      <h3 class="section-title">
+        <mat-icon>location_on</mat-icon>
+        Mis direcciones
+      </h3>
 
-        <form [formGroup]="passwordForm" (ngSubmit)="cambiarPassword()" class="edit-form">
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Contraseña actual</mat-label>
-            <input matInput formControlName="passwordActual" type="password">
-            <mat-icon matPrefix>lock_outline</mat-icon>
-            <mat-error *ngIf="passwordForm.get('passwordActual')?.hasError('required')">Requerido</mat-error>
-          </mat-form-field>
-
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Nueva contraseña</mat-label>
-            <input matInput formControlName="passwordNuevo" type="password">
-            <mat-icon matPrefix>lock</mat-icon>
-            <mat-error *ngIf="passwordForm.get('passwordNuevo')?.hasError('required')">Requerido</mat-error>
-            <mat-error *ngIf="passwordForm.get('passwordNuevo')?.hasError('minlength')">Mínimo 6 caracteres</mat-error>
-          </mat-form-field>
-
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Confirmar nueva contraseña</mat-label>
-            <input matInput formControlName="confirmarPassword" type="password">
-            <mat-icon matPrefix>lock_reset</mat-icon>
-            <mat-error *ngIf="passwordForm.get('confirmarPassword')?.hasError('required')">Requerido</mat-error>
-          </mat-form-field>
-
-          <div class="form-error" *ngIf="passwordForm.hasError('noCoinciden')">
-            Las contraseñas no coinciden
-          </div>
-          <div class="form-error" *ngIf="passwordForm.hasError('mismaPassword')">
-            La nueva contraseña debe ser diferente a la actual
-          </div>
-
-          <div class="form-actions">
-            <button mat-raised-button color="accent" type="submit"
-                    [disabled]="passwordForm.invalid || savingPassword">
-              <mat-icon>key</mat-icon>
-              {{ savingPassword ? 'Actualizando...' : 'Cambiar contraseña' }}
+      <mat-card class="section-card">
+        <mat-card-content>
+          <div class="actions-row" style="margin-bottom: 12px;">
+            <button mat-raised-button color="primary" *ngIf="!mostrarFormDireccion"
+                    (click)="nuevaDireccion()">
+              <mat-icon>add_location_alt</mat-icon> Nueva dirección
             </button>
           </div>
-        </form>
-      </mat-expansion-panel>
 
-    </mat-accordion>
+          <!-- Formulario de dirección (crear / editar) -->
+          <div *ngIf="mostrarFormDireccion" class="direccion-form">
+            <div class="form-grid">
+              <mat-form-field appearance="outline">
+                <mat-label>Alias (ej. Casa, Oficina)</mat-label>
+                <input matInput [(ngModel)]="dir.alias">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Destinatario</mat-label>
+                <input matInput [(ngModel)]="dir.destinatario" required>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Calle principal</mat-label>
+                <input matInput [(ngModel)]="dir.callePrincipal" required>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Calle secundaria</mat-label>
+                <input matInput [(ngModel)]="dir.calleSecundaria">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Número</mat-label>
+                <input matInput [(ngModel)]="dir.numero">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Ciudad</mat-label>
+                <mat-select [(ngModel)]="dir.ciudadId">
+                  <mat-option *ngFor="let c of ciudades" [value]="c.id">{{ c.nombre }}</mat-option>
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Código postal</mat-label>
+                <input matInput [(ngModel)]="dir.codigoPostal">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Teléfono de contacto</mat-label>
+                <input matInput [(ngModel)]="dir.telefono">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Tipo</mat-label>
+                <mat-select [(ngModel)]="dir.tipo">
+                  <mat-option value="envio">Envío</mat-option>
+                  <mat-option value="facturacion">Facturación</mat-option>
+                  <mat-option value="ambas">Ambas</mat-option>
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Referencia</mat-label>
+                <input matInput [(ngModel)]="dir.referencia">
+              </mat-form-field>
+            </div>
+            <mat-checkbox [(ngModel)]="dir.esPredeterminada">Dirección predeterminada</mat-checkbox>
+            <div class="actions-row">
+              <button mat-raised-button color="accent"
+                      [disabled]="guardandoDireccion" (click)="guardarDireccion()">
+                <mat-icon>save</mat-icon>
+                {{ editandoId ? 'Actualizar' : 'Guardar' }} dirección
+              </button>
+              <button mat-stroked-button (click)="cancelarDireccion()">Cancelar</button>
+            </div>
+          </div>
 
+          <!-- Lista de direcciones -->
+          <div class="empty-state" *ngIf="direcciones.length === 0 && !mostrarFormDireccion">
+            <mat-icon>location_off</mat-icon>
+            <p>Aún no tienes direcciones registradas.</p>
+          </div>
+
+          <mat-card class="direccion-card" *ngFor="let d of direcciones">
+            <div class="direccion-row">
+              <div class="direccion-info">
+                <div class="direccion-alias">
+                  <strong>{{ d.alias || 'Dirección' }}</strong>
+                  <mat-chip *ngIf="d.esPredeterminada" class="chip-predeterminada">
+                    <mat-icon>star</mat-icon> Predeterminada
+                  </mat-chip>
+                  <span class="direccion-tipo">({{ d.tipo }})</span>
+                </div>
+                <p>{{ d.destinatario }}</p>
+                <p>
+                  {{ d.callePrincipal }}<span *ngIf="d.calleSecundaria"> y {{ d.calleSecundaria }}</span>
+                  <span *ngIf="d.numero"> #{{ d.numero }}</span> — {{ d.ciudad }}
+                </p>
+                <p *ngIf="d.referencia" class="direccion-ref">Ref: {{ d.referencia }}</p>
+              </div>
+              <div class="direccion-actions">
+                <button mat-icon-button matTooltip="Predeterminada" *ngIf="!d.esPredeterminada"
+                        (click)="marcarPredeterminada(d)">
+                  <mat-icon>star_border</mat-icon>
+                </button>
+                <button mat-icon-button matTooltip="Editar" (click)="editarDireccion(d)">
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button mat-icon-button color="warn" matTooltip="Eliminar" (click)="eliminarDireccion(d)">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </div>
+            </div>
+          </mat-card>
+        </mat-card-content>
+      </mat-card>
+
+    </ng-container>
   </ng-container>
-
 </div>

@@ -1,164 +1,175 @@
 package com.retailmind.catalogo;
 
-import java.time.LocalDateTime;
-import java.time.temporal.WeekFields;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Catálogo público de la tienda del cliente, servido desde PostgreSQL
+ * (producto/producto_variante/inventario): la MISMA base que administra el
+ * back-office. El identificador expuesto como productoId es el id de la
+ * VARIANTE (predeterminada), porque carrito_item, wishlist_item y
+ * pedido_detalle referencian producto_variante_id.
+ *
+ * ClickHouse ya no participa aquí; los eventos de navegación se registran
+ * best-effort vía EventoTiendaService (analítica).
+ */
 @Service
-@SuppressWarnings({"null", "resource"})
 public class ProductoCatalogoService {
 
-    private static final Logger logger = LoggerFactory.getLogger(ProductoCatalogoService.class);
-    private final JdbcTemplate ch;
+    /** Joins comunes: variante representativa + marca + categoría + stock total. */
+    private static final String FROM_CATALOGO = """
+            FROM producto pr
+            JOIN LATERAL (SELECT v.id, v.sku, v.precio
+                          FROM producto_variante v
+                          WHERE v.producto_id = pr.id AND v.activo
+                          ORDER BY v.es_predeterminada DESC, v.id
+                          LIMIT 1) pv ON true
+            LEFT JOIN marca m ON m.id = pr.marca_id
+            LEFT JOIN LATERAL (SELECT pc.categoria_id, c.nombre
+                               FROM producto_categoria pc
+                               JOIN categoria c ON c.id = pc.categoria_id
+                               WHERE pc.producto_id = pr.id
+                               ORDER BY pc.es_principal DESC, pc.id
+                               LIMIT 1) cat ON true
+            LEFT JOIN (SELECT producto_variante_id, SUM(stock_actual) AS stock
+                       FROM inventario GROUP BY producto_variante_id) inv
+                   ON inv.producto_variante_id = pv.id
+            """;
 
-    public ProductoCatalogoService(@Qualifier("clickHouseJdbc") JdbcTemplate ch) {
-        this.ch = ch;
+    private static final RowMapper<Map<String, Object>> PRODUCTO_MAPPER = (rs, rn) -> {
+        Map<String, Object> r = new LinkedHashMap<>();
+        r.put("productoId", rs.getLong("variante_id"));
+        r.put("nombre", rs.getString("nombre"));
+        r.put("descripcion", rs.getString("descripcion"));
+        r.put("categoriaId", rs.getInt("categoria_id"));
+        r.put("categoriaNombre", rs.getString("categoria_nombre"));
+        r.put("brand", rs.getString("brand"));
+        r.put("price", rs.getBigDecimal("price"));
+        r.put("stock", rs.getInt("stock"));
+        r.put("sku", rs.getString("sku"));
+        r.put("imagenUrl", null);
+        return r;
+    };
+
+    private final JdbcTemplate pg;
+
+    public ProductoCatalogoService(@Qualifier("pgJdbcTemplate") JdbcTemplate pg) {
+        this.pg = pg;
     }
 
-    public Map<String, Object> getProductos(Integer categoriaId, String brand,
-                                             Float minPrice, Float maxPrice, int page, int size) {
-        try {
-            StringBuilder where = new StringBuilder(" WHERE p.activo = 1");
-            if (categoriaId != null) where.append(" AND p.categoria_id = ").append(categoriaId);
-            if (brand != null && !brand.isEmpty()) where.append(" AND p.brand = '").append(brand).append("'");
-            if (minPrice != null) where.append(" AND p.price >= ").append(minPrice);
-            if (maxPrice != null) where.append(" AND p.price <= ").append(maxPrice);
+    @Transactional(readOnly = true)
+    public Map<String, Object> getProductos(Long categoriaId, String brand, String q,
+                                            Double minPrice, Double maxPrice,
+                                            int page, int size) {
+        if (size < 1 || size > 100) size = 20;
+        if (page < 0) page = 0;
 
-            String countWhere = where.toString().replace("p.activo", "activo")
-                    .replace("p.categoria_id", "categoria_id")
-                    .replace("p.brand", "brand")
-                    .replace("p.price", "price");
-
-            Long total = ch.queryForObject(
-                    "SELECT count() FROM retailmind.productos_catalogo" + countWhere, Long.class);
-
-            List<Map<String, Object>> rows = ch.query(
-                    "SELECT p.producto_id, p.nombre, p.descripcion, p.categoria_id, " +
-                    "p.brand, p.price, p.stock, p.imagen_url, " +
-                    "c.categoria_nombre " +
-                    "FROM retailmind.productos_catalogo p " +
-                    "LEFT JOIN retailmind.dim_categoria c ON p.categoria_id = c.categoria_id" +
-                    where +
-                    " ORDER BY p.producto_id LIMIT " + size + " OFFSET " + (page * size),
-                    (rs, rn) -> {
-                        Map<String, Object> r = new LinkedHashMap<>();
-                        r.put("productoId", rs.getString("producto_id"));
-                        r.put("nombre", rs.getString("nombre"));
-                        r.put("descripcion", rs.getString("descripcion"));
-                        r.put("categoriaId", rs.getInt("categoria_id"));
-                        r.put("categoriaNombre", rs.getString("categoria_nombre"));
-                        r.put("brand", rs.getString("brand"));
-                        r.put("price", rs.getFloat("price"));
-                        r.put("stock", rs.getInt("stock"));
-                        r.put("imagenUrl", rs.getString("imagen_url"));
-                        return r;
-                    });
-
-            long t = total != null ? total : 0L;
-            return Map.of("content", rows, "totalElements", t,
-                    "totalPages", (int) Math.ceil((double) t / size), "number", page, "size", size);
-        } catch (RuntimeException e) {
-            logger.error("Error al obtener productos: {}", e.getMessage());
-            return Map.of("content", List.of(), "totalElements", 0L, "totalPages", 0, "number", page, "size", size);
+        StringBuilder where = new StringBuilder(" WHERE pr.publicado AND pr.activo");
+        List<Object> params = new ArrayList<>();
+        if (categoriaId != null) {
+            where.append(" AND EXISTS (SELECT 1 FROM producto_categoria f")
+                 .append(" WHERE f.producto_id = pr.id AND f.categoria_id = ?)");
+            params.add(categoriaId);
         }
-    }
-
-    public Map<String, Object> getProductoById(String productoId) {
-        try {
-            List<Map<String, Object>> rows = ch.query(
-                    "SELECT p.producto_id, p.nombre, p.descripcion, p.categoria_id, " +
-                    "p.brand, p.price, p.stock, p.imagen_url, " +
-                    "c.categoria_nombre " +
-                    "FROM retailmind.productos_catalogo p " +
-                    "LEFT JOIN retailmind.dim_categoria c ON p.categoria_id = c.categoria_id " +
-                    "WHERE p.producto_id = '" + productoId + "'",
-                    (rs, rn) -> {
-                        Map<String, Object> r = new LinkedHashMap<>();
-                        r.put("productoId", rs.getString("producto_id"));
-                        r.put("nombre", rs.getString("nombre"));
-                        r.put("descripcion", rs.getString("descripcion"));
-                        r.put("categoriaId", rs.getInt("categoria_id"));
-                        r.put("categoriaNombre", rs.getString("categoria_nombre"));
-                        r.put("brand", rs.getString("brand"));
-                        r.put("price", rs.getFloat("price"));
-                        r.put("stock", rs.getInt("stock"));
-                        r.put("imagenUrl", rs.getString("imagen_url"));
-                        return r;
-                    });
-            return rows.isEmpty() ? null : rows.get(0);
-        } catch (RuntimeException e) {
-            logger.error("Error al obtener producto {}: {}", productoId, e.getMessage());
-            return null;
+        if (brand != null && !brand.isBlank()) {
+            where.append(" AND m.nombre = ?");
+            params.add(brand.trim());
         }
+        if (q != null && !q.isBlank()) {
+            where.append(" AND (pr.nombre ILIKE '%' || ? || '%'")
+                 .append(" OR pr.descripcion_corta ILIKE '%' || ? || '%'")
+                 .append(" OR pv.sku ILIKE '%' || ? || '%'")
+                 .append(" OR m.nombre ILIKE '%' || ? || '%')");
+            String term = q.trim();
+            params.add(term); params.add(term); params.add(term); params.add(term);
+        }
+        if (minPrice != null) { where.append(" AND pv.precio >= ?"); params.add(minPrice); }
+        if (maxPrice != null) { where.append(" AND pv.precio <= ?"); params.add(maxPrice); }
+
+        Long total = pg.queryForObject(
+                "SELECT count(*) " + FROM_CATALOGO + where, Long.class, params.toArray());
+
+        List<Object> pageParams = new ArrayList<>(params);
+        pageParams.add(size);
+        pageParams.add(page * size);
+        List<Map<String, Object>> rows = pg.query(
+                "SELECT pv.id AS variante_id, pr.nombre, " +
+                "COALESCE(pr.descripcion_corta, pr.descripcion) AS descripcion, " +
+                "COALESCE(cat.categoria_id, 0) AS categoria_id, cat.nombre AS categoria_nombre, " +
+                "m.nombre AS brand, pv.precio AS price, COALESCE(inv.stock, 0) AS stock, pv.sku " +
+                FROM_CATALOGO + where + " ORDER BY pr.id LIMIT ? OFFSET ?",
+                PRODUCTO_MAPPER, pageParams.toArray());
+
+        long t = total != null ? total : 0L;
+        Map<String, Object> res = new LinkedHashMap<>();
+        res.put("content", rows);
+        res.put("totalElements", t);
+        res.put("totalPages", (int) Math.ceil((double) t / size));
+        res.put("number", page);
+        res.put("size", size);
+        return res;
     }
 
+    /** Detalle por id de VARIANTE (el id que usan carrito/wishlist/pedido). */
+    @Transactional(readOnly = true)
+    public Map<String, Object> getProductoById(long varianteId) {
+        List<Map<String, Object>> rows = pg.query("""
+                SELECT pv.id AS variante_id, pr.nombre,
+                       COALESCE(pr.descripcion, pr.descripcion_corta) AS descripcion,
+                       COALESCE(cat.categoria_id, 0) AS categoria_id,
+                       cat.nombre AS categoria_nombre,
+                       m.nombre AS brand, pv.precio AS price,
+                       COALESCE(inv.stock, 0) AS stock, pv.sku
+                FROM producto_variante pv
+                JOIN producto pr ON pr.id = pv.producto_id
+                LEFT JOIN marca m ON m.id = pr.marca_id
+                LEFT JOIN LATERAL (SELECT pc.categoria_id, c.nombre
+                                   FROM producto_categoria pc
+                                   JOIN categoria c ON c.id = pc.categoria_id
+                                   WHERE pc.producto_id = pr.id
+                                   ORDER BY pc.es_principal DESC, pc.id
+                                   LIMIT 1) cat ON true
+                LEFT JOIN (SELECT producto_variante_id, SUM(stock_actual) AS stock
+                           FROM inventario GROUP BY producto_variante_id) inv
+                       ON inv.producto_variante_id = pv.id
+                WHERE pv.id = ? AND pv.activo AND pr.publicado AND pr.activo""",
+                PRODUCTO_MAPPER, varianteId);
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    @Transactional(readOnly = true)
     public List<Map<String, Object>> getCategorias() {
-        try {
-            return ch.query(
-                    "SELECT p.categoria_id, c.categoria_nombre, count() as total " +
-                    "FROM retailmind.productos_catalogo p " +
-                    "INNER JOIN retailmind.dim_categoria c ON p.categoria_id = c.categoria_id " +
-                    "WHERE p.activo = 1 " +
-                    "GROUP BY p.categoria_id, c.categoria_nombre " +
-                    "ORDER BY p.categoria_id",
-                    (rs, rn) -> {
-                        Map<String, Object> r = new LinkedHashMap<>();
-                        r.put("categoriaId", rs.getInt("categoria_id"));
-                        r.put("nombre", rs.getString("categoria_nombre"));
-                        r.put("total", rs.getLong("total"));
-                        return r;
-                    });
-        } catch (RuntimeException e) {
-            logger.error("Error al obtener categorias: {}", e.getMessage());
-            return List.of();
-        }
+        return pg.query("""
+                SELECT c.id, c.nombre, count(DISTINCT pr.id) AS total
+                FROM categoria c
+                JOIN producto_categoria pc ON pc.categoria_id = c.id
+                JOIN producto pr ON pr.id = pc.producto_id AND pr.publicado AND pr.activo
+                GROUP BY c.id, c.nombre
+                ORDER BY c.id""",
+                (rs, rn) -> {
+                    Map<String, Object> r = new LinkedHashMap<>();
+                    r.put("categoriaId", rs.getLong("id"));
+                    r.put("nombre", rs.getString("nombre"));
+                    r.put("total", rs.getLong("total"));
+                    return r;
+                });
     }
 
+    @Transactional(readOnly = true)
     public List<String> getMarcas() {
-        try {
-            return ch.query(
-                    "SELECT DISTINCT brand FROM retailmind.productos_catalogo WHERE activo = 1 ORDER BY brand",
-                    (rs, rn) -> rs.getString("brand"));
-        } catch (RuntimeException e) {
-            logger.error("Error al obtener marcas: {}", e.getMessage());
-            return List.of();
-        }
-    }
-
-    @SuppressWarnings("null")
-    public void registrarEvento(String userId, String productId, String userAction,
-                                 String channel, Float price, String sessionId) {
-        try {
-            if (sessionId == null || sessionId.isEmpty()) {
-                sessionId = "sess_shop_" + UUID.randomUUID().toString().substring(0, 8);
-            }
-            int semana = LocalDateTime.now().get(WeekFields.ISO.weekOfYear());
-            int isConversion = "purchase".equals(userAction) ? 1 : 0;
-            int dropOff = "drop".equals(userAction) ? 1 : 0;
-            String timestamp = LocalDateTime.now().toString();
-
-            ch.execute(String.format(
-                    "INSERT INTO retailmind.fact_eventos " +
-                    "(session_id, user_id, timestamp_utc, event_index, user_action, product_id, " +
-                    "time_spent_sec, session_length, interaction_count, is_conversion, drop_off_flag, " +
-                    "price, channel, semana) VALUES " +
-                    "('%s', '%s', '%s', 1, '%s', '%s', 0, 0, 1, %d, %d, %s, '%s', %d)",
-                    sessionId, userId != null ? userId : "anonymous", timestamp,
-                    userAction, productId != null ? productId : "",
-                    isConversion, dropOff,
-                    price != null ? price.toString() : "0",
-                    channel != null ? channel : "web", semana));
-        } catch (RuntimeException e) {
-            logger.warn("Error al registrar evento: {}", e.getMessage());
-        }
+        return pg.query("""
+                SELECT DISTINCT m.nombre
+                FROM marca m
+                JOIN producto pr ON pr.marca_id = m.id AND pr.publicado AND pr.activo
+                ORDER BY m.nombre""",
+                (rs, rn) -> rs.getString("nombre"));
     }
 }
