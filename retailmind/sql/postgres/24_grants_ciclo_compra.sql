@@ -11,3 +11,11 @@
 
 GRANT UPDATE (cantidad_recibida)           ON orden_compra_detalle TO grp_bodega;
 GRANT UPDATE (estado, fecha_actualizacion) ON orden_compra         TO grp_bodega;
+
+-- Bodega necesita leer factura_compra (subconsulta EXISTS en listarOrdenes)
+GRANT SELECT ON factura_compra TO grp_bodega;
+
+-- El pago a proveedor lo registra COMPRAS (tiene INSERT en pago_proveedor); para
+-- elegir el metodo en la pantalla necesita LEER el catalogo metodo_pago. Sin esto
+-- el <select> de metodos llega vacio (GET /api/referencias/metodos-pago -> 403).
+GRANT SELECT ON metodo_pago TO grp_compras;

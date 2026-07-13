@@ -123,9 +123,15 @@ FOR EACH ROW EXECUTE FUNCTION fn_recalcular_total_factura_venta();
 -- ------------------------------------------------------------
 -- 2c) Totales de orden_compra
 -- ------------------------------------------------------------
+-- SECURITY DEFINER: recalcular los totales de cabecera es un invariante del
+-- sistema. Corre con los privilegios del dueño para que CUALQUIER rol con
+-- permiso de modificar orden_compra_detalle (compras al crear la orden, bodega
+-- al actualizar cantidad_recibida en la recepcion) dispare el recalculo sin
+-- necesitar UPDATE sobre las columnas de montos de orden_compra (que la regla 1
+-- reserva a los triggers). search_path fijo por seguridad.
 CREATE OR REPLACE FUNCTION fn_recalcular_total_orden_compra()
 RETURNS trigger
-LANGUAGE plpgsql AS $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE
     v_orden_id bigint := COALESCE(NEW.orden_compra_id, OLD.orden_compra_id);
 BEGIN

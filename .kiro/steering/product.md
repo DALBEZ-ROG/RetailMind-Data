@@ -6,18 +6,23 @@ analítica sobre eventos (~2.3M) y una tienda online. Es un sistema web con arqu
 de dos bases de datos**:
 
 - **PostgreSQL** (BD `retailmind`, ~102 tablas): **base de datos operativa principal**. Todo el
-  núcleo transaccional vive aquí: usuarios/roles, clientes, catálogo, compras, inventario, ventas,
-  facturación, marketing, horarios de acceso.
+  núcleo transaccional vive aquí, **incluida la tienda del cliente** (catálogo `/api/catalogo`,
+  carrito, wishlist, perfil/direcciones, checkout y mis pedidos — migrados 2026-07-11).
 - **ClickHouse**: **solo analítica** (esquema estrella `fact_eventos` + dimensiones `dim_*`),
-  alimentado por el pipeline ETL de Python desde PocketBase.
+  alimentado por el pipeline ETL de Python desde PocketBase. Con ClickHouse apagado TODO funciona;
+  solo analytics/recomendaciones se degradan con aviso.
+
+> Si algún documento viejo dice "PostgreSQL eliminado" o describe la tienda sobre ClickHouse,
+> está desactualizado: ignorarlo.
 
 El sistema se organiza en tres niveles empresariales:
 
 - **Operativo (genera ventas)**: catálogo maestro (productos/variantes/atributos), ciclo de compra
   (orden → aprobación → recepción → factura → pago), inventario (transferencias, ajustes, kardex),
-  ciclo de venta (pedido → factura → despacho → devolución) con PDF imprimible, marketing
-  (cupones, promociones, campañas, banners, newsletter), tienda online (carrito, wishlist,
-  checkout, perfil, recomendaciones) y horarios de acceso por rol.
+  ciclo de venta (pedido → pago del cliente → factura → despacho → devolución) con PDF imprimible,
+  marketing (cupones, promociones, campañas, banners, newsletter), tienda online (carrito,
+  wishlist, checkout → pedido del ciclo de venta, perfil + direcciones, recomendaciones) y
+  horarios de acceso por rol.
 - **Táctico (toma de decisiones)**: sesiones, conversiones, funnel, analytics por
   región/dispositivo/tráfico y reportes (Excel/PDF). Corre sobre ClickHouse.
 - **Estratégico**: dashboard ejecutivo con KPIs.
@@ -27,14 +32,29 @@ El sistema se organiza en tres niveles empresariales:
 | Módulo | Alcance |
 |---|---|
 | Catálogo | CRUD de productos, variantes (SKU), marcas, categorías, atributos |
-| Compras | Orden de compra → aprobación (gerencia) → recepción → factura → cuentas por pagar/pagos |
-| Inventario | Transferencias entre bodegas, ajustes, kardex de movimientos |
-| Ventas | Pedido → factura (PDF) → despacho/seguimiento → devoluciones; vista "mis pedidos" para clientes |
-| Marketing | Cupones (con historial de uso), promociones + productos (N:M), campañas, banners, newsletter |
+| Compras | Orden → aprobación (GERENTE/ADMIN, compuerta enforced) → recepción completa → factura → CxP/pagos |
+| Inventario | Transferencias entre bodegas, ajustes (con anulación por contramovimiento de kardex), kardex |
+| Ventas | Pedido confirmado → pago del cliente (tabla `pago`+`transaccion_pago`, abonos parciales) → pagado → factura (PDF) → despacho con guía → entregado → devolución (solo tras entrega); listado facturas con búsqueda/paginación; timeline (`historial_estado_pedido`); acciones encadenadas en detalle |
+| Marketing | Cupones (con historial de uso), promociones + productos (N:M), campañas, banners, newsletter (solo gestión) |
+| Tienda online | Catálogo real (búsqueda/paginación), carrito, wishlist, checkout → pedido del ciclo de venta (el back-office cobra/factura/despacha); perfil + CRUD direcciones; "Mis Pedidos" con estado/guía/seguimiento/factura PDF (RLS, script 35); recomendaciones (señal CH + productos PG, degradan a destacados) |
+| Soporte | Tickets, categorías, FAQ con RLS de cliente |
 | Seguridad | Horarios de acceso por rol de grupo, gestión de usuarios |
+| Notas de pedido | Bitácora `nota_pedido`: nota interna vs. visible al cliente |
 
-**Pendientes**: módulo de soporte, reseñas, aplicación real de descuentos (cupones/promociones a
-pedidos), orquestación del ETL con Airflow.
+## Pendientes
+- Aplicación real de descuentos (cupones/promociones a pedidos, alimenta `uso_cupon`).
+- Módulo de reseñas.
+- Orquestación ETL con Airflow.
+
+## Deuda técnica conocida (tablas huérfanas, requieren bloque dedicado)
+- `lote` (0 filas): trazabilidad por lote/vencimiento. FK ya en `movimiento_inventario.lote_id`
+  y `recepcion_detalle.lote_id`. Darle uso obliga a tocar recepción (capturar lote), kardex
+  (arrastrar `lote_id`) y salida FEFO en despacho — no es un CRUD suelto.
+- `ajuste_inventario.estado = 'borrador'`: CHECK lo admite y `'anulado'` ya tiene flujo, pero un
+  borrador aplicable exigiría tabla de detalle de líneas (hoy el ajuste escribe el movimiento
+  directo al aplicarse).
+- `devolucion_proveedor` **no existe** en la BD: la única devolución modelada es al cliente
+  (`devolucion` / `devolucion_detalle`), ya implementada.
 
 ## Roles y seguridad
 

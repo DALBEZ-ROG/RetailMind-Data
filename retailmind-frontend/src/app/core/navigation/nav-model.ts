@@ -67,7 +67,9 @@ export const ROLES_POR_DATO: Record<PermisoDato, readonly string[]> = {
   refBodegas:           ['ADMIN', 'GERENTE', 'VENDEDOR', 'COMPRAS', 'BODEGA', 'ANALISTA'],
   refProveedores:       ['ADMIN', 'GERENTE', 'COMPRAS', 'BODEGA', 'ANALISTA'],
   refVariantes:         ['ADMIN', 'GERENTE', 'VENDEDOR', 'COMPRAS', 'BODEGA', 'CLIENTE', 'ANALISTA'],
-  refMetodosPago:       ['ADMIN', 'GERENTE', 'VENDEDOR', 'CLIENTE', 'ANALISTA'],
+  // COMPRAS: registra el pago a proveedor (INSERT en pago_proveedor) y necesita
+  // el catalogo de metodos en la pantalla de Facturas de Compra (grant script 24)
+  refMetodosPago:       ['ADMIN', 'GERENTE', 'VENDEDOR', 'COMPRAS', 'CLIENTE', 'ANALISTA'],
   refMetodosEnvio:      ['ADMIN', 'GERENTE', 'VENDEDOR', 'DESPACHO', 'CLIENTE', 'ANALISTA'],
   refTransportistas:    ['ADMIN', 'GERENTE', 'DESPACHO', 'ANALISTA'],
   refMotivosDevolucion: ['ADMIN', 'GERENTE', 'ANALISTA'],

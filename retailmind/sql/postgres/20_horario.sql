@@ -75,14 +75,20 @@ BEGIN
         RETURN true;
     END IF;
 
+    -- Las ventanas de grupo_horario se definen en hora local de Ecuador
+    -- (UTC-5). Anclamos la evaluacion a 'America/Guayaquil' para que sea
+    -- INMUNE al huso de la sesion JDBC: el driver pgjdbc fija el TZ de la
+    -- sesion al TZ de la JVM, y si el backend corre en UTC (p.ej. Docker),
+    -- EXTRACT(DOW FROM now()) y localtime verian otro dia/hora y bloquearian
+    -- operaciones validas con SQLState 42501 (-> 403).
     RETURN EXISTS (
         SELECT 1
         FROM grupo_horario gh
         WHERE gh.rol_grupo  = p_rol
           AND gh.activo
-          AND gh.dia_semana = EXTRACT(DOW FROM now())::smallint
-          AND localtime    >= gh.hora_inicio
-          AND localtime    <  gh.hora_fin
+          AND gh.dia_semana = EXTRACT(DOW FROM (now() AT TIME ZONE 'America/Guayaquil'))::smallint
+          AND (now() AT TIME ZONE 'America/Guayaquil')::time >= gh.hora_inicio
+          AND (now() AT TIME ZONE 'America/Guayaquil')::time <  gh.hora_fin
     );
 END;
 $$;

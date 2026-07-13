@@ -1,14 +1,17 @@
 # Tech Stack
 
 > Stack verificado contra el código (pom.xml, package.json, application.properties, esquema real).
-> Arquitectura **híbrida**: PostgreSQL es la BD operativa principal; ClickHouse es solo analítica.
+> Arquitectura **híbrida**: PostgreSQL es la BD operativa principal (incluida la tienda del
+> cliente, migrada 2026-07-11); ClickHouse es **solo analítica**. Con ClickHouse apagado TODO
+> funciona; solo analytics/recomendaciones se degradan con aviso. Si algún documento viejo dice
+> "PostgreSQL eliminado" o describe la tienda sobre ClickHouse, está desactualizado: ignorarlo.
 
 ## Bases de datos (arquitectura híbrida — dual datasource)
 
 ### PostgreSQL (operativa principal)
 - **BD**: `retailmind` (~102 tablas transaccionales), local en `localhost:5432` (no está en
-  docker-compose; se administra con los scripts de `retailmind/sql/postgres/`, 28 scripts
-  numerados 01–27 + 99).
+  docker-compose; se administra con los scripts de `retailmind/sql/postgres/`, scripts numerados
+  01–35 + 99).
 - **Conexión de la app**: usuario `retailmind_app` (LOGIN **NOINHERIT**, sin privilegios de
   negocio directos). Nunca conectar como `postgres` desde la app.
 - **Seguridad de motor**: 8 roles de grupo `grp_administrador`, `grp_gerente`, `grp_vendedor`,
@@ -16,7 +19,8 @@
   privilegios GRANT por tabla; **RLS** (aislamiento de cliente vía `app.cliente_id`); restricción
   por **horario** (`grupo_horario` + `esta_en_horario()` + triggers de bloqueo; admin exento).
 - **Integridad en la BD**: columnas GENERATED, totales de cabecera calculados por triggers,
-  triggers `touch` para `fecha_actualizacion`, CHECKs de estado/vigencia.
+  triggers `touch` para `fecha_actualizacion`, contadores como `usos_actuales` (NO escribirlos),
+  CHECKs de estado/vigencia.
 
 ### ClickHouse (solo analítica)
 - Esquema estrella: `fact_eventos` (~2.3M) + dimensiones `dim_*` + tablas legacy de tienda.
@@ -50,6 +54,17 @@
   `ApiErrorDTO`; nunca mostrar el texto técnico del status
 - **Charts**: Chart.js 4.5 · **Reportes cliente**: xlsx, jspdf · **TypeScript**: 5.4
 
+## Tienda del cliente (solo rol CLIENTE)
+- Backend en paquetes `catalogo/`, `carrito/`, `wishlist/`, `perfil/`, `recomendaciones/` contra
+  `pgJdbcTemplate`. El id público de producto es el de la **VARIANTE**.
+- Checkout llama a `VentasService.crearPedido` (mismo pedido que el back-office, stock vía
+  `StockService`).
+- Script `34_grants_tienda_cliente.sql` da a `grp_cliente` lo necesario (inventario,
+  movimiento_inventario, tipo_movimiento, bodega, historial_estado_pedido + políticas RLS
+  de horario).
+- Eventos a ClickHouse solo best-effort (`EventoTiendaService`).
+- Recomendaciones con señal ClickHouse + productos PG; degradan a destacados si CH no disponible.
+
 ## ETL Pipeline (`retailmind/`)
 - Python 3.12, clickhouse-connect, pocketbase, pyarrow, pandas
 - Flujo: PocketBase → `data/stage/*.parquet` → ClickHouse (solo analítica)
@@ -67,21 +82,26 @@
 
 ## Reglas de oro (obligatorias en código nuevo)
 1. **Nunca** escribir columnas GENERATED ni totales de cabecera (los ponen triggers de la BD).
+   Tampoco `fecha_actualizacion` (trigger touch) ni contadores como `usos_actuales`.
 2. **Todo** acceso a Postgres dentro de `@Transactional` (si no, `SET LOCAL ROLE` no aplica y la
    operación corre sin privilegios de negocio).
 3. Validación por **lista blanca** + parámetros de JdbcTemplate; **nunca** concatenar SQL.
-4. Guardias de estado/idempotencia con mensaje claro (`IllegalStateException` → 409,
-   `IllegalArgumentException` → 400) vía `GlobalExceptionHandler`.
+4. Guardias de estado/idempotencia con mensaje claro: `IllegalArgumentException` → 400,
+   `IllegalStateException` → 409, `NoSuchElementException` → 404 (vía `GlobalExceptionHandler`).
 5. Errores al frontend siempre con `api-error.util.ts`; pantallas nuevas imitan el patrón de
    `features/operativo/` (tabla + formulario + toggle activo, diseño Dubai).
 6. Ruta nueva = entrada en `SecurityConfig` + `roleGuard` en `app.routes.ts` + entrada en el
-   sidebar (`app.component.html`) + `routeMap` de breadcrumbs (`app.component.ts`).
+   sidebar (`app.component.html`, getters `canX`) + `routeMap` de breadcrumbs (`app.component.ts`).
+7. No modificar tablas existentes ni sus triggers; no tocar `analytics/` ni ClickHouse desde lo
+   operativo.
+8. Parámetros null hacia PG en contexto no tipado: castear en SQL (`?::bigint`,
+   `NULLIF(?,'')::timestamptz`).
 
 ## Credenciales de desarrollo
 - Admin: `admin@retailmind.com` / `Admin2026!`
 - Usuarios de prueba por rol (gerente@, vendedor@, compras@, bodega@, despacho@, analista@
-  `retailmind.com`; clientes `maria.lopez@demo.com`, `carlos.vera@demo.com`): `Retail2026!`
-  (seed `27_seed_usuarios_prueba_roles.sql`)
+  `retailmind.com`): `Retail2026!` (seed `27_seed_usuarios_prueba_roles.sql`)
+- Clientes demo (`maria.lopez@demo.com`, `carlos.vera@demo.com`): `Cliente2026!` (script 26)
 
 ## Common Commands
 
@@ -100,6 +120,12 @@ npm start                          # ng serve, puerto 4200
 npm run build                      # Build a dist/
 ```
 
+### Verificación mínima antes de dar por bueno un cambio
+```bash
+cd retailmind-backend && mvn compile
+cd retailmind-frontend && ng build
+```
+
 ### ETL (solo analítica)
 ```bash
 cd retailmind
@@ -110,4 +136,9 @@ python etl/carga/09_load_clickhouse.py
 ### Docker (analítica + tienda legacy)
 ```bash
 docker-compose up -d               # pocketbase, clickhouse, backend, frontend, etl
+```
+
+### Inspección de esquema PostgreSQL
+```
+MCP retailmind (solo lectura) o psycopg2 (postgres/1250143656@localhost:5432/retailmind)
 ```

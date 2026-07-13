@@ -169,8 +169,15 @@ public class ComprasService {
         if (items == null || items.isEmpty()) {
             throw new IllegalArgumentException("La recepcion requiere al menos un item");
         }
-        Map<String, Object> orden = pg.queryForMap(
-                "SELECT id, numero, bodega_id, estado FROM orden_compra WHERE id = ? FOR UPDATE",
+        // No se usa "SELECT ... FOR UPDATE": ese lock exige privilegio UPDATE
+        // a nivel de TABLA COMPLETA (sin fallback a nivel de columna), y
+        // grp_bodega solo tiene UPDATE(estado, fecha_actualizacion) sobre
+        // orden_compra (script 24). Un UPDATE real que solo toca 'estado'
+        // adquiere el mismo lock de fila y sí respeta el grant column-level.
+        Map<String, Object> orden = pg.queryForMap("""
+                UPDATE orden_compra SET estado = estado
+                WHERE id = ?
+                RETURNING id, numero, bodega_id, estado""",
                 ordenId);
         String estadoOrden = (String) orden.get("estado");
         // Compuerta de control interno: sin aprobación de Gerencia no hay recepción

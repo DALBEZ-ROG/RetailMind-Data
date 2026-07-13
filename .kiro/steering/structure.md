@@ -1,24 +1,28 @@
 # Project Structure
 
 Monorepo con tres sub-proyectos. Arquitectura híbrida: **PostgreSQL** (BD `retailmind`, local) es
-la base operativa principal; **ClickHouse** (Docker) sirve solo la analítica.
+la base operativa principal (incluida tienda del cliente); **ClickHouse** (Docker) sirve solo la
+analítica. Con CH apagado todo funciona excepto analytics/recomendaciones (degradan).
 
 ```
 1M6DatosCS/
 ├── retailmind/                       # Pipeline ETL Python 3.12 + DDL de PostgreSQL
 │   ├── config/
-│   │   └── clickhouse_connection.py  # Conexión ClickHouse + logging
+│   │   ├── clickhouse_connection.py  # Conexión ClickHouse + logging
+│   │   └── db_connection.py          # Conexión PostgreSQL (inspección/admin)
 │   ├── etl/
 │   │   ├── extraccion/               # PocketBase -> data/stage/datos.parquet
 │   │   ├── carga/                    # Parquet -> ClickHouse (+ verify/reset)
 │   │   ├── sinteticos/               # Generador de datos sintéticos
 │   │   ├── analytics/ y reportes/    # Scripts/notas
 │   ├── data/stage/                   # Capa cruda Parquet
-│   ├── sql/postgres/                 # ★ DDL OPERATIVO VIGENTE: 28 scripts numerados
-│   │                                 #   01-13 módulos (seguridad, clientes, catálogo, ventas,
-│   │                                 #   compras, inventario, marketing, soporte...),
-│   │                                 #   2x seguridad de motor (grp_*, RLS, horarios),
-│   │                                 #   2x seeds demo, 27 usuarios de prueba
+│   ├── sql/postgres/                 # ★ DDL OPERATIVO VIGENTE: scripts numerados 01–35 + 99
+│   │                                 #   01-15 módulos (seguridad, clientes, catálogo, ventas,
+│   │                                 #   compras, inventario, marketing, soporte, reseñas...),
+│   │                                 #   16 triggers, 17 seeds catálogos,
+│   │                                 #   18-22 seguridad motor (grp_*, privilegios, RLS, horarios, app_login),
+│   │                                 #   23-27 seeds demo/roles/usuarios prueba,
+│   │                                 #   28-35 grants consolidación/soporte/reseñas/tienda_cliente
 │   ├── requirements.txt / Dockerfile / .env
 │
 ├── retailmind-backend/               # API REST Spring Boot 3.5 / Java 17
@@ -40,13 +44,17 @@ la base operativa principal; **ClickHouse** (Docker) sirve solo la analítica.
 │       ├── admin/horarios/           # Ventanas horarias por rol (ADMIN)
 │       ├── admin/usuarios/           # Gestión de usuarios
 │       ├── compras/                  # Orden -> aprobar -> recepción -> factura -> pago (+PDF)
-│       ├── inventario/               # Transferencias, ajustes, kardex, StockService
-│       ├── ventas/                   # Pedido -> factura -> despacho -> devolución (+PDF)
+│       ├── inventario/               # Transferencias, ajustes (+ anulación), kardex, StockService
+│       ├── ventas/                   # Pedido -> pago cliente -> factura -> despacho -> devolución (+PDF)
 │       ├── marketing/                # Cupones, promociones(+productos), campañas, banners, newsletter
 │       │
-│       │   # --- Tienda online (PostgreSQL) ---
-│       ├── catalogo/                 # Catálogo público
-│       ├── carrito/  wishlist/  pedidos/  perfil/  recomendaciones/
+│       │   # --- Tienda online (PostgreSQL, rol CLIENTE) ---
+│       ├── catalogo/                 # Catálogo público (búsqueda/paginación, id público = variante)
+│       ├── carrito/                  # Carrito de compras
+│       ├── wishlist/                 # Lista de deseos
+│       ├── pedidos/                  # Mis pedidos (RLS, estado/guía/factura PDF)
+│       ├── perfil/                   # Perfil + CRUD direcciones
+│       ├── recomendaciones/          # Señal CH + productos PG, degrada a destacados
 │       │
 │       │   # --- Analítica (ClickHouse, EXCLUIDA del SET LOCAL ROLE) ---
 │       ├── analytics/                # dashboard, sesiones, conversiones, funnel,
@@ -78,7 +86,8 @@ la base operativa principal; **ClickHouse** (Docker) sirve solo la analítica.
 │
 ├── docker-compose.yml                # 5 servicios: pocketbase, clickhouse, backend, frontend, etl
 │                                     # (PostgreSQL corre LOCAL, fuera de compose)
-├── .kiro/steering/                   # Este steering
+├── CLAUDE.md                         # Contexto para Claude Code (equivalente a este steering)
+├── .kiro/steering/                   # Steering para Kiro (este archivo)
 └── .specify/ / openspec/             # Spec Kit
 ```
 
@@ -100,3 +109,5 @@ la base operativa principal; **ClickHouse** (Docker) sirve solo la analítica.
   getters `canX`) + `routeMap` de breadcrumbs.
 - **Flujo analítico**: PocketBase → Python ETL (Parquet) → ClickHouse ← `analytics/` ← Angular.
 - **Flujo operativo**: Angular ← API Spring ← PostgreSQL (retailmind_app + SET LOCAL ROLE).
+- **Tienda del cliente**: checkout llama a `VentasService.crearPedido` (mismo flujo back-office);
+  el id público de producto es el de la VARIANTE; eventos a CH best-effort.
