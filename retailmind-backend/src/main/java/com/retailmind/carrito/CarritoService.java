@@ -120,14 +120,38 @@ public class CarritoService {
         eventos.registrar(usuarioEmail(), String.valueOf(varianteId), "drop", "web", null, null);
     }
 
+    public record TarjetaReq(String numero, String titular, String vencimiento, String cvv) {}
+    public record CheckoutReq(Long direccionId, Long metodoPagoId, String cupon,
+                              TarjetaReq tarjeta, String referenciaTransferencia) {}
+
+    /** Métodos de pago disponibles en el checkout online (pago simulado). */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> metodosCheckout() {
+        return pg.queryForList("""
+                SELECT id, codigo, nombre, tipo FROM metodo_pago
+                WHERE activo AND tipo IN ('tarjeta', 'transferencia')
+                ORDER BY orden, id""");
+    }
+
     /**
-     * Convierte el carrito activo en un pedido del ciclo de venta y marca el
-     * carrito como 'convertido'. El stock se descuenta dentro de crearPedido
-     * vía StockService (kardex incluido), en ESTA misma transacción y bajo el
-     * rol grp_cliente del usuario.
+     * Checkout ONLINE completo (tipo tienda real): valida dirección de envío
+     * y método de pago, crea el pedido del ciclo de venta (canal 'web'),
+     * registra el pago SIMULADO y deja el pedido 'pagado' — todo en UNA
+     * transacción bajo grp_cliente. El stock se descuenta dentro de
+     * crearPedido vía StockService (kardex incluido); si algo se agotó, la
+     * transacción completa se revierte con mensaje claro.
+     *
+     * Tarjeta: se valida formato (número 13-19 dígitos + Luhn, MM/AA vigente,
+     * CVV 3-4 dígitos) pero NO hay pasarela real y NUNCA se persiste el número
+     * completo ni el CVV: solo marca + últimos 4 como referencia.
+     *
+     * Cupón: el campo viaja en la request pero su validación/aplicación es de
+     * la fase de descuentos. Enganche futuro: validar contra cupon/uso_cupon
+     * (marketing) ANTES de crearPedido y pasar el descuento al pedido. Hoy
+     * solo se informa que aún no aplica, sin romper el checkout.
      */
     @Transactional
-    public Map<String, Object> checkout() {
+    public Map<String, Object> checkout(CheckoutReq req) {
         AppUserPrincipal principal = principal();
         if (principal == null || principal.getClienteId() == null) {
             throw new IllegalStateException("Solo un cliente puede hacer checkout");
@@ -144,6 +168,47 @@ public class CarritoService {
             throw new IllegalStateException("El carrito esta vacio");
         }
 
+        // Dirección de envío obligatoria y del propio cliente (RLS: una
+        // dirección ajena simplemente no es visible para grp_cliente)
+        if (req == null || req.direccionId() == null) {
+            throw new IllegalArgumentException("Selecciona una direccion de envio");
+        }
+        List<Long> direcciones = pg.queryForList(
+                "SELECT id FROM direccion WHERE id = ? AND activo", Long.class, req.direccionId());
+        if (direcciones.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "La direccion de envio seleccionada no existe o no te pertenece");
+        }
+
+        // Método de pago obligatorio y habilitado para compras online
+        if (req.metodoPagoId() == null) {
+            throw new IllegalArgumentException("Selecciona un metodo de pago");
+        }
+        List<Map<String, Object>> metodos = pg.queryForList("""
+                SELECT nombre, tipo FROM metodo_pago
+                WHERE id = ? AND activo AND tipo IN ('tarjeta', 'transferencia')""",
+                req.metodoPagoId());
+        if (metodos.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "El metodo de pago no esta disponible para compras online");
+        }
+        String tipoMetodo = (String) metodos.get(0).get("tipo");
+
+        // Datos del pago simulado (referencia + autorización + detalle jsonb)
+        String referencia;
+        String detalleJson;
+        String autorizacion = "SIM-" + siglasAleatorias();
+        if ("tarjeta".equals(tipoMetodo)) {
+            referencia = validarTarjeta(req.tarjeta());   // "VISA ****1234"
+            detalleJson = "{\"simulado\": true, \"tipo\": \"tarjeta\", \"referencia\": \""
+                    + referencia + "\"}";
+        } else {
+            String ref = req.referenciaTransferencia();
+            referencia = ref != null && !ref.isBlank()
+                    ? ref.trim() : "TRANSF-" + siglasAleatorias();
+            detalleJson = "{\"simulado\": true, \"tipo\": \"transferencia\"}";
+        }
+
         List<Long> bodegas = pg.queryForList("""
                 SELECT id FROM bodega WHERE es_principal AND activo ORDER BY id LIMIT 1""",
                 Long.class);
@@ -158,8 +223,14 @@ public class CarritoService {
                     ((Number) it.get("cantidad")).intValue()));
         }
 
+        // Pedido real del ciclo de venta (descuenta stock) + pago simulado:
+        // el pedido ONLINE nace PAGADO, listo para facturar y despachar.
         Map<String, Object> pedido = ventas.crearPedido(
-                principal.getClienteId(), bodegas.get(0), "web", itemsPedido);
+                principal.getClienteId(), bodegas.get(0), "web", itemsPedido,
+                req.direccionId());
+        long pedidoId = ((Number) pedido.get("id")).longValue();
+        ventas.pagarCheckoutOnline(pedidoId, req.metodoPagoId(),
+                referencia, autorizacion, detalleJson);
 
         pg.update("UPDATE carrito SET estado = 'convertido' WHERE id = ?", carritoId);
 
@@ -170,11 +241,77 @@ public class CarritoService {
         }
 
         Map<String, Object> res = new LinkedHashMap<>();
-        res.put("pedidoId", pedido.get("id"));
+        res.put("pedidoId", pedidoId);
         res.put("ordenId", pedido.get("numero"));
         res.put("total", pedido.get("total"));
         res.put("items", items.size());
+        res.put("estado", "pagado");
+        res.put("metodoPago", metodos.get(0).get("nombre"));
+        res.put("referenciaPago", referencia);
+        if (req.cupon() != null && !req.cupon().isBlank()) {
+            // Fase de descuentos pendiente: no rompe el checkout, solo informa
+            res.put("cuponMensaje", "El cupon '" + req.cupon().trim()
+                    + "' se validara cuando el modulo de descuentos este activo; "
+                    + "tu pedido se proceso sin descuento");
+        }
         return res;
+    }
+
+    // ── Validación de tarjeta (pago simulado; nunca se persiste PAN/CVV) ─
+
+    /** Valida formato y devuelve la referencia segura "MARCA ****9999". */
+    private static String validarTarjeta(TarjetaReq t) {
+        if (t == null) {
+            throw new IllegalArgumentException("Completa los datos de la tarjeta");
+        }
+        String numero = t.numero() == null ? "" : t.numero().replaceAll("[\\s-]", "");
+        if (!numero.matches("\\d{13,19}")) {
+            throw new IllegalArgumentException(
+                    "El numero de tarjeta debe tener entre 13 y 19 digitos");
+        }
+        if (!pasaLuhn(numero)) {
+            throw new IllegalArgumentException("El numero de tarjeta no es valido");
+        }
+        if (t.titular() == null || t.titular().isBlank()) {
+            throw new IllegalArgumentException("El nombre del titular es requerido");
+        }
+        String venc = t.vencimiento() == null ? "" : t.vencimiento().trim();
+        if (!venc.matches("(0[1-9]|1[0-2])/\\d{2}")) {
+            throw new IllegalArgumentException("El vencimiento debe tener formato MM/AA");
+        }
+        java.time.YearMonth vencimiento = java.time.YearMonth.of(
+                2000 + Integer.parseInt(venc.substring(3)), Integer.parseInt(venc.substring(0, 2)));
+        if (vencimiento.isBefore(java.time.YearMonth.now())) {
+            throw new IllegalArgumentException("La tarjeta esta vencida (" + venc + ")");
+        }
+        if (t.cvv() == null || !t.cvv().matches("\\d{3,4}")) {
+            throw new IllegalArgumentException("El CVV debe tener 3 o 4 digitos");
+        }
+        return marcaDe(numero) + " ****" + numero.substring(numero.length() - 4);
+    }
+
+    private static boolean pasaLuhn(String numero) {
+        int suma = 0;
+        boolean doble = false;
+        for (int i = numero.length() - 1; i >= 0; i--) {
+            int d = numero.charAt(i) - '0';
+            if (doble) { d *= 2; if (d > 9) d -= 9; }
+            suma += d;
+            doble = !doble;
+        }
+        return suma % 10 == 0;
+    }
+
+    private static String marcaDe(String numero) {
+        if (numero.startsWith("4")) return "VISA";
+        if (numero.matches("^(5[1-5]|2[2-7]).*")) return "MASTERCARD";
+        if (numero.matches("^3[47].*")) return "AMEX";
+        if (numero.startsWith("6")) return "DISCOVER";
+        return "TARJETA";
+    }
+
+    private static String siglasAleatorias() {
+        return String.valueOf((int) (Math.random() * 900000) + 100000);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────

@@ -48,6 +48,15 @@ export class SoporteService {
   asignar(id: number, usuarioId: number | null): Observable<unknown> {
     return this.http.patch(`${this.base}/tickets/${id}/asignar`, { usuarioId });
   }
+  /** El agente toma el ticket (auto-asignación). ADMIN/SOPORTE. */
+  tomar(id: number): Observable<{ success: boolean; estado: string }> {
+    return this.http.post<{ success: boolean; estado: string }>(
+      `${this.base}/tickets/${id}/tomar`, {});
+  }
+  /** Ajuste manual de prioridad (nace automática por categoría). ADMIN/SOPORTE. */
+  cambiarPrioridad(id: number, prioridad: string): Observable<unknown> {
+    return this.http.patch(`${this.base}/tickets/${id}/prioridad`, { prioridad });
+  }
   usuariosRef(): Observable<UsuarioSoporteRef[]> {
     return this.http.get<UsuarioSoporteRef[]>(`${this.base}/usuarios-ref`);
   }

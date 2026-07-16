@@ -51,17 +51,25 @@ public class VentasService {
     @Transactional
     public Map<String, Object> crearPedido(long clienteId, long bodegaId, String canal,
                                            List<ItemPedido> items) {
+        return crearPedido(clienteId, bodegaId, canal, items, null);
+    }
+
+    @Transactional
+    public Map<String, Object> crearPedido(long clienteId, long bodegaId, String canal,
+                                           List<ItemPedido> items, Long direccionEnvioId) {
         if (items == null || items.isEmpty()) {
             throw new IllegalArgumentException("El pedido requiere al menos un item");
         }
         String numero = siguienteNumero("PED");
         Long pedidoId = pg.queryForObject("""
-                INSERT INTO pedido (numero, cliente_id, estado_pedido_id, moneda_id, canal)
+                INSERT INTO pedido (numero, cliente_id, estado_pedido_id, moneda_id, canal,
+                                    direccion_envio_id)
                 VALUES (?, ?, (SELECT id FROM estado_pedido WHERE codigo = 'confirmado'),
-                        (SELECT id FROM moneda WHERE es_base LIMIT 1), ?)
+                        (SELECT id FROM moneda WHERE es_base LIMIT 1), ?, ?::bigint)
                 RETURNING id""",
                 Long.class, numero, clienteId,
-                canal != null && List.of("web", "tienda", "telefono").contains(canal) ? canal : "web");
+                canal != null && List.of("web", "tienda", "telefono").contains(canal) ? canal : "web",
+                direccionEnvioId);
 
         for (ItemPedido it : items) {
             if (it.cantidad() <= 0) {
@@ -194,7 +202,7 @@ public class VentasService {
     public List<Map<String, Object>> listarPedidos() {
         // tiene_factura permite a los selectores ofrecer solo pedidos válidos
         return pg.queryForList("""
-                SELECT p.id, p.numero, ep.codigo AS estado, p.total, p.fecha_pedido,
+                SELECT p.id, p.numero, ep.codigo AS estado, p.canal, p.total, p.fecha_pedido,
                        c.nombre || ' ' || COALESCE(c.apellido,'') AS cliente,
                        EXISTS (SELECT 1 FROM factura_venta fv
                                WHERE fv.pedido_id = p.id) AS tiene_factura
@@ -216,7 +224,7 @@ public class VentasService {
     public Map<String, Object> registrarPago(long pedidoId, long metodoPagoId,
                                              BigDecimal monto, String referencia) {
         List<Map<String, Object>> filas = pg.queryForList("""
-                SELECT p.id, p.numero, p.total, p.moneda_id, ep.codigo AS estado
+                SELECT p.id, p.numero, p.total, p.moneda_id, p.canal, ep.codigo AS estado
                 FROM pedido p JOIN estado_pedido ep ON ep.id = p.estado_pedido_id
                 WHERE p.id = ? FOR UPDATE OF p""", pedidoId);
         if (filas.isEmpty()) {
@@ -225,6 +233,13 @@ public class VentasService {
         Map<String, Object> ped = filas.get(0);
         String estado = (String) ped.get("estado");
         String numero = (String) ped.get("numero");
+        // Un pedido ONLINE (canal web) se paga en el checkout de la tienda y
+        // nace 'pagado'; el cobro manual queda reservado a pedidos internos.
+        if ("web".equals(ped.get("canal"))) {
+            throw new IllegalStateException("El pedido " + numero
+                    + " es de la tienda online: el cliente lo paga en el checkout. "
+                    + "El cobro manual solo aplica a pedidos internos (tienda/telefono)");
+        }
         switch (estado) {
             case "pagado", "en_preparacion", "despachado", "entregado" ->
                     throw new IllegalStateException("El pedido " + numero
@@ -272,6 +287,52 @@ public class VentasService {
         }
         return Map.of("pagoId", pagoId, "totalPagado", total.subtract(nuevoSaldo),
                 "saldoPendiente", nuevoSaldo, "estadoPedido", cubierto ? "pagado" : estado);
+    }
+
+    /**
+     * Pago SIMULADO del checkout online: se registra en la MISMA transacción
+     * que acaba de crear el pedido (no requiere FOR UPDATE: la fila aún no es
+     * visible para nadie más) y lo deja 'pagado' por el total. Corre bajo
+     * grp_cliente (INSERT en pago/transaccion_pago, script 36). El detalle de
+     * tarjeta llega ya SANITIZADO por el caller: marca + últimos 4, nunca el
+     * número completo ni el CVV.
+     */
+    @Transactional
+    public Map<String, Object> pagarCheckoutOnline(long pedidoId, long metodoPagoId,
+                                                   String referencia, String codigoAutorizacion,
+                                                   String detalleJson) {
+        Map<String, Object> ped = pg.queryForMap("""
+                SELECT p.numero, p.total, p.moneda_id, ep.codigo AS estado
+                FROM pedido p JOIN estado_pedido ep ON ep.id = p.estado_pedido_id
+                WHERE p.id = ?""", pedidoId);
+        if (!"confirmado".equals(ped.get("estado"))) {
+            throw new IllegalStateException("El pedido " + ped.get("numero")
+                    + " no admite el pago del checkout (estado '" + ped.get("estado") + "')");
+        }
+        List<String> metodos = pg.queryForList(
+                "SELECT nombre FROM metodo_pago WHERE id = ? AND activo", String.class, metodoPagoId);
+        if (metodos.isEmpty()) {
+            throw new IllegalArgumentException("El metodo de pago no existe o esta inactivo");
+        }
+        BigDecimal total = (BigDecimal) ped.get("total");
+
+        Long pagoId = pg.queryForObject("""
+                INSERT INTO pago (pedido_id, metodo_pago_id, moneda_id, monto, estado,
+                                  referencia_externa, fecha_pago)
+                VALUES (?, ?, ?, ?, 'completado', NULLIF(?, ''), now())
+                RETURNING id""",
+                Long.class, pedidoId, metodoPagoId,
+                ((Number) ped.get("moneda_id")).longValue(), total, referencia);
+        pg.update("""
+                INSERT INTO transaccion_pago (pago_id, tipo, estado, monto,
+                                              codigo_autorizacion, respuesta_pasarela)
+                VALUES (?, 'captura', 'exitosa', ?, ?, ?::jsonb)""",
+                pagoId, total, codigoAutorizacion, detalleJson);
+
+        cambiarEstadoPedido(pedidoId, "pagado", "Pago online confirmado en el checkout ("
+                + metodos.get(0) + (referencia != null && !referencia.isBlank()
+                        ? " · " + referencia : "") + ")");
+        return Map.of("pagoId", pagoId, "monto", total, "metodo", metodos.get(0));
     }
 
     /** Suma de pagos completados del pedido. */

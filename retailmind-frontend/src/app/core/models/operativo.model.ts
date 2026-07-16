@@ -94,9 +94,11 @@ export interface ItemPedidoReq { varianteId: number; cantidad: number; }
 export interface PedidoVentaRow {
   id: number; numero: string; estado: string; total: number;
   fecha_pedido: string; cliente: string; tiene_factura?: boolean;
+  // 'web' = tienda online (nace pagado en el checkout); 'tienda'/'telefono' = interno
+  canal: string;
 }
 export interface PedidoVentaDetalle extends PedidoVentaRow {
-  subtotal: number; monto_impuesto: number; canal: string;
+  subtotal: number; monto_impuesto: number;
   detalles: {
     id: number; sku: string; nombre_producto: string; cantidad: number;
     precio_unitario: number; subtotal: number;
@@ -204,8 +206,9 @@ export interface SuscriptorRow {
 export interface CategoriaTicketRow {
   id: number; nombre: string; descripcion: string | null; activo: boolean;
   fecha_creacion: string; tickets: number; faqs: number;
+  prioridad_defecto: string; // la prioridad del ticket nace de aquí (script 37)
 }
-export interface CategoriaTicketRef { id: number; nombre: string; }
+export interface CategoriaTicketRef { id: number; nombre: string; descripcion?: string | null; }
 export interface TicketRow {
   id: number; numero: string; asunto: string; prioridad: string; estado: string;
   pedido_id: number | null; fecha_creacion: string; fecha_cierre: string | null;
@@ -213,6 +216,8 @@ export interface TicketRow {
   // solo en la vista del personal
   cliente_id?: number; cliente?: string | null;
   asignado_usuario_id?: number | null; asignado?: string | null;
+  asignado_a_mi?: boolean;
+  sla_vence?: string; sla_vencido?: boolean; // SLA por prioridad (2/4/24/72 h)
 }
 export interface MensajeTicketRow {
   id: number; mensaje: string; fecha_creacion: string; de_cliente: boolean;
@@ -224,6 +229,7 @@ export interface TicketDetalle {
   fecha_creacion: string; fecha_cierre: string | null; categoria: string | null;
   cliente_id?: number; cliente?: string | null;
   asignado_usuario_id?: number | null; asignado?: string | null;
+  sla_vence?: string; sla_vencido?: boolean;
   mensajes: MensajeTicketRow[];
 }
 export interface UsuarioSoporteRef { id: number; nombre: string; rol: string; }

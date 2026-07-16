@@ -28,10 +28,6 @@ export class CarritoComponent implements OnInit {
 
   items: any[] = [];
   loading = true;
-  checkoutExitoso = false;
-  procesando = false;
-  ordenId = '';
-  pedidoId: number | null = null;
 
   constructor(
     private shopService: ShopService,
@@ -79,25 +75,9 @@ export class CarritoComponent implements OnInit {
     });
   }
 
+  /** El pago ocurre en el checkout (dirección + método + tarjeta simulada). */
   finalizarCompra(): void {
-    if (this.procesando) return;
-    this.procesando = true;
-    this.shopService.checkout().subscribe({
-      next: (res) => {
-        this.procesando = false;
-        this.checkoutExitoso = true;
-        this.ordenId = res.ordenId;
-        this.pedidoId = res.pedidoId;
-        this.items = [];
-        this.snackBar.open('Compra realizada con exito!', 'OK',
-          { duration: 4000, panelClass: ['snack-success'] });
-      },
-      error: (e) => {
-        this.procesando = false;
-        this.snackBar.open(mensajeError(e, 'Error en checkout'), 'Cerrar',
-          { duration: 5000, panelClass: ['snack-error'] });
-      }
-    });
+    this.router.navigate(['/shop/checkout']);
   }
 
   seguirComprando(): void {

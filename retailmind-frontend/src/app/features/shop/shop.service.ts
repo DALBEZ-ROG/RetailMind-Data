@@ -63,9 +63,36 @@ export class ShopService {
     return this.http.delete(`${this.base}/api/carrito/items/${varianteId}`);
   }
 
-  /** Convierte el carrito en un pedido REAL del ciclo de venta. */
-  checkout(): Observable<any> {
-    return this.http.post(`${this.base}/api/carrito/checkout`, {});
+  // ── Checkout online (el pedido nace PAGADO; pago simulado) ───────────
+  /** Métodos de pago que ofrece el checkout (tarjeta / transferencia). */
+  checkoutMetodos(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.base}/api/carrito/checkout/metodos`);
+  }
+
+  /**
+   * Checkout completo: dirección + método de pago + cupón (preparado para la
+   * fase de descuentos). La tarjeta viaja solo para VALIDAR formato: el
+   * backend guarda únicamente marca + últimos 4 dígitos (nunca PAN/CVV).
+   */
+  checkout(body: {
+    direccionId: number; metodoPagoId: number; cupon?: string;
+    tarjeta?: { numero: string; titular: string; vencimiento: string; cvv: string };
+    referenciaTransferencia?: string;
+  }): Observable<any> {
+    return this.http.post(`${this.base}/api/carrito/checkout`, body);
+  }
+
+  // ── Direcciones del cliente (mismas del perfil) ───────────────────────
+  getDirecciones(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.base}/api/perfil/direcciones`);
+  }
+
+  crearDireccion(body: any): Observable<any> {
+    return this.http.post(`${this.base}/api/perfil/direcciones`, body);
+  }
+
+  getCiudades(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.base}/api/perfil/ciudades`);
   }
 
   // ── Wishlist ──────────────────────────────────────────────────────────

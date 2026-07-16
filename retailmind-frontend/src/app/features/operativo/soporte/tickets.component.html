@@ -1,13 +1,14 @@
 <div class="op-page">
   <div class="section-header">
-    <h2><mat-icon>support_agent</mat-icon> Tickets de Soporte</h2>
-    <p *ngIf="esCliente">Crea un ticket y conversa con el equipo de soporte.</p>
-    <p *ngIf="!esCliente">Atención al cliente: hilo de mensajes, estados y asignación de agentes.</p>
+    <h2><mat-icon>support_agent</mat-icon> {{ esCliente ? 'Mis Tickets' : 'Bandeja de Soporte' }}</h2>
+    <p *ngIf="esCliente">Cuéntanos tu problema: el equipo de soporte te responderá en el hilo.</p>
+    <p *ngIf="!esCliente">Atención al cliente: prioridad automática, SLA, asignación y estados con guardias.</p>
   </div>
 
   <div class="op-card">
     <div class="form-actions">
-      <button class="btn-aplicar" (click)="showForm ? showForm = false : nuevo()">
+      <button class="btn-aplicar" *ngIf="esCliente || esGestion"
+              (click)="showForm ? showForm = false : nuevo()">
         <mat-icon>{{ showForm ? 'close' : 'add' }}</mat-icon>
         {{ showForm ? 'Cancelar' : 'Nuevo Ticket' }}
       </button>
@@ -25,17 +26,14 @@
           </mat-select>
         </mat-form-field>
         <mat-form-field appearance="outline">
-          <mat-label>Categoría (opcional)</mat-label>
+          <mat-label>Categoría del problema</mat-label>
           <mat-select [(ngModel)]="form.categoriaId">
             <mat-option [value]="null">— Sin categoría —</mat-option>
-            <mat-option *ngFor="let c of categoriasRef" [value]="c.id">{{ c.nombre }}</mat-option>
+            <mat-option *ngFor="let c of categoriasRef" [value]="c.id"
+                        [matTooltip]="c.descripcion || ''">{{ c.nombre }}</mat-option>
           </mat-select>
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>Prioridad</mat-label>
-          <mat-select [(ngModel)]="form.prioridad">
-            <mat-option *ngFor="let p of prioridades" [value]="p">{{ p }}</mat-option>
-          </mat-select>
+          <!-- La prioridad NO se elige: la asigna el sistema según la categoría -->
+          <mat-hint>La prioridad se asigna automáticamente según la categoría</mat-hint>
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Pedido relacionado (opcional)</mat-label>
@@ -66,14 +64,48 @@
   </div>
 
   <div class="op-card">
-    <h3><mat-icon>list</mat-icon> {{ esCliente ? 'Mis tickets' : 'Tickets' }} ({{ tickets.length }})</h3>
-    <div class="table-wrapper" *ngIf="tickets.length; else vacio">
-      <table mat-table [dataSource]="tickets">
+    <h3><mat-icon>list</mat-icon> {{ esCliente ? 'Mis tickets' : 'Tickets' }}
+      ({{ ticketsFiltrados.length }}<span *ngIf="ticketsFiltrados.length !== tickets.length"> de {{ tickets.length }}</span>)
+    </h3>
+
+    <!-- Filtros de la bandeja (solo personal) -->
+    <div *ngIf="esStaff" style="display:flex; flex-wrap:wrap; gap:12px; align-items:baseline; margin: 8px 0 4px;">
+      <mat-button-toggle-group [(ngModel)]="filtroBandeja">
+        <mat-button-toggle value="todos">Todos</mat-button-toggle>
+        <mat-button-toggle value="sin_asignar">Sin asignar</mat-button-toggle>
+        <mat-button-toggle value="mios">Asignados a mí</mat-button-toggle>
+      </mat-button-toggle-group>
+      <mat-form-field appearance="outline" style="width: 170px;">
+        <mat-label>Estado</mat-label>
+        <mat-select [(ngModel)]="filtroEstado">
+          <mat-option value="">Todos</mat-option>
+          <mat-option *ngFor="let e of estadosFiltro" [value]="e">{{ e.replaceAll('_',' ') }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline" style="width: 190px;">
+        <mat-label>Categoría</mat-label>
+        <mat-select [(ngModel)]="filtroCategoria">
+          <mat-option value="">Todas</mat-option>
+          <mat-option *ngFor="let c of categoriasEnBandeja" [value]="c">{{ c }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline" style="width: 150px;">
+        <mat-label>Prioridad</mat-label>
+        <mat-select [(ngModel)]="filtroPrioridad">
+          <mat-option value="">Todas</mat-option>
+          <mat-option *ngFor="let p of prioridades" [value]="p">{{ p }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+
+    <div class="table-wrapper" *ngIf="ticketsFiltrados.length; else vacio">
+      <table mat-table [dataSource]="ticketsFiltrados">
         <ng-container matColumnDef="numero">
           <th mat-header-cell *matHeaderCellDef>Ticket</th>
           <td mat-cell *matCellDef="let t">
             <strong>{{ t.numero }}</strong>
             <div style="font-size: 11px; opacity: 0.7;">{{ t.asunto }}</div>
+            <div style="font-size: 10px; opacity: 0.55;">{{ t.fecha_creacion | date:'dd/MM/yy HH:mm' }}</div>
           </td>
         </ng-container>
         <ng-container matColumnDef="cliente">
@@ -93,6 +125,17 @@
             </span>
           </td>
         </ng-container>
+        <ng-container matColumnDef="sla">
+          <th mat-header-cell *matHeaderCellDef>SLA</th>
+          <td mat-cell *matCellDef="let t">
+            <span class="stat-chip" [class.chip-warning]="t.sla_vencido"
+                  [style.background]="t.sla_vencido ? '#ffebee' : ''"
+                  [style.color]="t.sla_vencido ? '#c62828' : ''"
+                  matTooltip="Límite de respuesta: {{ t.sla_vence | date:'dd/MM/yy HH:mm' }} (urgente 2h · alta 4h · media 24h · baja 72h)">
+              {{ slaTexto(t) }}
+            </span>
+          </td>
+        </ng-container>
         <ng-container matColumnDef="estado">
           <th mat-header-cell *matHeaderCellDef>Estado</th>
           <td mat-cell *matCellDef="let t">
@@ -104,7 +147,10 @@
         </ng-container>
         <ng-container matColumnDef="asignado">
           <th mat-header-cell *matHeaderCellDef>Asignado</th>
-          <td mat-cell *matCellDef="let t">{{ t.asignado || '—' }}</td>
+          <td mat-cell *matCellDef="let t">
+            <span *ngIf="t.asignado; else sinAsignar">{{ t.asignado }}<strong *ngIf="t.asignado_a_mi"> (tú)</strong></span>
+            <ng-template #sinAsignar><span style="opacity:0.55;">sin asignar</span></ng-template>
+          </td>
         </ng-container>
         <ng-container matColumnDef="mensajes">
           <th mat-header-cell *matHeaderCellDef>Mensajes</th>
@@ -122,6 +168,11 @@
             <button mat-icon-button matTooltip="Ver conversación" (click)="ver(t.id)">
               <mat-icon>forum</mat-icon>
             </button>
+            <button mat-icon-button color="primary" matTooltip="Tomar este ticket"
+                    *ngIf="puedeTomar && !t.asignado_usuario_id && t.estado !== 'cerrado'"
+                    (click)="tomar(t.id)">
+              <mat-icon>pan_tool_alt</mat-icon>
+            </button>
           </td>
         </ng-container>
         <tr mat-header-row *matHeaderRowDef="columnas"></tr>
@@ -132,7 +183,7 @@
     <ng-template #vacio>
       <div class="empty-state" *ngIf="!loading">
         <mat-icon>support_agent</mat-icon>
-        <p>No hay tickets todavía. Crea el primero.</p>
+        <p>{{ tickets.length ? 'Ningún ticket coincide con los filtros.' : 'No hay tickets todavía.' }}</p>
       </div>
     </ng-template>
   </div>
@@ -152,7 +203,13 @@
             [class.error]="detalle.estado === 'cerrado'">
         {{ detalle.estado.replaceAll('_', ' ') }}
       </span>
-      <span class="stat-chip chip-info">prioridad: {{ detalle.prioridad }}</span>
+      <span class="stat-chip" [class.chip-warning]="detalle.prioridad === 'alta' || detalle.prioridad === 'urgente'"
+            [class.chip-info]="detalle.prioridad === 'baja' || detalle.prioridad === 'media'">
+        prioridad: {{ detalle.prioridad }}
+      </span>
+      <span class="stat-chip" *ngIf="!esCliente" [class.chip-warning]="detalle.sla_vencido" class="stat-chip chip-info">
+        SLA: {{ slaTexto(detalle) }}
+      </span>
       <span class="stat-chip chip-info" *ngIf="detalle.categoria">{{ detalle.categoria }}</span>
       <span class="stat-chip chip-info" *ngIf="detalle.pedido_id">pedido #{{ detalle.pedido_id }}</span>
       <span class="stat-chip chip-info" *ngIf="!esCliente && detalle.cliente">cliente: {{ detalle.cliente }}</span>
@@ -168,9 +225,16 @@
       {{ detalle.descripcion }}
     </p>
 
-    <!-- Controles de gestión (estado + asignación) -->
-    <div class="form-grid" *ngIf="esGestion && estadosSiguientes.length">
-      <mat-form-field appearance="outline">
+    <!-- Controles del agente: tomar / estado / prioridad / asignación -->
+    <div class="form-actions" *ngIf="puedeTomar && !detalle.asignado_usuario_id && detalle.estado !== 'cerrado'"
+         style="margin-bottom: 10px;">
+      <button class="btn-aplicar" (click)="tomar(detalle.id)">
+        <mat-icon>pan_tool_alt</mat-icon> Tomar este ticket
+      </button>
+    </div>
+
+    <div class="form-grid" *ngIf="esStaff && detalle.estado !== 'cerrado'">
+      <mat-form-field appearance="outline" *ngIf="estadosSiguientes.length">
         <mat-label>Cambiar estado a…</mat-label>
         <mat-select [(ngModel)]="estadoSel">
           <mat-option *ngFor="let e of estadosSiguientes" [value]="e">
@@ -178,12 +242,24 @@
           </mat-option>
         </mat-select>
       </mat-form-field>
-      <div class="form-actions" style="align-self: center;">
+      <div class="form-actions" style="align-self: center;" *ngIf="estadosSiguientes.length">
         <button class="btn-aplicar" [disabled]="!estadoSel" (click)="cambiarEstado()">
           <mat-icon>sync_alt</mat-icon> Aplicar estado
         </button>
       </div>
-      <mat-form-field appearance="outline">
+      <mat-form-field appearance="outline" *ngIf="puedeTomar">
+        <mat-label>Prioridad (ajuste manual)</mat-label>
+        <mat-select [(ngModel)]="prioridadSel">
+          <mat-option *ngFor="let p of prioridades" [value]="p">{{ p }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <div class="form-actions" style="align-self: center;" *ngIf="puedeTomar">
+        <button class="btn-limpiar" [disabled]="prioridadSel === detalle.prioridad"
+                (click)="cambiarPrioridad()">
+          <mat-icon>priority_high</mat-icon> Cambiar prioridad
+        </button>
+      </div>
+      <mat-form-field appearance="outline" *ngIf="puedeAsignar">
         <mat-label>Asignar agente</mat-label>
         <mat-select [(ngModel)]="asignarSel">
           <mat-option [value]="null">— Sin asignar —</mat-option>
@@ -192,7 +268,7 @@
           </mat-option>
         </mat-select>
       </mat-form-field>
-      <div class="form-actions" style="align-self: center;">
+      <div class="form-actions" style="align-self: center;" *ngIf="puedeAsignar">
         <button class="btn-limpiar" (click)="asignar()">
           <mat-icon>person_add</mat-icon> Asignar
         </button>
@@ -221,6 +297,9 @@
 
     <!-- Responder -->
     <div *ngIf="detalle.estado !== 'cerrado'; else cerrado">
+      <p *ngIf="esCliente && detalle.estado === 'resuelto'" style="font-size: 12px; color: #ef6c00;">
+        Este ticket está resuelto: si respondes, se reabrirá para el equipo de soporte.
+      </p>
       <mat-form-field appearance="outline" style="width: 100%;">
         <mat-label>Escribe una respuesta…</mat-label>
         <textarea matInput rows="3" [(ngModel)]="nuevoMensaje"></textarea>

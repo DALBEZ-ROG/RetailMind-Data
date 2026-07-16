@@ -4,24 +4,8 @@
     Mi Carrito
   </h2>
 
-  <!-- Checkout exitoso -->
-  <mat-card class="success-card" *ngIf="checkoutExitoso">
-    <mat-card-content>
-      <mat-icon class="success-icon">check_circle</mat-icon>
-      <h3>Compra realizada con exito!</h3>
-      <p>Pedido: <strong>{{ ordenId }}</strong></p>
-      <button mat-raised-button color="primary" (click)="seguirComprando()">
-        <mat-icon>storefront</mat-icon> Seguir comprando
-      </button>
-      <a mat-stroked-button color="primary" routerLink="/operativo/ventas/mis-pedidos"
-         style="margin-left: 8px;">
-        <mat-icon>shopping_basket</mat-icon> Ver mis pedidos
-      </a>
-    </mat-card-content>
-  </mat-card>
-
   <!-- Carrito vacío -->
-  <div class="empty-state" *ngIf="!loading && items.length === 0 && !checkoutExitoso">
+  <div class="empty-state" *ngIf="!loading && items.length === 0">
     <mat-icon>remove_shopping_cart</mat-icon>
     <p>Tu carrito esta vacio</p>
     <button mat-raised-button color="primary" (click)="seguirComprando()">
@@ -67,9 +51,9 @@
         <span class="total-amount">${{ total | number:'1.2-2' }}</span>
       </div>
       <button mat-raised-button color="accent" class="btn-checkout"
-              [disabled]="procesando" (click)="finalizarCompra()">
+              (click)="finalizarCompra()">
         <mat-icon>payment</mat-icon>
-        {{ procesando ? 'Procesando...' : 'Finalizar Compra' }}
+        Proceder al pago
       </button>
     </div>
   </div>

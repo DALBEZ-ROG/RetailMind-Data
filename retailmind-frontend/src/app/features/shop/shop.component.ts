@@ -1,4 +1,6 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Subject } from 'rxjs';
+import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -8,6 +10,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
+import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatBadgeModule } from '@angular/material/badge';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -41,16 +44,17 @@ const CATEGORY_COLORS: Record<number, { bg: string; border: string; icon: string
   standalone: true,
   imports: [
     CommonModule, FormsModule, MatCardModule, MatButtonModule,
-    MatIconModule, MatFormFieldModule, MatInputModule,
+    MatIconModule, MatFormFieldModule, MatInputModule, MatSelectModule,
     MatPaginatorModule, MatSnackBarModule, MatBadgeModule, MatProgressSpinnerModule
   ],
   templateUrl: './shop.component.html',
   styleUrl: './shop.component.scss'
 })
-export class ShopComponent implements OnInit {
+export class ShopComponent implements OnInit, OnDestroy {
 
   productos: any[] = [];
   categorias: any[] = [];
+  marcas: string[] = [];
   totalProductos = 0;
   page = 0;
   size = 12;
@@ -58,7 +62,11 @@ export class ShopComponent implements OnInit {
 
   // Filtros (se aplican en el servidor)
   categoriaSeleccionada: number | null = null;
+  marcaSeleccionada: string | null = null;
   busqueda = '';
+
+  // Búsqueda fluida: se dispara sola tras una pausa de tipeo (server-side)
+  private readonly busqueda$ = new Subject<string>();
 
   // Carrito badge
   carritoCount = 0;
@@ -76,16 +84,24 @@ export class ShopComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    this.busqueda$.pipe(debounceTime(350), distinctUntilChanged())
+      .subscribe(() => this.buscar());
     this.loadProductos();
     this.loadCategorias();
+    this.loadMarcas();
     this.loadCarritoCount();
     this.loadWishlistIds();
+  }
+
+  ngOnDestroy(): void {
+    this.busqueda$.complete();
   }
 
   loadProductos(): void {
     this.loading = true;
     const filters: any = {};
     if (this.categoriaSeleccionada) filters.categoria_id = this.categoriaSeleccionada;
+    if (this.marcaSeleccionada) filters.brand = this.marcaSeleccionada;
     if (this.busqueda.trim()) filters.q = this.busqueda.trim();
 
     this.shopService.getProductos(this.page, this.size, filters).subscribe({
@@ -107,10 +123,20 @@ export class ShopComponent implements OnInit {
     this.loadProductos();
   }
 
+  /** Cada tecla alimenta el Subject; buscar() se dispara tras la pausa. */
+  onBusquedaCambia(): void {
+    this.busqueda$.next(this.busqueda.trim());
+  }
+
   limpiarBusqueda(): void {
     if (!this.busqueda) return;
     this.busqueda = '';
     this.buscar();
+  }
+
+  filtrarMarca(): void {
+    this.page = 0;
+    this.loadProductos();
   }
 
   loadCategorias(): void {
@@ -118,6 +144,17 @@ export class ShopComponent implements OnInit {
       next: (cats) => this.categorias = cats,
       error: () => {}
     });
+  }
+
+  loadMarcas(): void {
+    this.shopService.getMarcas().subscribe({
+      next: (m) => this.marcas = m,
+      error: () => {}
+    });
+  }
+
+  trackByProducto(_i: number, p: any): number {
+    return p.productoId;
   }
 
   loadCarritoCount(): void {

@@ -104,22 +104,28 @@ public class SecurityConfig {
                 // de la BD (grp_admin/gerente/analista/cliente)
                 .requestMatchers(HttpMethod.GET,
                         "/api/soporte/categorias-ref", "/api/soporte/faqs-activas")
-                    .hasAnyAuthority("ADMIN", "GERENTE", "ANALISTA", "CLIENTE")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "ANALISTA", "CLIENTE", "SOPORTE")
                 // Selector "pedido relacionado" del ticket: personal + cliente
                 // (CLIENTE queda aislado a sus pedidos por RLS)
                 .requestMatchers(HttpMethod.GET, "/api/soporte/pedidos-ref")
-                    .hasAnyAuthority("ADMIN", "GERENTE", "CLIENTE")
-                // Estado y asignación de tickets: solo personal de gestión
+                    .hasAnyAuthority("ADMIN", "GERENTE", "CLIENTE", "SOPORTE")
+                // Tomar (auto-asignarse) y cambiar prioridad: agente de soporte
+                // y ADMIN (la prioridad NACE automática según la categoría)
+                .requestMatchers("/api/soporte/tickets/*/tomar",
+                        "/api/soporte/tickets/*/prioridad")
+                    .hasAnyAuthority("ADMIN", "SOPORTE")
+                // Estado y asignación de tickets: gestión + agentes de soporte
                 .requestMatchers(HttpMethod.PATCH,
                         "/api/soporte/tickets/*/estado", "/api/soporte/tickets/*/asignar")
-                    .hasAnyAuthority("ADMIN", "GERENTE")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "SOPORTE")
                 // Tickets: personal ve todos; CLIENTE solo los suyos (RLS pol_cliente_propio
-                // sobre ticket_soporte/mensaje_ticket, script 29)
+                // script 29; grp_soporte con pol_soporte, script 37)
                 .requestMatchers("/api/soporte/tickets", "/api/soporte/tickets/**")
-                    .hasAnyAuthority("ADMIN", "GERENTE", "CLIENTE")
-                // Resto de soporte: lectura ADMIN/GERENTE; gestión de categorías/FAQ solo ADMIN
+                    .hasAnyAuthority("ADMIN", "GERENTE", "CLIENTE", "SOPORTE")
+                // Resto de soporte: lectura ADMIN/GERENTE/SOPORTE; gestión de
+                // categorías/FAQ solo ADMIN
                 .requestMatchers(HttpMethod.GET, "/api/soporte/**")
-                    .hasAnyAuthority("ADMIN", "GERENTE")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "SOPORTE")
                 .requestMatchers("/api/soporte/**").hasAuthority("ADMIN")
                 // Reseñas y preguntas de producto: el CLIENTE crea/vota/reporta;
                 // el listado público por producto y las referencias también son

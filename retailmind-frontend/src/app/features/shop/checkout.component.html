@@ -1,0 +1,208 @@
+<div class="checkout-container">
+  <h2 class="checkout-title">
+    <mat-icon>shopping_cart_checkout</mat-icon>
+    Finalizar compra
+  </h2>
+
+  <!-- Compra confirmada: el pedido nació PAGADO -->
+  <mat-card class="success-card" *ngIf="exito">
+    <mat-card-content>
+      <mat-icon class="success-icon">check_circle</mat-icon>
+      <h3>¡Gracias por tu compra!</h3>
+      <p class="success-orden">Pedido <strong>{{ exito.ordenId }}</strong></p>
+      <div class="success-chips">
+        <span class="chip chip-pagado"><mat-icon>paid</mat-icon> PAGADO</span>
+        <span class="chip">{{ exito.metodoPago }} · {{ exito.referenciaPago }}</span>
+        <span class="chip">Total {{ exito.total | currency:'USD' }}</span>
+      </div>
+      <p class="cupon-info" *ngIf="exito.cuponMensaje">
+        <mat-icon>info</mat-icon> {{ exito.cuponMensaje }}
+      </p>
+      <p class="success-sub">Prepararemos tu pedido y podrás seguir su estado,
+        la guía de envío y la factura en <strong>Mis Pedidos</strong>.</p>
+      <div class="success-actions">
+        <a mat-raised-button color="primary" routerLink="/operativo/ventas/mis-pedidos">
+          <mat-icon>shopping_basket</mat-icon> Ver mis pedidos
+        </a>
+        <button mat-stroked-button color="primary" (click)="seguirComprando()">
+          <mat-icon>storefront</mat-icon> Seguir comprando
+        </button>
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+  <div class="checkout-grid" *ngIf="!exito && !loading && items.length">
+    <div class="checkout-pasos">
+
+      <!-- 1 · Dirección de envío -->
+      <mat-card class="paso-card">
+        <div class="paso-header">
+          <span class="paso-num">1</span>
+          <h3><mat-icon>local_shipping</mat-icon> Dirección de envío</h3>
+        </div>
+        <mat-radio-group class="dir-list" [(ngModel)]="direccionId">
+          <mat-radio-button class="dir-item" *ngFor="let d of direcciones" [value]="d.id">
+            <div class="dir-texto">
+              <strong>{{ d.destinatario }}</strong>
+              <span *ngIf="d.alias" class="dir-alias">{{ d.alias }}</span>
+              <div>{{ d.callePrincipal }}<span *ngIf="d.numero"> {{ d.numero }}</span><span *ngIf="d.calleSecundaria"> y {{ d.calleSecundaria }}</span></div>
+              <div class="dir-sub">{{ d.ciudad }}<span *ngIf="d.telefono"> · Tel. {{ d.telefono }}</span></div>
+            </div>
+          </mat-radio-button>
+        </mat-radio-group>
+        <p class="hint-vacio" *ngIf="!direcciones.length">Aún no tienes direcciones guardadas: agrega una para continuar.</p>
+
+        <button mat-stroked-button color="primary" *ngIf="!mostrarNuevaDireccion"
+                (click)="mostrarNuevaDireccion = true">
+          <mat-icon>add_location_alt</mat-icon> Agregar nueva dirección
+        </button>
+
+        <div class="nueva-dir" *ngIf="mostrarNuevaDireccion">
+          <div class="form-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>Destinatario *</mat-label>
+              <input matInput [(ngModel)]="nuevaDireccion.destinatario">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Calle principal *</mat-label>
+              <input matInput [(ngModel)]="nuevaDireccion.callePrincipal">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Calle secundaria</mat-label>
+              <input matInput [(ngModel)]="nuevaDireccion.calleSecundaria">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Número</mat-label>
+              <input matInput [(ngModel)]="nuevaDireccion.numero">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Ciudad *</mat-label>
+              <mat-select [(ngModel)]="nuevaDireccion.ciudadId">
+                <mat-option *ngFor="let c of ciudades" [value]="c.id">{{ c.nombre }}</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Teléfono</mat-label>
+              <input matInput [(ngModel)]="nuevaDireccion.telefono">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Referencia</mat-label>
+              <input matInput [(ngModel)]="nuevaDireccion.referencia">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Alias (Casa, Oficina…)</mat-label>
+              <input matInput [(ngModel)]="nuevaDireccion.alias">
+            </mat-form-field>
+          </div>
+          <div class="acciones-inline">
+            <button mat-raised-button color="primary" [disabled]="guardandoDireccion"
+                    (click)="guardarDireccion()">
+              <mat-icon>save</mat-icon> {{ guardandoDireccion ? 'Guardando…' : 'Guardar dirección' }}
+            </button>
+            <button mat-button *ngIf="direcciones.length" (click)="mostrarNuevaDireccion = false">Cancelar</button>
+          </div>
+        </div>
+      </mat-card>
+
+      <!-- 2 · Cupón de descuento (fase de descuentos pendiente) -->
+      <mat-card class="paso-card">
+        <div class="paso-header">
+          <span class="paso-num">2</span>
+          <h3><mat-icon>confirmation_number</mat-icon> Cupón de descuento</h3>
+        </div>
+        <div class="cupon-row">
+          <mat-form-field appearance="outline" class="cupon-field">
+            <mat-label>Código de cupón (opcional)</mat-label>
+            <input matInput [(ngModel)]="cupon" (keyup.enter)="aplicarCupon()">
+          </mat-form-field>
+          <button mat-stroked-button color="primary" (click)="aplicarCupon()">Aplicar</button>
+        </div>
+        <p class="cupon-info" *ngIf="cuponInfo"><mat-icon>info</mat-icon> {{ cuponInfo }}</p>
+      </mat-card>
+
+      <!-- 3 · Método de pago (SIMULADO: sin cobro real) -->
+      <mat-card class="paso-card">
+        <div class="paso-header">
+          <span class="paso-num">3</span>
+          <h3><mat-icon>credit_card</mat-icon> Método de pago</h3>
+        </div>
+        <mat-radio-group class="metodo-list" [(ngModel)]="metodoPagoId">
+          <mat-radio-button *ngFor="let m of metodos" [value]="m.id">
+            <mat-icon class="metodo-icon">{{ m.tipo === 'tarjeta' ? 'credit_card' : 'account_balance' }}</mat-icon>
+            {{ m.nombre }}
+          </mat-radio-button>
+        </mat-radio-group>
+
+        <!-- Tarjeta simulada: solo se guardan marca + últimos 4 dígitos -->
+        <div class="tarjeta-form" *ngIf="esTarjeta">
+          <div class="form-grid">
+            <mat-form-field appearance="outline" class="span-2">
+              <mat-label>Número de tarjeta *</mat-label>
+              <input matInput [(ngModel)]="tarjeta.numero" (input)="formatearNumero()"
+                     placeholder="4111 1111 1111 1111" inputmode="numeric" autocomplete="off">
+              <span matSuffix class="marca-chip" *ngIf="marcaTarjeta">{{ marcaTarjeta }}</span>
+              <mat-hint *ngIf="tarjeta.numero && !numeroValido">Debe tener entre 13 y 19 dígitos</mat-hint>
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="span-2">
+              <mat-label>Titular de la tarjeta *</mat-label>
+              <input matInput [(ngModel)]="tarjeta.titular" autocomplete="off">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Vencimiento (MM/AA) *</mat-label>
+              <input matInput [(ngModel)]="tarjeta.vencimiento" (input)="formatearVencimiento()"
+                     placeholder="08/28" inputmode="numeric" autocomplete="off">
+              <mat-hint *ngIf="tarjeta.vencimiento && !vencimientoValido">Formato MM/AA y vigente</mat-hint>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>CVV *</mat-label>
+              <input matInput [(ngModel)]="tarjeta.cvv" type="password" maxlength="4"
+                     inputmode="numeric" autocomplete="off">
+              <mat-hint *ngIf="tarjeta.cvv && !cvvValido">3 o 4 dígitos</mat-hint>
+            </mat-form-field>
+          </div>
+          <p class="pago-nota"><mat-icon>lock</mat-icon>
+            Pago simulado para la demo: no se realiza ningún cobro real y solo
+            guardamos la marca y los últimos 4 dígitos como referencia.</p>
+        </div>
+
+        <div class="tarjeta-form" *ngIf="metodoSeleccionado && !esTarjeta">
+          <mat-form-field appearance="outline" class="span-2" style="width:100%;">
+            <mat-label>Referencia de la transferencia (opcional)</mat-label>
+            <input matInput [(ngModel)]="referenciaTransferencia" placeholder="N.º de comprobante">
+          </mat-form-field>
+          <p class="pago-nota"><mat-icon>lock</mat-icon>
+            Transferencia simulada para la demo: el pago se confirma al instante.</p>
+        </div>
+      </mat-card>
+    </div>
+
+    <!-- Resumen del pedido -->
+    <mat-card class="resumen-card">
+      <h3><mat-icon>receipt_long</mat-icon> Resumen del pedido</h3>
+      <div class="resumen-item" *ngFor="let i of items">
+        <span class="ri-nombre">{{ i.nombre }} <span class="ri-cant">×{{ i.cantidad }}</span></span>
+        <span class="ri-precio">{{ i.precioUnitario * i.cantidad | currency:'USD' }}</span>
+      </div>
+      <mat-divider></mat-divider>
+      <div class="resumen-linea"><span>Subtotal</span><span>{{ subtotal | currency:'USD' }}</span></div>
+      <div class="resumen-linea"><span>IVA (15%)</span><span>{{ impuesto | currency:'USD' }}</span></div>
+      <div class="resumen-linea"><span>Envío</span><span>Gratis</span></div>
+      <div class="resumen-total"><span>Total</span><span>{{ total | currency:'USD' }}</span></div>
+
+      <button mat-raised-button color="accent" class="btn-confirmar"
+              [disabled]="!puedeConfirmar" (click)="confirmar()">
+        <mat-icon>lock</mat-icon>
+        {{ procesando ? 'Procesando pago…' : 'Pagar y confirmar pedido' }}
+      </button>
+      <p class="confirmar-hint" *ngIf="!direccionId">Selecciona una dirección de envío</p>
+      <p class="confirmar-hint" *ngIf="direccionId && esTarjeta && !tarjetaValida">Completa los datos de la tarjeta</p>
+      <button mat-button class="btn-volver" (click)="volverAlCarrito()">
+        <mat-icon>arrow_back</mat-icon> Volver al carrito
+      </button>
+    </mat-card>
+  </div>
+
+  <div class="empty-state" *ngIf="loading">
+    <mat-spinner diameter="42"></mat-spinner>
+  </div>
+</div>

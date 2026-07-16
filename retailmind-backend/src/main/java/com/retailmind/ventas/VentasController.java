@@ -42,11 +42,19 @@ public class VentasController {
         this.pdfService = pdfService;
     }
 
-    // Caso 7: pedidos
+    // Caso 7: pedidos INTERNOS (venta en tienda/telefónica). El canal 'web'
+    // queda reservado al checkout de la tienda online (/api/carrito/checkout),
+    // que crea el pedido ya pagado.
     @PostMapping("/pedidos")
     public ResponseEntity<?> crearPedido(@RequestBody PedidoReq r) {
+        String canal = r.canal() == null || r.canal().isBlank() ? "tienda" : r.canal();
+        if (!List.of("tienda", "telefono").contains(canal)) {
+            throw new IllegalArgumentException("Canal invalido para un pedido interno: "
+                    + "usa 'tienda' o 'telefono' (el canal 'web' es exclusivo del "
+                    + "checkout de la tienda online)");
+        }
         return ResponseEntity.status(HttpStatus.CREATED).body(
-                servicio.crearPedido(r.clienteId(), r.bodegaId(), r.canal(), r.items()));
+                servicio.crearPedido(r.clienteId(), r.bodegaId(), canal, r.items()));
     }
 
     @GetMapping("/pedidos")

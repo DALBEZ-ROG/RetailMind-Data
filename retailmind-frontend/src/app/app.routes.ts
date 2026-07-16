@@ -48,6 +48,12 @@ export const routes: Routes = [
       import('./features/shop/carrito.component').then(m => m.CarritoComponent)
   },
   {
+    path: 'shop/checkout',
+    canActivate: [authGuard, roleGuard(['CLIENTE'])],
+    loadComponent: () =>
+      import('./features/shop/checkout.component').then(m => m.CheckoutComponent)
+  },
+  {
     path: 'wishlist',
     canActivate: [authGuard, roleGuard(['CLIENTE'])],
     loadComponent: () =>
@@ -259,7 +265,7 @@ export const routes: Routes = [
   //    FAQ: gestión ADMIN, lectura para roles con SELECT en la BD)
   {
     path: 'operativo/soporte/tickets',
-    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'CLIENTE'])],
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'CLIENTE', 'SOPORTE'])],
     loadComponent: () =>
       import('./features/operativo/soporte/tickets.component').then(m => m.TicketsComponent)
   },
@@ -271,7 +277,7 @@ export const routes: Routes = [
   },
   {
     path: 'operativo/soporte/faq',
-    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'ANALISTA', 'CLIENTE'])],
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'ANALISTA', 'CLIENTE', 'SOPORTE'])],
     loadComponent: () =>
       import('./features/operativo/soporte/faq.component').then(m => m.FaqComponent)
   },

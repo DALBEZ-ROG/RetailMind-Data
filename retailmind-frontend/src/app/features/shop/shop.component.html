@@ -13,17 +13,27 @@
     </div>
   </div>
 
-  <!-- Búsqueda en servidor (1.200+ productos) -->
-  <mat-form-field appearance="outline" class="search-field" style="width: 100%;">
-    <mat-label>Buscar productos (nombre, marca o SKU)</mat-label>
-    <input matInput [(ngModel)]="busqueda" (keyup.enter)="buscar()" placeholder="Ej. Samsung">
-    <button *ngIf="busqueda" matSuffix mat-icon-button aria-label="Limpiar" (click)="limpiarBusqueda()">
-      <mat-icon>close</mat-icon>
-    </button>
-    <button matSuffix mat-icon-button aria-label="Buscar" (click)="buscar()">
-      <mat-icon>search</mat-icon>
-    </button>
-  </mat-form-field>
+  <!-- Búsqueda y filtros en servidor (1.200+ productos, paginado) -->
+  <div class="search-row" style="display:flex; gap:12px; flex-wrap:wrap; align-items:baseline;">
+    <mat-form-field appearance="outline" class="search-field" style="flex:1; min-width:260px;">
+      <mat-label>Buscar productos (nombre, marca o SKU)</mat-label>
+      <input matInput [(ngModel)]="busqueda" (ngModelChange)="onBusquedaCambia()"
+             (keyup.enter)="buscar()" placeholder="Ej. Samsung">
+      <button *ngIf="busqueda" matSuffix mat-icon-button aria-label="Limpiar" (click)="limpiarBusqueda()">
+        <mat-icon>close</mat-icon>
+      </button>
+      <button matSuffix mat-icon-button aria-label="Buscar" (click)="buscar()">
+        <mat-icon>search</mat-icon>
+      </button>
+    </mat-form-field>
+    <mat-form-field appearance="outline" style="width:220px;">
+      <mat-label>Marca</mat-label>
+      <mat-select [(ngModel)]="marcaSeleccionada" (selectionChange)="filtrarMarca()">
+        <mat-option [value]="null">Todas las marcas</mat-option>
+        <mat-option *ngFor="let m of marcas" [value]="m">{{ m }}</mat-option>
+      </mat-select>
+    </mat-form-field>
+  </div>
 
   <!-- Filtros de categoría -->
   <div class="category-chips-container">
@@ -44,15 +54,15 @@
     </div>
   </div>
 
-  <!-- Loading -->
-  <div class="loading-container" *ngIf="loading">
+  <!-- Loading: solo en la primera carga; al paginar/buscar el grid no parpadea -->
+  <div class="loading-container" *ngIf="loading && !productos.length">
     <mat-spinner diameter="40"></mat-spinner>
   </div>
 
   <!-- Grid de productos -->
-  <div class="products-grid" *ngIf="!loading">
+  <div class="products-grid" [style.opacity]="loading ? 0.55 : 1">
     <mat-card class="product-card"
-              *ngFor="let p of productos"
+              *ngFor="let p of productos; trackBy: trackByProducto"
               [class.categoria-activa]="categoriaSeleccionada && p.categoriaId === categoriaSeleccionada"
               [class.categoria-inactiva]="categoriaSeleccionada && p.categoriaId !== categoriaSeleccionada"
               [ngStyle]="getCardStyle(p)"

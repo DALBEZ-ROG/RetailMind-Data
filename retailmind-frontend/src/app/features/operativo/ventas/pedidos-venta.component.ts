@@ -69,7 +69,7 @@ export class PedidosVentaComponent implements OnInit {
   montoCobro: number | null = null;
   referenciaCobro = '';
 
-  columnas = ['numero', 'cliente', 'estado', 'fecha', 'total', 'acciones'];
+  columnas = ['numero', 'cliente', 'origen', 'estado', 'fecha', 'total', 'acciones'];
 
   constructor(private ventas: VentasService, private referencias: ReferenciasService,
               private nav: NavPermissionsService, private auth: AuthService,
@@ -86,8 +86,11 @@ export class PedidosVentaComponent implements OnInit {
   get puedeEntregar(): boolean { return this.rol === 'ADMIN'; }
 
   // ── Estado del pedido seleccionado → qué acción sigue ───────────────────
+  // Un pedido ONLINE (canal web) se paga en el checkout de la tienda y nace
+  // pagado: nunca se le "registra pago" manualmente (el backend lo refuerza).
+  get esOnline(): boolean { return this.detallePedido?.canal === 'web'; }
   get esCobrable(): boolean {
-    return !!this.detallePedido
+    return !!this.detallePedido && !this.esOnline
       && ['pendiente', 'confirmado'].includes(this.detallePedido.estado);
   }
   get esFacturable(): boolean {

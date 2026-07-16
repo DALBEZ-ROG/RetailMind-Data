@@ -28,9 +28,9 @@
           <mat-label>Canal</mat-label>
           <mat-select [(ngModel)]="canal">
             <mat-option value="tienda">Tienda</mat-option>
-            <mat-option value="web">Web</mat-option>
             <mat-option value="telefono">Teléfono</mat-option>
           </mat-select>
+          <mat-hint>Los pedidos web los crea el cliente en el checkout (ya pagados)</mat-hint>
         </mat-form-field>
       </div>
 
@@ -78,6 +78,16 @@
         <ng-container matColumnDef="cliente">
           <th mat-header-cell *matHeaderCellDef>Cliente</th>
           <td mat-cell *matCellDef="let p">{{ p.cliente }}</td>
+        </ng-container>
+        <ng-container matColumnDef="origen">
+          <th mat-header-cell *matHeaderCellDef>Origen</th>
+          <td mat-cell *matCellDef="let p">
+            <span class="stat-chip" [class.chip-info]="p.canal === 'web'"
+                  matTooltip="{{ p.canal === 'web' ? 'Compra online: pagada en el checkout' : 'Pedido interno (canal ' + p.canal + '): se cobra en el back-office' }}">
+              <mat-icon style="font-size:14px;height:14px;width:14px;">{{ p.canal === 'web' ? 'language' : 'storefront' }}</mat-icon>
+              {{ p.canal === 'web' ? 'Online' : 'Interno' }}
+            </span>
+          </td>
         </ng-container>
         <ng-container matColumnDef="estado">
           <th mat-header-cell *matHeaderCellDef>Estado</th>
@@ -127,6 +137,10 @@
             [class.warn]="['despachado','en_preparacion'].includes(detallePedido.estado)"
             [class.error]="['devuelto','cancelado'].includes(detallePedido.estado)">
         Estado: {{ detallePedido.estado }}
+      </span>
+      <span class="stat-chip" [class.chip-info]="esOnline">
+        <mat-icon style="font-size:14px;height:14px;width:14px;">{{ esOnline ? 'language' : 'storefront' }}</mat-icon>
+        {{ esOnline ? 'Compra online — pagada en el checkout' : 'Pedido interno (' + detallePedido.canal + ')' }}
       </span>
       <span class="stat-chip chip-info" *ngIf="detallePedido.saldo_pendiente != null">
         Pagado: {{ detallePedido.total_pagado | currency:'USD' }} ·

@@ -27,7 +27,7 @@ export type PermisoNav =
 export const ROLES_POR_PERMISO: Record<PermisoNav, readonly string[]> = {
   admin:            ['ADMIN'],
   cliente:          ['CLIENTE'],
-  autenticado:      ['ADMIN', 'GERENTE', 'VENDEDOR', 'COMPRAS', 'BODEGA', 'DESPACHO', 'CLIENTE', 'ANALISTA'],
+  autenticado:      ['ADMIN', 'GERENTE', 'VENDEDOR', 'COMPRAS', 'BODEGA', 'DESPACHO', 'CLIENTE', 'ANALISTA', 'SOPORTE'],
   catalogo:         ['ADMIN'],
   compras:          ['ADMIN', 'GERENTE', 'COMPRAS', 'BODEGA'],
   inventario:       ['ADMIN', 'GERENTE', 'BODEGA'],
@@ -37,9 +37,10 @@ export const ROLES_POR_PERMISO: Record<PermisoNav, readonly string[]> = {
   logistica:        ['ADMIN', 'GERENTE', 'VENDEDOR', 'DESPACHO'],
   despachar:        ['ADMIN', 'GERENTE', 'DESPACHO'],
   marketing:        ['ADMIN', 'GERENTE'],
-  tickets:          ['ADMIN', 'GERENTE', 'CLIENTE'],
+  // SOPORTE (9º rol, script 37): bandeja de tickets + FAQ; nada más
+  tickets:          ['ADMIN', 'GERENTE', 'CLIENTE', 'SOPORTE'],
   categoriasTicket: ['ADMIN'],
-  faq:              ['ADMIN', 'GERENTE', 'ANALISTA', 'CLIENTE'],
+  faq:              ['ADMIN', 'GERENTE', 'ANALISTA', 'CLIENTE', 'SOPORTE'],
   resenas:          ['ADMIN', 'GERENTE', 'CLIENTE']
 };
 

@@ -10,6 +10,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { SoporteService } from '../../../core/services/soporte.service';
 import { ReferenciasService } from '../../../core/services/referencias.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -28,12 +29,20 @@ const TRANSICIONES: Record<string, string[]> = {
   cerrado: []
 };
 
+/**
+ * Tickets de soporte.
+ *  - CLIENTE: crea (categoría + descripción, SIN prioridad: es automática),
+ *    ve los suyos (RLS) y conversa con "Equipo de soporte".
+ *  - SOPORTE (9º rol): bandeja con SLA y filtros; toma tickets, responde,
+ *    cambia estado y prioridad.
+ *  - ADMIN/GERENTE: además crean en nombre del cliente y asignan agentes.
+ */
 @Component({
   selector: 'app-tickets',
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatCheckboxModule,
-    MatSnackBarModule, MatTooltipModule],
+    MatSnackBarModule, MatTooltipModule, MatButtonToggleModule],
   templateUrl: './tickets.component.html',
   styleUrl: '../operativo-shared.scss'
 })
@@ -50,6 +59,7 @@ export class TicketsComponent implements OnInit {
   esInterno = false;
   estadoSel = '';
   asignarSel: number | null = null;
+  prioridadSel = '';
 
   categoriasRef: CategoriaTicketRef[] = [];
   clientesRef: ClienteRef[] = [];
@@ -57,22 +67,51 @@ export class TicketsComponent implements OnInit {
   pedidosRef: PedidoSoporteRef[] = [];
 
   prioridades = ['baja', 'media', 'alta', 'urgente'];
+  estadosFiltro = ['abierto', 'en_proceso', 'esperando_cliente', 'resuelto', 'cerrado'];
+
+  // Filtros de la bandeja (solo personal)
+  filtroBandeja: 'todos' | 'sin_asignar' | 'mios' = 'todos';
+  filtroEstado = '';
+  filtroCategoria = '';
+  filtroPrioridad = '';
 
   constructor(private soporte: SoporteService, private referencias: ReferenciasService,
               private auth: AuthService, private snackBar: MatSnackBar) {}
 
   get esCliente(): boolean { return this.auth.hasRole('CLIENTE'); }
+  get esSoporte(): boolean { return this.auth.hasRole('SOPORTE'); }
   get esGestion(): boolean { return this.auth.hasRole('ADMIN') || this.auth.hasRole('GERENTE'); }
+  /** Puede atender: responder, cambiar estado. */
+  get esStaff(): boolean { return this.esGestion || this.esSoporte; }
+  /** Tomar ticket / cambiar prioridad: agente de soporte y admin. */
+  get puedeTomar(): boolean { return this.esSoporte || this.auth.hasRole('ADMIN'); }
+  /** Asignar a terceros: gestión (el agente se auto-asigna con "tomar"). */
+  get puedeAsignar(): boolean { return this.esGestion; }
 
   get columnas(): string[] {
     return this.esCliente
-      ? ['numero', 'categoria', 'prioridad', 'estado', 'mensajes', 'fecha', 'acciones']
-      : ['numero', 'cliente', 'categoria', 'prioridad', 'estado', 'asignado', 'mensajes', 'fecha', 'acciones'];
+      ? ['numero', 'categoria', 'estado', 'mensajes', 'fecha', 'acciones']
+      : ['numero', 'cliente', 'categoria', 'prioridad', 'sla', 'estado', 'asignado', 'acciones'];
   }
 
   /** Estados a los que puede pasar el ticket abierto en el detalle. */
   get estadosSiguientes(): string[] {
     return this.detalle ? (TRANSICIONES[this.detalle.estado] || []) : [];
+  }
+
+  /** Bandeja con los filtros aplicados (client-side sobre la lista cargada). */
+  get ticketsFiltrados(): TicketRow[] {
+    return this.tickets.filter(t =>
+      (this.filtroBandeja === 'todos'
+        || (this.filtroBandeja === 'sin_asignar' && !t.asignado_usuario_id)
+        || (this.filtroBandeja === 'mios' && t.asignado_a_mi))
+      && (!this.filtroEstado || t.estado === this.filtroEstado)
+      && (!this.filtroCategoria || t.categoria === this.filtroCategoria)
+      && (!this.filtroPrioridad || t.prioridad === this.filtroPrioridad));
+  }
+
+  get categoriasEnBandeja(): string[] {
+    return [...new Set(this.tickets.map(t => t.categoria).filter((c): c is string => !!c))].sort();
   }
 
   ngOnInit(): void {
@@ -85,8 +124,9 @@ export class TicketsComponent implements OnInit {
   }
 
   private formVacio() {
+    // Sin prioridad: la asigna el backend según la categoría elegida
     return { clienteId: null as number | null, categoriaId: null as number | null,
-             pedidoId: null as number | null, asunto: '', descripcion: '', prioridad: 'media' };
+             pedidoId: null as number | null, asunto: '', descripcion: '' };
   }
 
   cargar(): void {
@@ -129,8 +169,8 @@ export class TicketsComponent implements OnInit {
     }
     this.soporte.crearTicket(this.form).subscribe({
       next: r => {
-        this.snackBar.open(`Ticket ${r.numero} creado`, 'OK',
-          { duration: 2500, panelClass: ['snack-success'] });
+        this.snackBar.open(`Ticket ${r.numero} creado (prioridad ${(r as any).prioridad})`,
+          'OK', { duration: 3000, panelClass: ['snack-success'] });
         this.showForm = false;
         this.cargar();
         this.ver(r.id);
@@ -146,6 +186,7 @@ export class TicketsComponent implements OnInit {
         this.detalle = t;
         this.estadoSel = '';
         this.asignarSel = t.asignado_usuario_id ?? null;
+        this.prioridadSel = t.prioridad;
         this.nuevoMensaje = '';
         this.esInterno = false;
       },
@@ -172,6 +213,19 @@ export class TicketsComponent implements OnInit {
     });
   }
 
+  tomar(id: number): void {
+    this.soporte.tomar(id).subscribe({
+      next: r => {
+        this.snackBar.open('Ticket tomado: quedó asignado a ti (' + r.estado + ')',
+          'OK', { duration: 2500, panelClass: ['snack-success'] });
+        if (this.detalle?.id === id) this.ver(id);
+        this.cargar();
+      },
+      error: e => this.snackBar.open(mensajeError(e, 'No se pudo tomar el ticket'),
+        'Cerrar', { duration: 4000 })
+    });
+  }
+
   cambiarEstado(): void {
     if (!this.detalle || !this.estadoSel) return;
     this.soporte.cambiarEstado(this.detalle.id, this.estadoSel).subscribe({
@@ -181,6 +235,19 @@ export class TicketsComponent implements OnInit {
         this.cargar();
       },
       error: e => this.snackBar.open(mensajeError(e, 'No se pudo cambiar el estado'),
+        'Cerrar', { duration: 4000 })
+    });
+  }
+
+  cambiarPrioridad(): void {
+    if (!this.detalle || !this.prioridadSel || this.prioridadSel === this.detalle.prioridad) return;
+    this.soporte.cambiarPrioridad(this.detalle.id, this.prioridadSel).subscribe({
+      next: () => {
+        this.snackBar.open('Prioridad actualizada a ' + this.prioridadSel, 'OK', { duration: 2000 });
+        this.ver(this.detalle!.id);
+        this.cargar();
+      },
+      error: e => this.snackBar.open(mensajeError(e, 'No se pudo cambiar la prioridad'),
         'Cerrar', { duration: 4000 })
     });
   }
@@ -203,5 +270,17 @@ export class TicketsComponent implements OnInit {
     if (estado === 'cerrado') return 'error';
     if (estado === 'resuelto') return 'ok';
     return '';
+  }
+
+  /** Texto del SLA: "vence en 3 h" / "vence en 25 min" / "VENCIDO" / "—". */
+  slaTexto(t: { sla_vence?: string; sla_vencido?: boolean; estado: string }): string {
+    if (['resuelto', 'cerrado'].includes(t.estado) || !t.sla_vence) return '—';
+    if (t.sla_vencido) return 'VENCIDO';
+    const min = Math.round((new Date(t.sla_vence).getTime() - Date.now()) / 60000);
+    if (min >= 60) {
+      const h = Math.floor(min / 60);
+      return h >= 48 ? `vence en ${Math.floor(h / 24)} d` : `vence en ${h} h`;
+    }
+    return `vence en ${Math.max(min, 1)} min`;
   }
 }

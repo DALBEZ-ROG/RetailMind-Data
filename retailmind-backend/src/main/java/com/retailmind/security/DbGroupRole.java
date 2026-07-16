@@ -18,7 +18,8 @@ public enum DbGroupRole {
     BODEGA("grp_bodega"),
     DESPACHO("grp_despacho"),
     CLIENTE("grp_cliente"),
-    ANALISTA("grp_analista");
+    ANALISTA("grp_analista"),
+    SOPORTE("grp_soporte");
 
     private final String pgRole;
 

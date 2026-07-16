@@ -27,11 +27,14 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/soporte")
 public class SoporteController {
 
-    public record CategoriaReq(String nombre, String descripcion) {}
+    public record CategoriaReq(String nombre, String descripcion, String prioridadDefecto) {}
+    // Sin prioridad: es AUTOMÁTICA por categoría. Si un cliente la manda por
+    // API, Jackson la descarta (campo inexistente) y el backend no la mira.
     public record TicketReq(Long clienteId, Long categoriaId, Long pedidoId,
-                            String asunto, String descripcion, String prioridad) {}
+                            String asunto, String descripcion) {}
     public record MensajeReq(String mensaje, Boolean esInterno) {}
     public record EstadoReq(String estado) {}
+    public record PrioridadReq(String prioridad) {}
     public record AsignarReq(Long usuarioId) {}
     public record FaqReq(Long categoriaId, String pregunta, String respuesta, Integer orden) {}
     public record ActivoReq(boolean activo) {}
@@ -52,13 +55,13 @@ public class SoporteController {
 
     @PostMapping("/categorias")
     public ResponseEntity<?> crearCategoria(@RequestBody CategoriaReq r) {
-        long id = servicio.crearCategoria(r.nombre(), r.descripcion());
+        long id = servicio.crearCategoria(r.nombre(), r.descripcion(), r.prioridadDefecto());
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("id", id));
     }
 
     @PutMapping("/categorias/{id}")
     public ResponseEntity<?> editarCategoria(@PathVariable long id, @RequestBody CategoriaReq r) {
-        servicio.editarCategoria(id, r.nombre(), r.descripcion());
+        servicio.editarCategoria(id, r.nombre(), r.descripcion(), r.prioridadDefecto());
         return ResponseEntity.ok(Map.of("success", true));
     }
 
@@ -80,8 +83,22 @@ public class SoporteController {
     @PostMapping("/tickets")
     public ResponseEntity<?> crearTicket(@RequestBody TicketReq r) {
         Map<String, Object> creado = servicio.crearTicket(r.clienteId(), r.categoriaId(),
-                r.pedidoId(), r.asunto(), r.descripcion(), r.prioridad());
+                r.pedidoId(), r.asunto(), r.descripcion());
         return ResponseEntity.status(HttpStatus.CREATED).body(creado);
+    }
+
+    /** El agente toma el ticket (auto-asignación). ADMIN/SOPORTE. */
+    @PostMapping("/tickets/{id}/tomar")
+    public Map<String, Object> tomar(@PathVariable long id) {
+        return servicio.tomarTicket(id);
+    }
+
+    /** Ajuste manual de prioridad (nace automática). ADMIN/SOPORTE. */
+    @PatchMapping("/tickets/{id}/prioridad")
+    public ResponseEntity<?> cambiarPrioridad(@PathVariable long id,
+                                              @RequestBody PrioridadReq r) {
+        servicio.cambiarPrioridad(id, r.prioridad());
+        return ResponseEntity.ok(Map.of("success", true));
     }
 
     @PostMapping("/tickets/{id}/mensajes")

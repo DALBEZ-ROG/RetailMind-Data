@@ -29,10 +29,13 @@ desactualizado: ignóralo.
 
 ## Seguridad a nivel de BD (lo más importante)
 
-- 8 roles de grupo en PostgreSQL: `grp_administrador, grp_gerente, grp_vendedor, grp_compras,
-  grp_bodega, grp_despacho, grp_cliente, grp_analista` — con matriz de privilegios GRANT, **RLS**
-  (cliente aislado vía `app.cliente_id`) y **restricción por horario** (`grupo_horario` +
-  `esta_en_horario()` + triggers). Admin exento de horario.
+- 9 roles de grupo en PostgreSQL: `grp_administrador, grp_gerente, grp_vendedor, grp_compras,
+  grp_bodega, grp_despacho, grp_cliente, grp_analista, grp_soporte` — con matriz de privilegios
+  GRANT, **RLS** (cliente aislado vía `app.cliente_id`) y **restricción por horario**
+  (`grupo_horario` + `esta_en_horario()` + triggers). Admin exento de horario; soporte 24/7.
+  OJO al crear un rol nuevo: además de los GRANTs necesita `GRANT USAGE ON SCHEMA public`
+  (el script 19 lo revocó a PUBLIC) y política RLS propia en cada tabla con RLS (las
+  pol_horario enumeran los grupos). Patrón completo en `37_rol_soporte.sql`.
 - La app conecta como `retailmind_app` (LOGIN **NOINHERIT**, sin privilegios de negocio) y asume
   el rol del usuario **por transacción** con `SET LOCAL ROLE` (aspecto
   `security/PgSessionRoleAspect`, excluye `analytics/`).
@@ -90,16 +93,33 @@ factura, sin recibir completo no se factura, sin factura no hay CxP ni pago); in
 PAGO del cliente [tabla pago+transaccion_pago, abonos parciales]→pagado→factura→despacho con guía→
 entregado→devolución solo tras entrega) con PDF, listado de facturas de venta con búsqueda/
 paginación, timeline (historial_estado_pedido) y acciones encadenadas en el detalle del pedido;
-el checkout del cliente entra al MISMO flujo (el back-office lo cobra/factura/despacha) y el
-cliente ve estado/guía/seguimiento/factura PDF en Mis Pedidos (RLS, script 35);
+el checkout del cliente entra al MISMO flujo y el cliente ve estado/guía/seguimiento/factura PDF
+en Mis Pedidos (RLS, script 35); **checkout ONLINE completo tipo Amazon (2026-07-15, script 36)**:
+`/shop/checkout` con dirección de envío (o alta inline), campo de cupón (solo UI; la validación
+llega con la fase de descuentos — enganche en `CarritoService.checkout`), método de pago
+tarjeta/transferencia SIMULADO (validación de formato + Luhn + MM/AA + CVV; se persiste SOLO
+marca + últimos 4 en `pago.referencia_externa` y `transaccion_pago.respuesta_pasarela`, NUNCA
+PAN/CVV) — el pedido online nace **PAGADO** en una sola transacción (`pagarCheckoutOnline`).
+`pedido.canal` discrimina origen: 'web' = online (el back-office NO muestra "registrar pago";
+`registrarPago` lo rechaza con 409) vs 'tienda'/'telefono' = interno (cobro manual intacto;
+POST /api/ventas/pedidos rechaza canal 'web');
 horarios de acceso; marketing (cupones, promociones+productos, campañas, banners, newsletter —
-solo gestión); tienda online 100% PostgreSQL (catálogo real con búsqueda/paginación, carrito,
+solo gestión); tienda online 100% PostgreSQL (catálogo real con búsqueda con debounce, filtro por
+marca/categoría y paginación server-side, carrito,
 wishlist, checkout → pedido del ciclo de venta, perfil + CRUD de direcciones, un solo
 "Mis Pedidos" en `/operativo/ventas/mis-pedidos`; recomendaciones con señal ClickHouse y
 productos PG, degradan a destacados); analítica
-ClickHouse (dashboard, funnel, sesiones, región/dispositivo/tráfico, reportes); soporte (tickets,
-categorías, FAQ) con RLS de cliente; notas de pedido (`nota_pedido`, bitácora con nota interna vs.
-visible al cliente); anulación de ajuste de inventario por contramovimiento de kardex.
+ClickHouse (dashboard, funnel, sesiones, región/dispositivo/tráfico, reportes); **soporte
+profesional con rol SOPORTE (2026-07-15, script 37)**: usuario `soporte@retailmind.com` /
+`Retail2026!`, bandeja con filtros (sin asignar/míos, estado, categoría, prioridad), 7 categorías
+reales con `prioridad_defecto` → prioridad AUTOMÁTICA al crear (el cliente no la elige;
+solo SOPORTE/ADMIN la cambia con PATCH /prioridad), número `TICK-AAAA-NNNN`, SLA calculado
+(urgente 2h/alta 4h/media 24h/baja 72h, indicador vence en/VENCIDO), tomar ticket
+(auto-asignación, abierto→en_proceso), transiciones con guardias, reapertura si el cliente
+responde un 'resuelto' (grant de columna UPDATE(estado) a grp_cliente), RLS de cliente y
+"Equipo de soporte" como autor anónimo; notas de pedido (`nota_pedido`, bitácora con nota
+interna vs. visible al cliente); anulación de ajuste de inventario por contramovimiento de
+kardex. La deuda técnica acumulada vive en `DEUDA_TECNICA.md` (raíz).
 
 **Pendiente**: aplicación real de descuentos (cupones/promociones a pedidos, alimenta `uso_cupon`);
 módulo de reseñas; orquestación ETL con Airflow.

@@ -6,6 +6,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { SoporteService } from '../../../core/services/soporte.service';
@@ -16,7 +17,7 @@ import { CategoriaTicketRow } from '../../../core/models/operativo.model';
   selector: 'app-categorias-ticket',
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
-    MatFormFieldModule, MatInputModule, MatSnackBarModule, MatTooltipModule],
+    MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule, MatTooltipModule],
   templateUrl: './categorias-ticket.component.html',
   styleUrl: '../operativo-shared.scss'
 })
@@ -29,14 +30,15 @@ export class CategoriasTicketComponent implements OnInit {
   editandoId: number | null = null;
   form = this.formVacio();
 
-  columnas = ['nombre', 'uso', 'activo', 'acciones'];
+  columnas = ['nombre', 'prioridad', 'uso', 'activo', 'acciones'];
+  prioridades = ['baja', 'media', 'alta', 'urgente'];
 
   constructor(private soporte: SoporteService, private snackBar: MatSnackBar) {}
 
   ngOnInit(): void { this.cargar(); }
 
   private formVacio() {
-    return { nombre: '', descripcion: '' };
+    return { nombre: '', descripcion: '', prioridadDefecto: 'media' };
   }
 
   cargar(): void {
@@ -55,7 +57,8 @@ export class CategoriasTicketComponent implements OnInit {
 
   editar(c: CategoriaTicketRow): void {
     this.editandoId = c.id;
-    this.form = { nombre: c.nombre, descripcion: c.descripcion || '' };
+    this.form = { nombre: c.nombre, descripcion: c.descripcion || '',
+                  prioridadDefecto: c.prioridad_defecto || 'media' };
     this.showForm = true;
   }
 

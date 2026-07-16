@@ -62,8 +62,19 @@ public class CarritoController {
         return Map.of("success", true, "mensaje", "Producto eliminado del carrito");
     }
 
+    /** Métodos de pago que ofrece el checkout online (pago simulado). */
+    @GetMapping("/checkout/metodos")
+    public List<Map<String, Object>> metodosCheckout() {
+        return service.metodosCheckout();
+    }
+
+    /**
+     * Checkout online completo: dirección + método de pago (tarjeta simulada
+     * o transferencia) + cupón (preparado; se valida en la fase de
+     * descuentos). El pedido nace PAGADO.
+     */
     @PostMapping("/checkout")
-    public ResponseEntity<?> checkout() {
-        return ResponseEntity.status(HttpStatus.CREATED).body(service.checkout());
+    public ResponseEntity<?> checkout(@RequestBody CarritoService.CheckoutReq req) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.checkout(req));
     }
 }
