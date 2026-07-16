@@ -146,13 +146,40 @@ export interface EnvioDetalle {
   detalles: { cantidad: number; sku: string; nombre_producto: string }[];
 }
 export interface SeguimientoRow { estado: string; descripcion: string; ubicacion: string; fecha_evento: string; }
+// ── Devoluciones RMA / logística inversa (script 38) ─────────────────────
 export interface ItemDevolucionReq {
-  pedidoDetalleId: number; cantidad: number; estadoProducto?: string; accion?: string;
+  pedidoDetalleId: number; cantidad: number; estadoProducto?: string;
 }
-export interface DevolucionDetalle {
+export interface DevolucionRow {
   id: number; numero: string; estado: string; monto_total: number;
-  descripcion: string; motivo: string; numero_pedido: string;
-  detalles: { cantidad: number; estado_producto: string; accion: string; sku: string; nombre_producto: string }[];
+  monto_reembolsado: number | null; guia_retorno: string | null;
+  fecha_creacion: string; ticket_soporte_id: number | null;
+  motivo: string; numero_pedido: string; cliente?: string;
+  transportista?: string | null;
+}
+export interface DevolucionItemRma {
+  id: number; cantidad: number; estado_producto: string; accion: string;
+  resultado_inspeccion: string | null; nota_inspeccion: string | null;
+  sku: string; nombre_producto: string; precio_unitario: number;
+}
+export interface HistorialDevolucionRow {
+  estado: string; comentario: string; fecha_creacion: string; autor: string;
+}
+export interface DevolucionRma extends DevolucionRow {
+  descripcion: string | null; metodo_reembolso: string | null;
+  fecha_reembolso: string | null; motivo_rechazo: string | null;
+  pedido_id: number; cliente_email?: string; bodega?: string | null;
+  bodega_direccion?: string | null; ticket_numero?: string | null;
+  detalles: DevolucionItemRma[]; historial: HistorialDevolucionRow[];
+}
+export interface ItemElegibleDevolucion {
+  pedido_detalle_id: number; sku: string; nombre_producto: string;
+  comprada: number; devuelta: number; disponible: number; precio_unitario: number;
+}
+export interface ElegibilidadDevolucion {
+  pedido_id: number; numero_pedido: string; estado_pedido: string;
+  fecha_entrega: string | null; plazo_dias: number; dias_restantes: number;
+  elegible: boolean; items: ItemElegibleDevolucion[];
 }
 
 // ── Horarios de acceso ───────────────────────────────────────────────────

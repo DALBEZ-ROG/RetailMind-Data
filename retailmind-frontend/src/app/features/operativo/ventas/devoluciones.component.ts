@@ -8,123 +8,185 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { VentasService } from '../../../core/services/ventas.service';
-import { ReferenciasService } from '../../../core/services/referencias.service';
-import { NavPermissionsService } from '../../../core/navigation/nav-permissions.service';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { Observable } from 'rxjs';
+import { DevolucionesService } from '../../../core/services/devoluciones.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { mensajeError } from '../../../core/services/api-error.util';
 import {
-  PedidoVentaRow, PedidoVentaDetalle, BodegaRef, CatalogoRef,
-  DevolucionDetalle, StockRow
+  CatalogoRef, DevolucionRow, DevolucionRma
 } from '../../../core/models/operativo.model';
 
-interface LineaDevolucion {
-  detalleId: number; sku: string; producto: string;
-  compradas: number; devolver: number; estadoProducto: string; accion: string;
-}
-
+/**
+ * Tablero RMA / logística inversa. Una sola pantalla para todo el pipeline;
+ * cada rol ve SOLO sus acciones (el backend + la BD son la fuente de verdad):
+ *   SOPORTE  revisar / aprobar (guía de retorno) / rechazar / cerrar
+ *   DESPACHO en tránsito / recibida
+ *   BODEGA   recibida / inspección por ítem (único reingreso de stock)
+ *   GERENTE  reembolso
+ *   ADMIN    todas · VENDEDOR solo consulta
+ */
 @Component({
   selector: 'app-devoluciones',
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
-    MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule],
+    MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule, MatTooltipModule],
   templateUrl: './devoluciones.component.html',
   styleUrl: '../operativo-shared.scss'
 })
 export class DevolucionesComponent implements OnInit {
 
-  pedidos: PedidoVentaRow[] = [];
-  bodegas: BodegaRef[] = [];
-  motivos: CatalogoRef[] = [];
+  readonly estados = ['solicitada', 'en_revision', 'aprobada', 'rechazada', 'en_transito',
+    'recibida', 'inspeccionada', 'reembolsada', 'cerrada'];
+  readonly metodosReembolso = ['transferencia', 'tarjeta', 'credito_tienda', 'efectivo'];
 
-  pedidoId: number | null = null;
-  pedido: PedidoVentaDetalle | null = null;
-  lineas: LineaDevolucion[] = [];
-
-  motivoCodigo: string | null = null;
-  bodegaId: number | null = null;
-  descripcion = '';
-
-  devolucion: DevolucionDetalle | null = null;
-  stockDespues: StockRow[] = [];
+  devoluciones: DevolucionRow[] = [];
+  filtroEstado: string | null = null;
+  detalle: DevolucionRma | null = null;
+  transportistas: CatalogoRef[] = [];
+  loading = true;
   procesando = false;
 
-  constructor(private ventas: VentasService, private referencias: ReferenciasService,
-              private nav: NavPermissionsService, private snackBar: MatSnackBar) {}
+  // Formularios de las transiciones
+  transportistaId: number | null = null;
+  motivoRechazo = '';
+  observacion = '';
+  inspeccion: Record<number, { resultado: string | null; nota: string }> = {};
+  metodoReembolso: string | null = null;
+  referenciaReembolso = '';
+
+  columnas = ['numero', 'pedido', 'cliente', 'motivo', 'monto', 'estado', 'fecha', 'acciones'];
+
+  constructor(private rma: DevolucionesService, private auth: AuthService,
+              private snackBar: MatSnackBar) {}
+
+  // Acciones visibles por rol (espeja SecurityConfig; el backend decide)
+  get esAdmin(): boolean    { return this.auth.hasRole('ADMIN'); }
+  get esSoporte(): boolean  { return this.esAdmin || this.auth.hasRole('SOPORTE'); }
+  get esDespacho(): boolean { return this.esAdmin || this.auth.hasRole('DESPACHO'); }
+  get esBodega(): boolean   { return this.esAdmin || this.auth.hasRole('BODEGA'); }
+  get esGerente(): boolean  { return this.esAdmin || this.auth.hasRole('GERENTE'); }
 
   ngOnInit(): void {
-    // Devolvibles: entregados (o con devolución parcial previa) — compuerta del backend
-    this.ventas.pedidos().subscribe(p =>
-      this.pedidos = p.filter(x => ['entregado', 'devuelto'].includes(x.estado)));
-    // VENDEDOR/DESPACHO no tienen SELECT sobre bodega ni motivo_devolucion en
-    // la BD: no se disparan esas peticiones (evita 403 en consola).
-    if (this.nav.canDato('refBodegas')) {
-      this.referencias.bodegas().subscribe(b => this.bodegas = b);
-    }
-    if (this.nav.canDato('refMotivosDevolucion')) {
-      this.referencias.motivosDevolucion().subscribe(m => this.motivos = m);
+    this.cargar();
+    if (this.esSoporte) {
+      this.rma.transportistas().subscribe(t => this.transportistas = t);
     }
   }
 
-  cargarPedido(): void {
-    if (!this.pedidoId) return;
-    this.devolucion = null;
-    this.stockDespues = [];
-    this.ventas.pedido(this.pedidoId).subscribe({
-      next: p => {
-        this.pedido = p;
-        this.lineas = p.detalles.map(d => ({
-          detalleId: d.id, sku: d.sku, producto: d.nombre_producto,
-          compradas: d.cantidad, devolver: 0, estadoProducto: 'nuevo', accion: 'reembolso'
-        }));
-      },
-      error: () => this.snackBar.open('No se pudo cargar el pedido', 'Cerrar', { duration: 3000 })
-    });
-  }
-
-  procesar(): void {
-    if (!this.pedido || !this.motivoCodigo || !this.bodegaId) {
-      this.snackBar.open('Pedido, motivo y bodega de reingreso son requeridos', 'Cerrar', { duration: 3500 });
-      return;
-    }
-    const items = this.lineas
-      .filter(l => l.devolver > 0)
-      .map(l => ({
-        pedidoDetalleId: l.detalleId, cantidad: l.devolver,
-        estadoProducto: l.estadoProducto, accion: l.accion
-      }));
-    if (!items.length) {
-      this.snackBar.open('Indica al menos una cantidad a devolver mayor que 0', 'Cerrar', { duration: 3500 });
-      return;
-    }
-    const excedida = this.lineas.find(l => l.devolver > l.compradas);
-    if (excedida) {
-      this.snackBar.open(`No puedes devolver ${excedida.devolver} de ${excedida.sku}: solo se compraron ${excedida.compradas}`, 'Cerrar', { duration: 4500 });
-      return;
-    }
-    this.procesando = true;
-    this.ventas.procesarDevolucion(this.pedido.id, {
-      motivoCodigo: this.motivoCodigo, bodegaId: this.bodegaId,
-      descripcion: this.descripcion, items
-    }).subscribe({
-      next: dev => {
-        this.procesando = false;
-        this.devolucion = dev;
-        this.snackBar.open(`Devolución ${dev.numero} procesada — stock reingresado`, 'OK',
-          { duration: 3500, panelClass: ['snack-success'] });
-        this.verificarStock();
-      },
+  cargar(): void {
+    this.loading = true;
+    this.rma.listar(this.filtroEstado || undefined).subscribe({
+      next: d => { this.devoluciones = d; this.loading = false; },
       error: e => {
-        this.procesando = false;
-        this.snackBar.open(mensajeError(e, 'No se pudo procesar la devolución'), 'Cerrar', { duration: 5000 });
+        this.loading = false;
+        this.snackBar.open(mensajeError(e, 'No se pudieron cargar las devoluciones'), 'Cerrar', { duration: 5000 });
       }
     });
   }
 
-  /** Evidencia del reingreso: stock en la bodega elegida. */
-  private verificarStock(): void {
-    if (!this.bodegaId) return;
-    const skus = new Set(this.lineas.filter(l => l.devolver > 0).map(l => l.sku));
-    this.referencias.stock(undefined, this.bodegaId).subscribe(rows =>
-      this.stockDespues = rows.filter(r => skus.has(r.sku)));
+  ver(id: number): void {
+    this.rma.detalle(id).subscribe({
+      next: d => {
+        this.detalle = d;
+        this.motivoRechazo = '';
+        this.observacion = '';
+        this.metodoReembolso = null;
+        this.referenciaReembolso = '';
+        this.inspeccion = {};
+        d.detalles.forEach(it => this.inspeccion[it.id] = { resultado: null, nota: '' });
+      },
+      error: e => this.snackBar.open(mensajeError(e, 'No se pudo cargar la devolución'), 'Cerrar', { duration: 4000 })
+    });
+  }
+
+  /** true cuando BODEGA puede capturar el resultado por ítem. */
+  get enInspeccion(): boolean {
+    return !!this.detalle && this.detalle.estado === 'recibida';
+  }
+
+  /** Monto que pagaría el reembolso: ítems apto_reventa + defectuoso. */
+  get montoReembolsable(): number {
+    if (!this.detalle) return 0;
+    return this.detalle.detalles
+      .filter(d => ['apto_reventa', 'defectuoso'].includes(d.resultado_inspeccion || ''))
+      .reduce((acc, d) => acc + d.precio_unitario * d.cantidad, 0);
+  }
+
+  revision(): void  { this.transicion(this.rma.revision(this.detalle!.id), 'Revisión iniciada'); }
+
+  aprobar(): void {
+    this.transicion(this.rma.aprobar(this.detalle!.id, this.transportistaId),
+      'Devolución APROBADA — guía de retorno generada');
+  }
+
+  rechazar(): void {
+    if (!this.motivoRechazo.trim()) {
+      this.snackBar.open('Indica el motivo del rechazo', 'Cerrar', { duration: 3000 });
+      return;
+    }
+    this.transicion(this.rma.rechazar(this.detalle!.id, this.motivoRechazo), 'Devolución RECHAZADA');
+  }
+
+  transito(): void  { this.transicion(this.rma.transito(this.detalle!.id, this.observacion), 'Paquete EN TRÁNSITO'); }
+  recepcion(): void { this.transicion(this.rma.recepcion(this.detalle!.id, this.observacion), 'Paquete RECIBIDO en almacén'); }
+
+  inspeccionar(): void {
+    const items = Object.entries(this.inspeccion).map(([id, v]) => ({
+      devolucionDetalleId: +id, resultado: v.resultado as string, nota: v.nota
+    }));
+    if (items.some(i => !i.resultado)) {
+      this.snackBar.open('Registra el resultado de TODOS los ítems', 'Cerrar', { duration: 3500 });
+      return;
+    }
+    this.transicion(this.rma.inspeccionar(this.detalle!.id, items),
+      'Inspección registrada — stock apto reingresado');
+  }
+
+  reembolsar(): void {
+    if (!this.metodoReembolso) {
+      this.snackBar.open('Selecciona el método del reembolso', 'Cerrar', { duration: 3000 });
+      return;
+    }
+    this.transicion(this.rma.reembolsar(this.detalle!.id, this.metodoReembolso, this.referenciaReembolso),
+      'Reembolso procesado');
+  }
+
+  cerrar(): void { this.transicion(this.rma.cerrar(this.detalle!.id), 'Devolución CERRADA — ticket resuelto'); }
+
+  verGuiaPdf(): void {
+    if (!this.detalle) return;
+    this.rma.guiaPdf(this.detalle.id).subscribe({
+      next: blob => {
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      },
+      error: () => this.snackBar.open('No se pudo generar el PDF de la guía', 'Cerrar', { duration: 3000 })
+    });
+  }
+
+  private transicion(peticion: Observable<DevolucionRma>, exito: string): void {
+    if (!this.detalle || this.procesando) return;
+    this.procesando = true;
+    peticion.subscribe({
+      next: d => {
+        this.procesando = false;
+        this.detalle = d;
+        d.detalles.forEach(it => this.inspeccion[it.id] ??= { resultado: null, nota: '' });
+        this.snackBar.open(exito, 'OK', { duration: 3500, panelClass: ['snack-success'] });
+        this.cargar();
+      },
+      error: e => {
+        this.procesando = false;
+        this.snackBar.open(mensajeError(e, 'No se pudo aplicar la transición'), 'Cerrar', { duration: 5000 });
+      }
+    });
+  }
+
+  chipEstado(estado: string): string {
+    if (['aprobada', 'reembolsada', 'cerrada', 'inspeccionada'].includes(estado)) return 'ok';
+    if (estado === 'rechazada') return 'error';
+    return 'warn';
   }
 }

@@ -16,8 +16,9 @@ export type PermisoNav =
   | 'ajustes'          // ajustes de inventario
   | 'kardex'           // kardex
   | 'ventas'           // pedidos / facturas de venta
-  | 'logistica'        // devoluciones
+  | 'logistica'        // (legado) ventas + despacho
   | 'despachar'        // despachos
+  | 'devoluciones'     // RMA / logística inversa (pipeline multi-rol)
   | 'marketing'        // cupones / promos / campañas / banners / newsletter
   | 'tickets'          // tickets de soporte
   | 'categoriasTicket' // categorías de ticket
@@ -36,6 +37,9 @@ export const ROLES_POR_PERMISO: Record<PermisoNav, readonly string[]> = {
   ventas:           ['ADMIN', 'GERENTE', 'VENDEDOR'],
   logistica:        ['ADMIN', 'GERENTE', 'VENDEDOR', 'DESPACHO'],
   despachar:        ['ADMIN', 'GERENTE', 'DESPACHO'],
+  // RMA: cada rol del pipeline entra al tablero (VENDEDOR solo consulta);
+  // el CLIENTE no: su devolución nace y se sigue desde Mis Pedidos
+  devoluciones:     ['ADMIN', 'GERENTE', 'VENDEDOR', 'DESPACHO', 'BODEGA', 'SOPORTE'],
   marketing:        ['ADMIN', 'GERENTE'],
   // SOPORTE (9º rol, script 37): bandeja de tickets + FAQ; nada más
   tickets:          ['ADMIN', 'GERENTE', 'CLIENTE', 'SOPORTE'],
@@ -73,7 +77,8 @@ export const ROLES_POR_DATO: Record<PermisoDato, readonly string[]> = {
   refMetodosPago:       ['ADMIN', 'GERENTE', 'VENDEDOR', 'COMPRAS', 'CLIENTE', 'ANALISTA'],
   refMetodosEnvio:      ['ADMIN', 'GERENTE', 'VENDEDOR', 'DESPACHO', 'CLIENTE', 'ANALISTA'],
   refTransportistas:    ['ADMIN', 'GERENTE', 'DESPACHO', 'ANALISTA'],
-  refMotivosDevolucion: ['ADMIN', 'GERENTE', 'ANALISTA'],
+  // Script 38 amplió motivo_devolucion a todo el pipeline RMA + cliente
+  refMotivosDevolucion: ['ADMIN', 'GERENTE', 'VENDEDOR', 'DESPACHO', 'BODEGA', 'SOPORTE', 'CLIENTE', 'ANALISTA'],
   cuentasPorPagar:      ['ADMIN', 'GERENTE', 'COMPRAS', 'ANALISTA']
 };
 
@@ -176,13 +181,13 @@ export const DASHBOARD_AREAS: AreaNav[] = [
   {
     id: 'devoluciones',
     titulo: 'Devoluciones',
-    descripcion: 'Retornos de mercancía del cliente',
+    descripcion: 'RMA: retorno, inspección y reembolso',
     icono: 'assignment_return',
     acento: '#8e24aa',
     gradiente: 'linear-gradient(135deg, #6a1b9a, #ab47bc)',
     acciones: [
-      { titulo: 'Devoluciones', descripcion: 'Registrar y procesar devoluciones',
-        icono: 'assignment_return', ruta: '/operativo/ventas/devoluciones', permiso: 'logistica' }
+      { titulo: 'Devoluciones (RMA)', descripcion: 'Solicitudes, guía de retorno, inspección y reembolso',
+        icono: 'assignment_return', ruta: '/operativo/ventas/devoluciones', permiso: 'devoluciones' }
     ]
   },
   {

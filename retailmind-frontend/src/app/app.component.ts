@@ -133,6 +133,7 @@ export class AppComponent {
   get canVentas(): boolean     { return this.nav.can('ventas'); }
   get canLogistica(): boolean  { return this.nav.can('logistica'); }
   get canDespachar(): boolean  { return this.nav.can('despachar'); }
+  get canDevoluciones(): boolean { return this.nav.can('devoluciones'); }
   get canMarketing(): boolean  { return this.nav.can('marketing'); }
   get canTickets(): boolean    { return this.nav.can('tickets'); }
   get canCategoriasTicket(): boolean { return this.nav.can('categoriasTicket'); }

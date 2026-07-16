@@ -141,7 +141,7 @@ public class CarritoService {
      * crearPedido vía StockService (kardex incluido); si algo se agotó, la
      * transacción completa se revierte con mensaje claro.
      *
-     * Tarjeta: se valida formato (número 13-19 dígitos + Luhn, MM/AA vigente,
+     * Tarjeta: se valida formato (número 16 dígitos, MM/AA vigente,
      * CVV 3-4 dígitos) pero NO hay pasarela real y NUNCA se persiste el número
      * completo ni el CVV: solo marca + últimos 4 como referencia.
      *
@@ -265,12 +265,9 @@ public class CarritoService {
             throw new IllegalArgumentException("Completa los datos de la tarjeta");
         }
         String numero = t.numero() == null ? "" : t.numero().replaceAll("[\\s-]", "");
-        if (!numero.matches("\\d{13,19}")) {
+        if (!numero.matches("\\d{16}")) {
             throw new IllegalArgumentException(
-                    "El numero de tarjeta debe tener entre 13 y 19 digitos");
-        }
-        if (!pasaLuhn(numero)) {
-            throw new IllegalArgumentException("El numero de tarjeta no es valido");
+                    "El numero de tarjeta debe tener 16 digitos");
         }
         if (t.titular() == null || t.titular().isBlank()) {
             throw new IllegalArgumentException("El nombre del titular es requerido");
@@ -288,18 +285,6 @@ public class CarritoService {
             throw new IllegalArgumentException("El CVV debe tener 3 o 4 digitos");
         }
         return marcaDe(numero) + " ****" + numero.substring(numero.length() - 4);
-    }
-
-    private static boolean pasaLuhn(String numero) {
-        int suma = 0;
-        boolean doble = false;
-        for (int i = numero.length() - 1; i >= 0; i--) {
-            int d = numero.charAt(i) - '0';
-            if (doble) { d *= 2; if (d > 9) d -= 9; }
-            suma += d;
-            doble = !doble;
-        }
-        return suma % 10 == 0;
     }
 
     private static String marcaDe(String numero) {

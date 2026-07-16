@@ -28,8 +28,6 @@ public class VentasController {
                             List<VentasService.ItemPedido> items) {}
     public record DespachoReq(long transportistaId, long metodoEnvioId,
                               Long bodegaId, String observacion) {}
-    public record DevolucionReq(String motivoCodigo, long bodegaId, String descripcion,
-                                List<VentasService.ItemDevolucion> items) {}
     public record NotaReq(String nota, Boolean esVisibleCliente) {}
     public record PagoClienteReq(long metodoPagoId, java.math.BigDecimal monto, String referencia) {}
     public record EntregaReq(String observacion) {}
@@ -132,16 +130,5 @@ public class VentasController {
         return servicio.seguimiento(id);
     }
 
-    // Caso 10: devolución
-    @PostMapping("/pedidos/{id}/devolucion")
-    public ResponseEntity<?> devolver(@PathVariable long id, @RequestBody DevolucionReq r) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(
-                servicio.procesarDevolucion(id, r.motivoCodigo(), r.bodegaId(),
-                        r.descripcion(), r.items()));
-    }
-
-    @GetMapping("/devoluciones/{id}")
-    public Map<String, Object> devolucion(@PathVariable long id) {
-        return servicio.obtenerDevolucion(id);
-    }
+    // Caso 10 (devolución RMA): movido a /api/devoluciones (DevolucionController)
 }

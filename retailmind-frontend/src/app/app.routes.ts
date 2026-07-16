@@ -224,9 +224,12 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/operativo/ventas/despachos.component').then(m => m.DespachosComponent)
   },
+  // RMA / logística inversa: todo el pipeline (soporte valida, despacho mueve,
+  // bodega inspecciona, gerente reembolsa; vendedor consulta). El CLIENTE
+  // solicita y sigue su devolución desde /operativo/ventas/mis-pedidos.
   {
     path: 'operativo/ventas/devoluciones',
-    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'VENDEDOR', 'DESPACHO'])],
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'VENDEDOR', 'DESPACHO', 'BODEGA', 'SOPORTE'])],
     loadComponent: () =>
       import('./features/operativo/ventas/devoluciones.component').then(m => m.DevolucionesComponent)
   },

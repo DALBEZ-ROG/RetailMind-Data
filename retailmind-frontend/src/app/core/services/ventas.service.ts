@@ -4,9 +4,9 @@ import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { HttpParams } from '@angular/common/http';
 import {
-  ItemPedidoReq, ItemDevolucionReq, PedidoVentaRow, PedidoVentaDetalle,
+  ItemPedidoReq, PedidoVentaRow, PedidoVentaDetalle,
   FacturaVenta, PaginaFacturasVenta, PagoClienteRes, EnvioDetalle,
-  SeguimientoRow, DevolucionDetalle
+  SeguimientoRow
 } from '../models/operativo.model';
 
 @Injectable({ providedIn: 'root' })
@@ -66,12 +66,5 @@ export class VentasService {
     return this.http.get<SeguimientoRow[]>(`${this.base}/envios/${envioId}/seguimiento`);
   }
 
-  procesarDevolucion(pedidoId: number, body: {
-    motivoCodigo: string; bodegaId: number; descripcion?: string; items: ItemDevolucionReq[];
-  }): Observable<DevolucionDetalle> {
-    return this.http.post<DevolucionDetalle>(`${this.base}/pedidos/${pedidoId}/devolucion`, body);
-  }
-  devolucion(id: number): Observable<DevolucionDetalle> {
-    return this.http.get<DevolucionDetalle>(`${this.base}/devoluciones/${id}`);
-  }
+  // Devoluciones (RMA / logística inversa): core/services/devoluciones.service.ts
 }

@@ -1,112 +1,239 @@
 <div class="op-page">
   <div class="section-header">
     <h2><mat-icon>assignment_return</mat-icon> Devoluciones (RMA)</h2>
-    <p>Procesa la devolución de un pedido: reingresa el stock y registra el motivo.</p>
+    <p>Logística inversa: la solicitud nace del cliente, soporte la valida, despacho gestiona
+       el retorno, bodega inspecciona (solo lo apto reingresa a stock) y gerencia reembolsa.</p>
   </div>
 
   <div class="op-card">
-    <h3><mat-icon>search</mat-icon> Pedido a devolver</h3>
+    <h3><mat-icon>list_alt</mat-icon> Bandeja de devoluciones ({{ devoluciones.length }})</h3>
     <div class="form-grid">
       <mat-form-field appearance="outline">
-        <mat-label>Pedido</mat-label>
-        <mat-select [(ngModel)]="pedidoId" (selectionChange)="cargarPedido()">
-          <mat-option *ngFor="let p of pedidos" [value]="p.id">
-            {{ p.numero }} — {{ p.cliente }} ({{ p.estado }})
-          </mat-option>
+        <mat-label>Filtrar por estado</mat-label>
+        <mat-select [(ngModel)]="filtroEstado" (selectionChange)="cargar()">
+          <mat-option [value]="null">Todos</mat-option>
+          <mat-option *ngFor="let e of estados" [value]="e">{{ e }}</mat-option>
         </mat-select>
-      </mat-form-field>
-      <mat-form-field appearance="outline">
-        <mat-label>Motivo</mat-label>
-        <mat-select [(ngModel)]="motivoCodigo">
-          <mat-option *ngFor="let m of motivos" [value]="m.codigo">{{ m.nombre }}</mat-option>
-        </mat-select>
-      </mat-form-field>
-      <mat-form-field appearance="outline">
-        <mat-label>Bodega de reingreso</mat-label>
-        <mat-select [(ngModel)]="bodegaId">
-          <mat-option *ngFor="let b of bodegas" [value]="b.id">{{ b.nombre }}</mat-option>
-        </mat-select>
-      </mat-form-field>
-      <mat-form-field appearance="outline">
-        <mat-label>Descripción</mat-label>
-        <input matInput [(ngModel)]="descripcion">
       </mat-form-field>
     </div>
+    <div class="form-actions">
+      <button class="btn-limpiar" (click)="cargar()"><mat-icon>refresh</mat-icon> Actualizar</button>
+    </div>
+    <div class="table-wrapper" *ngIf="devoluciones.length; else vacio">
+      <table mat-table [dataSource]="devoluciones">
+        <ng-container matColumnDef="numero">
+          <th mat-header-cell *matHeaderCellDef>Número</th>
+          <td mat-cell *matCellDef="let d"><strong>{{ d.numero }}</strong></td>
+        </ng-container>
+        <ng-container matColumnDef="pedido">
+          <th mat-header-cell *matHeaderCellDef>Pedido</th>
+          <td mat-cell *matCellDef="let d">{{ d.numero_pedido }}</td>
+        </ng-container>
+        <ng-container matColumnDef="cliente">
+          <th mat-header-cell *matHeaderCellDef>Cliente</th>
+          <td mat-cell *matCellDef="let d">{{ d.cliente }}</td>
+        </ng-container>
+        <ng-container matColumnDef="motivo">
+          <th mat-header-cell *matHeaderCellDef>Motivo</th>
+          <td mat-cell *matCellDef="let d">{{ d.motivo }}</td>
+        </ng-container>
+        <ng-container matColumnDef="monto">
+          <th mat-header-cell *matHeaderCellDef>Monto</th>
+          <td mat-cell *matCellDef="let d">{{ d.monto_total | currency:'USD' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="estado">
+          <th mat-header-cell *matHeaderCellDef>Estado</th>
+          <td mat-cell *matCellDef="let d">
+            <span class="estado-chip" [class.ok]="chipEstado(d.estado) === 'ok'"
+                  [class.warn]="chipEstado(d.estado) === 'warn'"
+                  [class.error]="chipEstado(d.estado) === 'error'">{{ d.estado }}</span>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="fecha">
+          <th mat-header-cell *matHeaderCellDef>Solicitada</th>
+          <td mat-cell *matCellDef="let d">{{ d.fecha_creacion | date:'short' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="acciones">
+          <th mat-header-cell *matHeaderCellDef>Detalle</th>
+          <td mat-cell *matCellDef="let d">
+            <button mat-icon-button (click)="ver(d.id)" matTooltip="Ver detalle">
+              <mat-icon>visibility</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="columnas"></tr>
+        <tr mat-row *matRowDef="let d; columns: columnas"
+            [class.fila-seleccionada]="detalle?.id === d.id"></tr>
+      </table>
+    </div>
+    <ng-template #vacio>
+      <div class="empty-state" *ngIf="!loading">
+        <mat-icon>assignment_return</mat-icon><p>No hay devoluciones con ese filtro.</p>
+      </div>
+    </ng-template>
   </div>
 
-  <div class="op-card" *ngIf="pedido">
-    <h3><mat-icon>rule</mat-icon> Ítems de {{ pedido.numero }}</h3>
-    <div class="table-wrapper">
-      <table mat-table [dataSource]="lineas">
+  <div class="op-card" *ngIf="detalle">
+    <h3><mat-icon>assignment_return</mat-icon> Devolución {{ detalle.numero }}</h3>
+    <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:12px;">
+      <span class="estado-chip" [class.ok]="chipEstado(detalle.estado) === 'ok'"
+            [class.warn]="chipEstado(detalle.estado) === 'warn'"
+            [class.error]="chipEstado(detalle.estado) === 'error'">{{ detalle.estado }}</span>
+      <span class="stat-chip chip-info">Pedido {{ detalle.numero_pedido }}</span>
+      <span class="stat-chip chip-info" *ngIf="detalle.cliente">{{ detalle.cliente }}</span>
+      <span class="stat-chip chip-info">Motivo: {{ detalle.motivo }}</span>
+      <span class="stat-chip chip-info" *ngIf="detalle.ticket_numero">Ticket {{ detalle.ticket_numero }}</span>
+      <span class="stat-chip chip-info" *ngIf="detalle.guia_retorno">
+        <mat-icon style="font-size:14px;height:14px;width:14px;">local_shipping</mat-icon>
+        Guía {{ detalle.guia_retorno }} ({{ detalle.transportista }})
+      </span>
+      <span class="stat-chip chip-success" *ngIf="detalle.monto_reembolsado">
+        Reembolsado {{ detalle.monto_reembolsado | currency:'USD' }} · {{ detalle.metodo_reembolso }}
+      </span>
+      <button class="btn-limpiar" *ngIf="detalle.guia_retorno" (click)="verGuiaPdf()">
+        <mat-icon>picture_as_pdf</mat-icon> Guía de retorno PDF
+      </button>
+    </div>
+    <div class="dato" *ngIf="detalle.descripcion">Descripción del cliente: {{ detalle.descripcion }}</div>
+    <div class="dato" *ngIf="detalle.motivo_rechazo"><strong>Rechazo:</strong> {{ detalle.motivo_rechazo }}</div>
+    <div class="dato" *ngIf="detalle.bodega">Bodega de reingreso: {{ detalle.bodega }}</div>
+
+    <!-- Ítems: en 'recibida' BODEGA captura el resultado de inspección -->
+    <div class="table-wrapper" style="margin-top:12px;">
+      <table mat-table [dataSource]="detalle.detalles">
         <ng-container matColumnDef="sku">
           <th mat-header-cell *matHeaderCellDef>SKU</th>
-          <td mat-cell *matCellDef="let l"><strong>{{ l.sku }}</strong></td>
+          <td mat-cell *matCellDef="let it"><strong>{{ it.sku }}</strong></td>
         </ng-container>
         <ng-container matColumnDef="producto">
           <th mat-header-cell *matHeaderCellDef>Producto</th>
-          <td mat-cell *matCellDef="let l">{{ l.producto }}</td>
+          <td mat-cell *matCellDef="let it">{{ it.nombre_producto }}</td>
         </ng-container>
-        <ng-container matColumnDef="compradas">
-          <th mat-header-cell *matHeaderCellDef>Compradas</th>
-          <td mat-cell *matCellDef="let l">{{ l.compradas }}</td>
+        <ng-container matColumnDef="cantidad">
+          <th mat-header-cell *matHeaderCellDef>Cant.</th>
+          <td mat-cell *matCellDef="let it">{{ it.cantidad }}</td>
         </ng-container>
-        <ng-container matColumnDef="devolver">
-          <th mat-header-cell *matHeaderCellDef>Devolver</th>
-          <td mat-cell *matCellDef="let l">
-            <mat-form-field appearance="outline" subscriptSizing="dynamic" style="width:90px;">
-              <input matInput type="number" min="0" [max]="l.compradas" [(ngModel)]="l.devolver">
-            </mat-form-field>
+        <ng-container matColumnDef="precio">
+          <th mat-header-cell *matHeaderCellDef>P. Unit.</th>
+          <td mat-cell *matCellDef="let it">{{ it.precio_unitario | currency:'USD' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="inspeccion">
+          <th mat-header-cell *matHeaderCellDef>Inspección</th>
+          <td mat-cell *matCellDef="let it">
+            <ng-container *ngIf="it.resultado_inspeccion; else capturar">
+              <span class="estado-chip"
+                    [class.ok]="it.resultado_inspeccion === 'apto_reventa'"
+                    [class.warn]="it.resultado_inspeccion === 'defectuoso'"
+                    [class.error]="it.resultado_inspeccion === 'rechazado'">
+                {{ it.resultado_inspeccion }}</span>
+              <div *ngIf="it.nota_inspeccion" style="font-size:12px; color:#666;">{{ it.nota_inspeccion }}</div>
+            </ng-container>
+            <ng-template #capturar>
+              <ng-container *ngIf="esBodega && enInspeccion; else pendiente">
+                <mat-form-field appearance="outline" subscriptSizing="dynamic" style="width:160px;">
+                  <mat-select [(ngModel)]="inspeccion[it.id].resultado" placeholder="Resultado">
+                    <mat-option value="apto_reventa">Apto reventa (reingresa)</mat-option>
+                    <mat-option value="defectuoso">Defectuoso (merma)</mat-option>
+                    <mat-option value="rechazado">Rechazado (sin reembolso)</mat-option>
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline" subscriptSizing="dynamic" style="width:170px; margin-left:6px;">
+                  <input matInput placeholder="Nota" [(ngModel)]="inspeccion[it.id].nota">
+                </mat-form-field>
+              </ng-container>
+              <ng-template #pendiente><span class="stat-chip">pendiente</span></ng-template>
+            </ng-template>
           </td>
         </ng-container>
-        <ng-container matColumnDef="estadoProducto">
-          <th mat-header-cell *matHeaderCellDef>Estado</th>
-          <td mat-cell *matCellDef="let l">
-            <mat-form-field appearance="outline" subscriptSizing="dynamic" style="width:130px;">
-              <mat-select [(ngModel)]="l.estadoProducto">
-                <mat-option value="nuevo">Nuevo</mat-option>
-                <mat-option value="abierto">Abierto</mat-option>
-                <mat-option value="danado">Dañado</mat-option>
-              </mat-select>
-            </mat-form-field>
-          </td>
-        </ng-container>
-        <ng-container matColumnDef="accion">
-          <th mat-header-cell *matHeaderCellDef>Acción</th>
-          <td mat-cell *matCellDef="let l">
-            <mat-form-field appearance="outline" subscriptSizing="dynamic" style="width:140px;">
-              <mat-select [(ngModel)]="l.accion">
-                <mat-option value="reembolso">Reembolso</mat-option>
-                <mat-option value="cambio">Cambio</mat-option>
-                <mat-option value="credito">Crédito</mat-option>
-              </mat-select>
-            </mat-form-field>
-          </td>
-        </ng-container>
-        <tr mat-header-row *matHeaderRowDef="['sku','producto','compradas','devolver','estadoProducto','accion']"></tr>
-        <tr mat-row *matRowDef="let l; columns: ['sku','producto','compradas','devolver','estadoProducto','accion']"></tr>
+        <tr mat-header-row *matHeaderRowDef="['sku','producto','cantidad','precio','inspeccion']"></tr>
+        <tr mat-row *matRowDef="let it; columns: ['sku','producto','cantidad','precio','inspeccion']"></tr>
       </table>
     </div>
-    <div class="form-actions" style="margin-top:16px;">
-      <button class="btn-aplicar" (click)="procesar()" [disabled]="procesando">
-        <mat-icon>assignment_return</mat-icon> {{ procesando ? 'Procesando…' : 'Procesar Devolución' }}
+
+    <!-- Acciones de transición: cada rol ve SOLO la suya (backend = verdad) -->
+    <div class="form-actions" style="margin-top:16px; flex-wrap:wrap; gap:10px;">
+      <button class="btn-limpiar" *ngIf="esSoporte && detalle.estado === 'solicitada'"
+              (click)="revision()" [disabled]="procesando">
+        <mat-icon>fact_check</mat-icon> Iniciar revisión (Soporte)
+      </button>
+
+      <ng-container *ngIf="esSoporte && ['solicitada','en_revision'].includes(detalle.estado)">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" style="width:200px;">
+          <mat-label>Transportista de retorno</mat-label>
+          <mat-select [(ngModel)]="transportistaId">
+            <mat-option [value]="null">(el primero activo)</mat-option>
+            <mat-option *ngFor="let t of transportistas" [value]="t.id">{{ t.nombre }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <button class="btn-aplicar" (click)="aprobar()" [disabled]="procesando">
+          <mat-icon>check_circle</mat-icon> Aprobar y generar guía
+        </button>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" style="width:240px;">
+          <mat-label>Motivo del rechazo</mat-label>
+          <input matInput [(ngModel)]="motivoRechazo">
+        </mat-form-field>
+        <button class="btn-limpiar" (click)="rechazar()" [disabled]="procesando">
+          <mat-icon>cancel</mat-icon> Rechazar
+        </button>
+      </ng-container>
+
+      <ng-container *ngIf="esDespacho && detalle.estado === 'aprobada'">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" style="width:240px;">
+          <mat-label>Observación</mat-label>
+          <input matInput [(ngModel)]="observacion">
+        </mat-form-field>
+        <button class="btn-aplicar" (click)="transito()" [disabled]="procesando">
+          <mat-icon>local_shipping</mat-icon> Marcar en tránsito (Despacho)
+        </button>
+      </ng-container>
+
+      <ng-container *ngIf="(esDespacho || esBodega) && detalle.estado === 'en_transito'">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" style="width:240px;">
+          <mat-label>Observación</mat-label>
+          <input matInput [(ngModel)]="observacion">
+        </mat-form-field>
+        <button class="btn-aplicar" (click)="recepcion()" [disabled]="procesando">
+          <mat-icon>move_to_inbox</mat-icon> Confirmar recepción en almacén
+        </button>
+      </ng-container>
+
+      <button class="btn-aplicar" *ngIf="esBodega && detalle.estado === 'recibida'"
+              (click)="inspeccionar()" [disabled]="procesando">
+        <mat-icon>rule</mat-icon> Registrar inspección (solo lo APTO reingresa)
+      </button>
+
+      <ng-container *ngIf="esGerente && detalle.estado === 'inspeccionada' && montoReembolsable > 0">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" style="width:180px;">
+          <mat-label>Método</mat-label>
+          <mat-select [(ngModel)]="metodoReembolso">
+            <mat-option *ngFor="let m of metodosReembolso" [value]="m">{{ m }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" style="width:180px;">
+          <mat-label>Referencia</mat-label>
+          <input matInput [(ngModel)]="referenciaReembolso">
+        </mat-form-field>
+        <button class="btn-aplicar" (click)="reembolsar()" [disabled]="procesando">
+          <mat-icon>payments</mat-icon> Reembolsar {{ montoReembolsable | currency:'USD' }}
+        </button>
+      </ng-container>
+
+      <button class="btn-aplicar" *ngIf="esSoporte && (detalle.estado === 'reembolsada'
+                || (detalle.estado === 'inspeccionada' && montoReembolsable === 0))"
+              (click)="cerrar()" [disabled]="procesando">
+        <mat-icon>task_alt</mat-icon> Cerrar devolución (resuelve el ticket)
       </button>
     </div>
 
-    <div class="resultado-box" *ngIf="devolucion">
-      <div class="titulo"><mat-icon>check_circle</mat-icon> Devolución procesada y stock reingresado</div>
-      <div class="dato">Número: <strong>{{ devolucion.numero }}</strong> · Estado: <strong>{{ devolucion.estado }}</strong> · Motivo: <strong>{{ devolucion.motivo }}</strong></div>
-      <div class="dato">Monto devuelto: <strong>{{ devolucion.monto_total | currency:'USD' }}</strong></div>
-      <div class="dato" *ngFor="let d of devolucion.detalles">
-        {{ d.sku }} — {{ d.nombre_producto }}: <strong>{{ d.cantidad }}</strong> ({{ d.estado_producto }}, {{ d.accion }})
+    <!-- Línea de tiempo: quién hizo qué y cuándo -->
+    <div *ngIf="detalle.historial.length" style="margin-top:16px;">
+      <h3><mat-icon>history</mat-icon> Línea de tiempo</h3>
+      <div class="dato" *ngFor="let h of detalle.historial">
+        <span class="estado-chip" [class.ok]="chipEstado(h.estado) === 'ok'"
+              [class.warn]="chipEstado(h.estado) === 'warn'"
+              [class.error]="chipEstado(h.estado) === 'error'">{{ h.estado }}</span>
+        {{ h.comentario }} — <strong>{{ h.autor }}</strong> · {{ h.fecha_creacion | date:'short' }}
       </div>
     </div>
-  </div>
-
-  <!-- Evidencia del reingreso -->
-  <div class="op-card" *ngIf="stockDespues.length">
-    <h3><mat-icon>warehouse</mat-icon> Stock tras el reingreso</h3>
-    <span class="stat-chip chip-success" *ngFor="let s of stockDespues" style="margin-right:8px;">
-      {{ s.sku }} · {{ s.bodega }}: {{ s.stock_actual }}
-    </span>
   </div>
 </div>

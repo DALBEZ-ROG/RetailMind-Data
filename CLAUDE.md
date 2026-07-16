@@ -119,7 +119,22 @@ solo SOPORTE/ADMIN la cambia con PATCH /prioridad), número `TICK-AAAA-NNNN`, SL
 responde un 'resuelto' (grant de columna UPDATE(estado) a grp_cliente), RLS de cliente y
 "Equipo de soporte" como autor anónimo; notas de pedido (`nota_pedido`, bitácora con nota
 interna vs. visible al cliente); anulación de ajuste de inventario por contramovimiento de
-kardex. La deuda técnica acumulada vive en `DEUDA_TECNICA.md` (raíz).
+kardex; **RMA / logística inversa (2026-07-16, script 38, paquete `devoluciones/`)**: la
+devolución NACE DEL CLIENTE en Mis Pedidos (pedido entregado/devuelto con plazo de 30 días
+desde la entrega — constante `PLAZO_DIAS_DEVOLUCION` — o despachado = rechazo en puerta) y
+crea/engancha un ticket categoría "Devolución" (`devolucion.ticket_soporte_id`); ciclo
+solicitada→en_revision→aprobada|rechazada(terminal)→en_transito→recibida→inspeccionada→
+reembolsada→cerrada con UN rol por transición (SOPORTE valida y genera guía de retorno
+RET-… + transportista + bodega, PDF vía DocumentoPdfService; DESPACHO tránsito/recepción;
+BODEGA inspección POR ÍTEM: solo `apto_reventa` reingresa stock vía StockService con kardex
+`entrada_devolucion_cliente` y el pedido pasa a 'devuelto' — `defectuoso` = merma pendiente
+proveedor, `rechazado` = sin reembolso; GERENTE/ADMIN reembolso SIMULADO apto+defectuoso;
+SOPORTE cierra y el ticket queda resuelto), historial en `historial_estado_devolucion`
+(autor usuario O cliente), RLS pol_cliente_propio/pol_soporte/pol_horario en las 3 tablas,
+`devolucion.monto_total` lo mantiene el trigger `fn_recalcular_total_devolucion`
+(SECURITY DEFINER, NUNCA escribirlo) y el endpoint viejo de devolución en un paso se
+eliminó (`/api/devoluciones`, tablero multi-rol en `/operativo/ventas/devoluciones`).
+La deuda técnica acumulada vive en `DEUDA_TECNICA.md` (raíz).
 
 **Pendiente**: aplicación real de descuentos (cupones/promociones a pedidos, alimenta `uso_cupon`);
 módulo de reseñas; orquestación ETL con Airflow.
@@ -134,7 +149,9 @@ módulo de reseñas; orquestación ETL con Airflow.
   borrador aplicable exigiría una tabla de detalle de líneas del ajuste, que hoy no existe (el
   ajuste escribe el movimiento de kardex directo al aplicarse).
 - `devolucion_proveedor` **no existe** en la BD: la única devolución modelada es al cliente
-  (`devolucion` / `devolucion_detalle`), ya implementada. No hay nada huérfano que conectar.
+  (`devolucion` / `devolucion_detalle`), ya implementada como RMA completo. Los ítems
+  `defectuoso` de la inspección quedan como merma documental esperando ese proceso (el
+  kardex ya tiene `salida_devolucion_proveedor` sin uso).
 
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,

@@ -141,7 +141,7 @@
               <input matInput [(ngModel)]="tarjeta.numero" (input)="formatearNumero()"
                      placeholder="4111 1111 1111 1111" inputmode="numeric" autocomplete="off">
               <span matSuffix class="marca-chip" *ngIf="marcaTarjeta">{{ marcaTarjeta }}</span>
-              <mat-hint *ngIf="tarjeta.numero && !numeroValido">Debe tener entre 13 y 19 dígitos</mat-hint>
+              <mat-hint *ngIf="tarjeta.numero && !numeroValido">Debe tener 16 dígitos</mat-hint>
             </mat-form-field>
             <mat-form-field appearance="outline" class="span-2">
               <mat-label>Titular de la tarjeta *</mat-label>

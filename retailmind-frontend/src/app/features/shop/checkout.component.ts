@@ -116,9 +116,9 @@ export class CheckoutComponent implements OnInit {
   }
   get esTarjeta(): boolean { return this.metodoSeleccionado?.tipo === 'tarjeta'; }
 
-  // ── Validaciones de tarjeta (formato; el backend re-valida y hace Luhn) ─
+  // ── Validaciones de tarjeta (formato; el backend re-valida) ─
   get numeroValido(): boolean {
-    return /^\d{13,19}$/.test(this.tarjeta.numero.replace(/[\s-]/g, ''));
+    return /^\d{16}$/.test(this.tarjeta.numero.replace(/[\s-]/g, ''));
   }
   get vencimientoValido(): boolean {
     if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(this.tarjeta.vencimiento.trim())) return false;
@@ -149,7 +149,7 @@ export class CheckoutComponent implements OnInit {
   }
 
   formatearNumero(): void {
-    const digitos = this.tarjeta.numero.replace(/\D/g, '').slice(0, 19);
+    const digitos = this.tarjeta.numero.replace(/\D/g, '').slice(0, 16);
     this.tarjeta.numero = digitos.replace(/(\d{4})(?=\d)/g, '$1 ');
   }
 

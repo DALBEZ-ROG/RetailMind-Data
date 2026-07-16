@@ -86,6 +86,29 @@ public class SecurityConfig {
                 // Ciclo de venta: vendedor/despacho + cliente (RLS lo aisla a sus filas)
                 .requestMatchers("/api/ventas/**")
                     .hasAnyAuthority("ADMIN", "GERENTE", "VENDEDOR", "DESPACHO", "CLIENTE")
+                // RMA / logística inversa: un rol por transición (script 38).
+                // La solicitud NACE del cliente; el resto es el pipeline interno.
+                .requestMatchers(HttpMethod.POST, "/api/devoluciones").hasAuthority("CLIENTE")
+                .requestMatchers(HttpMethod.GET, "/api/devoluciones/pedido/*/elegibilidad")
+                    .hasAnyAuthority("ADMIN", "CLIENTE")
+                .requestMatchers(HttpMethod.GET, "/api/devoluciones/transportistas-ref")
+                    .hasAnyAuthority("ADMIN", "SOPORTE")
+                .requestMatchers("/api/devoluciones/*/revision", "/api/devoluciones/*/aprobar",
+                        "/api/devoluciones/*/rechazar", "/api/devoluciones/*/cerrar")
+                    .hasAnyAuthority("ADMIN", "SOPORTE")
+                .requestMatchers("/api/devoluciones/*/transito")
+                    .hasAnyAuthority("ADMIN", "DESPACHO")
+                .requestMatchers("/api/devoluciones/*/recepcion")
+                    .hasAnyAuthority("ADMIN", "DESPACHO", "BODEGA")
+                .requestMatchers("/api/devoluciones/*/inspeccion")
+                    .hasAnyAuthority("ADMIN", "BODEGA")
+                .requestMatchers("/api/devoluciones/*/reembolso")
+                    .hasAnyAuthority("ADMIN", "GERENTE")
+                // Listado/detalle/guía: todos los roles del pipeline + CLIENTE
+                // (RLS pol_cliente_propio lo aisla a sus devoluciones)
+                .requestMatchers("/api/devoluciones/**")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "VENDEDOR", "DESPACHO",
+                            "BODEGA", "SOPORTE", "CLIENTE")
                 // Ajuste de inventario (CU-O-16): solo bodega/admin
                 .requestMatchers("/api/inventario/ajustes/**")
                     .hasAnyAuthority("ADMIN", "BODEGA")
