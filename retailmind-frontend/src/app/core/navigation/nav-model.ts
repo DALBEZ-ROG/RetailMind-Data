@@ -17,6 +17,7 @@ export type PermisoNav =
   | 'kardex'           // kardex
   | 'ventas'           // pedidos / facturas de venta
   | 'logistica'        // (legado) ventas + despacho
+  | 'preparar'         // preparación de pedidos (picking de bodega, script 39)
   | 'despachar'        // despachos
   | 'devoluciones'     // RMA / logística inversa (pipeline multi-rol)
   | 'marketing'        // cupones / promos / campañas / banners / newsletter
@@ -36,6 +37,8 @@ export const ROLES_POR_PERMISO: Record<PermisoNav, readonly string[]> = {
   kardex:           ['ADMIN', 'GERENTE', 'BODEGA', 'ANALISTA'],
   ventas:           ['ADMIN', 'GERENTE', 'VENDEDOR'],
   logistica:        ['ADMIN', 'GERENTE', 'VENDEDOR', 'DESPACHO'],
+  // Preparación (picking): espeja /api/ventas/preparacion (ADMIN/BODEGA)
+  preparar:         ['ADMIN', 'BODEGA'],
   despachar:        ['ADMIN', 'GERENTE', 'DESPACHO'],
   // RMA: cada rol del pipeline entra al tablero (VENDEDOR solo consulta);
   // el CLIENTE no: su devolución nace y se sigue desde Mis Pedidos
@@ -174,7 +177,9 @@ export const DASHBOARD_AREAS: AreaNav[] = [
     acento: '#039be5',
     gradiente: 'linear-gradient(135deg, #01579b, #29b6f6)',
     acciones: [
-      { titulo: 'Despachos', descripcion: 'Preparar y entregar pedidos facturados',
+      { titulo: 'Preparación de Pedidos', descripcion: 'Picking y empaque de pedidos facturados (bodega)',
+        icono: 'inventory', ruta: '/operativo/ventas/preparacion', permiso: 'preparar' },
+      { titulo: 'Despachos', descripcion: 'Despachar pedidos preparados y registrar la entrega',
         icono: 'local_shipping', ruta: '/operativo/ventas/despachos', permiso: 'despachar' }
     ]
   },

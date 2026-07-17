@@ -1,7 +1,7 @@
 <div class="op-page">
   <div class="section-header">
     <h2><mat-icon>local_shipping</mat-icon> Despachar Pedidos</h2>
-    <p>Asigna transportista, genera la guía y consulta el seguimiento del envío.</p>
+    <p>Pedidos preparados por bodega: revisa el detalle, confirma (o cambia) el transportista, genera la guía y registra la entrega.</p>
   </div>
 
   <div class="op-card">
@@ -9,33 +9,64 @@
     <div class="form-grid">
       <mat-form-field appearance="outline">
         <mat-label>Pedido a despachar</mat-label>
-        <mat-select [(ngModel)]="pedidoId">
+        <mat-select [(ngModel)]="pedidoId" (selectionChange)="seleccionarPedido()">
           <mat-option *ngFor="let p of pedidos" [value]="p.id">
-            {{ p.numero }} — {{ p.cliente }} ({{ p.estado }})
+            {{ p.numero }} — {{ p.cliente }}{{ p.transportista ? ' · ' + p.transportista : '' }}
           </mat-option>
         </mat-select>
-        <mat-hint>Solo pedidos pagados y con factura emitida</mat-hint>
-      </mat-form-field>
-      <mat-form-field appearance="outline">
-        <mat-label>Transportista</mat-label>
-        <mat-select [(ngModel)]="transportistaId">
-          <mat-option *ngFor="let t of transportistas" [value]="t.id">{{ t.nombre }}</mat-option>
-        </mat-select>
-      </mat-form-field>
-      <mat-form-field appearance="outline">
-        <mat-label>Método de envío</mat-label>
-        <mat-select [(ngModel)]="metodoEnvioId">
-          <mat-option *ngFor="let m of metodosEnvio" [value]="m.id">{{ m.nombre }}</mat-option>
-        </mat-select>
+        <mat-hint>Solo pedidos PREPARADOS por bodega</mat-hint>
       </mat-form-field>
       <mat-form-field appearance="outline">
         <mat-label>Observación</mat-label>
         <input matInput [(ngModel)]="observacion">
       </mat-form-field>
     </div>
+
+    <!-- Detalle logístico completo del pedido seleccionado -->
+    <ng-container *ngIf="detalle">
+      <div class="resultado-box">
+        <div class="titulo"><mat-icon>fact_check</mat-icon> Qué se envía — {{ detalle.numero }}</div>
+        <div class="dato">Cliente: <strong>{{ detalle.cliente }}</strong>
+          <span *ngIf="detalle.cliente_telefono"> · Tel: {{ detalle.cliente_telefono }}</span></div>
+        <div class="dato">Dirección de entrega: <strong>{{ detalle.direccion_entrega }}</strong></div>
+        <div class="dato">Transportista asignado por zona:
+          <strong>{{ detalle.transportista || 'Sin asignar (elige uno)' }}</strong>
+          <span *ngIf="detalle.metodo_envio"> · {{ detalle.metodo_envio }}
+            ({{ detalle.dias_entrega_min }}-{{ detalle.dias_entrega_max }} días)</span>
+        </div>
+        <div class="dato" *ngIf="detalle.factura">Factura: <strong>{{ detalle.factura }}</strong></div>
+        <div class="dato" *ngFor="let d of detalle.detalles">
+          <mat-icon style="font-size:14px;width:14px;height:14px;vertical-align:middle;">inventory_2</mat-icon>
+          {{ d.cantidad }} × <strong>{{ d.nombre_producto }}</strong> ({{ d.sku }})
+        </div>
+      </div>
+
+      <div class="form-actions" *ngIf="detalle.transportista_id">
+        <button mat-button (click)="cambiarTransportista = !cambiarTransportista">
+          <mat-icon>swap_horiz</mat-icon>
+          {{ cambiarTransportista ? 'Mantener transportista asignado' : 'Cambiar transportista' }}
+        </button>
+      </div>
+      <div class="form-grid" *ngIf="cambiarTransportista">
+        <mat-form-field appearance="outline">
+          <mat-label>Transportista</mat-label>
+          <mat-select [(ngModel)]="transportistaId">
+            <mat-option *ngFor="let t of transportistas" [value]="t.id">{{ t.nombre }}</mat-option>
+          </mat-select>
+          <mat-hint>El cambio queda registrado en la línea de tiempo</mat-hint>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Método de envío</mat-label>
+          <mat-select [(ngModel)]="metodoEnvioId">
+            <mat-option *ngFor="let m of metodosEnvio" [value]="m.id">{{ m.nombre }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+    </ng-container>
+
     <div class="form-actions">
-      <button class="btn-aplicar" (click)="despachar()" [disabled]="procesando">
-        <mat-icon>local_shipping</mat-icon> {{ procesando ? 'Despachando…' : 'Despachar' }}
+      <button class="btn-aplicar" (click)="despachar()" [disabled]="procesando || !pedidoId">
+        <mat-icon>local_shipping</mat-icon> {{ procesando ? 'Despachando…' : 'Despachar (genera guía)' }}
       </button>
     </div>
 
@@ -44,6 +75,7 @@
       <div class="dato">Envío: <strong>{{ envio.numero }}</strong> · Guía: <strong>{{ envio.numero_guia }}</strong> · Estado: <strong>{{ envio.estado }}</strong></div>
       <div class="dato">Pedido: <strong>{{ envio.numero_pedido }}</strong> · Transportista: <strong>{{ envio.transportista }}</strong> · Método: <strong>{{ envio.metodo_envio }}</strong></div>
       <div class="dato">Entrega en: <strong>{{ envio.direccion_entrega }}</strong></div>
+      <div class="dato" *ngFor="let d of envio.detalles">{{ d.cantidad }} × {{ d.nombre_producto }} ({{ d.sku }})</div>
     </div>
   </div>
 
@@ -54,7 +86,7 @@
         <mat-label>Pedido en tránsito</mat-label>
         <mat-select [(ngModel)]="pedidoEntregaId">
           <mat-option *ngFor="let p of pedidosEnTransito" [value]="p.id">
-            {{ p.numero }} — {{ p.cliente }}
+            {{ p.numero }} — {{ p.cliente }}{{ p.transportista ? ' · ' + p.transportista : '' }}
           </mat-option>
         </mat-select>
         <mat-hint>Solo pedidos despachados pendientes de entrega</mat-hint>

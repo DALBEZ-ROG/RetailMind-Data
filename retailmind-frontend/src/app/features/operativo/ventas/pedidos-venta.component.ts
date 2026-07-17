@@ -93,13 +93,21 @@ export class PedidosVentaComponent implements OnInit {
     return !!this.detallePedido && !this.esOnline
       && ['pendiente', 'confirmado'].includes(this.detallePedido.estado);
   }
+  // La factura de un pedido ONLINE se emite AUTOMÁTICAMENTE al pagar el
+  // checkout (script 39): "Emitir factura" solo aplica a internos pagados.
   get esFacturable(): boolean {
     return !!this.detallePedido && !this.detallePedido.factura
-      && ['pagado', 'en_preparacion', 'despachado', 'entregado'].includes(this.detallePedido.estado);
+      && !this.esOnline && this.detallePedido.estado === 'pagado';
   }
+  // El despacho exige la PREPARACIÓN de bodega (facturado → en_preparacion →
+  // preparado); aquí solo se informa en qué eslabón va el pedido.
   get esDespachable(): boolean {
     return !!this.detallePedido && !!this.detallePedido.factura
-      && ['pagado', 'en_preparacion'].includes(this.detallePedido.estado);
+      && this.detallePedido.estado === 'preparado';
+  }
+  get enPreparacion(): boolean {
+    return !!this.detallePedido
+      && ['facturado', 'en_preparacion'].includes(this.detallePedido.estado);
   }
   get esEntregable(): boolean {
     return this.detallePedido?.estado === 'despachado';

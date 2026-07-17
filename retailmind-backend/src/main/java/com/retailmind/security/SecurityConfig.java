@@ -76,6 +76,19 @@ public class SecurityConfig {
                 // Cobro del pedido (espeja la BD: INSERT en pago = admin/vendedor)
                 .requestMatchers(HttpMethod.POST, "/api/ventas/pedidos/*/pagos")
                     .hasAnyAuthority("ADMIN", "VENDEDOR")
+                // Factura MANUAL (pedidos internos; la online se emite sola al
+                // pagar el checkout). Espeja INSERT factura_venta = admin/vendedor
+                .requestMatchers(HttpMethod.POST, "/api/ventas/pedidos/*/factura")
+                    .hasAnyAuthority("ADMIN", "VENDEDOR")
+                // Preparación de pedidos (picking/empaque): BODEGA (script 39)
+                .requestMatchers("/api/ventas/preparacion/**", "/api/ventas/preparacion",
+                        "/api/ventas/pedidos/*/preparacion", "/api/ventas/pedidos/*/preparado")
+                    .hasAnyAuthority("ADMIN", "BODEGA")
+                // Despacho: solo pedidos PREPARADOS (espeja INSERT envio = admin/despacho)
+                .requestMatchers(HttpMethod.POST, "/api/ventas/pedidos/*/despacho")
+                    .hasAnyAuthority("ADMIN", "DESPACHO")
+                .requestMatchers(HttpMethod.GET, "/api/ventas/despacho/*")
+                    .hasAnyAuthority("ADMIN", "DESPACHO")
                 // Entrega: cierra la logística (espeja UPDATE envio = admin/despacho)
                 .requestMatchers(HttpMethod.POST, "/api/ventas/pedidos/*/entrega")
                     .hasAnyAuthority("ADMIN", "DESPACHO")

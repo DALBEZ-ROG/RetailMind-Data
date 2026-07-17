@@ -12,15 +12,33 @@
       <p class="success-orden">Pedido <strong>{{ exito.ordenId }}</strong></p>
       <div class="success-chips">
         <span class="chip chip-pagado"><mat-icon>paid</mat-icon> PAGADO</span>
+        <span class="chip chip-pagado" *ngIf="exito.facturaNumero">
+          <mat-icon>receipt</mat-icon> FACTURADO
+        </span>
         <span class="chip">{{ exito.metodoPago }} · {{ exito.referenciaPago }}</span>
         <span class="chip">Total {{ exito.total | currency:'USD' }}</span>
+      </div>
+      <div class="success-chips" *ngIf="exito.facturaNumero || exito.transportista">
+        <span class="chip" *ngIf="exito.facturaNumero">
+          Factura {{ exito.facturaNumero }} (emitida automáticamente)
+        </span>
+        <span class="chip" *ngIf="exito.transportista">
+          <mat-icon>local_shipping</mat-icon> Envío con {{ exito.transportista }}
+          <ng-container *ngIf="exito.diasEntregaMin">
+            · llega en {{ exito.diasEntregaMin }}-{{ exito.diasEntregaMax }} días
+          </ng-container>
+        </span>
       </div>
       <p class="cupon-info" *ngIf="exito.cuponMensaje">
         <mat-icon>info</mat-icon> {{ exito.cuponMensaje }}
       </p>
-      <p class="success-sub">Prepararemos tu pedido y podrás seguir su estado,
-        la guía de envío y la factura en <strong>Mis Pedidos</strong>.</p>
+      <p class="success-sub">Bodega ya está preparando tu pedido; puedes seguir su
+        estado, la guía de envío y la factura en <strong>Mis Pedidos</strong>.</p>
       <div class="success-actions">
+        <button mat-raised-button color="primary" *ngIf="exito.facturaId"
+                (click)="descargarFactura()">
+          <mat-icon>picture_as_pdf</mat-icon> Descargar factura
+        </button>
         <a mat-raised-button color="primary" routerLink="/operativo/ventas/mis-pedidos">
           <mat-icon>shopping_basket</mat-icon> Ver mis pedidos
         </a>

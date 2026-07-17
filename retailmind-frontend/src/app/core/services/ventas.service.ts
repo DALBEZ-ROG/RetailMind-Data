@@ -6,7 +6,7 @@ import { HttpParams } from '@angular/common/http';
 import {
   ItemPedidoReq, PedidoVentaRow, PedidoVentaDetalle,
   FacturaVenta, PaginaFacturasVenta, PagoClienteRes, EnvioDetalle,
-  SeguimientoRow
+  SeguimientoRow, PreparacionRow, DetalleLogistico
 } from '../models/operativo.model';
 
 @Injectable({ providedIn: 'root' })
@@ -49,8 +49,28 @@ export class VentasService {
     return this.http.get(`${this.base}/facturas/${id}/pdf`, { responseType: 'blob' });
   }
 
+  // ── Preparación por BODEGA (cola de picking, script 39) ──────────────
+  colaPreparacion(): Observable<PreparacionRow[]> {
+    return this.http.get<PreparacionRow[]>(`${this.base}/preparacion`);
+  }
+  detallePreparacion(pedidoId: number): Observable<DetalleLogistico> {
+    return this.http.get<DetalleLogistico>(`${this.base}/preparacion/${pedidoId}`);
+  }
+  iniciarPreparacion(pedidoId: number): Observable<DetalleLogistico> {
+    return this.http.post<DetalleLogistico>(`${this.base}/pedidos/${pedidoId}/preparacion`, {});
+  }
+  marcarPreparado(pedidoId: number): Observable<DetalleLogistico> {
+    return this.http.post<DetalleLogistico>(`${this.base}/pedidos/${pedidoId}/preparado`, {});
+  }
+
+  /** Detalle logístico para la pantalla de despacho (ítems + dirección + asignación). */
+  detalleDespacho(pedidoId: number): Observable<DetalleLogistico> {
+    return this.http.get<DetalleLogistico>(`${this.base}/despacho/${pedidoId}`);
+  }
+  /** transportista/método opcionales: sin ellos se despacha con los ASIGNADOS. */
   despachar(pedidoId: number, body: {
-    transportistaId: number; metodoEnvioId: number; bodegaId?: number | null; observacion?: string;
+    transportistaId?: number | null; metodoEnvioId?: number | null;
+    bodegaId?: number | null; observacion?: string;
   }): Observable<EnvioDetalle> {
     return this.http.post<EnvioDetalle>(`${this.base}/pedidos/${pedidoId}/despacho`, body);
   }

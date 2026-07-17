@@ -90,9 +90,26 @@ esquema usa el MCP `retailmind` (solo lectura) o psycopg2 (`postgres/1250143656@
 (orden→aprobación de GERENTE/ADMIN→recepción completa→factura→pago; sin aprobar no se recibe ni
 factura, sin recibir completo no se factura, sin factura no hay CxP ni pago); inventario
 (transferencias, ajustes, kardex); ciclo de venta completo con compuertas (pedido confirmado→
-PAGO del cliente [tabla pago+transaccion_pago, abonos parciales]→pagado→factura→despacho con guía→
-entregado→devolución solo tras entrega) con PDF, listado de facturas de venta con búsqueda/
-paginación, timeline (historial_estado_pedido) y acciones encadenadas en el detalle del pedido;
+PAGO del cliente [tabla pago+transaccion_pago, abonos parciales]→pagado→facturado→
+en_preparacion→preparado→despachado→entregado→devolución solo tras entrega) con PDF, listado
+de facturas de venta con búsqueda/paginación, timeline (historial_estado_pedido) y acciones
+encadenadas en el detalle del pedido; **TRAMO DE SALIDA robustecido (2026-07-16, script 39)**:
+estados nuevos `facturado` y `preparado`; la factura del pedido ONLINE se emite AUTOMÁTICAMENTE
+al pagar el checkout (misma transacción, bajo grp_cliente: INSERT + pol_cliente_emision +
+`fn_recalcular_total_factura_venta` SECURITY DEFINER) y el cliente la ve/descarga en la
+confirmación y en Mis Pedidos; la factura de pedidos INTERNOS sigue MANUAL
+(POST /pedidos/{id}/factura = ADMIN/VENDEDOR; en ambos casos exige estado 'pagado' exacto y
+deja el pedido 'facturado'); transportista ASIGNADO AUTOMÁTICAMENTE por zona al crear el pedido
+(`pedido.transportista_id` + metodo_envio_id; dirección→zona_envio por ciudad>provincia>país→
+tarifa activa más barata→metodo_envio.transportista_id; seeds Quevedo local/Los Ríos/Ecuador,
+el cliente solo lo VE con su tiempo estimado); BODEGA prepara en
+`/operativo/ventas/preparacion` (cola GET /api/ventas/preparacion = pedidos
+facturado/en_preparacion con detalle de picking dedicado — NO usa obtenerPedido porque bodega
+no lee pago — y transiciones POST /pedidos/{id}/preparacion y /preparado con guardias);
+DESPACHO solo despacha pedidos 'preparado' (detalle GET /api/ventas/despacho/{id} con ítems,
+cliente, dirección y transportista asignado; en el POST transportista/método son OPCIONALES:
+por defecto van los asignados y mandarlos distintos es un override que queda registrado en
+historial y seguimiento, actualizando el pedido);
 el checkout del cliente entra al MISMO flujo y el cliente ve estado/guía/seguimiento/factura PDF
 en Mis Pedidos (RLS, script 35); **checkout ONLINE completo tipo Amazon (2026-07-15, script 36)**:
 `/shop/checkout` con dirección de envío (o alta inline), campo de cupón (solo UI; la validación

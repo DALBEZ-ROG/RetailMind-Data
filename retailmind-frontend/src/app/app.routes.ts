@@ -218,6 +218,13 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/operativo/ventas/facturas-venta.component').then(m => m.FacturasVentaComponent)
   },
+  // Preparación de pedidos (picking de bodega, script 39)
+  {
+    path: 'operativo/ventas/preparacion',
+    canActivate: [authGuard, roleGuard(['ADMIN', 'BODEGA'])],
+    loadComponent: () =>
+      import('./features/operativo/ventas/preparacion-pedidos.component').then(m => m.PreparacionPedidosComponent)
+  },
   {
     path: 'operativo/ventas/despachos',
     canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'DESPACHO'])],

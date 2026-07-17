@@ -72,6 +72,7 @@ export class AppComponent {
     '/operativo/ventas/pedidos': 'Pedidos de Venta',
     '/operativo/ventas/mis-pedidos': 'Mis Pedidos',
     '/operativo/ventas/facturas': 'Facturas de Venta',
+    '/operativo/ventas/preparacion': 'Preparación de Pedidos',
     '/operativo/ventas/despachos': 'Despachos',
     '/operativo/ventas/devoluciones': 'Devoluciones',
     '/operativo/marketing/cupones': 'Cupones de Descuento',
@@ -131,6 +132,7 @@ export class AppComponent {
   get canAjustes(): boolean    { return this.nav.can('ajustes'); }
   get canKardex(): boolean     { return this.nav.can('kardex'); }
   get canVentas(): boolean     { return this.nav.can('ventas'); }
+  get canPreparar(): boolean   { return this.nav.can('preparar'); }
   get canLogistica(): boolean  { return this.nav.can('logistica'); }
   get canDespachar(): boolean  { return this.nav.can('despachar'); }
   get canDevoluciones(): boolean { return this.nav.can('devoluciones'); }

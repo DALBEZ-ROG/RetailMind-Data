@@ -12,9 +12,16 @@ import { VentasService } from '../../../core/services/ventas.service';
 import { ReferenciasService } from '../../../core/services/referencias.service';
 import { mensajeError } from '../../../core/services/api-error.util';
 import {
-  PedidoVentaRow, CatalogoRef, EnvioDetalle, SeguimientoRow
+  PedidoVentaRow, CatalogoRef, EnvioDetalle, SeguimientoRow, DetalleLogistico
 } from '../../../core/models/operativo.model';
 
+/**
+ * Despacho (script 39): solo pedidos PREPARADOS por bodega. Al seleccionar el
+ * pedido se carga el detalle logístico completo (ítems, cliente, dirección,
+ * transportista ASIGNADO por zona); despacho puede cambiar el transportista
+ * (override registrado en la línea de tiempo), genera la guía y despacha.
+ * Luego confirma la entrega. Compuerta backend: no se despacha sin preparar.
+ */
 @Component({
   selector: 'app-despachos',
   standalone: true,
@@ -31,6 +38,8 @@ export class DespachosComponent implements OnInit {
   metodosEnvio: CatalogoRef[] = [];
 
   pedidoId: number | null = null;
+  detalle: DetalleLogistico | null = null;
+  cambiarTransportista = false;
   transportistaId: number | null = null;
   metodoEnvioId: number | null = null;
   observacion = '';
@@ -55,11 +64,30 @@ export class DespachosComponent implements OnInit {
 
   cargarPedidos(): void {
     this.ventas.pedidos().subscribe(p => {
-      // Despachables: PAGADOS y con factura emitida (compuertas del backend)
-      this.pedidos = p.filter(x =>
-        ['pagado', 'en_preparacion'].includes(x.estado) && !!x.tiene_factura);
+      // Despachables: PREPARADOS por bodega (compuerta del backend)
+      this.pedidos = p.filter(x => x.estado === 'preparado');
       // Entregables: en tránsito
       this.pedidosEnTransito = p.filter(x => x.estado === 'despachado');
+    });
+  }
+
+  /** Al elegir el pedido carga su detalle logístico (ítems + asignación). */
+  seleccionarPedido(): void {
+    this.detalle = null;
+    this.cambiarTransportista = false;
+    this.transportistaId = null;
+    this.metodoEnvioId = null;
+    if (!this.pedidoId) return;
+    this.ventas.detalleDespacho(this.pedidoId).subscribe({
+      next: d => {
+        this.detalle = d;
+        this.transportistaId = d.transportista_id;
+        this.metodoEnvioId = d.metodo_envio_id;
+        // Sin asignación por zona (pedido legacy): despacho debe elegir
+        this.cambiarTransportista = !d.transportista_id;
+      },
+      error: e => this.snackBar.open(
+        mensajeError(e, 'No se pudo cargar el detalle del pedido'), 'Cerrar', { duration: 5000 })
     });
   }
 
@@ -88,21 +116,29 @@ export class DespachosComponent implements OnInit {
   }
 
   despachar(): void {
-    if (!this.pedidoId || !this.transportistaId || !this.metodoEnvioId) {
-      this.snackBar.open('Pedido, transportista y método de envío son requeridos', 'Cerrar', { duration: 3500 });
+    if (!this.pedidoId) {
+      this.snackBar.open('Selecciona el pedido a despachar', 'Cerrar', { duration: 3500 });
+      return;
+    }
+    if (this.cambiarTransportista && (!this.transportistaId || !this.metodoEnvioId)) {
+      this.snackBar.open('Selecciona transportista y método de envío', 'Cerrar', { duration: 3500 });
       return;
     }
     this.procesando = true;
-    this.ventas.despachar(this.pedidoId, {
-      transportistaId: this.transportistaId, metodoEnvioId: this.metodoEnvioId,
-      observacion: this.observacion
-    }).subscribe({
+    // Sin override se despacha con el transportista ASIGNADO por zona
+    const body = this.cambiarTransportista
+      ? { transportistaId: this.transportistaId, metodoEnvioId: this.metodoEnvioId,
+          observacion: this.observacion }
+      : { observacion: this.observacion };
+    this.ventas.despachar(this.pedidoId, body).subscribe({
       next: envio => {
         this.procesando = false;
         this.envio = envio;
         this.snackBar.open(`Despachado — guía ${envio.numero_guia}`, 'OK',
           { duration: 3500, panelClass: ['snack-success'] });
         this.pedidoId = null; // el pedido ya no es despachable
+        this.detalle = null;
+        this.observacion = '';
         this.cargarSeguimiento(envio.id);
         this.cargarPedidos();
       },

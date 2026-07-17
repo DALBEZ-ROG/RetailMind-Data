@@ -26,7 +26,9 @@ public class VentasController {
 
     public record PedidoReq(long clienteId, long bodegaId, String canal,
                             List<VentasService.ItemPedido> items) {}
-    public record DespachoReq(long transportistaId, long metodoEnvioId,
+    /** transportista/método son opcionales: por defecto van los ASIGNADOS por
+     *  zona en el pedido; si despacho los manda distintos es un override. */
+    public record DespachoReq(Long transportistaId, Long metodoEnvioId,
                               Long bodegaId, String observacion) {}
     public record NotaReq(String nota, Boolean esVisibleCliente) {}
     public record PagoClienteReq(long metodoPagoId, java.math.BigDecimal monto, String referencia) {}
@@ -107,12 +109,44 @@ public class VentasController {
                 .body(pdf);
     }
 
-    // Caso 9: despacho
+    // ── Preparación por BODEGA (cola de picking; SecurityConfig: ADMIN/BODEGA)
+    @GetMapping("/preparacion")
+    public List<Map<String, Object>> colaPreparacion() {
+        return servicio.colaPreparacion();
+    }
+
+    /** Detalle para picking: ítems, cliente, dirección y transportista asignado. */
+    @GetMapping("/preparacion/{pedidoId}")
+    public Map<String, Object> detallePreparacion(@PathVariable long pedidoId) {
+        return servicio.detalleLogistico(pedidoId);
+    }
+
+    @PostMapping("/pedidos/{id}/preparacion")
+    public Map<String, Object> iniciarPreparacion(@PathVariable long id) {
+        return servicio.iniciarPreparacion(id);
+    }
+
+    @PostMapping("/pedidos/{id}/preparado")
+    public Map<String, Object> marcarPreparado(@PathVariable long id) {
+        return servicio.marcarPreparado(id);
+    }
+
+    // Detalle logístico para la pantalla de despacho (ADMIN/DESPACHO)
+    @GetMapping("/despacho/{pedidoId}")
+    public Map<String, Object> detalleDespacho(@PathVariable long pedidoId) {
+        return servicio.detalleLogistico(pedidoId);
+    }
+
+    // Caso 9: despacho (solo pedidos PREPARADOS por bodega)
     @PostMapping("/pedidos/{id}/despacho")
-    public ResponseEntity<?> despachar(@PathVariable long id, @RequestBody DespachoReq r) {
+    public ResponseEntity<?> despachar(@PathVariable long id,
+                                       @RequestBody(required = false) DespachoReq r) {
         return ResponseEntity.status(HttpStatus.CREATED).body(
-                servicio.despachar(id, r.transportistaId(), r.metodoEnvioId(),
-                        r.bodegaId(), r.observacion()));
+                servicio.despachar(id,
+                        r != null ? r.transportistaId() : null,
+                        r != null ? r.metodoEnvioId() : null,
+                        r != null ? r.bodegaId() : null,
+                        r != null ? r.observacion() : null));
     }
 
     // Entrega: cierra la logística (ADMIN/DESPACHO)

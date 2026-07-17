@@ -93,8 +93,8 @@
           <th mat-header-cell *matHeaderCellDef>Estado</th>
           <td mat-cell *matCellDef="let p">
             <span class="estado-chip"
-                  [class.ok]="p.estado === 'confirmado' || p.estado === 'pagado'"
-                  [class.warn]="p.estado === 'despachado'"
+                  [class.ok]="['confirmado','pagado','facturado','preparado'].includes(p.estado)"
+                  [class.warn]="p.estado === 'despachado' || p.estado === 'en_preparacion'"
                   [class.error]="p.estado === 'devuelto' || p.estado === 'cancelado'">{{ p.estado }}</span>
           </td>
         </ng-container>
@@ -133,10 +133,14 @@
     <!-- Estado actual + documentos del proceso -->
     <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:14px;">
       <span class="estado-chip"
-            [class.ok]="['pagado','entregado'].includes(detallePedido.estado)"
+            [class.ok]="['pagado','facturado','preparado','entregado'].includes(detallePedido.estado)"
             [class.warn]="['despachado','en_preparacion'].includes(detallePedido.estado)"
             [class.error]="['devuelto','cancelado'].includes(detallePedido.estado)">
         Estado: {{ detallePedido.estado }}
+      </span>
+      <span class="stat-chip chip-info" *ngIf="detallePedido.transportista">
+        <mat-icon style="font-size:14px;height:14px;width:14px;">local_shipping</mat-icon>
+        {{ detallePedido.transportista }}<ng-container *ngIf="detallePedido.metodo_envio"> · {{ detallePedido.metodo_envio }}</ng-container>
       </span>
       <span class="stat-chip" [class.chip-info]="esOnline">
         <mat-icon style="font-size:14px;height:14px;width:14px;">{{ esOnline ? 'language' : 'storefront' }}</mat-icon>
@@ -171,7 +175,12 @@
         <mat-icon>local_shipping</mat-icon> Ir a despachar
       </button>
       <span class="stat-chip chip-info" *ngIf="esDespachable && !puedeIrADespachos">
-        Listo para despacho (lo gestiona Despacho)
+        Preparado — listo para despacho (lo gestiona Despacho)
+      </span>
+      <span class="stat-chip chip-info" *ngIf="enPreparacion">
+        {{ detallePedido.estado === 'facturado'
+           ? 'Facturado — en cola de preparación de bodega'
+           : 'En preparación (picking de bodega en curso)' }}
       </span>
       <button class="btn-aplicar" *ngIf="esEntregable && puedeEntregar"
               (click)="entregar()" [disabled]="procesando">

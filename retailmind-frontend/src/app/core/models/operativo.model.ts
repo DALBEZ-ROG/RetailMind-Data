@@ -94,11 +94,15 @@ export interface ItemPedidoReq { varianteId: number; cantidad: number; }
 export interface PedidoVentaRow {
   id: number; numero: string; estado: string; total: number;
   fecha_pedido: string; cliente: string; tiene_factura?: boolean;
-  // 'web' = tienda online (nace pagado en el checkout); 'tienda'/'telefono' = interno
+  // 'web' = tienda online (nace pagado+facturado en el checkout); 'tienda'/'telefono' = interno
   canal: string;
+  // Transportista ASIGNADO por zona (script 39); despacho puede cambiarlo
+  transportista?: string | null;
 }
 export interface PedidoVentaDetalle extends PedidoVentaRow {
   subtotal: number; monto_impuesto: number;
+  metodo_envio?: string | null;
+  dias_entrega_min?: number | null; dias_entrega_max?: number | null;
   detalles: {
     id: number; sku: string; nombre_producto: string; cantidad: number;
     precio_unitario: number; subtotal: number;
@@ -146,6 +150,25 @@ export interface EnvioDetalle {
   detalles: { cantidad: number; sku: string; nombre_producto: string }[];
 }
 export interface SeguimientoRow { estado: string; descripcion: string; ubicacion: string; fecha_evento: string; }
+// ── Tramo de salida: preparación de bodega y despacho con detalle (script 39) ─
+export interface PreparacionRow {
+  id: number; numero: string; estado: string; canal: string; fecha_pedido: string;
+  total: number; cliente: string; factura: string | null;
+  transportista: string | null; metodo_envio: string | null;
+  items: number; unidades: number;
+}
+export interface DetalleLogistico {
+  id: number; numero: string; estado: string; canal: string; fecha_pedido: string;
+  total: number; cliente: string; cliente_telefono: string | null;
+  transportista_id: number | null; transportista: string | null;
+  metodo_envio_id: number | null; metodo_envio: string | null;
+  dias_entrega_min: number | null; dias_entrega_max: number | null;
+  factura: string | null; direccion_entrega: string;
+  detalles: {
+    id: number; sku: string; nombre_producto: string; cantidad: number;
+    precio_unitario: number; subtotal: number;
+  }[];
+}
 // ── Devoluciones RMA / logística inversa (script 38) ─────────────────────
 export interface ItemDevolucionReq {
   pedidoDetalleId: number; cantidad: number; estadoProducto?: string;

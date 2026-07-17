@@ -223,13 +223,14 @@ public class CarritoService {
                     ((Number) it.get("cantidad")).intValue()));
         }
 
-        // Pedido real del ciclo de venta (descuenta stock) + pago simulado:
-        // el pedido ONLINE nace PAGADO, listo para facturar y despachar.
+        // Pedido real del ciclo de venta (descuenta stock, asigna transportista
+        // por zona) + pago simulado + factura AUTOMÁTICA: el pedido ONLINE
+        // nace PAGADO y FACTURADO, y entra directo a la cola de preparación.
         Map<String, Object> pedido = ventas.crearPedido(
                 principal.getClienteId(), bodegas.get(0), "web", itemsPedido,
                 req.direccionId());
         long pedidoId = ((Number) pedido.get("id")).longValue();
-        ventas.pagarCheckoutOnline(pedidoId, req.metodoPagoId(),
+        Map<String, Object> pago = ventas.pagarCheckoutOnline(pedidoId, req.metodoPagoId(),
                 referencia, autorizacion, detalleJson);
 
         pg.update("UPDATE carrito SET estado = 'convertido' WHERE id = ?", carritoId);
@@ -245,9 +246,16 @@ public class CarritoService {
         res.put("ordenId", pedido.get("numero"));
         res.put("total", pedido.get("total"));
         res.put("items", items.size());
-        res.put("estado", "pagado");
+        res.put("estado", "facturado");
         res.put("metodoPago", metodos.get(0).get("nombre"));
         res.put("referenciaPago", referencia);
+        // Factura automática + logística asignada, para la confirmación
+        res.put("facturaId", pago.get("facturaId"));
+        res.put("facturaNumero", pago.get("facturaNumero"));
+        res.put("transportista", pedido.get("transportista"));
+        res.put("metodoEnvio", pedido.get("metodo_envio"));
+        res.put("diasEntregaMin", pedido.get("dias_entrega_min"));
+        res.put("diasEntregaMax", pedido.get("dias_entrega_max"));
         if (req.cupon() != null && !req.cupon().isBlank()) {
             // Fase de descuentos pendiente: no rompe el checkout, solo informa
             res.put("cuponMensaje", "El cupon '" + req.cupon().trim()

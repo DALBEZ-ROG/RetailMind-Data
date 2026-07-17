@@ -13,6 +13,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ShopService } from './shop.service';
+import { VentasService } from '../../core/services/ventas.service';
 import { mensajeError } from '../../core/services/api-error.util';
 
 /**
@@ -68,6 +69,7 @@ export class CheckoutComponent implements OnInit {
 
   constructor(
     private shop: ShopService,
+    private ventas: VentasService,
     private router: Router,
     private snackBar: MatSnackBar
   ) {}
@@ -208,7 +210,7 @@ export class CheckoutComponent implements OnInit {
         this.procesando = false;
         this.exito = res;
         this.items = [];
-        this.snackBar.open('¡Pago confirmado! Tu pedido quedó PAGADO', 'OK',
+        this.snackBar.open('¡Pago confirmado! Tu pedido quedó PAGADO y FACTURADO', 'OK',
           { duration: 4500, panelClass: ['snack-success'] });
       },
       error: e => {
@@ -216,6 +218,20 @@ export class CheckoutComponent implements OnInit {
         this.snackBar.open(mensajeError(e, 'No se pudo completar la compra'), 'Cerrar',
           { duration: 6000, panelClass: ['snack-error'] });
       }
+    });
+  }
+
+  /** Descarga la factura emitida automáticamente (RLS: solo la propia). */
+  descargarFactura(): void {
+    if (!this.exito?.facturaId) return;
+    this.ventas.facturaPdf(this.exito.facturaId).subscribe({
+      next: blob => {
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      },
+      error: e => this.snackBar.open(
+        mensajeError(e, 'No se pudo descargar la factura'), 'Cerrar', { duration: 4500 })
     });
   }
 

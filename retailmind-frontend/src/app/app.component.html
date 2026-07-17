@@ -116,7 +116,7 @@
     </ng-container>
 
     <!-- Operación Section (visibilidad por rol, espeja SecurityConfig) -->
-    <ng-container *ngIf="canCatalogo || canCompras || canInventario || canVentas || canLogistica || canKardex || canDevoluciones">
+    <ng-container *ngIf="canCatalogo || canCompras || canInventario || canVentas || canPreparar || canLogistica || canKardex || canDevoluciones">
       <div class="sidebar-section-label">Operación</div>
 
       <ng-container *ngIf="canCatalogo">
@@ -180,6 +180,11 @@
         </a>
       </ng-container>
 
+      <a class="nav-item" *ngIf="canPreparar"
+         routerLink="/operativo/ventas/preparacion" routerLinkActive="active">
+        <mat-icon>inventory</mat-icon>
+        <span>Preparación de Pedidos</span>
+      </a>
       <a class="nav-item" *ngIf="canDespachar"
          routerLink="/operativo/ventas/despachos" routerLinkActive="active">
         <mat-icon>local_shipping</mat-icon>

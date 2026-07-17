@@ -19,8 +19,11 @@ import com.retailmind.inventario.StockService;
 /**
  * Ciclo de venta (Order-to-Cash) con compuertas enforzadas en backend:
  *
- *   confirmado -> [pago(s) del cliente] -> pagado -> [factura] -> [despacho]
- *   -> despachado -> [entrega] -> entregado -> [devolución] -> devuelto
+ *   confirmado -> [pago(s) del cliente] -> pagado -> facturado (AUTOMÁTICO si
+ *   canal 'web'; manual VENDEDOR/ADMIN si interno) -> en_preparacion ->
+ *   preparado (BODEGA hace picking/empaque) -> despachado (DESPACHO, con el
+ *   transportista asignado por zona u override manual) -> entregado ->
+ *   [devolución] -> devuelto
  *
  * Cada paso valida el estado anterior (mensajes claros vía IllegalState/
  * IllegalArgument -> GlobalExceptionHandler). Réplica del patrón de compras/:
@@ -105,7 +108,54 @@ public class VentasService {
         }
 
         registrarHistorial(pedidoId, "confirmado", "Pedido creado y stock descontado");
+        asignarEnvioPorZona(pedidoId, clienteId, direccionEnvioId);
         return obtenerPedido(pedidoId);
+    }
+
+    /**
+     * Asignación AUTOMÁTICA de transportista/método de envío por ZONA
+     * (script 39): la dirección del pedido (o la predeterminada del cliente)
+     * resuelve la zona por especificidad ciudad > provincia > país; la tarifa
+     * activa más barata de esa zona define el método y su transportista. El
+     * cliente solo lo VE (no lo elige); DESPACHO puede cambiarlo al despachar.
+     * Sin dirección o sin zona configurada el pedido queda sin asignar y
+     * despacho decide manualmente.
+     */
+    private void asignarEnvioPorZona(long pedidoId, long clienteId, Long direccionEnvioId) {
+        List<Map<String, Object>> asignaciones = pg.queryForList("""
+                WITH dir AS (
+                    SELECT ci.id AS ciudad_id, ci.provincia_id, pr.pais_id
+                    FROM direccion d
+                    JOIN ciudad ci ON ci.id = d.ciudad_id
+                    JOIN provincia pr ON pr.id = ci.provincia_id
+                    WHERE d.id = COALESCE(?::bigint,
+                          (SELECT d2.id FROM direccion d2
+                           JOIN cliente c ON c.usuario_id = d2.usuario_id
+                           WHERE c.id = ? AND d2.activo
+                           ORDER BY d2.es_predeterminada DESC, d2.id LIMIT 1))
+                )
+                SELECT z.nombre AS zona, me.id AS metodo_envio_id, me.nombre AS metodo,
+                       me.dias_entrega_min, me.dias_entrega_max,
+                       t.id AS transportista_id, t.nombre AS transportista
+                FROM dir
+                JOIN zona_envio z ON z.activo AND z.pais_id = dir.pais_id
+                     AND (z.provincia_id IS NULL OR z.provincia_id = dir.provincia_id)
+                     AND (z.ciudad_id IS NULL OR z.ciudad_id = dir.ciudad_id)
+                JOIN tarifa_envio tf ON tf.zona_envio_id = z.id AND tf.activo
+                JOIN metodo_envio me ON me.id = tf.metodo_envio_id AND me.activo
+                JOIN transportista t ON t.id = me.transportista_id AND t.activo
+                ORDER BY (z.ciudad_id IS NOT NULL) DESC,
+                         (z.provincia_id IS NOT NULL) DESC, tf.costo_base
+                LIMIT 1""", direccionEnvioId, clienteId);
+        if (asignaciones.isEmpty()) return;
+        Map<String, Object> a = asignaciones.get(0);
+        pg.update("UPDATE pedido SET metodo_envio_id = ?, transportista_id = ? WHERE id = ?",
+                ((Number) a.get("metodo_envio_id")).longValue(),
+                ((Number) a.get("transportista_id")).longValue(), pedidoId);
+        registrarHistorial(pedidoId, "confirmado", "Transportista asignado por zona "
+                + a.get("zona") + ": " + a.get("transportista") + " — " + a.get("metodo")
+                + " (" + a.get("dias_entrega_min") + "-" + a.get("dias_entrega_max")
+                + " días hábiles)");
     }
 
     @Transactional(readOnly = true)
@@ -113,10 +163,14 @@ public class VentasService {
         Map<String, Object> pedido = pg.queryForMap("""
                 SELECT p.id, p.numero, ep.codigo AS estado, p.canal, p.fecha_pedido,
                        p.subtotal, p.monto_impuesto, p.costo_envio, p.total,
-                       c.nombre || ' ' || COALESCE(c.apellido,'') AS cliente, c.email AS cliente_email
+                       c.nombre || ' ' || COALESCE(c.apellido,'') AS cliente, c.email AS cliente_email,
+                       t.nombre AS transportista, me.nombre AS metodo_envio,
+                       me.dias_entrega_min, me.dias_entrega_max
                 FROM pedido p
                 JOIN estado_pedido ep ON ep.id = p.estado_pedido_id
                 JOIN cliente c ON c.id = p.cliente_id
+                LEFT JOIN transportista t ON t.id = p.transportista_id
+                LEFT JOIN metodo_envio me ON me.id = p.metodo_envio_id
                 WHERE p.id = ?""", pedidoId);
         pedido.put("detalles", pg.queryForList("""
                 SELECT id, sku, nombre_producto, cantidad, precio_unitario, subtotal, monto_impuesto
@@ -204,11 +258,13 @@ public class VentasService {
         return pg.queryForList("""
                 SELECT p.id, p.numero, ep.codigo AS estado, p.canal, p.total, p.fecha_pedido,
                        c.nombre || ' ' || COALESCE(c.apellido,'') AS cliente,
+                       t.nombre AS transportista,
                        EXISTS (SELECT 1 FROM factura_venta fv
                                WHERE fv.pedido_id = p.id) AS tiene_factura
                 FROM pedido p
                 JOIN estado_pedido ep ON ep.id = p.estado_pedido_id
                 JOIN cliente c ON c.id = p.cliente_id
+                LEFT JOIN transportista t ON t.id = p.transportista_id
                 ORDER BY p.id DESC""");
     }
 
@@ -241,7 +297,8 @@ public class VentasService {
                     + "El cobro manual solo aplica a pedidos internos (tienda/telefono)");
         }
         switch (estado) {
-            case "pagado", "en_preparacion", "despachado", "entregado" ->
+            case "pagado", "facturado", "en_preparacion", "preparado",
+                 "despachado", "entregado" ->
                     throw new IllegalStateException("El pedido " + numero
                             + " ya esta pagado; no admite mas cobros");
             case "cancelado", "devuelto" -> throw new IllegalStateException(
@@ -332,7 +389,13 @@ public class VentasService {
         cambiarEstadoPedido(pedidoId, "pagado", "Pago online confirmado en el checkout ("
                 + metodos.get(0) + (referencia != null && !referencia.isBlank()
                         ? " · " + referencia : "") + ")");
-        return Map.of("pagoId", pagoId, "monto", total, "metodo", metodos.get(0));
+        // Factura AUTOMÁTICA del pedido online: misma transacción que el pago
+        // (compra online real: el comprobante nace con el cobro, sin pasos
+        // manuales del back-office). El pedido queda 'facturado' y entra a la
+        // cola de preparación de bodega.
+        Map<String, Object> factura = emitirFactura(pedidoId, true);
+        return Map.of("pagoId", pagoId, "monto", total, "metodo", metodos.get(0),
+                "facturaId", factura.get("id"), "facturaNumero", factura.get("numero"));
     }
 
     /** Suma de pagos completados del pedido. */
@@ -344,25 +407,39 @@ public class VentasService {
 
     // ── Caso 8: factura de venta ─────────────────────────────────────────
 
+    /** Emisión MANUAL (VENDEDOR/ADMIN) para pedidos internos; los online se
+     *  facturan solos al pagar el checkout. */
     @Transactional
     public Map<String, Object> emitirFactura(long pedidoId) {
-        String estado = estadoPedido(pedidoId);
-        if (List.of("cancelado", "devuelto").contains(estado)) {
-            throw new IllegalStateException(
-                    "No se puede facturar un pedido en estado '" + estado + "'");
-        }
-        // Compuerta: la factura se emite sobre un pedido ya COBRADO
-        if (List.of("pendiente", "confirmado").contains(estado)) {
-            throw new IllegalStateException(
-                    "El pedido debe estar pagado antes de emitir la factura; "
-                    + "registra primero el pago del cliente (estado actual: '" + estado + "')");
-        }
+        return emitirFactura(pedidoId, false);
+    }
+
+    /**
+     * Emite la factura del pedido y lo pasa a 'facturado' (entra a la cola de
+     * preparación de bodega). Compuerta: solo un pedido 'pagado' se factura,
+     * y una sola vez. Con automatica=true la dispara el pago del checkout
+     * online, en la MISMA transacción (corre bajo grp_cliente: INSERT +
+     * política pol_cliente_emision del script 39).
+     */
+    @Transactional
+    public Map<String, Object> emitirFactura(long pedidoId, boolean automatica) {
         // Guardia de idempotencia: un pedido se factura una sola vez
         List<String> existentes = pg.queryForList(
                 "SELECT numero FROM factura_venta WHERE pedido_id = ?", String.class, pedidoId);
         if (!existentes.isEmpty()) {
             throw new IllegalStateException("El pedido ya fue facturado (factura "
                     + existentes.get(0) + "); no se puede facturar de nuevo");
+        }
+        String estado = estadoPedido(pedidoId);
+        if (List.of("cancelado", "devuelto").contains(estado)) {
+            throw new IllegalStateException(
+                    "No se puede facturar un pedido en estado '" + estado + "'");
+        }
+        // Compuerta: la factura se emite sobre un pedido ya COBRADO
+        if (!"pagado".equals(estado)) {
+            throw new IllegalStateException(
+                    "El pedido debe estar pagado antes de emitir la factura; "
+                    + "registra primero el pago del cliente (estado actual: '" + estado + "')");
         }
 
         Map<String, Object> datos = pg.queryForMap("""
@@ -397,9 +474,11 @@ public class VentasService {
                        cantidad, precio_unitario, monto_impuesto
                 FROM pedido_detalle WHERE pedido_id = ?""", facturaId, pedidoId);
 
-        // El estado NO cambia al facturar (el pago ya lo puso en 'pagado');
-        // se deja constancia en la línea de tiempo del pedido.
-        registrarHistorial(pedidoId, estado, "Factura de venta " + numero + " emitida");
+        // El pedido pasa a 'facturado': entra a la cola de preparación de bodega
+        cambiarEstadoPedido(pedidoId, "facturado", "Factura de venta " + numero
+                + (automatica
+                   ? " emitida AUTOMÁTICAMENTE al confirmar el pago online"
+                   : " emitida") + "; pedido en cola de preparación de bodega");
         return obtenerFactura(facturaId); // totales ya recalculados por el trigger
     }
 
@@ -440,10 +519,126 @@ public class VentasService {
         return f;
     }
 
+    // ── Preparación por BODEGA (picking/empaque, script 39) ──────────────
+
+    /** Cola de preparación: pedidos facturados (por tomar) y en preparación. */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> colaPreparacion() {
+        return pg.queryForList("""
+                SELECT p.id, p.numero, ep.codigo AS estado, p.canal, p.fecha_pedido, p.total,
+                       c.nombre || ' ' || COALESCE(c.apellido,'') AS cliente,
+                       fv.numero AS factura, t.nombre AS transportista,
+                       me.nombre AS metodo_envio,
+                       (SELECT COUNT(*) FROM pedido_detalle pd
+                        WHERE pd.pedido_id = p.id) AS items,
+                       (SELECT COALESCE(SUM(pd.cantidad), 0) FROM pedido_detalle pd
+                        WHERE pd.pedido_id = p.id) AS unidades
+                FROM pedido p
+                JOIN estado_pedido ep ON ep.id = p.estado_pedido_id
+                JOIN cliente c ON c.id = p.cliente_id
+                LEFT JOIN LATERAL (SELECT numero FROM factura_venta
+                                   WHERE pedido_id = p.id ORDER BY id DESC LIMIT 1) fv ON true
+                LEFT JOIN transportista t ON t.id = p.transportista_id
+                LEFT JOIN metodo_envio me ON me.id = p.metodo_envio_id
+                WHERE ep.codigo IN ('facturado', 'en_preparacion')
+                ORDER BY p.fecha_pedido""");
+    }
+
+    /**
+     * Detalle del pedido a preparar / despachar: ítems con cantidades,
+     * cliente, dirección de entrega y transportista asignado. Consulta
+     * dedicada (no obtenerPedido) para que corra con los grants de
+     * grp_bodega / grp_despacho, que no leen pagos ni notas.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> detalleLogistico(long pedidoId) {
+        List<Map<String, Object>> pedidos = pg.queryForList("""
+                SELECT p.id, p.numero, ep.codigo AS estado, p.canal, p.fecha_pedido, p.total,
+                       c.nombre || ' ' || COALESCE(c.apellido,'') AS cliente,
+                       c.telefono AS cliente_telefono,
+                       p.transportista_id, t.nombre AS transportista,
+                       p.metodo_envio_id, me.nombre AS metodo_envio,
+                       me.dias_entrega_min, me.dias_entrega_max,
+                       fv.numero AS factura,
+                       COALESCE(d.calle_principal
+                                || COALESCE(' ' || d.numero, '')
+                                || COALESCE(', ' || d.referencia, '')
+                                || COALESCE(' — ' || ci.nombre, ''),
+                                'Retiro en tienda') AS direccion_entrega
+                FROM pedido p
+                JOIN estado_pedido ep ON ep.id = p.estado_pedido_id
+                JOIN cliente c ON c.id = p.cliente_id
+                LEFT JOIN transportista t ON t.id = p.transportista_id
+                LEFT JOIN metodo_envio me ON me.id = p.metodo_envio_id
+                LEFT JOIN LATERAL (SELECT numero FROM factura_venta
+                                   WHERE pedido_id = p.id ORDER BY id DESC LIMIT 1) fv ON true
+                LEFT JOIN direccion d ON d.id = COALESCE(p.direccion_envio_id,
+                        (SELECT d2.id FROM direccion d2
+                         WHERE d2.usuario_id = c.usuario_id AND d2.activo
+                         ORDER BY d2.es_predeterminada DESC, d2.id LIMIT 1))
+                LEFT JOIN ciudad ci ON ci.id = d.ciudad_id
+                WHERE p.id = ?""", pedidoId);
+        if (pedidos.isEmpty()) {
+            throw new NoSuchElementException("No existe el pedido " + pedidoId);
+        }
+        Map<String, Object> pedido = pedidos.get(0);
+        pedido.put("detalles", pg.queryForList("""
+                SELECT id, sku, nombre_producto, cantidad, precio_unitario, subtotal
+                FROM pedido_detalle WHERE pedido_id = ? ORDER BY id""", pedidoId));
+        return pedido;
+    }
+
+    /** Compuerta: solo un pedido FACTURADO entra a preparación (picking). */
+    @Transactional
+    public Map<String, Object> iniciarPreparacion(long pedidoId) {
+        String estado = estadoPedido(pedidoId);
+        if ("en_preparacion".equals(estado)) {
+            throw new IllegalStateException(
+                    "El pedido ya está en preparación; márcalo como preparado al terminar");
+        }
+        if (!"facturado".equals(estado)) {
+            throw new IllegalStateException(
+                    "Solo se puede preparar un pedido FACTURADO; este pedido está en estado '"
+                    + estado + "'" + (List.of("pendiente", "confirmado", "pagado")
+                            .contains(estado) ? " (falta la factura de venta)" : ""));
+        }
+        cambiarEstadoPedido(pedidoId, "en_preparacion",
+                "Preparación iniciada por bodega (picking en curso)");
+        return detalleLogistico(pedidoId);
+    }
+
+    /** Compuerta: solo un pedido EN PREPARACIÓN se marca preparado. */
+    @Transactional
+    public Map<String, Object> marcarPreparado(long pedidoId) {
+        String estado = estadoPedido(pedidoId);
+        if ("preparado".equals(estado)) {
+            throw new IllegalStateException(
+                    "El pedido ya está preparado; queda a la espera del despacho");
+        }
+        if ("facturado".equals(estado)) {
+            throw new IllegalStateException(
+                    "Inicia primero la preparación del pedido (picking) antes de marcarlo preparado");
+        }
+        if (!"en_preparacion".equals(estado)) {
+            throw new IllegalStateException(
+                    "Solo se puede marcar preparado un pedido en preparación; "
+                    + "este pedido está en estado '" + estado + "'");
+        }
+        cambiarEstadoPedido(pedidoId, "preparado",
+                "Pedido preparado por bodega (picking y empaque completos); listo para despacho");
+        return detalleLogistico(pedidoId);
+    }
+
     // ── Caso 9: despachar pedido ─────────────────────────────────────────
 
+    /**
+     * Despacha un pedido PREPARADO por bodega. El transportista/método vienen
+     * asignados por zona en el pedido; DESPACHO puede pasarlos en la request
+     * para hacer override (optimización logística), y el cambio queda
+     * registrado en la línea de tiempo.
+     */
     @Transactional
-    public Map<String, Object> despachar(long pedidoId, long transportistaId, long metodoEnvioId,
+    public Map<String, Object> despachar(long pedidoId, Long transportistaId, Long metodoEnvioId,
                                          Long bodegaId, String observacion) {
         // Guardia de estado: solo se despacha una vez y desde un estado valido
         String estado = estadoPedido(pedidoId);
@@ -455,13 +650,22 @@ public class VentasService {
                     + (guias.isEmpty() ? "" : " (guia " + guias.get(0) + ")")
                     + "; no se puede despachar de nuevo");
         }
-        // Compuertas: pagado -> facturado -> despachable
+        // Compuertas: pagado -> facturado -> preparado por bodega -> despachable
         if (List.of("pendiente", "confirmado").contains(estado)) {
             throw new IllegalStateException(
                     "El pedido debe estar pagado antes de despachar; "
                     + "registra primero el pago del cliente (estado actual: '" + estado + "')");
         }
-        if (!List.of("pagado", "en_preparacion").contains(estado)) {
+        if ("pagado".equals(estado)) {
+            throw new IllegalStateException(
+                    "El pedido debe tener factura de venta emitida antes del despacho");
+        }
+        if (List.of("facturado", "en_preparacion").contains(estado)) {
+            throw new IllegalStateException(
+                    "Bodega debe PREPARAR el pedido (picking y empaque) antes del despacho "
+                    + "(estado actual: '" + estado + "')");
+        }
+        if (!"preparado".equals(estado)) {
             throw new IllegalStateException(
                     "No se puede despachar un pedido en estado '" + estado + "'");
         }
@@ -470,6 +674,38 @@ public class VentasService {
         if (facturas.isEmpty()) {
             throw new IllegalStateException(
                     "El pedido debe tener factura de venta emitida antes del despacho");
+        }
+
+        // Transportista/método: el asignado por zona, salvo override de despacho
+        Map<String, Object> asignado = pg.queryForMap(
+                "SELECT transportista_id, metodo_envio_id FROM pedido WHERE id = ?", pedidoId);
+        Long transportistaFinal = transportistaId != null ? transportistaId
+                : asignado.get("transportista_id") != null
+                        ? ((Number) asignado.get("transportista_id")).longValue() : null;
+        Long metodoFinal = metodoEnvioId != null ? metodoEnvioId
+                : asignado.get("metodo_envio_id") != null
+                        ? ((Number) asignado.get("metodo_envio_id")).longValue() : null;
+        if (transportistaFinal == null || metodoFinal == null) {
+            throw new IllegalArgumentException("El pedido no tiene transportista/método de "
+                    + "envío asignado: selecciónalos para despachar");
+        }
+        Long transportistaAsignado = asignado.get("transportista_id") != null
+                ? ((Number) asignado.get("transportista_id")).longValue() : null;
+        String cambioTransportista = null;
+        if (transportistaAsignado != null && !transportistaAsignado.equals(transportistaFinal)) {
+            List<String> nombres = pg.queryForList("""
+                    SELECT nombre FROM transportista WHERE id IN (?, ?) ORDER BY id = ?""",
+                    String.class, transportistaAsignado, transportistaFinal, transportistaFinal);
+            cambioTransportista = "Transportista cambiado por despacho: "
+                    + (nombres.size() > 1 ? nombres.get(0) + " → " + nombres.get(1)
+                                          : "override manual");
+        }
+        // El pedido refleja el transportista/método reales del envío
+        if (!transportistaFinal.equals(transportistaAsignado)
+                || !metodoFinal.equals(asignado.get("metodo_envio_id") != null
+                        ? ((Number) asignado.get("metodo_envio_id")).longValue() : null)) {
+            pg.update("UPDATE pedido SET transportista_id = ?, metodo_envio_id = ? WHERE id = ?",
+                    transportistaFinal, metodoFinal, pedidoId);
         }
 
         String direccion = pg.queryForObject("""
@@ -484,11 +720,14 @@ public class VentasService {
         String guia = "GUIA-" + numero.substring(3);
         Long envioId = pg.queryForObject("""
                 INSERT INTO envio (numero, pedido_id, transportista_id, metodo_envio_id,
-                                   bodega_id, direccion_entrega, numero_guia, estado, fecha_despacho)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 'en_transito', now())
+                                   bodega_id, direccion_entrega, numero_guia, estado,
+                                   fecha_despacho, fecha_entrega_estimada)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'en_transito', now(),
+                        current_date + COALESCE((SELECT dias_entrega_max FROM metodo_envio
+                                                 WHERE id = ?), 3)::int)
                 RETURNING id""",
-                Long.class, numero, pedidoId, transportistaId, metodoEnvioId,
-                bodegaId, direccion, guia);
+                Long.class, numero, pedidoId, transportistaFinal, metodoFinal,
+                bodegaId, direccion, guia, metodoFinal);
 
         pg.update("""
                 INSERT INTO envio_detalle (envio_id, pedido_detalle_id, cantidad)
@@ -499,9 +738,12 @@ public class VentasService {
                 INSERT INTO seguimiento_envio (envio_id, estado, descripcion, ubicacion)
                 VALUES (?, 'en_transito', ?, 'Bodega RetailMind - Quevedo')""",
                 envioId, "Paquete entregado al transportista"
-                        + (observacion != null ? " · " + observacion : ""));
+                        + (cambioTransportista != null ? " · " + cambioTransportista : "")
+                        + (observacion != null && !observacion.isBlank()
+                           ? " · " + observacion : ""));
 
-        cambiarEstadoPedido(pedidoId, "despachado", "Despachado con guia " + guia);
+        cambiarEstadoPedido(pedidoId, "despachado", "Despachado con guia " + guia
+                + (cambioTransportista != null ? " · " + cambioTransportista : ""));
         return obtenerEnvio(envioId);
     }
 
