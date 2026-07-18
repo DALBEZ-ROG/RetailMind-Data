@@ -66,6 +66,7 @@ export class AppComponent {
     '/operativo/compras/ordenes': 'Órdenes de Compra',
     '/operativo/compras/recepciones': 'Recepción de Mercancía',
     '/operativo/compras/facturas': 'Facturas de Compra',
+    '/operativo/compras/devoluciones-proveedor': 'Devolución a Proveedor',
     '/operativo/inventario/transferencias': 'Transferencias de Stock',
     '/operativo/inventario/ajustes': 'Ajustes de Inventario',
     '/operativo/inventario/kardex': 'Kardex de Inventario',

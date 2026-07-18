@@ -484,9 +484,12 @@ public class VentasService {
      */
     @Transactional
     public Map<String, Object> emitirFactura(long pedidoId, boolean automatica) {
-        // Guardia de idempotencia: un pedido se factura una sola vez
+        // Guardia de idempotencia: un pedido se factura una sola vez. Las
+        // facturas ANULADAS no cuentan: un pedido con su factura anulada
+        // puede volver a facturarse (saneamiento script 43).
         List<String> existentes = pg.queryForList(
-                "SELECT numero FROM factura_venta WHERE pedido_id = ?", String.class, pedidoId);
+                "SELECT numero FROM factura_venta WHERE pedido_id = ? AND estado <> 'anulada'",
+                String.class, pedidoId);
         if (!existentes.isEmpty()) {
             throw new IllegalStateException("El pedido ya fue facturado (factura "
                     + existentes.get(0) + "); no se puede facturar de nuevo");
@@ -890,7 +893,13 @@ public class VentasService {
         }
         // Cierra el envío vigente (el más reciente) y deja rastro de seguimiento
         List<Map<String, Object>> envios = pg.queryForList(
-                "SELECT id, numero_guia FROM envio WHERE pedido_id = ? ORDER BY id DESC", pedidoId);
+                "SELECT id, numero_guia, estado FROM envio WHERE pedido_id = ? ORDER BY id DESC",
+                pedidoId);
+        // Compuerta de novedades: un envío 'fallido' no se entrega sin resolver
+        if (!envios.isEmpty() && "fallido".equals(envios.get(0).get("estado"))) {
+            throw new IllegalStateException("El envío tiene una novedad abierta; "
+                    + "resuélvela (reprogramar o devolver al almacén) antes de marcar la entrega");
+        }
         String guia = null;
         if (!envios.isEmpty()) {
             long envioId = ((Number) envios.get(0).get("id")).longValue();
@@ -928,6 +937,239 @@ public class VentasService {
     // DESPACHO/BODEGA hacen el retorno físico y el stock reingresa SOLO tras
     // la inspección de bodega. El registro directo en un paso se eliminó.
 
+    // ── Novedades / incidencias de envío (script 44) ─────────────────────
+
+    /** Tipos de novedad = CHECK de novedad_envio (lista blanca) con su
+     *  etiqueta legible para seguimiento/historial. */
+    private static final Map<String, String> TIPOS_NOVEDAD = Map.of(
+            "cliente_ausente", "cliente ausente",
+            "direccion_incorrecta", "dirección incorrecta",
+            "cliente_rechazo", "el cliente rechazó el paquete",
+            "zona_dificil_acceso", "zona de difícil acceso",
+            "dano_en_transito", "daño en tránsito");
+
+    /** Tras este nº de intentos fallidos solo queda devolver al almacén. */
+    public static final int MAX_INTENTOS_ENTREGA = 3;
+
+    /**
+     * Registra una novedad/incidencia sobre un envío EN TRÁNSITO (pedido
+     * despachado, aún no entregado). El envío pasa a 'fallido' hasta que
+     * despacho la resuelva (reprogramar o devolver al almacén); el pedido
+     * sigue 'despachado'. Autor del JWT + rastro en seguimiento, historial
+     * del pedido y log_auditoria.
+     */
+    @Transactional
+    public Map<String, Object> registrarNovedad(long envioId, String tipo, String descripcion) {
+        if (tipo == null || !TIPOS_NOVEDAD.containsKey(tipo)) {
+            throw new IllegalArgumentException(
+                    "Tipo de novedad inválido: usa uno de " + TIPOS_NOVEDAD.keySet());
+        }
+        Map<String, Object> envio = envioPorId(envioId);
+        String estadoEnvio = (String) envio.get("estado");
+        long pedidoId = ((Number) envio.get("pedido_id")).longValue();
+        switch (estadoEnvio) {
+            case "entregado" -> throw new IllegalStateException("El envío ya fue entregado; "
+                    + "no admite novedades (si el cliente quiere devolver, aplica la RMA)");
+            case "devuelto" -> throw new IllegalStateException(
+                    "El envío ya fue devuelto al almacén; no admite más novedades");
+            case "fallido" -> throw new IllegalStateException("El envío ya tiene una novedad "
+                    + "abierta; resuélvela (reprogramar o devolver al almacén)");
+            case "en_transito" -> { }
+            default -> throw new IllegalStateException(
+                    "Solo se registran novedades sobre envíos despachados/en tránsito "
+                    + "(estado actual del envío: '" + estadoEnvio + "')");
+        }
+        int intento = intentoActual(envioId);
+        Long id = pg.queryForObject("""
+                INSERT INTO novedad_envio (envio_id, pedido_id, tipo, descripcion,
+                                           intento_numero, registrado_por)
+                VALUES (?, ?, ?, NULLIF(?, ''), ?, ?) RETURNING id""",
+                Long.class, envioId, pedidoId, tipo, descripcion, intento, usuarioActualId());
+        pg.update("UPDATE envio SET estado = 'fallido' WHERE id = ?", envioId);
+        pg.update("""
+                INSERT INTO seguimiento_envio (envio_id, estado, descripcion, ubicacion)
+                VALUES (?, 'fallido', ?, 'Ruta de entrega')""",
+                envioId, "Novedad en la entrega (intento " + intento + "): "
+                        + TIPOS_NOVEDAD.get(tipo)
+                        + (descripcion != null && !descripcion.isBlank()
+                           ? " · " + descripcion : ""));
+        registrarHistorial(pedidoId, "despachado",
+                "Novedad de envío registrada: " + TIPOS_NOVEDAD.get(tipo));
+        auditoria.registrar("novedad_envio", id, "INSERT",
+                Map.of("envio_estado", "en_transito"),
+                Map.of("envio_id", envioId, "pedido_id", pedidoId, "tipo", tipo,
+                       "intento", intento, "envio_estado", "fallido"));
+        return novedadesDePedido(pedidoId);
+    }
+
+    /**
+     * Resuelve la novedad reprogramando un SEGUNDO (o tercer) intento de
+     * entrega: el envío vuelve a 'en_transito' con nueva fecha estimada.
+     * Máximo MAX_INTENTOS_ENTREGA intentos; después solo queda devolver.
+     */
+    @Transactional
+    public Map<String, Object> reprogramarEntrega(long novedadId, String observacion) {
+        Map<String, Object> n = novedadAbierta(novedadId, "reprogramar la entrega");
+        long envioId = ((Number) n.get("envio_id")).longValue();
+        long pedidoId = ((Number) n.get("pedido_id")).longValue();
+        int intento = ((Number) n.get("intento_numero")).intValue();
+        if (intento >= MAX_INTENTOS_ENTREGA) {
+            throw new IllegalStateException("Se alcanzó el máximo de " + MAX_INTENTOS_ENTREGA
+                    + " intentos de entrega; devuelve el envío al almacén");
+        }
+        pg.update("""
+                UPDATE novedad_envio SET estado = 'resuelta', accion = 'reprogramada',
+                       resuelto_por = ?, fecha_resolucion = now() WHERE id = ?""",
+                usuarioActualId(), novedadId);
+        pg.update("""
+                UPDATE envio SET estado = 'en_transito',
+                       fecha_entrega_estimada = current_date + COALESCE(
+                           (SELECT me.dias_entrega_max FROM metodo_envio me
+                            WHERE me.id = envio.metodo_envio_id), 3)::int
+                WHERE id = ?""", envioId);
+        int nuevoIntento = intento + 1;
+        pg.update("""
+                INSERT INTO seguimiento_envio (envio_id, estado, descripcion, ubicacion)
+                VALUES (?, 'en_transito', ?, 'Ruta de entrega')""",
+                envioId, "Entrega reprogramada: intento " + nuevoIntento + " de "
+                        + MAX_INTENTOS_ENTREGA
+                        + (observacion != null && !observacion.isBlank()
+                           ? " · " + observacion : ""));
+        registrarHistorial(pedidoId, "despachado",
+                "Entrega reprogramada (intento " + nuevoIntento + " de " + MAX_INTENTOS_ENTREGA
+                + ") tras novedad: " + TIPOS_NOVEDAD.get((String) n.get("tipo")));
+        auditoria.registrar("novedad_envio", novedadId, "UPDATE",
+                Map.of("estado", "abierta", "envio_estado", "fallido"),
+                Map.of("accion", "reprogramada", "intento_nuevo", nuevoIntento,
+                       "envio_estado", "en_transito"));
+        return novedadesDePedido(pedidoId);
+    }
+
+    /**
+     * Resuelve la novedad devolviendo el envío al almacén: el envío queda
+     * 'devuelto' y el pedido pasa a 'no_entregado' (terminal). Criterio de
+     * stock/RMA documentado: aquí NO se reingresa stock — el kardex solo se
+     * mueve tras inspección FÍSICA de bodega (mismo criterio que la RMA,
+     * script 38). La RMA de cliente no aplica (exige pedido entregado): el
+     * reembolso/reingreso del pedido no entregado se gestiona vía ticket de
+     * soporte + gerencia (deuda documentada).
+     */
+    @Transactional
+    public Map<String, Object> devolverAlmacen(long novedadId, String observacion) {
+        Map<String, Object> n = novedadAbierta(novedadId, "devolver al almacén");
+        long envioId = ((Number) n.get("envio_id")).longValue();
+        long pedidoId = ((Number) n.get("pedido_id")).longValue();
+        String motivo = TIPOS_NOVEDAD.get((String) n.get("tipo"));
+        pg.update("""
+                UPDATE novedad_envio SET estado = 'resuelta', accion = 'devuelto_almacen',
+                       resuelto_por = ?, fecha_resolucion = now() WHERE id = ?""",
+                usuarioActualId(), novedadId);
+        pg.update("UPDATE envio SET estado = 'devuelto' WHERE id = ?", envioId);
+        pg.update("""
+                INSERT INTO seguimiento_envio (envio_id, estado, descripcion, ubicacion)
+                VALUES (?, 'devuelto', ?, 'Bodega RetailMind - Quevedo')""",
+                envioId, "Envío devuelto al almacén tras novedad: " + motivo
+                        + (observacion != null && !observacion.isBlank()
+                           ? " · " + observacion : ""));
+        cambiarEstadoPedido(pedidoId, "no_entregado",
+                "Pedido no entregado: envío devuelto al almacén (" + motivo
+                + "); el stock no se reingresa hasta la inspección de bodega");
+        auditoria.registrar("novedad_envio", novedadId, "UPDATE",
+                Map.of("estado", "abierta", "envio_estado", "fallido",
+                       "estado_pedido", "despachado"),
+                Map.of("accion", "devuelto_almacen", "envio_estado", "devuelto",
+                       "estado_pedido", "no_entregado"));
+        return novedadesDePedido(pedidoId);
+    }
+
+    /**
+     * Envío vigente + intentos + historial de novedades del pedido. La usan
+     * la pantalla de despacho y Mis Pedidos del cliente (RLS lo aísla a sus
+     * pedidos; su consulta no une usuario porque grp_cliente no lo lee).
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> novedadesDePedido(long pedidoId) {
+        estadoPedido(pedidoId); // mensaje claro si no existe (o RLS lo oculta)
+        List<Map<String, Object>> envios = pg.queryForList("""
+                SELECT id, numero, numero_guia, estado, fecha_entrega_estimada
+                FROM envio WHERE pedido_id = ? ORDER BY id DESC LIMIT 1""", pedidoId);
+        Map<String, Object> res = new java.util.LinkedHashMap<>();
+        res.put("pedido_id", pedidoId);
+        res.put("envio", envios.isEmpty() ? null : envios.get(0));
+        if (envios.isEmpty()) {
+            res.put("intentos", 0);
+            res.put("novedades", List.of());
+            return res;
+        }
+        long envioId = ((Number) envios.get(0).get("id")).longValue();
+        res.put("intentos", intentoActual(envioId));
+        res.put("max_intentos", MAX_INTENTOS_ENTREGA);
+        boolean esCliente = "CLIENTE".equalsIgnoreCase(rolActual());
+        res.put("novedades", esCliente
+                ? pg.queryForList("""
+                        SELECT id, tipo, descripcion, intento_numero, estado, accion,
+                               fecha_registro, fecha_resolucion
+                        FROM novedad_envio WHERE envio_id = ? ORDER BY id""", envioId)
+                : pg.queryForList("""
+                        SELECT n.id, n.tipo, n.descripcion, n.intento_numero, n.estado,
+                               n.accion, n.fecha_registro, n.fecha_resolucion,
+                               trim(concat(ur.nombre, ' ', COALESCE(ur.apellido, '')))
+                                   AS registrado_por,
+                               trim(concat(us.nombre, ' ', COALESCE(us.apellido, '')))
+                                   AS resuelto_por
+                        FROM novedad_envio n
+                        LEFT JOIN usuario ur ON ur.id = n.registrado_por
+                        LEFT JOIN usuario us ON us.id = n.resuelto_por
+                        WHERE n.envio_id = ? ORDER BY n.id""", envioId));
+        return res;
+    }
+
+    /** Envío por id con su pedido; 404 con mensaje claro si no existe. */
+    private Map<String, Object> envioPorId(long envioId) {
+        List<Map<String, Object>> envios = pg.queryForList(
+                "SELECT id, pedido_id, estado, numero_guia FROM envio WHERE id = ?", envioId);
+        if (envios.isEmpty()) {
+            throw new NoSuchElementException("No existe el envío " + envioId);
+        }
+        return envios.get(0);
+    }
+
+    /** Nº del intento de entrega en curso = 1 + reprogramaciones previas. */
+    private int intentoActual(long envioId) {
+        Integer reprogramadas = pg.queryForObject("""
+                SELECT COUNT(*) FROM novedad_envio
+                WHERE envio_id = ? AND accion = 'reprogramada'""", Integer.class, envioId);
+        return 1 + (reprogramadas == null ? 0 : reprogramadas);
+    }
+
+    /** Novedad ABIERTA con su envío; guardias de estado con mensaje claro. */
+    private Map<String, Object> novedadAbierta(long novedadId, String accionPedida) {
+        List<Map<String, Object>> novedades = pg.queryForList("""
+                SELECT n.id, n.envio_id, n.pedido_id, n.tipo, n.estado, n.accion,
+                       n.intento_numero, e.estado AS envio_estado
+                FROM novedad_envio n JOIN envio e ON e.id = n.envio_id
+                WHERE n.id = ?""", novedadId);
+        if (novedades.isEmpty()) {
+            throw new NoSuchElementException("No existe la novedad de envío " + novedadId);
+        }
+        Map<String, Object> n = novedades.get(0);
+        if ("resuelta".equals(n.get("estado"))) {
+            throw new IllegalStateException("La novedad ya fue resuelta ("
+                    + ("reprogramada".equals(n.get("accion"))
+                       ? "entrega reprogramada" : "envío devuelto al almacén")
+                    + "); no se puede " + accionPedida + " de nuevo");
+        }
+        if ("entregado".equals(n.get("envio_estado"))) {
+            throw new IllegalStateException(
+                    "El envío ya fue entregado; no se puede " + accionPedida);
+        }
+        if (!"fallido".equals(n.get("envio_estado"))) {
+            throw new IllegalStateException("El envío no está en estado de novedad "
+                    + "(estado actual: '" + n.get("envio_estado") + "')");
+        }
+        return n;
+    }
+
     // ── Utilitarios ──────────────────────────────────────────────────────
 
     /** Estado actual del pedido; falla con mensaje claro si el pedido no existe. */
@@ -958,8 +1200,10 @@ public class VentasService {
     }
 
     private String siguienteNumero(String prefijo) {
+        // Secuencia global (script 43): número único garantizado, sin la
+        // colisión posible del sufijo aleatorio legacy.
         return pg.queryForObject(
-                "SELECT ? || '-' || to_char(now(), 'YYYYMMDD') || '-' || lpad(floor(random()*100000)::text, 5, '0')",
+                "SELECT ? || '-' || to_char(now(), 'YYYYMMDD') || '-' || nextval('seq_numero_documento')::text",
                 String.class, prefijo);
     }
 

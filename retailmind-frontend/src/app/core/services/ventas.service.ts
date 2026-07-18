@@ -6,7 +6,7 @@ import { HttpParams } from '@angular/common/http';
 import {
   ItemPedidoReq, PedidoVentaRow, PedidoVentaDetalle,
   FacturaVenta, PaginaFacturasVenta, PagoClienteRes, EnvioDetalle,
-  SeguimientoRow, PreparacionRow, DetalleLogistico
+  SeguimientoRow, PreparacionRow, DetalleLogistico, NovedadesEnvioRes
 } from '../models/operativo.model';
 
 @Injectable({ providedIn: 'root' })
@@ -84,6 +84,26 @@ export class VentasService {
   }
   seguimiento(envioId: number): Observable<SeguimientoRow[]> {
     return this.http.get<SeguimientoRow[]>(`${this.base}/envios/${envioId}/seguimiento`);
+  }
+
+  // ── Novedades / incidencias de envío (script 44) ─────────────────────
+  novedadesPedido(pedidoId: number): Observable<NovedadesEnvioRes> {
+    return this.http.get<NovedadesEnvioRes>(`${this.base}/pedidos/${pedidoId}/novedades`);
+  }
+  /** Novedad sobre un envío en tránsito (queda 'fallido' hasta resolverla). */
+  registrarNovedad(envioId: number, body: { tipo: string; descripcion?: string }):
+      Observable<NovedadesEnvioRes> {
+    return this.http.post<NovedadesEnvioRes>(`${this.base}/envios/${envioId}/novedades`, body);
+  }
+  /** Nuevo intento de entrega (máx. 3): el envío vuelve a tránsito. */
+  reprogramarNovedad(novedadId: number, observacion?: string): Observable<NovedadesEnvioRes> {
+    return this.http.post<NovedadesEnvioRes>(
+      `${this.base}/novedades/${novedadId}/reprogramar`, { observacion });
+  }
+  /** Devuelve el envío al almacén; el pedido queda 'no_entregado'. */
+  devolverAlmacen(novedadId: number, observacion?: string): Observable<NovedadesEnvioRes> {
+    return this.http.post<NovedadesEnvioRes>(
+      `${this.base}/novedades/${novedadId}/devolver-almacen`, { observacion });
   }
 
   // Devoluciones (RMA / logística inversa): core/services/devoluciones.service.ts

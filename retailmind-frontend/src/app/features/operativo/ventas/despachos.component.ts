@@ -12,7 +12,8 @@ import { VentasService } from '../../../core/services/ventas.service';
 import { ReferenciasService } from '../../../core/services/referencias.service';
 import { mensajeError } from '../../../core/services/api-error.util';
 import {
-  PedidoVentaRow, CatalogoRef, EnvioDetalle, SeguimientoRow, DetalleLogistico
+  PedidoVentaRow, CatalogoRef, EnvioDetalle, SeguimientoRow, DetalleLogistico,
+  NovedadesEnvioRes, NovedadEnvioRow
 } from '../../../core/models/operativo.model';
 
 /**
@@ -152,5 +153,104 @@ export class DespachosComponent implements OnInit {
 
   cargarSeguimiento(envioId: number): void {
     this.ventas.seguimiento(envioId).subscribe(s => this.seguimiento = s);
+  }
+
+  // ── Novedades / incidencias de envío (script 44) ─────────────────────
+  // Sobre un pedido DESPACHADO: registrar la novedad (el envío queda
+  // 'fallido') y resolverla: reprogramar (máx. 3 intentos) o devolver al
+  // almacén (el pedido pasa a 'no_entregado'; el stock NO se reingresa aquí).
+
+  tiposNovedad = [
+    { codigo: 'cliente_ausente', nombre: 'Cliente ausente' },
+    { codigo: 'direccion_incorrecta', nombre: 'Dirección incorrecta' },
+    { codigo: 'cliente_rechazo', nombre: 'Cliente rechazó el paquete' },
+    { codigo: 'zona_dificil_acceso', nombre: 'Zona de difícil acceso' },
+    { codigo: 'dano_en_transito', nombre: 'Daño en tránsito' }
+  ];
+
+  pedidoNovedadId: number | null = null;
+  novedadesInfo: NovedadesEnvioRes | null = null;
+  tipoNovedad: string | null = null;
+  descripcionNovedad = '';
+  observacionResolucion = '';
+  procesandoNovedad = false;
+
+  get novedadAbierta(): NovedadEnvioRow | undefined {
+    return this.novedadesInfo?.novedades.find(n => n.estado === 'abierta');
+  }
+
+  etiquetaNovedad(codigo: string): string {
+    return this.tiposNovedad.find(t => t.codigo === codigo)?.nombre ?? codigo;
+  }
+
+  seleccionarPedidoNovedad(): void {
+    this.novedadesInfo = null;
+    this.tipoNovedad = null;
+    this.descripcionNovedad = '';
+    this.observacionResolucion = '';
+    if (!this.pedidoNovedadId) return;
+    this.ventas.novedadesPedido(this.pedidoNovedadId).subscribe({
+      next: info => {
+        this.novedadesInfo = info;
+        if (info.envio) this.cargarSeguimiento(info.envio.id);
+      },
+      error: e => this.snackBar.open(
+        mensajeError(e, 'No se pudieron cargar las novedades'), 'Cerrar', { duration: 5000 })
+    });
+  }
+
+  registrarNovedad(): void {
+    if (!this.novedadesInfo?.envio || !this.tipoNovedad) {
+      this.snackBar.open('Selecciona el pedido y el tipo de novedad', 'Cerrar', { duration: 3500 });
+      return;
+    }
+    this.procesandoNovedad = true;
+    this.ventas.registrarNovedad(this.novedadesInfo.envio.id,
+      { tipo: this.tipoNovedad, descripcion: this.descripcionNovedad }).subscribe({
+      next: info => this.trasAccionNovedad(info, 'Novedad registrada — el envío queda con incidencia'),
+      error: e => this.errorNovedad(e, 'No se pudo registrar la novedad')
+    });
+  }
+
+  reprogramar(): void {
+    const abierta = this.novedadAbierta;
+    if (!abierta) return;
+    this.procesandoNovedad = true;
+    this.ventas.reprogramarNovedad(abierta.id, this.observacionResolucion).subscribe({
+      next: info => this.trasAccionNovedad(info,
+        `Entrega reprogramada — intento ${info.intentos} de ${info.max_intentos ?? 3}`),
+      error: e => this.errorNovedad(e, 'No se pudo reprogramar la entrega')
+    });
+  }
+
+  devolverAlmacen(): void {
+    const abierta = this.novedadAbierta;
+    if (!abierta) return;
+    this.procesandoNovedad = true;
+    this.ventas.devolverAlmacen(abierta.id, this.observacionResolucion).subscribe({
+      next: info => {
+        this.trasAccionNovedad(info,
+          'Envío devuelto al almacén — el pedido queda NO ENTREGADO (sin reingreso de stock)');
+        this.pedidoNovedadId = null; // el pedido sale de "en tránsito"
+      },
+      error: e => this.errorNovedad(e, 'No se pudo devolver el envío al almacén')
+    });
+  }
+
+  private trasAccionNovedad(info: NovedadesEnvioRes, mensaje: string): void {
+    this.procesandoNovedad = false;
+    this.novedadesInfo = info;
+    this.tipoNovedad = null;
+    this.descripcionNovedad = '';
+    this.observacionResolucion = '';
+    this.snackBar.open(mensaje, 'OK', { duration: 4000, panelClass: ['snack-success'] });
+    if (info.envio) this.cargarSeguimiento(info.envio.id);
+    this.cargarPedidos();
+  }
+
+  private errorNovedad(e: unknown, porDefecto: string): void {
+    this.procesandoNovedad = false;
+    this.snackBar.open(mensajeError(e, porDefecto), 'Cerrar', { duration: 5000 });
+    this.seleccionarPedidoNovedad(); // refleja el estado real del envío
   }
 }

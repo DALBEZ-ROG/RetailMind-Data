@@ -1,9 +1,8 @@
 package com.retailmind.config;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,13 +77,11 @@ public class HealthCheckService {
             pb.redirectErrorStream(true);
             Process process = pb.start();
 
-            try (BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(process.getInputStream()))) {
-                reader.readLine(); // Python 3.x.x
+            if (!process.waitFor(3, TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                return "DOWN";
             }
-
-            int exitCode = process.waitFor();
-            return exitCode == 0 ? "UP" : "DOWN";
+            return process.exitValue() == 0 ? "UP" : "DOWN";
         } catch (Exception e) {
             logger.warn("Health check Python fallo: {}", e.getMessage());
             return "DOWN";

@@ -176,6 +176,21 @@ export interface DetalleLogistico {
     id: number; sku: string; nombre_producto: string; cantidad: number;
   }[];
 }
+// ── Novedades / incidencias de envío (script 44) ─────────────────────────────
+// registrado_por/resuelto_por solo llegan al personal (el cliente no lee usuario)
+export interface NovedadEnvioRow {
+  id: number; tipo: string; descripcion: string | null; intento_numero: number;
+  estado: 'abierta' | 'resuelta'; accion: 'reprogramada' | 'devuelto_almacen' | null;
+  fecha_registro: string; fecha_resolucion: string | null;
+  registrado_por?: string; resuelto_por?: string | null;
+}
+export interface NovedadesEnvioRes {
+  pedido_id: number;
+  envio: { id: number; numero: string; numero_guia: string; estado: string;
+           fecha_entrega_estimada: string | null } | null;
+  intentos: number; max_intentos?: number;
+  novedades: NovedadEnvioRow[];
+}
 // ── Devoluciones RMA / logística inversa (script 38) ─────────────────────
 export interface ItemDevolucionReq {
   pedidoDetalleId: number; cantidad: number; estadoProducto?: string;

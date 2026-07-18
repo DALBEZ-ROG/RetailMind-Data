@@ -139,7 +139,9 @@ export const DASHBOARD_AREAS: AreaNav[] = [
       { titulo: 'Recepciones', descripcion: 'Registrar la mercancía recibida',
         icono: 'move_to_inbox', ruta: '/operativo/compras/recepciones', permiso: 'compras' },
       { titulo: 'Facturas de Compra', descripcion: 'Facturas de proveedor y pagos',
-        icono: 'request_quote', ruta: '/operativo/compras/facturas', permiso: 'facturasCompra' }
+        icono: 'request_quote', ruta: '/operativo/compras/facturas', permiso: 'facturasCompra' },
+      { titulo: 'Devolución a Proveedor', descripcion: 'Producto defectuoso devuelto al proveedor',
+        icono: 'assignment_return', ruta: '/operativo/compras/devoluciones-proveedor', permiso: 'compras' }
     ]
   },
   {

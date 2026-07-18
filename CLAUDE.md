@@ -19,7 +19,7 @@ desactualizado: ignóralo.
   Pantallas operativas en `features/operativo/` (incluye `marketing/`); estilos compartidos
   `operativo-shared.scss`; errores con `core/services/api-error.util.ts`.
 - **ETL** `retailmind/`: Python 3.12, PocketBase → Parquet → ClickHouse. El DDL operativo vigente
-  de PostgreSQL está en `retailmind/sql/postgres/` (scripts numerados 01-41 + 99).
+  de PostgreSQL está en `retailmind/sql/postgres/` (scripts numerados 01-45 + 99).
 - **Tienda del cliente** (solo rol CLIENTE, guard + SecurityConfig): backend en paquetes
   `catalogo/`, `carrito/`, `wishlist/`, `perfil/`, `recomendaciones/` contra `pgJdbcTemplate`;
   el id público de producto es el de la VARIANTE. El checkout llama a `VentasService.crearPedido`
@@ -199,26 +199,84 @@ acciones) en: crear pedido interno, despachar, registrar factura de compra y mod
 reseña/pregunta; INSERT de log_auditoria otorgado a grp_vendedor/despacho/compras (script
 42; el checkout online NO loguea: grp_cliente sin INSERT a propósito). Trazabilidad futura
 (producto, marketing, historial de ticket) documentada en deuda.
-La deuda técnica acumulada vive en `DEUDA_TECNICA.md` (raíz).
+**SANEAMIENTO TIPO 1 (2026-07-18, script 43)**: los 10 bugs del inventario consolidado
+quedaron cerrados por causa raíz — cupón ahora SÍ recalcula el IVA (prorrateo por línea en
+`aplicarCupon`, reescala `pedido_detalle.monto_impuesto` antes del pago; `envio_gratis` no
+toca base); RLS habilitado en `pago`/`transaccion_pago`/`cupon`/`uso_cupon` (cliente aislado
+a lo suyo, cupones solo activos o usados por él; helper `fn_pago_del_cliente` SECURITY
+DEFINER); numeración de documentos por secuencia global `seq_numero_documento` (desde
+100000; los 3 `siguienteNumero`) y tickets por `fn_siguiente_numero_ticket()` (correlativo
+por año bajo lock); `resena` con grants de cliente POR COLUMNA (sin UPDATE); soporte sin
+escritura en `categoria_ticket`; RMA 'despachado' con plazo de 30 días desde
+`fecha_despacho`; pedidos legacy saneados (factura del 24662 anulada — `emitirFactura`
+ignora 'anulada' —, el 87538 facturado). La deuda técnica acumulada vive en
+`DEUDA_TECNICA.md` (raíz).
+**NOVEDADES DE ENVÍO (2026-07-18, script 44)**: incidencias sobre el envío en tránsito
+(tabla `novedad_envio`: cliente_ausente/direccion_incorrecta/cliente_rechazo/
+zona_dificil_acceso/dano_en_transito, autor del JWT, RLS pol_horario+pol_cliente_propio).
+DESPACHO registra la novedad (POST `/api/ventas/envios/{id}/novedades`, el envío pasa a
+'fallido' — CHECK existente) y la resuelve: REPROGRAMAR (`/novedades/{id}/reprogramar`,
+máx. 3 intentos, envío vuelve a 'en_transito' + nueva fecha estimada) o DEVOLVER AL ALMACÉN
+(`/novedades/{id}/devolver-almacen`: envío 'devuelto', pedido → estado NUEVO
+'no_entregado' terminal, SIN reingreso de stock — el kardex solo se mueve tras inspección
+de bodega, criterio RMA; reembolso/reingreso por soporte, deuda Fase 6). Guardias: solo
+envíos en tránsito, UNA novedad abierta a la vez, `entregar` bloqueado con novedad abierta,
+intentos = 1 + reprogramaciones (calculado, sin columna). Consulta compartida GET
+`/pedidos/{id}/novedades` (role-aware: el cliente no une usuario). Rastro triple:
+seguimiento_envio + historial_estado_pedido + log_auditoria. UI: tarjeta "Novedades de
+entrega" en `/operativo/ventas/despachos` y mensaje amable + timeline en Mis Pedidos.
 
-**Pendiente**: orquestación ETL con Airflow. El NIVEL TÁCTICO está en análisis (2026-07-17,
+**DEVOLUCIÓN A PROVEEDOR (2026-07-18, script 45, `compras/DevolucionProveedorService`)**:
+espejo del RMA hacia el proveedor. Pool `item_defectuoso` (pendiente→en_devolucion→resuelto)
+con DOS orígenes: (1) inspección RMA 'defectuoso' lo crea AUTOMÁTICO (proveedor rastreado por
+última OC de la variante o NULL → COMPRAS lo asigna con PATCH; SIN stock: nunca reingresó) y
+(2) recepción de compra — rechazo EN PUERTA (`cantidad_rechazada`, automático, jamás entró a
+stock; UI en Recepciones) o marcado POSTERIOR de BODEGA (POST
+`/api/compras/recepciones/detalles/{id}/defectuoso`: ahí SÍ sale del stock vendible con kardex
+`salida_devolucion_proveedor`, tope recibidas−ya marcadas). COMPRAS agrupa pendientes de UN
+proveedor en `devolucion_proveedor` (numero DP-… por seq global; registrada→enviada [sin
+movimiento de stock]→resuelta→cerrada, guardias 409) y registra la resolución: `nota_credito`
+(crédito SIMULADO = Σ cantidad·costo, sin stock) o `reposicion` (reingreso APTO vía
+StockService, kardex NUEVO `entrada_reposicion_proveedor`, en la bodega de origen de cada
+ítem, bajo grp_compras — grants de stock dados en el 45). Historial propio
+(`historial_devolucion_proveedor`) + AuditoriaService en cada acción (grp_bodega ganó INSERT
+de log_auditoria); RLS pol_horario en las 4 tablas nuevas. Pantalla multi-rol
+`/operativo/compras/devoluciones-proveedor` (BODEGA marca/ve, COMPRAS gestiona con timeline;
+GERENTE lee). Deuda de la fase en `DEUDA_TECNICA.md` (Fase 7): sin cuarentena física, nota de
+crédito sin asiento en CxP, reposición en un paso, rechazo total en puerta imposible
+(CHECK recibida>0).
+
+**RE-AUDITORÍA DE DEUDA + HEALTH FAIL-FAST (2026-07-18, solo backend, sin script)**: auditoría
+completa de deuda post scripts 43-45 verificada contra el sistema real; el único Tipo 1
+detectado quedó CERRADO el mismo día — `/api/health` se colgaba con ClickHouse apagado
+(Hikari con `connectionTimeout` por defecto de 30s y driver sin timeout). `ClickHouseConfig`
+ahora arma el pool con `connectionTimeout=3s`, `validationTimeout=1.5s`,
+`initializationFailTimeout=-1` y propiedades del driver `connect_timeout=2.5s` /
+`socket_timeout=30s`; `checkPythonRuntime` con `waitFor(3s)`. Verificado en vivo:
+`/api/health` responde en ~3.1s acotados con `status: UP, analytics: DEGRADED` — YA SIRVE
+como healthcheck de contenedores. **Tipo 1 vigentes = 0**; la foto completa de deuda vive en
+`DEUDA_TECNICA.md` (raíz) + `docs/INVENTARIO_DEUDA_CONSOLIDADO.md` (re-verificado).
+
+**Pendiente**: contenerización completa (PostgreSQL sigue local, fuera de compose) y
+orquestación ETL con Airflow. El NIVEL TÁCTICO está en análisis (2026-07-17,
 `docs/RetailMind_T11_Analisis_Tactico.pdf`): 25 informes tácticos por departamento — 12 simples
 que salen directo de la BDR PostgreSQL y 13 compuestos (agregaciones/series temporales) que se
 procesarán en ClickHouse vía el ETL orquestado por Airflow; esa es la siguiente fase.
 
 **Deuda técnica conocida** (tablas huérfanas, requieren bloque dedicado):
 
-- `lote` (0 filas): trazabilidad por lote/vencimiento. La FK ya existe desde
-  `movimiento_inventario.lote_id` y `recepcion_detalle.lote_id`, así que darle uso obliga a tocar
-  recepción de compra (capturar lote), kardex (arrastrar `lote_id`) y salida FEFO en el despacho —
-  no es un CRUD suelto.
+- `lote` (0 filas): trazabilidad por lote/vencimiento. **DECISIÓN DE ALCANCE (2026-07-18,
+  ver `ROADMAP.md`)**: se evaluó FEFO y se pospuso deliberadamente — obliga a tocar
+  recepción (capturar lote+vencimiento), inventario (stock por lote), kardex (arrastrar
+  `lote_id`) y salida FEFO en despacho, sin aporte al flujo retail general. Las FK
+  `movimiento_inventario.lote_id` y `recepcion_detalle.lote_id` quedan listas para esa fase.
 - `ajuste_inventario.estado = 'borrador'`: el CHECK lo admite y `'anulado'` ya tiene flujo, pero un
   borrador aplicable exigiría una tabla de detalle de líneas del ajuste, que hoy no existe (el
   ajuste escribe el movimiento de kardex directo al aplicarse).
-- `devolucion_proveedor` **no existe** en la BD: la única devolución modelada es al cliente
-  (`devolucion` / `devolucion_detalle`), ya implementada como RMA completo. Los ítems
-  `defectuoso` de la inspección quedan como merma documental esperando ese proceso (el
-  kardex ya tiene `salida_devolucion_proveedor` sin uso).
+- `devolucion_proveedor` **ya existe** (script 45): el ítem `defectuoso` de la inspección RMA
+  y el de recepción caen al pool `item_defectuoso` y se devuelven al proveedor con resolución
+  nota de crédito/reposición (ver bloque DEVOLUCIÓN A PROVEEDOR). `salida_devolucion_proveedor`
+  y `entrada_reposicion_proveedor` en uso.
 
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,

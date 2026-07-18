@@ -177,6 +177,14 @@ export const routes: Routes = [
       import('./features/operativo/compras/recepciones.component').then(m => m.RecepcionesComponent)
   },
   {
+    // Devolución a proveedor (script 45): BODEGA identifica el defectuoso,
+    // COMPRAS gestiona el ciclo; GERENTE supervisa
+    path: 'operativo/compras/devoluciones-proveedor',
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'COMPRAS', 'BODEGA'])],
+    loadComponent: () =>
+      import('./features/operativo/compras/devoluciones-proveedor.component').then(m => m.DevolucionesProveedorComponent)
+  },
+  {
     // Facturas de compra: documento financiero — BODEGA fuera (segregación)
     path: 'operativo/compras/facturas',
     canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'COMPRAS'])],

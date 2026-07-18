@@ -24,8 +24,10 @@ El sistema se organiza en tres niveles empresariales:
   compuertas (pedido → pago → facturado → preparación → despacho → entrega → devolución RMA)
   con PDF, marketing con descuentos reales aplicados (cupones + promociones), tienda online
   completa (checkout con pago simulado y factura automática), reseñas de compra verificada,
-  soporte con SLA, horarios de acceso por rol, y trazabilidad de autor + auditoría
-  centralizada (`log_auditoria`) en los procesos críticos.
+  soporte con SLA, horarios de acceso por rol, trazabilidad de autor + auditoría
+  centralizada (`log_auditoria`) en los procesos críticos, novedades/incidencias de envío
+  (script 44), devolución a proveedor de mercancía defectuosa (script 45) y saneamiento
+  completo de bugs Tipo 1 (scripts 43 + fix de health 2026-07-18: deuda de bugs reales = 0).
 - **Táctico (toma de decisiones — EN ANÁLISIS, 2026-07-17)**: definidos 25 informes tácticos por
   departamento (`docs/RetailMind_T11_Analisis_Tactico.pdf`): 12 simples directo de la BDR
   PostgreSQL y 13 compuestos que se procesarán en ClickHouse vía ETL orquestado por Airflow.
@@ -42,6 +44,8 @@ El sistema se organiza en tres niveles empresariales:
 | Inventario | Transferencias entre bodegas, ajustes (con anulación por contramovimiento de kardex), kardex |
 | Ventas | Pedido confirmado → pago del cliente (tabla `pago`+`transaccion_pago`, abonos parciales) → pagado → facturado (interna MANUAL, online AUTOMÁTICA al pagar, script 39) → preparación por BODEGA (cola sin montos) → despacho por DESPACHO solo si 'preparado' (transportista asignado por zona con override registrado) → entregado; listado facturas con búsqueda/paginación; timeline (`historial_estado_pedido`); acciones encadenadas en detalle |
 | Devoluciones (RMA) | Logística inversa completa (script 38, `devoluciones/`): nace del CLIENTE (30 días tras entrega o rechazo en puerta), engancha ticket de soporte; solicitada→en_revision→aprobada\|rechazada→en_transito→recibida→inspeccionada→reembolsada→cerrada, UN rol por transición (SOPORTE valida + guía RET-, DESPACHO tránsito/recepción, BODEGA inspección por ítem — solo `apto_reventa` reingresa stock —, GERENTE/ADMIN reembolso simulado, SOPORTE cierra) |
+| Novedades de envío | Incidencias en tránsito (script 44, tabla `novedad_envio`: cliente_ausente/direccion_incorrecta/cliente_rechazo/zona_dificil_acceso/dano_en_transito): DESPACHO registra (envío → 'fallido') y resuelve — REPROGRAMAR (máx. 3 intentos) o DEVOLVER AL ALMACÉN (envío 'devuelto', pedido → estado terminal 'no_entregado', SIN reingreso de stock: el kardex solo se mueve tras inspección de bodega, criterio RMA). Una novedad abierta a la vez; `entregar` bloqueado con novedad abierta. UI en Despachos + timeline en Mis Pedidos |
+| Devolución a proveedor | Espejo del RMA hacia el proveedor (script 45, `compras/DevolucionProveedorService`): pool `item_defectuoso` con DOS orígenes (inspección RMA 'defectuoso' automática + recepción: rechazo en puerta o marcado posterior de BODEGA con salida `salida_devolucion_proveedor`); COMPRAS agrupa por proveedor en `devolucion_proveedor` (DP-…, registrada→enviada→resuelta→cerrada) y resuelve: nota de crédito SIMULADA o reposición (reingreso apto, kardex `entrada_reposicion_proveedor`). Pantalla multi-rol `/operativo/compras/devoluciones-proveedor` |
 | Checkout online | Tipo Amazon (script 36): dirección (o alta inline), cupón validado en backend, pago tarjeta/transferencia SIMULADO (Luhn; NUNCA se persiste PAN/CVV); el pedido online nace PAGADO con factura automática; `pedido.canal` 'web' vs 'tienda'/'telefono' (cobro manual solo interno) |
 | Marketing | Cupones y promociones APLICADOS de verdad (script 40, `DescuentosService`): promociones automáticas por línea (prioridad + acumulables), cupón validado/recalculado SIEMPRE en backend (vigencia, `usos_maximos`, `usos_por_cliente`, monto mínimo), `uso_cupon` activa, factura prorratea el cupón; campañas, banners, newsletter (gestión) |
 | Reseñas | Solo compra verificada (script 32 + pulido 2026-07-17, `resenas/`): reseñas, votos, reportes de abuso, preguntas/respuestas, moderación ADMIN/GERENTE; selector solo de productos comprados |
@@ -52,21 +56,25 @@ El sistema se organiza en tres niveles empresariales:
 | Trazabilidad / Auditoría | Script 42 + `auditoria/AuditoriaService`: columnas directas de autor con FK a usuario, SIEMPRE del JWT — `pedido.vendedor_id` (NULL si canal 'web': el autor es el CLIENTE, trazado por `cliente_id`+historial), `envio.despachado_por`, `factura_compra.registrado_por`, `resena.moderado_por`+`fecha_moderacion`, `pregunta_producto.moderado_por`+`fecha_moderacion`; `registrar()` escribe `log_auditoria` (jsonb antes/después, CHECK de acciones, append-only por grants, sin RLS) en crear pedido interno, despachar, registrar factura de compra y moderar reseña/pregunta; el checkout online NO loguea (grp_cliente sin INSERT a propósito) |
 
 ## Pendientes
+- Contenerización completa (PostgreSQL sigue local, fuera de compose). `/api/health` ya sirve
+  como healthcheck de contenedores: responde acotado (~3s) con ClickHouse apagado
+  (`status: UP, analytics: DEGRADED`; fix 2026-07-18 en `ClickHouseConfig`).
 - Orquestación ETL con Airflow — siguiente fase, derivada del análisis del nivel táctico
   (2026-07-17, `docs/RetailMind_T11_Analisis_Tactico.pdf`): los 13 informes tácticos compuestos
   se procesarán en ClickHouse alimentado por ese pipeline.
 
-## Deuda técnica conocida (tablas huérfanas, requieren bloque dedicado)
-- `lote` (0 filas): trazabilidad por lote/vencimiento. FK ya en `movimiento_inventario.lote_id`
-  y `recepcion_detalle.lote_id`. Darle uso obliga a tocar recepción (capturar lote), kardex
-  (arrastrar `lote_id`) y salida FEFO en despacho — no es un CRUD suelto.
-- `ajuste_inventario.estado = 'borrador'`: CHECK lo admite y `'anulado'` ya tiene flujo, pero un
-  borrador aplicable exigiría tabla de detalle de líneas (hoy el ajuste escribe el movimiento
-  directo al aplicarse).
-- `devolucion_proveedor` **no existe** en la BD: la única devolución modelada es al cliente
-  (`devolucion` / `devolucion_detalle`), ya implementada como RMA completo. Los ítems
-  `defectuoso` de la inspección quedan como merma documental esperando ese proceso (el kardex
-  ya tiene `salida_devolucion_proveedor` sin uso).
+## Deuda técnica
+Re-auditada 2026-07-18 (post scripts 43-45) contra el sistema real: **cero bugs reales (Tipo 1)
+vigentes**; lo que queda es funcionalidad futura o mejoras opcionales. Registro canónico en
+`DEUDA_TECNICA.md` (raíz) y foto consolidada en `docs/INVENTARIO_DEUDA_CONSOLIDADO.md`.
+Decisiones de alcance formales (p. ej. Lote/FEFO pospuesto) en `ROADMAP.md`.
+- `lote` (0 filas): FEFO evaluado y POSPUESTO deliberadamente (`ROADMAP.md`); las FK
+  `movimiento_inventario.lote_id` y `recepcion_detalle.lote_id` quedan listas.
+- `ajuste_inventario.estado = 'borrador'`: CHECK lo admite pero exigiría tabla de detalle de
+  líneas que no existe.
+- `devolucion_proveedor` **ya existe** (script 45): los ítems `defectuoso` caen al pool
+  `item_defectuoso` y se devuelven al proveedor (nota de crédito o reposición);
+  `salida_devolucion_proveedor` y `entrada_reposicion_proveedor` en uso.
 
 ## Roles y seguridad
 

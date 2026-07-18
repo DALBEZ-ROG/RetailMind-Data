@@ -66,6 +66,19 @@ public class SecurityConfig {
                 // Aprobar orden de compra (CU-O-12): solo gerencia
                 .requestMatchers(HttpMethod.POST, "/api/compras/ordenes/*/aprobar")
                     .hasAnyAuthority("ADMIN", "GERENTE")
+                // Devolución a proveedor (script 45): BODEGA identifica el
+                // defectuoso tras la recepción; COMPRAS gestiona el ciclo
+                // (espeja INSERT item_defectuoso = bodega/compras y
+                // INSERT/UPDATE devolucion_proveedor = compras)
+                .requestMatchers(HttpMethod.POST, "/api/compras/recepciones/detalles/*/defectuoso")
+                    .hasAnyAuthority("ADMIN", "BODEGA")
+                .requestMatchers(HttpMethod.PATCH, "/api/compras/items-defectuosos/*/proveedor")
+                    .hasAnyAuthority("ADMIN", "COMPRAS")
+                .requestMatchers(HttpMethod.POST, "/api/compras/devoluciones-proveedor",
+                        "/api/compras/devoluciones-proveedor/*/enviar",
+                        "/api/compras/devoluciones-proveedor/*/resolver",
+                        "/api/compras/devoluciones-proveedor/*/cerrar")
+                    .hasAnyAuthority("ADMIN", "COMPRAS")
                 // Ciclo de compra: roles operativos (la BD afina por SET LOCAL ROLE)
                 .requestMatchers("/api/compras/**")
                     .hasAnyAuthority("ADMIN", "GERENTE", "COMPRAS", "BODEGA")
@@ -91,6 +104,13 @@ public class SecurityConfig {
                     .hasAnyAuthority("ADMIN", "DESPACHO")
                 // Entrega: cierra la logística (espeja UPDATE envio = admin/despacho)
                 .requestMatchers(HttpMethod.POST, "/api/ventas/pedidos/*/entrega")
+                    .hasAnyAuthority("ADMIN", "DESPACHO")
+                // Novedades de envío (script 44): registrar/resolver = despacho
+                // (espeja INSERT/UPDATE novedad_envio); la consulta GET cae en
+                // /api/ventas/** e incluye al CLIENTE (RLS pol_cliente_propio)
+                .requestMatchers(HttpMethod.POST, "/api/ventas/envios/*/novedades",
+                        "/api/ventas/novedades/*/reprogramar",
+                        "/api/ventas/novedades/*/devolver-almacen")
                     .hasAnyAuthority("ADMIN", "DESPACHO")
                 // Listado de facturas de venta: solo personal (el CLIENTE llega a
                 // SU factura por el detalle del pedido, aislado por RLS)

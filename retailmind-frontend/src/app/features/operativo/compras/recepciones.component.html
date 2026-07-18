@@ -51,8 +51,27 @@
             </mat-form-field>
           </td>
         </ng-container>
-        <tr mat-header-row *matHeaderRowDef="['sku','producto','pedida','recibida','aRecibir']"></tr>
-        <tr mat-row *matRowDef="let l; columns: ['sku','producto','pedida','recibida','aRecibir']"></tr>
+        <!-- Rechazo en puerta: mercancía dañada/defectuosa que NO entra a stock
+             y queda pendiente de devolución a proveedor (script 45) -->
+        <ng-container matColumnDef="rechazada">
+          <th mat-header-cell *matHeaderCellDef>Defectuosa (rechazo)</th>
+          <td mat-cell *matCellDef="let l">
+            <mat-form-field appearance="outline" class="celda-input" subscriptSizing="dynamic">
+              <input matInput type="number" min="0" [(ngModel)]="l.rechazada">
+            </mat-form-field>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="motivoRechazo">
+          <th mat-header-cell *matHeaderCellDef>Motivo del rechazo</th>
+          <td mat-cell *matCellDef="let l">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic" style="width:180px;">
+              <input matInput [(ngModel)]="l.motivoRechazo" placeholder="Ej. caja dañada"
+                     [disabled]="!l.rechazada">
+            </mat-form-field>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="columnas"></tr>
+        <tr mat-row *matRowDef="let l; columns: columnas"></tr>
       </table>
     </div>
     <div class="form-actions" style="margin-top:16px;">

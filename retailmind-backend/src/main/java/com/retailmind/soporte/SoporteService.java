@@ -226,13 +226,11 @@ public class SoporteService {
                     String.class, categoriaId);
         }
 
-        // Número legible secuencial por año: TICK-2026-0001. El UNIQUE de la
-        // BD respalda ante una carrera (reintento manual; ver DEUDA_TECNICA).
-        String numero = pg.queryForObject("""
-                SELECT 'TICK-' || to_char(now(), 'YYYY') || '-'
-                       || lpad((count(*) + 1)::text, 4, '0')
-                FROM ticket_soporte
-                WHERE numero LIKE 'TICK-' || to_char(now(), 'YYYY') || '-%'""", String.class);
+        // Número legible secuencial por año: TICK-2026-0001. La función
+        // SECURITY DEFINER (script 43) reserva el correlativo bajo lock de
+        // fila: dos creaciones simultáneas se serializan sin chocar.
+        String numero = pg.queryForObject(
+                "SELECT fn_siguiente_numero_ticket()", String.class);
         long id = idDe(pg.queryForObject("""
                 INSERT INTO ticket_soporte (numero, cliente_id, categoria_ticket_id, pedido_id,
                                             asunto, descripcion, prioridad)

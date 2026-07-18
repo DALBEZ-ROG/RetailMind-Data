@@ -16,6 +16,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.retailmind.auditoria.AuditoriaService;
 import com.retailmind.auth.AppUserPrincipal;
 import com.retailmind.inventario.StockService;
 import com.retailmind.soporte.SoporteService;
@@ -69,12 +70,15 @@ public class DevolucionService {
     private final JdbcTemplate pg;
     private final StockService stock;
     private final SoporteService soporte;
+    private final AuditoriaService auditoria;
 
     public DevolucionService(@Qualifier("pgJdbcTemplate") JdbcTemplate pg,
-                             StockService stock, SoporteService soporte) {
+                             StockService stock, SoporteService soporte,
+                             AuditoriaService auditoria) {
         this.pg = pg;
         this.stock = stock;
         this.soporte = soporte;
+        this.auditoria = auditoria;
     }
 
     // ── Consultas ────────────────────────────────────────────────────────
@@ -273,16 +277,20 @@ public class DevolucionService {
         Map<String, Object> ped = pedidoPropio(pedidoId);
         String estado = (String) ped.get("estado");
         OffsetDateTime entrega = fechaEntrega(pedidoId);
+        // 'despachado' = rechazo en puerta: aún no hay entrega, así que el
+        // plazo corre desde el DESPACHO — un envío que nunca se marque
+        // entregado no deja la ventana abierta para siempre.
+        OffsetDateTime referencia = "despachado".equals(estado)
+                ? fechaDespacho(pedidoId) : entrega;
         long diasRestantes = 0;
         boolean dentroPlazo = false;
-        if (entrega != null) {
-            long transcurridos = ChronoUnit.DAYS.between(entrega, OffsetDateTime.now());
+        if (referencia != null) {
+            long transcurridos = ChronoUnit.DAYS.between(referencia, OffsetDateTime.now());
             diasRestantes = Math.max(0, PLAZO_DIAS_DEVOLUCION - transcurridos);
             dentroPlazo = transcurridos <= PLAZO_DIAS_DEVOLUCION;
         }
         boolean estadoElegible = List.of("entregado", "devuelto", "despachado").contains(estado);
-        // 'despachado' = rechazo en puerta: aún no hay entrega, no corre plazo
-        boolean elegible = estadoElegible && ("despachado".equals(estado) || dentroPlazo);
+        boolean elegible = estadoElegible && dentroPlazo;
 
         List<Map<String, Object>> items = pg.queryForList("""
                 SELECT pd.id AS pedido_detalle_id, pd.sku, pd.nombre_producto,
@@ -344,6 +352,20 @@ public class DevolucionService {
             if (transcurridos > PLAZO_DIAS_DEVOLUCION) {
                 throw new IllegalStateException("El plazo de devolución venció: pasaron "
                         + transcurridos + " días desde la entrega y el máximo es "
+                        + PLAZO_DIAS_DEVOLUCION + " días");
+            }
+        } else {
+            // Rechazo en puerta: el plazo corre desde el DESPACHO (no hay
+            // entrega registrada; misma regla que elegibilidad()).
+            OffsetDateTime despacho = fechaDespacho(pedidoId);
+            if (despacho == null) {
+                throw new IllegalStateException("El pedido no registra fecha de despacho; "
+                        + "contacta a soporte para gestionar la devolución");
+            }
+            long transcurridos = ChronoUnit.DAYS.between(despacho, OffsetDateTime.now());
+            if (transcurridos > PLAZO_DIAS_DEVOLUCION) {
+                throw new IllegalStateException("El plazo de devolución venció: pasaron "
+                        + transcurridos + " días desde el despacho y el máximo es "
                         + PLAZO_DIAS_DEVOLUCION + " días");
             }
         }
@@ -519,9 +541,9 @@ public class DevolucionService {
      * BODEGA registra el resultado POR ÍTEM (todos los ítems, de una vez):
      *  - apto_reventa: reingresa a inventario AQUÍ (StockService, kardex
      *    entrada_devolucion_cliente) — único punto del proceso que toca stock.
-     *  - defectuoso: NO entra al stock vendible; queda documentado como merma
-     *    pendiente de devolución a proveedor (no existe devolucion_proveedor
-     *    en la BD — ver DEUDA_TECNICA).
+     *  - defectuoso: NO entra al stock vendible; cae al pool item_defectuoso
+     *    como 'pendiente de devolución a proveedor' (script 45, proceso en
+     *    compras/DevolucionProveedorService).
      *  - rechazado: daño imputable al cliente; ni stock ni reembolso.
      * Marca además el pedido como 'devuelto' (la mercancía retornó).
      */
@@ -577,7 +599,17 @@ public class DevolucionService {
                             "Inspección RMA " + dev.get("numero") + ": apto para reventa");
                     aptos++;
                 }
-                case "defectuoso" -> defectuosos++;
+                case "defectuoso" -> {
+                    // Script 45: el defectuoso cae al pool 'pendiente de
+                    // devolución a proveedor'. SIN stock vendible (nunca
+                    // reingresó). Proveedor: rastreo por la última OC de la
+                    // variante; si no hay, COMPRAS lo asigna al gestionar.
+                    registrarItemDefectuoso(detalleId,
+                            ((Number) det.get("producto_variante_id")).longValue(),
+                            bodega, cantidad, (String) dev.get("numero"),
+                            (String) det.get("sku"), it.nota());
+                    defectuosos++;
+                }
                 default -> rechazados++;
             }
         }
@@ -671,6 +703,40 @@ public class DevolucionService {
 
     // ── Utilitarios ──────────────────────────────────────────────────────
 
+    /**
+     * Alta en el pool de defectuosos pendientes de devolución a proveedor
+     * (script 45). Proveedor y costo salen de la última orden de compra que
+     * incluyó la variante (rastreo); sin OC, proveedor NULL (lo asigna
+     * COMPRAS) y costo = costo de catálogo de la variante.
+     */
+    private void registrarItemDefectuoso(long devolucionDetalleId, long varianteId,
+                                         long bodegaId, int cantidad, String numeroRma,
+                                         String sku, String nota) {
+        List<Map<String, Object>> origen = pg.queryForList("""
+                SELECT oc.proveedor_id, ocd.precio_unitario
+                FROM orden_compra_detalle ocd
+                JOIN orden_compra oc ON oc.id = ocd.orden_compra_id
+                WHERE ocd.producto_variante_id = ?
+                ORDER BY ocd.id DESC LIMIT 1""", varianteId);
+        Object proveedorId = origen.isEmpty() ? null : origen.get(0).get("proveedor_id");
+        Object costo = origen.isEmpty()
+                ? pg.queryForObject("SELECT costo FROM producto_variante WHERE id = ?",
+                        BigDecimal.class, varianteId)
+                : origen.get(0).get("precio_unitario");
+
+        Long itemId = pg.queryForObject("""
+                INSERT INTO item_defectuoso
+                    (producto_variante_id, bodega_id, cantidad, origen, devolucion_detalle_id,
+                     proveedor_id, costo_unitario, nota, registrado_por)
+                VALUES (?, ?, ?, 'rma', ?, ?, ?, NULLIF(?, ''), ?)
+                RETURNING id""", Long.class,
+                varianteId, bodegaId, cantidad, devolucionDetalleId,
+                proveedorId, costo, nota, usuarioActualId());
+        auditoria.registrar("item_defectuoso", itemId, "INSERT", null,
+                Map.of("origen", "rma", "rma", numeroRma, "sku", sku, "cantidad", cantidad,
+                       "proveedorRastreado", proveedorId != null));
+    }
+
     /** Suma reembolsable según inspección: apto_reventa + defectuoso. */
     private BigDecimal montoReembolsable(long id) {
         return pg.queryForObject("""
@@ -697,6 +763,20 @@ public class DevolucionService {
             throw new NoSuchElementException("No existe el pedido " + pedidoId);
         }
         return filas.get(0);
+    }
+
+    /** Fecha de despacho: el envío la registra; el historial es respaldo. */
+    private OffsetDateTime fechaDespacho(long pedidoId) {
+        OffsetDateTime despacho = pg.queryForObject(
+                "SELECT max(fecha_despacho) FROM envio WHERE pedido_id = ?",
+                OffsetDateTime.class, pedidoId);
+        if (despacho != null) return despacho;
+        return pg.queryForObject("""
+                SELECT max(h.fecha_creacion)
+                FROM historial_estado_pedido h
+                JOIN estado_pedido ep ON ep.id = h.estado_pedido_id
+                WHERE h.pedido_id = ? AND ep.codigo = 'despachado'""",
+                OffsetDateTime.class, pedidoId);
     }
 
     /** Fecha real de entrega: el envío la registra; el historial es respaldo. */
@@ -787,8 +867,10 @@ public class DevolucionService {
     }
 
     private String siguienteNumero(String prefijo) {
+        // Secuencia global (script 43): número único garantizado, sin la
+        // colisión posible del sufijo aleatorio legacy.
         return pg.queryForObject(
-                "SELECT ? || '-' || to_char(now(), 'YYYYMMDD') || '-' || lpad(floor(random()*100000)::text, 5, '0')",
+                "SELECT ? || '-' || to_char(now(), 'YYYYMMDD') || '-' || nextval('seq_numero_documento')::text",
                 String.class, prefijo);
     }
 

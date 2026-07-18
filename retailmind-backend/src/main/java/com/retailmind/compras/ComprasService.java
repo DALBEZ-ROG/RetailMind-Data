@@ -207,7 +207,7 @@ public class ComprasService {
         Map<String, Object> orden = pg.queryForMap("""
                 UPDATE orden_compra SET estado = estado
                 WHERE id = ?
-                RETURNING id, numero, bodega_id, estado""",
+                RETURNING id, numero, bodega_id, estado, proveedor_id""",
                 ordenId);
         String estadoOrden = (String) orden.get("estado");
         // Compuerta de control interno: sin aprobación de Gerencia no hay recepción
@@ -259,13 +259,34 @@ public class ComprasService {
                         + " pendientes por recibir en la orden");
             }
 
-            pg.update("""
+            int rechazada = it.cantidadRechazada() != null ? it.cantidadRechazada() : 0;
+            Long recepcionDetalleId = pg.queryForObject("""
                     INSERT INTO recepcion_detalle
                         (recepcion_mercancia_id, orden_compra_detalle_id, cantidad_recibida,
                          cantidad_rechazada, motivo_rechazo)
-                    VALUES (?, ?, ?, ?, ?)""",
+                    VALUES (?, ?, ?, ?, ?)
+                    RETURNING id""", Long.class,
                     recepcionId, it.ordenCompraDetalleId(), it.cantidadRecibida(),
-                    it.cantidadRechazada() != null ? it.cantidadRechazada() : 0, it.motivoRechazo());
+                    rechazada, it.motivoRechazo());
+
+            // Rechazo EN PUERTA = defectuoso de origen 'recepcion' (script 45):
+            // queda pendiente de devolución a proveedor. SIN movimiento de
+            // stock: lo rechazado jamás entra al inventario vendible.
+            if (rechazada > 0) {
+                Long itemId = pg.queryForObject("""
+                        INSERT INTO item_defectuoso
+                            (producto_variante_id, bodega_id, cantidad, origen,
+                             recepcion_detalle_id, proveedor_id, costo_unitario, nota,
+                             registrado_por)
+                        VALUES (?, ?, ?, 'recepcion', ?, ?, ?, NULLIF(?, ''), ?)
+                        RETURNING id""", Long.class,
+                        varianteId, bodegaId, rechazada, recepcionDetalleId,
+                        orden.get("proveedor_id"), costo, it.motivoRechazo(), usuarioActualId());
+                auditoria.registrar("item_defectuoso", itemId, "INSERT", null,
+                        Map.of("origen", "recepcion", "recepcion", numero,
+                               "sku", det.get("sku"), "cantidad", rechazada,
+                               "salidaStockVendible", false));
+            }
 
             // Stock: asegurar fila, bloquearla y moverla (la app es la dueña de este paso)
             pg.update("""
@@ -458,9 +479,10 @@ public class ComprasService {
     // ── Utilitarios ──────────────────────────────────────────────────────
 
     private String siguienteNumero(String prefijo) {
-        // Numeración legible y única (unique en BD respalda ante colisión)
+        // Secuencia global (script 43): número único garantizado, sin la
+        // colisión posible del sufijo aleatorio legacy.
         return pg.queryForObject(
-                "SELECT ? || '-' || to_char(now(), 'YYYYMMDD') || '-' || lpad(floor(random()*100000)::text, 5, '0')",
+                "SELECT ? || '-' || to_char(now(), 'YYYYMMDD') || '-' || nextval('seq_numero_documento')::text",
                 String.class, prefijo);
     }
 

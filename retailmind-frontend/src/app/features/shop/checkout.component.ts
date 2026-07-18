@@ -108,8 +108,9 @@ export class CheckoutComponent implements OnInit {
     this.shop.getCiudades().subscribe({ next: c => this.ciudades = c, error: () => {} });
   }
 
-  // ── Totales (mismo cálculo que el backend: promos por línea, IVA 15%
-  //    sobre la base rebajada, cupón sobre el subtotal neto) ─────────────
+  // ── Totales (mismo cálculo que el backend: promos por línea, cupón sobre
+  //    el subtotal neto e IVA 15% sobre la base realmente cobrada, es decir
+  //    neta de promos Y de cupón — salvo envío gratis, que no toca base) ──
   get subtotal(): number {
     return this.items.reduce((s, i) => s + i.precioUnitario * i.cantidad, 0);
   }
@@ -120,7 +121,11 @@ export class CheckoutComponent implements OnInit {
   get descuentoCupon(): number {
     return this.cuponAplicado ? Number(this.cuponAplicado.descuento) || 0 : 0;
   }
-  get impuesto(): number { return this.subtotalNeto * this.IVA; }
+  get impuesto(): number {
+    const cuponBase = this.cuponAplicado?.tipoDescuento === 'envio_gratis'
+      ? 0 : this.descuentoCupon;
+    return Math.max(0, this.subtotalNeto - cuponBase) * this.IVA;
+  }
   get total(): number {
     return Math.max(0, this.subtotalNeto - this.descuentoCupon + this.impuesto);
   }

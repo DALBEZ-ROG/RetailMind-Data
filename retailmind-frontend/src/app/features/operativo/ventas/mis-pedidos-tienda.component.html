@@ -25,7 +25,7 @@
             <span class="estado-chip"
                   [class.ok]="['entregado','despachado','facturado','preparado'].includes(p.estado)"
                   [class.warn]="p.estado === 'devuelto'"
-                  [class.error]="p.estado === 'cancelado'">{{ p.estado }}</span>
+                  [class.error]="['cancelado','no_entregado'].includes(p.estado)">{{ p.estado }}</span>
           </td>
         </ng-container>
         <ng-container matColumnDef="total">
@@ -56,7 +56,7 @@
       <span class="estado-chip"
             [class.ok]="['pagado','facturado','preparado','entregado'].includes(detalle.estado)"
             [class.warn]="['despachado','en_preparacion'].includes(detalle.estado)"
-            [class.error]="['devuelto','cancelado'].includes(detalle.estado)">{{ detalle.estado }}</span>
+            [class.error]="['devuelto','cancelado','no_entregado'].includes(detalle.estado)">{{ detalle.estado }}</span>
       <span class="stat-chip chip-info">Canal: {{ detalle.canal }}</span>
       <span class="stat-chip chip-info" *ngIf="detalle.transportista">
         <mat-icon style="font-size:14px;height:14px;width:14px;">local_shipping</mat-icon>
@@ -73,6 +73,26 @@
       <button class="btn-aplicar" *ngIf="puedeDevolver" (click)="prepararDevolucion()">
         <mat-icon>assignment_return</mat-icon> Devolver productos
       </button>
+    </div>
+
+    <!-- Novedades del envío (script 44): mensaje claro y amable al cliente -->
+    <div class="resultado-box" *ngIf="novedades.length">
+      <div class="titulo"><mat-icon>report_problem</mat-icon> Novedad en la entrega</div>
+      <div class="dato" *ngFor="let n of novedades">
+        <span class="estado-chip" [class.warn]="n.estado === 'abierta'"
+              [class.ok]="n.accion === 'reprogramada'"
+              [class.error]="n.accion === 'devuelto_almacen'">
+          {{ n.estado === 'abierta' ? 'en gestión'
+             : (n.accion === 'reprogramada' ? 'reprogramada' : 'devuelto al almacén') }}
+        </span>
+        {{ mensajeNovedad(n) }} · {{ n.fecha_registro | date:'short' }}
+      </div>
+      <div class="dato" *ngIf="novedades[novedades.length - 1].accion === 'devuelto_almacen'">
+        <a routerLink="/operativo/soporte/tickets" style="display:inline-flex;align-items:center;gap:4px;">
+          <mat-icon style="font-size:16px;width:16px;height:16px;">support_agent</mat-icon>
+          Abrir un ticket de soporte
+        </a>
+      </div>
     </div>
 
     <!-- Solicitud de devolución RMA: ítems + motivo, dentro del plazo -->

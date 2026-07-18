@@ -15,7 +15,7 @@ import { DevolucionesService } from '../../../core/services/devoluciones.service
 import { mensajeError } from '../../../core/services/api-error.util';
 import {
   CatalogoRef, DevolucionRow, DevolucionRma, ElegibilidadDevolucion,
-  PedidoVentaRow, PedidoVentaDetalle, SeguimientoRow
+  NovedadEnvioRow, PedidoVentaRow, PedidoVentaDetalle, SeguimientoRow
 } from '../../../core/models/operativo.model';
 
 /**
@@ -39,6 +39,7 @@ export class MisPedidosTiendaComponent implements OnInit {
   pedidos: PedidoVentaRow[] = [];
   detalle: PedidoVentaDetalle | null = null;
   seguimiento: SeguimientoRow[] = [];
+  novedades: NovedadEnvioRow[] = [];
   loading = true;
 
   // ── Devolución RMA del cliente ──
@@ -83,13 +84,37 @@ export class MisPedidosTiendaComponent implements OnInit {
       next: p => {
         this.detalle = p;
         this.seguimiento = [];
-        // Seguimiento del envío del pedido (RLS: solo el suyo)
+        this.novedades = [];
+        // Seguimiento y novedades del envío del pedido (RLS: solo el suyo)
         if (p.envio) {
           this.ventas.seguimiento(p.envio.id).subscribe(s => this.seguimiento = s);
+          this.ventas.novedadesPedido(p.id).subscribe(info => this.novedades = info.novedades);
         }
       },
       error: e => this.snackBar.open(mensajeError(e, 'No se pudo cargar el pedido'), 'Cerrar', { duration: 4000 })
     });
+  }
+
+  // ── Novedades de envío (script 44): mensaje amable para el cliente ──
+
+  private static readonly MOTIVOS_NOVEDAD: Record<string, string> = {
+    cliente_ausente: 'no encontramos a nadie en la dirección',
+    direccion_incorrecta: 'la dirección registrada es incorrecta',
+    cliente_rechazo: 'el paquete fue rechazado en la entrega',
+    zona_dificil_acceso: 'la zona de entrega es de difícil acceso',
+    dano_en_transito: 'el paquete sufrió un daño en el trayecto'
+  };
+
+  mensajeNovedad(n: NovedadEnvioRow): string {
+    const motivo = MisPedidosTiendaComponent.MOTIVOS_NOVEDAD[n.tipo] ?? n.tipo;
+    if (n.estado === 'abierta') {
+      return `Tu pedido no pudo entregarse: ${motivo}. Estamos gestionando la entrega.`;
+    }
+    if (n.accion === 'reprogramada') {
+      return `Tu pedido no pudo entregarse (${motivo}). Se reprogramó un nuevo intento de entrega.`;
+    }
+    return `Tu pedido no pudo entregarse (${motivo}) y fue devuelto al almacén. `
+      + 'Contáctanos por soporte para gestionar tu caso.';
   }
 
   /** PDF de la factura del pedido (el RLS de la BD lo limita a SUS facturas). */

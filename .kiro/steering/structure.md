@@ -16,7 +16,7 @@ analítica. Con CH apagado todo funciona excepto analytics/recomendaciones (degr
 │   │   ├── sinteticos/               # Generador de datos sintéticos
 │   │   ├── analytics/ y reportes/    # Scripts/notas
 │   ├── data/stage/                   # Capa cruda Parquet
-│   ├── sql/postgres/                 # ★ DDL OPERATIVO VIGENTE: scripts numerados 01–42 + 99
+│   ├── sql/postgres/                 # ★ DDL OPERATIVO VIGENTE: scripts numerados 01–45 + 99
 │   │                                 #   01-15 módulos (seguridad, clientes, catálogo, ventas,
 │   │                                 #   compras, inventario, marketing, soporte, reseñas...),
 │   │                                 #   16 triggers, 17 seeds catálogos,
@@ -26,14 +26,18 @@ analítica. Con CH apagado todo funciona excepto analytics/recomendaciones (degr
 │   │                                 #   36 checkout online, 37 rol SOPORTE, 38 RMA devoluciones,
 │   │                                 #   39 tramo salida (facturado/preparado/transportista),
 │   │                                 #   40 descuentos marketing, 41 segregación financiera,
-│   │                                 #   42 trazabilidad de autor + auditoría
+│   │                                 #   42 trazabilidad de autor + auditoría,
+│   │                                 #   43 saneamiento Tipo 1 (RLS pago/cupón, seq global, correlativo tickets),
+│   │                                 #   44 novedades de envío ('no_entregado'),
+│   │                                 #   45 devolución a proveedor (item_defectuoso, DP-…)
 │   ├── requirements.txt / Dockerfile / .env
 │
 ├── retailmind-backend/               # API REST Spring Boot 3.5 / Java 17
 │   ├── pom.xml
 │   └── src/main/java/com/retailmind/
 │       ├── RetailmindApplication.java
-│       ├── config/                   # PostgresConfig (@Primary tx), ClickHouseConfig, Cors, Health
+│       ├── config/                   # PostgresConfig (@Primary tx), ClickHouseConfig (fail-fast:
+│       │                             # timeouts para que /api/health no cuelgue sin CH), Cors, Health
 │       ├── security/                 # SecurityConfig, JwtAuthenticationFilter,
 │       │                             # PgSessionRoleAspect (SET LOCAL ROLE), DbGroupRole (lista blanca)
 │       ├── auth/                     # AuthService (login vs PostgreSQL), PostgresUserRepository,
@@ -49,10 +53,14 @@ analítica. Con CH apagado todo funciona excepto analytics/recomendaciones (degr
 │       ├── admin/catalogo/           # CRUD catálogo maestro (ADMIN)
 │       ├── admin/horarios/           # Ventanas horarias por rol (ADMIN)
 │       ├── admin/usuarios/           # Gestión de usuarios
-│       ├── compras/                  # Orden -> aprobar -> recepción -> factura -> pago (+PDF)
+│       ├── compras/                  # Orden -> aprobar -> recepción (con rechazo en puerta) -> factura
+│       │                             # -> pago (+PDF); DevolucionProveedorService (script 45: pool
+│       │                             # item_defectuoso + ciclo devolucion_proveedor DP-…)
 │       ├── inventario/               # Transferencias, ajustes (+ anulación), kardex, StockService
 │       ├── ventas/                   # Pedido -> pago -> facturado -> preparación (bodega) ->
-│       │                             # despacho (solo 'preparado', override transportista) -> entrega (+PDF)
+│       │                             # despacho (solo 'preparado', override transportista) -> entrega (+PDF);
+│       │                             # novedades de envío (script 44: reprogramar máx. 3 / devolver
+│       │                             # al almacén -> pedido 'no_entregado' terminal)
 │       ├── devoluciones/             # RMA logística inversa (ciclo multi-rol, guía RET-, inspección por ítem)
 │       ├── marketing/                # Cupones, promociones(+productos), campañas, banners, newsletter;
 │       │                             # DescuentosService (promos automáticas + cupón backend, script 40)
@@ -89,9 +97,10 @@ analítica. Con CH apagado todo funciona excepto analytics/recomendaciones (degr
 │           └── operativo/            # ★ pantallas del back-office (patrón a imitar:
 │               │                     #   tabla + formulario + toggle activo, operativo-shared.scss)
 │               ├── catalogo/         # productos-admin
-│               ├── compras/          # órdenes, recepciones, facturas
+│               ├── compras/          # órdenes, recepciones, facturas, devoluciones-proveedor (multi-rol)
 │               ├── inventario/       # transferencias, ajustes, kardex
-│               ├── ventas/           # pedidos, facturas, preparación, despachos, devoluciones (RMA), mis-pedidos
+│               ├── ventas/           # pedidos, facturas, preparación, despachos (+ novedades de envío),
+│               │                     # devoluciones (RMA), mis-pedidos
 │               ├── marketing/        # cupones, promociones, campañas, banners, newsletter
 │               ├── soporte/          # bandeja de tickets (SOPORTE/ADMIN) + tickets del cliente
 │               ├── resenas/          # moderación de reseñas (ADMIN/GERENTE)
@@ -100,6 +109,9 @@ analítica. Con CH apagado todo funciona excepto analytics/recomendaciones (degr
 ├── docker-compose.yml                # 5 servicios: pocketbase, clickhouse, backend, frontend, etl
 │                                     # (PostgreSQL corre LOCAL, fuera de compose)
 ├── CLAUDE.md                         # Contexto para Claude Code (equivalente a este steering)
+├── DEUDA_TECNICA.md                  # Registro canónico de deuda por fase (re-auditado 2026-07-18:
+│                                     # cero Tipo 1 vigentes) + docs/INVENTARIO_DEUDA_CONSOLIDADO.md
+├── ROADMAP.md                        # Decisiones de alcance formales (p. ej. Lote/FEFO pospuesto)
 ├── .kiro/steering/                   # Steering para Kiro (este archivo)
 └── .specify/ / openspec/             # Spec Kit
 ```

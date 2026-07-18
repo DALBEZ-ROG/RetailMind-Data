@@ -164,5 +164,38 @@ public class VentasController {
         return servicio.seguimiento(id);
     }
 
+    // ── Novedades / incidencias de envío (script 44) ─────────────────────
+    // Registro y resolución = ADMIN/DESPACHO (SecurityConfig); la consulta la
+    // comparte el CLIENTE, aislado a sus pedidos por RLS.
+    public record NovedadReq(String tipo, String descripcion) {}
+    public record ResolucionNovedadReq(String observacion) {}
+
+    /** Envío vigente + intentos + historial de novedades del pedido. */
+    @GetMapping("/pedidos/{id}/novedades")
+    public Map<String, Object> novedades(@PathVariable long id) {
+        return servicio.novedadesDePedido(id);
+    }
+
+    /** Novedad sobre un envío en tránsito (el envío queda 'fallido'). */
+    @PostMapping("/envios/{id}/novedades")
+    public ResponseEntity<?> registrarNovedad(@PathVariable long id, @RequestBody NovedadReq r) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                servicio.registrarNovedad(id, r.tipo(), r.descripcion()));
+    }
+
+    /** Nuevo intento de entrega (máx. 3): el envío vuelve a tránsito. */
+    @PostMapping("/novedades/{id}/reprogramar")
+    public Map<String, Object> reprogramar(@PathVariable long id,
+                                           @RequestBody(required = false) ResolucionNovedadReq r) {
+        return servicio.reprogramarEntrega(id, r != null ? r.observacion() : null);
+    }
+
+    /** Envío devuelto al almacén; el pedido queda 'no_entregado' (sin reingreso de stock). */
+    @PostMapping("/novedades/{id}/devolver-almacen")
+    public Map<String, Object> devolverAlmacen(@PathVariable long id,
+                                               @RequestBody(required = false) ResolucionNovedadReq r) {
+        return servicio.devolverAlmacen(id, r != null ? r.observacion() : null);
+    }
+
     // Caso 10 (devolución RMA): movido a /api/devoluciones (DevolucionController)
 }

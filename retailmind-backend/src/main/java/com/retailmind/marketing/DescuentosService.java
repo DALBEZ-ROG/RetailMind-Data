@@ -24,8 +24,10 @@ import org.springframework.transaction.annotation.Transactional;
  *    CABECERA. Va a pedido.monto_descuento y el trigger de cabecera lo resta
  *    del total. Se calcula sobre el subtotal YA rebajado por promociones
  *    (sin IVA ni envío) — promoción + cupón SÍ se combinan; dos cupones NO.
- *  - El IVA se calcula por línea sobre la base con promoción; el cupón no
- *    recalcula el IVA (decisión documentada en DEUDA_TECNICA.md).
+ *  - El IVA se calcula por línea sobre la base REALMENTE cobrada: la promoción
+ *    rebaja la base al crear la línea y el cupón (salvo envio_gratis, que no
+ *    toca base imponible) se prorratea entre las líneas al aplicarse,
+ *    reescalando el monto_impuesto de cada una (saneamiento 2026-07-18).
  *
  * La validación del cupón SIEMPRE ocurre aquí (backend) y el monto se
  * recalcula en el servidor al confirmar: el front solo envía el CÓDIGO.
@@ -193,11 +195,50 @@ public class DescuentosService {
         }
         BigDecimal descuento = (BigDecimal) v.get("descuento");
         pg.update("UPDATE pedido SET monto_descuento = ? WHERE id = ?", descuento, pedidoId);
+        if (!"envio_gratis".equals(v.get("tipoDescuento"))) {
+            recalcularIvaConCupon(pedidoId, descuento);
+        }
         pg.update("""
                 INSERT INTO uso_cupon (cupon_id, pedido_id, cliente_id, monto_descontado)
                 VALUES (?, ?, ?, ?)""",
                 ((Number) v.get("cuponId")).longValue(), pedidoId, clienteId, descuento);
         return v;
+    }
+
+    /**
+     * El cupón reduce la BASE IMPONIBLE: se prorratea entre las líneas en
+     * proporción a su neto (subtotal - promoción) y el monto_impuesto de cada
+     * línea se reescala a la base efectivamente cobrada, conservando la tasa
+     * con la que se calculó. El trigger de cabecera rehace subtotal /
+     * monto_impuesto / total del pedido a partir del detalle. La última línea
+     * absorbe el ajuste de redondeo (mismo criterio que la factura).
+     */
+    private void recalcularIvaConCupon(long pedidoId, BigDecimal cupon) {
+        List<Map<String, Object>> lineas = pg.queryForList("""
+                SELECT id, subtotal, monto_descuento, monto_impuesto
+                FROM pedido_detalle WHERE pedido_id = ? ORDER BY id""", pedidoId);
+        BigDecimal baseNeta = lineas.stream()
+                .map(l -> ((BigDecimal) l.get("subtotal"))
+                        .subtract((BigDecimal) l.get("monto_descuento")))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (cupon == null || cupon.signum() <= 0 || baseNeta.signum() <= 0) return;
+
+        BigDecimal repartido = BigDecimal.ZERO;
+        for (int i = 0; i < lineas.size(); i++) {
+            Map<String, Object> l = lineas.get(i);
+            BigDecimal neto = ((BigDecimal) l.get("subtotal"))
+                    .subtract((BigDecimal) l.get("monto_descuento"));
+            BigDecimal prorrateo = i == lineas.size() - 1
+                    ? cupon.subtract(repartido)
+                    : cupon.multiply(neto).divide(baseNeta, 2, RoundingMode.HALF_UP);
+            repartido = repartido.add(prorrateo);
+            if (neto.signum() <= 0) continue;
+            BigDecimal impuesto = (BigDecimal) l.get("monto_impuesto");
+            BigDecimal nuevo = impuesto.multiply(neto.subtract(prorrateo))
+                    .divide(neto, 2, RoundingMode.HALF_UP).max(BigDecimal.ZERO);
+            pg.update("UPDATE pedido_detalle SET monto_impuesto = ? WHERE id = ?",
+                    nuevo, ((Number) l.get("id")).longValue());
+        }
     }
 
     private static Map<String, Object> invalido(String motivo) {

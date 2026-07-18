@@ -103,6 +103,107 @@
     </div>
   </div>
 
+  <!-- ── Novedades / incidencias de envío (script 44) ─────────────────── -->
+  <div class="op-card">
+    <h3><mat-icon>report_problem</mat-icon> Novedades de entrega</h3>
+    <p>Incidencias sobre pedidos despachados: registra qué pasó y resuélvela
+      reprogramando un nuevo intento (máx. 3) o devolviendo el envío al almacén.</p>
+    <div class="form-grid">
+      <mat-form-field appearance="outline">
+        <mat-label>Pedido en tránsito</mat-label>
+        <mat-select [(ngModel)]="pedidoNovedadId" (selectionChange)="seleccionarPedidoNovedad()">
+          <mat-option *ngFor="let p of pedidosEnTransito" [value]="p.id">
+            {{ p.numero }} — {{ p.cliente }}{{ p.transportista ? ' · ' + p.transportista : '' }}
+          </mat-option>
+        </mat-select>
+        <mat-hint>Solo pedidos despachados (no entregados)</mat-hint>
+      </mat-form-field>
+    </div>
+
+    <ng-container *ngIf="novedadesInfo?.envio as env">
+      <div class="resultado-box">
+        <div class="titulo"><mat-icon>local_shipping</mat-icon>
+          Envío {{ env.numero }} · Guía {{ env.numero_guia }}</div>
+        <div class="dato">Estado del envío:
+          <span class="estado-chip" [class.ok]="env.estado === 'en_transito'"
+                [class.error]="env.estado === 'fallido'"
+                [class.warn]="env.estado === 'devuelto'">{{ env.estado }}</span>
+          · Intento de entrega <strong>{{ novedadesInfo?.intentos }}</strong>
+          de {{ novedadesInfo?.max_intentos ?? 3 }}
+        </div>
+      </div>
+
+      <!-- Registrar novedad: solo si el envío va en tránsito -->
+      <ng-container *ngIf="env.estado === 'en_transito'">
+        <div class="form-grid">
+          <mat-form-field appearance="outline">
+            <mat-label>Tipo de novedad</mat-label>
+            <mat-select [(ngModel)]="tipoNovedad">
+              <mat-option *ngFor="let t of tiposNovedad" [value]="t.codigo">{{ t.nombre }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Descripción de lo ocurrido</mat-label>
+            <input matInput [(ngModel)]="descripcionNovedad">
+          </mat-form-field>
+        </div>
+        <div class="form-actions">
+          <button class="btn-aplicar" (click)="registrarNovedad()"
+                  [disabled]="procesandoNovedad || !tipoNovedad">
+            <mat-icon>report_problem</mat-icon>
+            {{ procesandoNovedad ? 'Registrando…' : 'Registrar novedad' }}
+          </button>
+        </div>
+      </ng-container>
+
+      <!-- Resolver la novedad abierta: reprogramar o devolver al almacén -->
+      <ng-container *ngIf="novedadAbierta as abierta">
+        <div class="resultado-box">
+          <div class="titulo"><mat-icon>pending_actions</mat-icon> Novedad abierta</div>
+          <div class="dato"><strong>{{ etiquetaNovedad(abierta.tipo) }}</strong>
+            <span *ngIf="abierta.descripcion"> — {{ abierta.descripcion }}</span>
+            · intento {{ abierta.intento_numero }} · {{ abierta.fecha_registro | date:'short' }}
+            <span *ngIf="abierta.registrado_por"> · por {{ abierta.registrado_por }}</span>
+          </div>
+        </div>
+        <div class="form-grid">
+          <mat-form-field appearance="outline">
+            <mat-label>Observación de la resolución</mat-label>
+            <input matInput [(ngModel)]="observacionResolucion">
+          </mat-form-field>
+        </div>
+        <div class="form-actions">
+          <button class="btn-aplicar" (click)="reprogramar()" [disabled]="procesandoNovedad">
+            <mat-icon>event_repeat</mat-icon> Reprogramar entrega (nuevo intento)
+          </button>
+          <button class="btn-limpiar" (click)="devolverAlmacen()" [disabled]="procesandoNovedad">
+            <mat-icon>assignment_return</mat-icon> Devolver al almacén
+          </button>
+        </div>
+        <p style="margin-top:4px;">Devolver al almacén marca el pedido como
+          <strong>no entregado</strong>; el stock NO se reingresa (eso lo decide
+          la inspección de bodega, como en la RMA).</p>
+      </ng-container>
+
+      <!-- Historial de novedades e intentos del envío -->
+      <div *ngIf="novedadesInfo!.novedades.length" style="margin-top:12px;">
+        <h3><mat-icon>history</mat-icon> Historial de novedades</h3>
+        <div class="dato" *ngFor="let n of novedadesInfo!.novedades">
+          <span class="estado-chip" [class.warn]="n.estado === 'abierta'"
+                [class.ok]="n.accion === 'reprogramada'"
+                [class.error]="n.accion === 'devuelto_almacen'">
+            {{ n.estado === 'abierta' ? 'abierta'
+               : (n.accion === 'reprogramada' ? 'reprogramada' : 'devuelto a almacén') }}
+          </span>
+          {{ etiquetaNovedad(n.tipo) }}<span *ngIf="n.descripcion"> — {{ n.descripcion }}</span>
+          · intento {{ n.intento_numero }} · {{ n.fecha_registro | date:'short' }}
+          <span *ngIf="n.registrado_por"> · registró {{ n.registrado_por }}</span>
+          <span *ngIf="n.resuelto_por"> · resolvió {{ n.resuelto_por }}</span>
+        </div>
+      </div>
+    </ng-container>
+  </div>
+
   <div class="op-card" *ngIf="seguimiento.length">
     <h3><mat-icon>route</mat-icon> Seguimiento del envío</h3>
     <div class="timeline">

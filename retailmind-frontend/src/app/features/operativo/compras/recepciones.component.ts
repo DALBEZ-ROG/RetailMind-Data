@@ -16,6 +16,8 @@ import { OrdenCompraRow, OrdenCompraDetalle, StockRow } from '../../../core/mode
 interface LineaRecepcion {
   detalleId: number; sku: string; producto: string; varianteId: number;
   pedida: number; yaRecibida: number; aRecibir: number;
+  /** Rechazo en puerta: NO entra a stock; queda pendiente de devolución a proveedor. */
+  rechazada: number; motivoRechazo: string;
 }
 
 @Component({
@@ -27,6 +29,8 @@ interface LineaRecepcion {
   styleUrl: '../operativo-shared.scss'
 })
 export class RecepcionesComponent implements OnInit {
+
+  readonly columnas = ['sku', 'producto', 'pedida', 'recibida', 'aRecibir', 'rechazada', 'motivoRechazo'];
 
   ordenes: OrdenCompraRow[] = [];
   ordenId: number | null = null;
@@ -59,7 +63,8 @@ export class RecepcionesComponent implements OnInit {
           detalleId: d.id, sku: d.sku, producto: d.producto,
           varianteId: d.producto_variante_id,
           pedida: d.cantidad, yaRecibida: d.cantidad_recibida,
-          aRecibir: Math.max(d.cantidad - d.cantidad_recibida, 0)
+          aRecibir: Math.max(d.cantidad - d.cantidad_recibida, 0),
+          rechazada: 0, motivoRechazo: ''
         }));
       },
       error: () => this.snackBar.open('No se pudo cargar la orden', 'Cerrar', { duration: 3000 })
@@ -70,7 +75,13 @@ export class RecepcionesComponent implements OnInit {
     if (!this.orden) return;
     const items = this.lineas
       .filter(l => l.aRecibir > 0)
-      .map(l => ({ ordenCompraDetalleId: l.detalleId, cantidadRecibida: l.aRecibir }));
+      .map(l => ({
+        ordenCompraDetalleId: l.detalleId, cantidadRecibida: l.aRecibir,
+        // Rechazo en puerta: no entra a stock; cae al pool de defectuosos
+        // pendientes de devolución a proveedor (backend, script 45)
+        cantidadRechazada: l.rechazada > 0 ? l.rechazada : undefined,
+        motivoRechazo: l.rechazada > 0 && l.motivoRechazo ? l.motivoRechazo : undefined
+      }));
     if (!items.length) {
       this.snackBar.open('Indica al menos una cantidad a recibir mayor que 0', 'Cerrar', { duration: 3500 });
       return;
