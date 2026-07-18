@@ -19,8 +19,11 @@
       </div>
 
       <div *ngIf="showForm" style="margin-top: 20px;">
+        <p style="font-size: 12px; opacity: 0.75; margin: 0 0 8px;">
+          Solo puedes reseñar productos que has comprado.
+        </p>
         <div class="form-grid">
-          <app-select-buscable label="Producto" [opciones]="productosOpc"
+          <app-select-buscable label="Producto comprado" [opciones]="compradosOpc"
                                [(value)]="form.productoId"></app-select-buscable>
           <mat-form-field appearance="outline">
             <mat-label>Calificación</mat-label>

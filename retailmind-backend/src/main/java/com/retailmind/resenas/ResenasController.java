@@ -142,4 +142,10 @@ public class ResenasController {
     public List<Map<String, Object>> productosRef() {
         return servicio.listarProductosRef();
     }
+
+    /** Productos COMPRADOS por el cliente: los únicos que puede reseñar. */
+    @GetMapping("/productos-comprados")
+    public List<Map<String, Object>> productosComprados() {
+        return servicio.listarProductosComprados();
+    }
 }

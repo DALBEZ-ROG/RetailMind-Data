@@ -34,13 +34,16 @@ public class FacturaVentaPdfService {
         Map<String, Object> f = pg.queryForMap("""
                 SELECT fv.numero, fv.estado, fv.fecha_emision::date AS fecha,
                        fv.razon_social, fv.identificacion, fv.direccion_facturacion,
-                       fv.subtotal, fv.monto_impuesto, fv.total,
+                       fv.subtotal, fv.monto_descuento, fv.monto_impuesto, fv.total,
                        p.numero AS numero_pedido, c.email AS cliente_email,
-                       m.simbolo AS moneda_simbolo, m.codigo AS moneda_codigo
+                       m.simbolo AS moneda_simbolo, m.codigo AS moneda_codigo,
+                       cu.codigo AS cupon, uc.monto_descontado AS cupon_descuento
                 FROM factura_venta fv
                 JOIN pedido p ON p.id = fv.pedido_id
                 JOIN cliente c ON c.id = fv.cliente_id
                 JOIN moneda m ON m.id = fv.moneda_id
+                LEFT JOIN uso_cupon uc ON uc.pedido_id = fv.pedido_id
+                LEFT JOIN cupon cu ON cu.id = uc.cupon_id
                 WHERE fv.id = ?""", facturaId);
 
         List<Map<String, Object>> detalles = pg.queryForList("""
@@ -58,8 +61,12 @@ public class FacturaVentaPdfService {
                         (String) f.get("cliente_email")))
                 .meta("Pedido", (String) f.get("numero_pedido"))
                 .meta("Moneda", String.valueOf(f.get("moneda_codigo")).trim())
+                .meta("Cupón", f.get("cupon") != null
+                        ? f.get("cupon") + " (-" + f.get("moneda_simbolo")
+                          + " " + f.get("cupon_descuento") + ")" : null)
                 .totales(new DocumentoPdf.Totales(
                         (BigDecimal) f.get("subtotal"),
+                        (BigDecimal) f.get("monto_descuento"),
                         (BigDecimal) f.get("monto_impuesto"),
                         (BigDecimal) f.get("total"),
                         (String) f.get("moneda_simbolo")))

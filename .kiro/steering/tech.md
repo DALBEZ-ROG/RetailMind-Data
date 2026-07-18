@@ -9,18 +9,27 @@
 ## Bases de datos (arquitectura híbrida — dual datasource)
 
 ### PostgreSQL (operativa principal)
-- **BD**: `retailmind` (~102 tablas transaccionales), local en `localhost:5432` (no está en
-  docker-compose; se administra con los scripts de `retailmind/sql/postgres/`, scripts numerados
-  01–35 + 99).
+- **BD**: `retailmind` (~103 tablas transaccionales, catálogo con ~1.214 productos reales),
+  local en `localhost:5432` (no está en docker-compose; se administra con los scripts de
+  `retailmind/sql/postgres/`, scripts numerados 01–42 + 99).
 - **Conexión de la app**: usuario `retailmind_app` (LOGIN **NOINHERIT**, sin privilegios de
   negocio directos). Nunca conectar como `postgres` desde la app.
-- **Seguridad de motor**: 8 roles de grupo `grp_administrador`, `grp_gerente`, `grp_vendedor`,
-  `grp_compras`, `grp_bodega`, `grp_despacho`, `grp_cliente`, `grp_analista`; matriz de
-  privilegios GRANT por tabla; **RLS** (aislamiento de cliente vía `app.cliente_id`); restricción
-  por **horario** (`grupo_horario` + `esta_en_horario()` + triggers de bloqueo; admin exento).
+- **Seguridad de motor**: 9 roles de grupo `grp_administrador`, `grp_gerente`, `grp_vendedor`,
+  `grp_compras`, `grp_bodega`, `grp_despacho`, `grp_cliente`, `grp_analista`, `grp_soporte`;
+  matriz de privilegios GRANT por tabla (y POR COLUMNA para segregación financiera: BODEGA y
+  DESPACHO no leen montos, script 41); **RLS** (aislamiento de cliente vía `app.cliente_id`);
+  restricción por **horario** (`grupo_horario` + `esta_en_horario()` + triggers de bloqueo;
+  admin exento, soporte 24/7). OJO al crear un rol nuevo: además de los GRANTs necesita
+  `GRANT USAGE ON SCHEMA public` (el script 19 lo revocó a PUBLIC) y política RLS propia en
+  cada tabla con RLS — patrón completo en `37_rol_soporte.sql`.
 - **Integridad en la BD**: columnas GENERATED, totales de cabecera calculados por triggers,
   triggers `touch` para `fecha_actualizacion`, contadores como `usos_actuales` (NO escribirlos),
   CHECKs de estado/vigencia.
+- **Trazabilidad de autor (script 42)**: columnas directas FK a usuario en `pedido.vendedor_id`
+  (NULL en canal 'web'), `envio.despachado_por`, `factura_compra.registrado_por`,
+  `resena`/`pregunta_producto`.`moderado_por`+`fecha_moderacion`; `log_auditoria` append-only
+  por grants (INSERT para admin/gerente/vendedor/despacho/compras; grp_cliente sin INSERT a
+  propósito), CHECK de acciones, sin RLS.
 
 ### ClickHouse (solo analítica)
 - Esquema estrella: `fact_eventos` (~2.3M) + dimensiones `dim_*` + tablas legacy de tienda.
@@ -42,6 +51,10 @@
   `username` (contiene el email). `ClickHouseUserRepository` es el camino viejo.
 - **Errores**: `GlobalExceptionHandler` → `ApiErrorDTO` con mensajes de negocio claros
   (404/400/409; SQLState 42501 → 403 "fuera de horario / sin privilegios").
+- **Auditoría**: `auditoria/AuditoriaService.registrar()` — una fila en `log_auditoria`
+  (jsonb antes/después, lista blanca de acciones espejo del CHECK) con el usuario del JWT,
+  NUNCA del body; DEBE invocarse dentro de la `@Transactional` del caso de uso para correr
+  bajo `SET LOCAL ROLE` y confirmarse/revertirse junto con la acción que documenta.
 - **Reportes/PDF**: Apache POI 5.2.5 (Excel), iText 5.5.13.3 (PDF de facturas)
 - **Resilience**: Spring Retry (ETL)
 
@@ -78,7 +91,10 @@
 
 ## Orquestación del pipeline
 - El ETL se dispara manualmente por un ADMIN vía `/api/etl/**` (`ProcessBuilder`).
-- **PENDIENTE (visión)**: Apache Airflow. No implementado.
+- **PENDIENTE (siguiente fase)**: Apache Airflow. No implementado. El análisis del nivel
+  táctico (2026-07-17, `docs/RetailMind_T11_Analisis_Tactico.pdf`) definió 25 informes por
+  departamento: 12 simples directo de PostgreSQL y 13 compuestos que justifican este pipeline
+  hacia ClickHouse.
 
 ## Reglas de oro (obligatorias en código nuevo)
 1. **Nunca** escribir columnas GENERATED ni totales de cabecera (los ponen triggers de la BD).
@@ -100,7 +116,8 @@
 ## Credenciales de desarrollo
 - Admin: `admin@retailmind.com` / `Admin2026!`
 - Usuarios de prueba por rol (gerente@, vendedor@, compras@, bodega@, despacho@, analista@
-  `retailmind.com`): `Retail2026!` (seed `27_seed_usuarios_prueba_roles.sql`)
+  `retailmind.com`): `Retail2026!` (seed `27_seed_usuarios_prueba_roles.sql`);
+  `soporte@retailmind.com`: `Retail2026!` (script 37)
 - Clientes demo (`maria.lopez@demo.com`, `carlos.vera@demo.com`): `Cliente2026!` (script 26)
 
 ## Common Commands

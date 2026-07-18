@@ -147,7 +147,9 @@
           <mat-icon>move_to_inbox</mat-icon>
           <span>Recepciones</span>
         </a>
-        <a class="nav-item" routerLink="/operativo/compras/facturas" routerLinkActive="active">
+        <!-- Documento financiero: BODEGA no lo ve (segregación financiera) -->
+        <a class="nav-item" *ngIf="canFacturasCompra"
+           routerLink="/operativo/compras/facturas" routerLinkActive="active">
           <mat-icon>request_quote</mat-icon>
           <span>Facturas de Compra</span>
         </a>

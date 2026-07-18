@@ -90,7 +90,8 @@
       <span class="stat-chip chip-success" *ngIf="detalle.monto_reembolsado">
         Reembolsado {{ detalle.monto_reembolsado | currency:'USD' }} · {{ detalle.metodo_reembolso }}
       </span>
-      <button class="btn-limpiar" *ngIf="detalle.guia_retorno" (click)="verGuiaPdf()">
+      <!-- La guía valoriza los ítems: solo roles con acceso a montos -->
+      <button class="btn-limpiar" *ngIf="detalle.guia_retorno && veMontos" (click)="verGuiaPdf()">
         <mat-icon>picture_as_pdf</mat-icon> Guía de retorno PDF
       </button>
     </div>
@@ -145,8 +146,8 @@
             </ng-template>
           </td>
         </ng-container>
-        <tr mat-header-row *matHeaderRowDef="['sku','producto','cantidad','precio','inspeccion']"></tr>
-        <tr mat-row *matRowDef="let it; columns: ['sku','producto','cantidad','precio','inspeccion']"></tr>
+        <tr mat-header-row *matHeaderRowDef="columnasItems"></tr>
+        <tr mat-row *matRowDef="let it; columns: columnasItems"></tr>
       </table>
     </div>
 

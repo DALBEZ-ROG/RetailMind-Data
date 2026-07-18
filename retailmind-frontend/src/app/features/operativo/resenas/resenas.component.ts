@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { MatTableModule } from '@angular/material/table';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
@@ -52,6 +53,8 @@ export class ResenasComponent implements OnInit {
 
   productosRef: ProductoResenaRef[] = [];
   productosOpc: OpcionBuscable[] = [];
+  /** Solo productos COMPRADOS (compra verificada): opciones del formulario. */
+  compradosOpc: OpcionBuscable[] = [];
   loading = true;
 
   estados = ['pendiente', 'aprobada', 'rechazada'];
@@ -64,7 +67,7 @@ export class ResenasComponent implements OnInit {
   columnasMias = ['producto', 'calificacion', 'titulo', 'estado', 'utiles', 'fecha'];
 
   constructor(private servicio: ResenasService, private auth: AuthService,
-              private snackBar: MatSnackBar) {}
+              private route: ActivatedRoute, private snackBar: MatSnackBar) {}
 
   get esCliente(): boolean { return this.auth.hasRole('CLIENTE'); }
 
@@ -76,6 +79,19 @@ export class ResenasComponent implements OnInit {
       },
       error: () => {}
     });
+    if (this.esCliente) {
+      // El formulario solo ofrece productos COMPRADOS (el backend lo enforza)
+      this.servicio.productosComprados().subscribe({
+        next: p => this.compradosOpc = p.map(x => ({ id: x.id, texto: x.nombre })),
+        error: () => {}
+      });
+      // Llegada desde Mis Pedidos: ?productoId=N preselecciona y abre el form
+      const productoId = Number(this.route.snapshot.queryParamMap.get('productoId'));
+      if (productoId) {
+        this.form.productoId = productoId;
+        this.showForm = true;
+      }
+    }
     this.cargar();
   }
 

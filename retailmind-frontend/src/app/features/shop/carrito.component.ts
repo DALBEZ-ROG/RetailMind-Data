@@ -51,15 +51,22 @@ export class CarritoComponent implements OnInit {
     });
   }
 
+  /** Total con las promociones vigentes ya rebajadas (las calcula el backend). */
   get total(): number {
-    return this.items.reduce((sum, item) => sum + (item.precioUnitario * item.cantidad), 0);
+    return this.items.reduce((sum, item) =>
+      sum + (item.precioUnitario * item.cantidad) - (item.descuentoPromo || 0), 0);
+  }
+
+  get ahorroPromos(): number {
+    return this.items.reduce((sum, item) => sum + (item.descuentoPromo || 0), 0);
   }
 
   cambiarCantidad(item: any, delta: number): void {
     const nueva = item.cantidad + delta;
     if (nueva <= 0) { this.eliminarItem(item.productoId); return; }
     this.shopService.cambiarCantidad(item.productoId, nueva).subscribe({
-      next: () => item.cantidad = nueva,
+      // Recarga para que el backend recalcule el descuento promocional
+      next: () => this.loadCarrito(),
       error: (e) => this.snackBar.open(mensajeError(e, 'No se pudo actualizar la cantidad'),
         'Cerrar', { duration: 3000 })
     });

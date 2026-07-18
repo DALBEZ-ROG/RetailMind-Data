@@ -33,8 +33,18 @@
           </div>
         </div>
         <div class="item-price">
-          <span class="price">${{ item.precioUnitario * item.cantidad | number:'1.2-2' }}</span>
-          <span class="unit-price">${{ item.precioUnitario | number:'1.2-2' }} c/u</span>
+          <span class="promo-chip" *ngIf="item.descuentoPromo > 0">
+            <mat-icon>local_offer</mat-icon> {{ item.promocion }}
+          </span>
+          <span class="price">
+            ${{ item.precioUnitario * item.cantidad - (item.descuentoPromo || 0) | number:'1.2-2' }}
+          </span>
+          <span class="price-original" *ngIf="item.descuentoPromo > 0">
+            ${{ item.precioUnitario * item.cantidad | number:'1.2-2' }}
+          </span>
+          <span class="unit-price">
+            ${{ (item.descuentoPromo > 0 ? item.precioFinal : item.precioUnitario) | number:'1.2-2' }} c/u
+          </span>
         </div>
         <button mat-icon-button color="warn" (click)="eliminarItem(item.productoId)">
           <mat-icon>delete</mat-icon>
@@ -47,6 +57,9 @@
     <!-- Total y checkout -->
     <div class="carrito-footer">
       <div class="total-section">
+        <span class="promo-chip" *ngIf="ahorroPromos > 0">
+          <mat-icon>local_offer</mat-icon> Ahorras ${{ ahorroPromos | number:'1.2-2' }} en promociones
+        </span>
         <span class="total-label">Total:</span>
         <span class="total-amount">${{ total | number:'1.2-2' }}</span>
       </div>

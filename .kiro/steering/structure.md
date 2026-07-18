@@ -16,13 +16,17 @@ analítica. Con CH apagado todo funciona excepto analytics/recomendaciones (degr
 │   │   ├── sinteticos/               # Generador de datos sintéticos
 │   │   ├── analytics/ y reportes/    # Scripts/notas
 │   ├── data/stage/                   # Capa cruda Parquet
-│   ├── sql/postgres/                 # ★ DDL OPERATIVO VIGENTE: scripts numerados 01–35 + 99
+│   ├── sql/postgres/                 # ★ DDL OPERATIVO VIGENTE: scripts numerados 01–42 + 99
 │   │                                 #   01-15 módulos (seguridad, clientes, catálogo, ventas,
 │   │                                 #   compras, inventario, marketing, soporte, reseñas...),
 │   │                                 #   16 triggers, 17 seeds catálogos,
 │   │                                 #   18-22 seguridad motor (grp_*, privilegios, RLS, horarios, app_login),
 │   │                                 #   23-27 seeds demo/roles/usuarios prueba,
-│   │                                 #   28-35 grants consolidación/soporte/reseñas/tienda_cliente
+│   │                                 #   28-35 grants consolidación/soporte/reseñas/tienda_cliente,
+│   │                                 #   36 checkout online, 37 rol SOPORTE, 38 RMA devoluciones,
+│   │                                 #   39 tramo salida (facturado/preparado/transportista),
+│   │                                 #   40 descuentos marketing, 41 segregación financiera,
+│   │                                 #   42 trazabilidad de autor + auditoría
 │   ├── requirements.txt / Dockerfile / .env
 │
 ├── retailmind-backend/               # API REST Spring Boot 3.5 / Java 17
@@ -35,8 +39,10 @@ analítica. Con CH apagado todo funciona excepto analytics/recomendaciones (degr
 │       ├── auth/                     # AuthService (login vs PostgreSQL), PostgresUserRepository,
 │       │                             # JwtUtil, AppUserPrincipal, DataInitializer
 │       ├── exception/                # GlobalExceptionHandler -> ApiErrorDTO
+│       ├── auditoria/                # AuditoriaService: rastro en log_auditoria (script 42),
+│       │                             # autor SIEMPRE del JWT, dentro de la @Transactional del caso de uso
 │       ├── dto/                      # DTOs compartidos + repos ClickHouse legacy
-│       ├── pdf/                      # Base de documentos PDF (iText 5)
+│       ├── pdf/                      # Base de documentos PDF (iText 5, DocumentoPdfService)
 │       ├── referencias/              # Selects de referencia (proveedores, bodegas...)
 │       │
 │       │   # --- Núcleo operativo (PostgreSQL, @Transactional + SET LOCAL ROLE) ---
@@ -45,8 +51,13 @@ analítica. Con CH apagado todo funciona excepto analytics/recomendaciones (degr
 │       ├── admin/usuarios/           # Gestión de usuarios
 │       ├── compras/                  # Orden -> aprobar -> recepción -> factura -> pago (+PDF)
 │       ├── inventario/               # Transferencias, ajustes (+ anulación), kardex, StockService
-│       ├── ventas/                   # Pedido -> pago cliente -> factura -> despacho -> devolución (+PDF)
-│       ├── marketing/                # Cupones, promociones(+productos), campañas, banners, newsletter
+│       ├── ventas/                   # Pedido -> pago -> facturado -> preparación (bodega) ->
+│       │                             # despacho (solo 'preparado', override transportista) -> entrega (+PDF)
+│       ├── devoluciones/             # RMA logística inversa (ciclo multi-rol, guía RET-, inspección por ítem)
+│       ├── marketing/                # Cupones, promociones(+productos), campañas, banners, newsletter;
+│       │                             # DescuentosService (promos automáticas + cupón backend, script 40)
+│       ├── soporte/                  # Tickets rol SOPORTE: prioridad automática, SLA, TICK-AAAA-NNNN
+│       ├── resenas/                  # Reseñas compra verificada, votos, reportes, Q&A, moderación
 │       │
 │       │   # --- Tienda online (PostgreSQL, rol CLIENTE) ---
 │       ├── catalogo/                 # Catálogo público (búsqueda/paginación, id público = variante)
@@ -80,8 +91,10 @@ analítica. Con CH apagado todo funciona excepto analytics/recomendaciones (degr
 │               ├── catalogo/         # productos-admin
 │               ├── compras/          # órdenes, recepciones, facturas
 │               ├── inventario/       # transferencias, ajustes, kardex
-│               ├── ventas/           # pedidos, facturas, despachos, devoluciones, mis-pedidos
+│               ├── ventas/           # pedidos, facturas, preparación, despachos, devoluciones (RMA), mis-pedidos
 │               ├── marketing/        # cupones, promociones, campañas, banners, newsletter
+│               ├── soporte/          # bandeja de tickets (SOPORTE/ADMIN) + tickets del cliente
+│               ├── resenas/          # moderación de reseñas (ADMIN/GERENTE)
 │               └── horarios/
 │
 ├── docker-compose.yml                # 5 servicios: pocketbase, clickhouse, backend, frontend, etl
@@ -111,3 +124,7 @@ analítica. Con CH apagado todo funciona excepto analytics/recomendaciones (degr
 - **Flujo operativo**: Angular ← API Spring ← PostgreSQL (retailmind_app + SET LOCAL ROLE).
 - **Tienda del cliente**: checkout llama a `VentasService.crearPedido` (mismo flujo back-office);
   el id público de producto es el de la VARIANTE; eventos a CH best-effort.
+- **Trazabilidad**: las acciones críticas guardan autor en columnas directas (FK a usuario,
+  del JWT) y llaman a `AuditoriaService.registrar()` dentro de la misma transacción; el
+  checkout online NO loguea (grp_cliente sin INSERT a `log_auditoria` a propósito — su rastro
+  es `cliente_id` + canal 'web' + historial con RLS).

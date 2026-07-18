@@ -128,6 +128,7 @@ export class AppComponent {
   // el mismo punto único de verdad que usa el dashboard de inicio.
   get canCatalogo(): boolean   { return this.nav.can('catalogo'); }
   get canCompras(): boolean    { return this.nav.can('compras'); }
+  get canFacturasCompra(): boolean { return this.nav.can('facturasCompra'); }
   get canInventario(): boolean { return this.nav.can('inventario'); }
   get canAjustes(): boolean    { return this.nav.can('ajustes'); }
   get canKardex(): boolean     { return this.nav.can('kardex'); }

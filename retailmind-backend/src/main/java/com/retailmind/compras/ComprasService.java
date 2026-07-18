@@ -12,6 +12,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.retailmind.auditoria.AuditoriaService;
 import com.retailmind.auth.AppUserPrincipal;
 
 /**
@@ -32,9 +33,12 @@ public class ComprasService {
     private static final BigDecimal IVA_DEFECTO = new BigDecimal("15");
 
     private final JdbcTemplate pg;
+    private final AuditoriaService auditoria;
 
-    public ComprasService(@Qualifier("pgJdbcTemplate") JdbcTemplate pg) {
+    public ComprasService(@Qualifier("pgJdbcTemplate") JdbcTemplate pg,
+                          AuditoriaService auditoria) {
         this.pg = pg;
+        this.auditoria = auditoria;
     }
 
     // ── a) Emitir orden de compra ────────────────────────────────────────
@@ -87,6 +91,25 @@ public class ComprasService {
 
     @Transactional(readOnly = true)
     public Map<String, Object> obtenerOrden(long ordenId) {
+        // Segregación financiera: BODEGA ve la orden para RECIBIR (qué y
+        // cuánto), nunca costos ni totales (sus grants de columna lo espejan)
+        if (esBodega()) {
+            Map<String, Object> orden = pg.queryForMap("""
+                    SELECT oc.id, oc.numero, oc.estado, oc.fecha_emision, oc.fecha_entrega_esperada,
+                           p.razon_social AS proveedor, b.nombre AS bodega
+                    FROM orden_compra oc
+                    JOIN proveedor p ON p.id = oc.proveedor_id
+                    JOIN bodega b ON b.id = oc.bodega_id
+                    WHERE oc.id = ?""", ordenId);
+            orden.put("detalles", pg.queryForList("""
+                    SELECT d.id, d.producto_variante_id, pv.sku, pr.nombre AS producto,
+                           d.cantidad, d.cantidad_recibida
+                    FROM orden_compra_detalle d
+                    JOIN producto_variante pv ON pv.id = d.producto_variante_id
+                    JOIN producto pr ON pr.id = pv.producto_id
+                    WHERE d.orden_compra_id = ? ORDER BY d.id""", ordenId));
+            return orden;
+        }
         Map<String, Object> orden = pg.queryForMap("""
                 SELECT oc.id, oc.numero, oc.estado, oc.fecha_emision, oc.fecha_entrega_esperada,
                        oc.subtotal, oc.monto_impuesto, oc.total,
@@ -107,6 +130,18 @@ public class ComprasService {
 
     @Transactional(readOnly = true)
     public List<Map<String, Object>> listarOrdenes() {
+        // Segregación financiera: BODEGA lista órdenes sin el total
+        if (esBodega()) {
+            return pg.queryForList("""
+                    SELECT oc.id, oc.numero, oc.estado, oc.fecha_emision,
+                           p.razon_social AS proveedor, b.nombre AS bodega,
+                           EXISTS (SELECT 1 FROM factura_compra fc
+                                   WHERE fc.orden_compra_id = oc.id) AS tiene_factura
+                    FROM orden_compra oc
+                    JOIN proveedor p ON p.id = oc.proveedor_id
+                    JOIN bodega b ON b.id = oc.bodega_id
+                    ORDER BY oc.id DESC""");
+        }
         // tiene_factura permite al frontend ofrecer solo ordenes facturables
         return pg.queryForList("""
                 SELECT oc.id, oc.numero, oc.estado, oc.fecha_emision, oc.total,
@@ -147,13 +182,8 @@ public class ComprasService {
         // Auditoría de la aprobación. Solo llegan aquí ADMIN y GERENTE
         // (SecurityConfig) y ambos grupos tienen INSERT sobre log_auditoria
         // (scripts 19 y 30). estadoAnterior sale del check de la BD (lista blanca).
-        pg.update("""
-                INSERT INTO log_auditoria
-                    (usuario_id, tabla, registro_id, accion, datos_anteriores, datos_nuevos)
-                VALUES (?, 'orden_compra', ?, 'UPDATE', ?::jsonb, ?::jsonb)""",
-                usuarioActualId(), ordenId,
-                "{\"estado\": \"" + estado + "\"}",
-                "{\"estado\": \"confirmada\"}");
+        auditoria.registrar("orden_compra", ordenId, "UPDATE",
+                Map.of("estado", estado), Map.of("estado", "confirmada"));
         return Map.of("id", ordenId, "numero", numero,
                 "estadoAnterior", estado, "estado", "confirmada");
     }
@@ -319,16 +349,20 @@ public class ComprasService {
                     + " registrada; no se puede facturar de nuevo");
         }
 
-        // Numero autogenerado por el sistema (mismo patron que OC/PED/FV)
+        // Numero autogenerado por el sistema (mismo patron que OC/PED/FV).
+        // registrado_por = autor del JWT (trazabilidad, script 42).
         String numeroFactura = siguienteNumero("FC");
         Long facturaId = pg.queryForObject("""
                 INSERT INTO factura_compra
                     (proveedor_id, orden_compra_id, moneda_id, numero_factura,
-                     fecha_emision, fecha_vencimiento, estado)
-                VALUES (?, ?, ?, ?, CURRENT_DATE, CURRENT_DATE + ?::int, 'registrada')
+                     fecha_emision, fecha_vencimiento, estado, registrado_por)
+                VALUES (?, ?, ?, ?, CURRENT_DATE, CURRENT_DATE + ?::int, 'registrada', ?)
                 RETURNING id""",
                 Long.class, proveedorId, ordenId, ((Number) orden.get("moneda_id")).longValue(),
-                numeroFactura, diasCredito);
+                numeroFactura, diasCredito, usuarioActualId());
+        auditoria.registrar("factura_compra", facturaId, "INSERT", null,
+                Map.of("numero_factura", numeroFactura, "orden_compra_id", ordenId,
+                       "estado", "registrada"));
 
         // Detalle copiado de la orden (lo efectivamente pactado). subtotal = generado.
         pg.update("""
@@ -440,6 +474,15 @@ public class ComprasService {
             return p.getUsuarioId();
         }
         return null;
+    }
+
+    /** BODEGA recibe mercancía pero no lee montos (segregación financiera). */
+    private boolean esBodega() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof AppUserPrincipal p) {
+            return "BODEGA".equalsIgnoreCase(p.getRolCodigo());
+        }
+        return false;
     }
 
 }

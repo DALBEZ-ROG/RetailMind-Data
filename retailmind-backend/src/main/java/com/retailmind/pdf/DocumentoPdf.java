@@ -32,9 +32,15 @@ public class DocumentoPdf {
     public record Linea(String codigo, String descripcion, int cantidad,
                         BigDecimal precioUnitario, BigDecimal impuesto, BigDecimal subtotal) {}
 
-    /** Bloque de totales (los montos vienen de la BD, nunca recalculados aquí). */
-    public record Totales(BigDecimal subtotal, BigDecimal impuesto, BigDecimal total,
-                          String simboloMoneda) {}
+    /** Bloque de totales (los montos vienen de la BD, nunca recalculados aquí).
+     *  descuento es opcional: null o 0 = la fila no se imprime. */
+    public record Totales(BigDecimal subtotal, BigDecimal descuento, BigDecimal impuesto,
+                          BigDecimal total, String simboloMoneda) {
+        public Totales(BigDecimal subtotal, BigDecimal impuesto, BigDecimal total,
+                       String simboloMoneda) {
+            this(subtotal, null, impuesto, total, simboloMoneda);
+        }
+    }
 
     private final String titulo;
     private final String numero;

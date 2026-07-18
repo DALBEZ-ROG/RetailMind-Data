@@ -16,6 +16,11 @@
           <mat-icon>receipt</mat-icon> FACTURADO
         </span>
         <span class="chip">{{ exito.metodoPago }} · {{ exito.referenciaPago }}</span>
+        <span class="chip chip-descuento" *ngIf="exito.descuento > 0">
+          <mat-icon>confirmation_number</mat-icon>
+          {{ exito.cuponCodigo ? 'Cupón ' + exito.cuponCodigo : 'Descuento' }}
+          −{{ exito.descuento | currency:'USD' }}
+        </span>
         <span class="chip">Total {{ exito.total | currency:'USD' }}</span>
       </div>
       <div class="success-chips" *ngIf="exito.facturaNumero || exito.transportista">
@@ -29,9 +34,6 @@
           </ng-container>
         </span>
       </div>
-      <p class="cupon-info" *ngIf="exito.cuponMensaje">
-        <mat-icon>info</mat-icon> {{ exito.cuponMensaje }}
-      </p>
       <p class="success-sub">Bodega ya está preparando tu pedido; puedes seguir su
         estado, la guía de envío y la factura en <strong>Mis Pedidos</strong>.</p>
       <div class="success-actions">
@@ -122,20 +124,31 @@
         </div>
       </mat-card>
 
-      <!-- 2 · Cupón de descuento (fase de descuentos pendiente) -->
+      <!-- 2 · Cupón de descuento (validado en backend, script 40) -->
       <mat-card class="paso-card">
         <div class="paso-header">
           <span class="paso-num">2</span>
           <h3><mat-icon>confirmation_number</mat-icon> Cupón de descuento</h3>
         </div>
-        <div class="cupon-row">
+        <div class="cupon-row" *ngIf="!cuponAplicado">
           <mat-form-field appearance="outline" class="cupon-field">
             <mat-label>Código de cupón (opcional)</mat-label>
             <input matInput [(ngModel)]="cupon" (keyup.enter)="aplicarCupon()">
           </mat-form-field>
-          <button mat-stroked-button color="primary" (click)="aplicarCupon()">Aplicar</button>
+          <button mat-stroked-button color="primary" [disabled]="validandoCupon"
+                  (click)="aplicarCupon()">
+            {{ validandoCupon ? 'Validando…' : 'Aplicar' }}
+          </button>
         </div>
-        <p class="cupon-info" *ngIf="cuponInfo"><mat-icon>info</mat-icon> {{ cuponInfo }}</p>
+        <p class="cupon-error" *ngIf="cuponError"><mat-icon>error_outline</mat-icon> {{ cuponError }}</p>
+        <div class="cupon-aplicado" *ngIf="cuponAplicado">
+          <mat-icon>check_circle</mat-icon>
+          <span>Cupón <strong>{{ cuponAplicado.codigo }}</strong> aplicado:
+            −{{ descuentoCupon | currency:'USD' }}</span>
+          <button mat-button color="warn" (click)="quitarCupon()">
+            <mat-icon>close</mat-icon> Quitar
+          </button>
+        </div>
       </mat-card>
 
       <!-- 3 · Método de pago (SIMULADO: sin cobro real) -->
@@ -198,11 +211,26 @@
     <mat-card class="resumen-card">
       <h3><mat-icon>receipt_long</mat-icon> Resumen del pedido</h3>
       <div class="resumen-item" *ngFor="let i of items">
-        <span class="ri-nombre">{{ i.nombre }} <span class="ri-cant">×{{ i.cantidad }}</span></span>
-        <span class="ri-precio">{{ i.precioUnitario * i.cantidad | currency:'USD' }}</span>
+        <span class="ri-nombre">{{ i.nombre }} <span class="ri-cant">×{{ i.cantidad }}</span>
+          <span class="ri-promo" *ngIf="i.descuentoPromo > 0">
+            <mat-icon>local_offer</mat-icon> {{ i.promocion }}
+          </span>
+        </span>
+        <span class="ri-precio">
+          <span class="ri-tachado" *ngIf="i.descuentoPromo > 0">
+            {{ i.precioUnitario * i.cantidad | currency:'USD' }}
+          </span>
+          {{ i.precioUnitario * i.cantidad - (i.descuentoPromo || 0) | currency:'USD' }}
+        </span>
       </div>
       <mat-divider></mat-divider>
       <div class="resumen-linea"><span>Subtotal</span><span>{{ subtotal | currency:'USD' }}</span></div>
+      <div class="resumen-linea linea-descuento" *ngIf="descuentoPromos > 0">
+        <span>Promociones</span><span>−{{ descuentoPromos | currency:'USD' }}</span>
+      </div>
+      <div class="resumen-linea linea-descuento" *ngIf="cuponAplicado">
+        <span>Cupón {{ cuponAplicado.codigo }}</span><span>−{{ descuentoCupon | currency:'USD' }}</span>
+      </div>
       <div class="resumen-linea"><span>IVA (15%)</span><span>{{ impuesto | currency:'USD' }}</span></div>
       <div class="resumen-linea"><span>Envío</span><span>Gratis</span></div>
       <div class="resumen-total"><span>Total</span><span>{{ total | currency:'USD' }}</span></div>

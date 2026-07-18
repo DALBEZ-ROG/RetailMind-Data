@@ -177,8 +177,9 @@ export const routes: Routes = [
       import('./features/operativo/compras/recepciones.component').then(m => m.RecepcionesComponent)
   },
   {
+    // Facturas de compra: documento financiero — BODEGA fuera (segregación)
     path: 'operativo/compras/facturas',
-    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'COMPRAS', 'BODEGA'])],
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'COMPRAS'])],
     loadComponent: () =>
       import('./features/operativo/compras/facturas-compra.component').then(m => m.FacturasCompraComponent)
   },

@@ -1,9 +1,10 @@
 # RetailMind — contexto para Claude Code
 
-Tienda PyME con back-office completo. **PostgreSQL (BD `retailmind`, ~102 tablas) es la ÚNICA
-base transaccional** — incluida la TIENDA DEL CLIENTE (catálogo `/api/catalogo`, carrito,
-wishlist, perfil/direcciones, checkout y mis pedidos, migrados 2026-07-11). ClickHouse es **solo
-analítica** (paquete `analytics/` + señal de eventos para recomendaciones): con ClickHouse
+Tienda PyME con back-office completo. **PostgreSQL (BD `retailmind`, ~103 tablas) es la ÚNICA
+base transaccional** — incluida la TIENDA DEL CLIENTE (catálogo `/api/catalogo` con ~1.214
+productos reales cargados del dataset original vía ETL puntual, carrito, wishlist,
+perfil/direcciones, checkout y mis pedidos, migrados 2026-07-11). Con Docker apagado TODO el
+sistema funciona. ClickHouse es **solo analítica** (paquete `analytics/` + señal de eventos para recomendaciones): con ClickHouse
 apagado TODO el sistema funciona; solo analytics/recomendaciones se degradan con aviso. Si algún
 documento viejo dice "PostgreSQL eliminado" o describe la tienda sobre ClickHouse, está
 desactualizado: ignóralo.
@@ -18,7 +19,7 @@ desactualizado: ignóralo.
   Pantallas operativas en `features/operativo/` (incluye `marketing/`); estilos compartidos
   `operativo-shared.scss`; errores con `core/services/api-error.util.ts`.
 - **ETL** `retailmind/`: Python 3.12, PocketBase → Parquet → ClickHouse. El DDL operativo vigente
-  de PostgreSQL está en `retailmind/sql/postgres/` (scripts numerados 01-35 + 99).
+  de PostgreSQL está en `retailmind/sql/postgres/` (scripts numerados 01-41 + 99).
 - **Tienda del cliente** (solo rol CLIENTE, guard + SecurityConfig): backend en paquetes
   `catalogo/`, `carrito/`, `wishlist/`, `perfil/`, `recomendaciones/` contra `pgJdbcTemplate`;
   el id público de producto es el de la VARIANTE. El checkout llama a `VentasService.crearPedido`
@@ -81,7 +82,8 @@ esquema usa el MCP `retailmind` (solo lectura) o psycopg2 (`postgres/1250143656@
 
 - Admin: `admin@retailmind.com` / `Admin2026!`
 - Resto de roles (`gerente@`, `vendedor@`, `compras@`, `bodega@`, `despacho@`,
-  `analista@retailmind.com`): `Retail2026!` (script 27)
+  `analista@retailmind.com`): `Retail2026!` (script 27); `soporte@retailmind.com`:
+  `Retail2026!` (script 37)
 - Clientes demo (`maria.lopez@demo.com`, `carlos.vera@demo.com`): `Cliente2026!` (script 26)
 
 ## Qué está hecho / qué falta
@@ -151,10 +153,58 @@ SOPORTE cierra y el ticket queda resuelto), historial en `historial_estado_devol
 `devolucion.monto_total` lo mantiene el trigger `fn_recalcular_total_devolucion`
 (SECURITY DEFINER, NUNCA escribirlo) y el endpoint viejo de devolución en un paso se
 eliminó (`/api/devoluciones`, tablero multi-rol en `/operativo/ventas/devoluciones`).
+**DESCUENTOS REALES (2026-07-17, script 40, `marketing/DescuentosService`)**: promociones
+vigentes se aplican AUTOMÁTICAMENTE por línea en `crearPedido`
+(`pedido_detalle.monto_descuento`, IVA sobre la base rebajada; gana la de mayor prioridad y
+solo las `acumulable` se suman; historial las registra) y el CUPÓN del checkout online se
+valida/recalcula SIEMPRE en backend (existe+activo, vigencia, `usos_maximos` vía
+`usos_actuales`, `usos_por_cliente` contra `uso_cupon`, monto mínimo sobre el subtotal neto
+de promos sin IVA; el front solo envía el CÓDIGO) y se aplica en `pedido.monto_descuento`
+— los triggers de total ya restaban ambas capas, CERO columnas nuevas — registrando
+`uso_cupon` en la misma transacción; trigger `fn_registrar_uso_cupon` SECURITY DEFINER
+(lock FOR UPDATE del cupón) mantiene `usos_actuales` y es el backstop de concurrencia de
+límites; un solo cupón por pedido (UNIQUE `uso_cupon.pedido_id`); promoción + cupón SÍ
+combinan (promo a la línea, cupón sobre el subtotal ya rebajado); la factura PRORRATEA el
+cupón entre líneas (`factura_venta_detalle.monto_descuento`, ajuste de redondeo en la
+última) porque su trigger recalcula solo desde el detalle, y el PDF muestra
+Subtotal/Descuento/IVA/Total + meta "Cupón"; endpoint POST `/api/carrito/cupon/validar`
+(motivos claros), carrito/checkout muestran precio promocional tachado y desglose, y el
+back-office/Mis Pedidos muestran cupón y descuentos.
+**RESEÑAS con compra verificada (script 32 + fase de pulido 2026-07-17)**: módulo completo
+en `resenas/` (reseñas, votos de utilidad, reportes de abuso, preguntas/respuestas;
+moderación ADMIN/GERENTE en `/operativo/resenas`); crear reseña EXIGE compra
+(pedido pagado→entregado, incluye 'devuelto', del propio cliente con ese producto;
+si no → 409 "Solo puedes reseñar productos que has comprado"); el selector del
+formulario ofrece SOLO productos comprados (GET `/api/resenas/productos-comprados`,
+CLIENTE) y Mis Pedidos tiene botón "Reseñar" por ítem que navega con
+`?productoId=` preseleccionado.
+**SEGREGACIÓN FINANCIERA (2026-07-17, script 41)**: BODEGA y DESPACHO no leen montos —
+grants POR COLUMNA sin dinero sobre pedido/pedido_detalle/factura_venta/factura_compra/
+orden_compra/orden_compra_detalle/devolucion y `pago` revocado a despacho; consultas
+role-aware en `VentasService` (colaPreparacion/detalleLogistico/listarPedidos/entregar),
+`ComprasService` (listarOrdenes/obtenerOrden) y `DevolucionService` (listar/obtener);
+UI sin columnas de monto para esos roles y BODEGA fuera de Facturas de Compra
+(ruta + nav `facturasCompra`). EXCEPCIÓN documentada: grp_bodega conserva SELECT de
+`precio_unitario` en los DETALLES porque valoriza el kardex bajo su rol (recepción y
+reingreso RMA); la UI no lo muestra. OJO: `entregar` devuelve respuesta ligera para
+DESPACHO (sin pagos) y el pedido completo para el resto.
+**TRAZABILIDAD DE AUTOR (2026-07-17, script 42, `auditoria/AuditoriaService`)**: columnas
+directas de autor (FK a usuario, del JWT SIEMPRE) — `pedido.vendedor_id` (NULL si canal
+'web': el autor del checkout es el CLIENTE, trazado por cliente_id+historial),
+`envio.despachado_por`, `factura_compra.registrado_por`, `resena.moderado_por` +
+`fecha_moderacion` y `pregunta_producto.moderado_por`+`fecha_moderacion`
+(`respuesta_pregunta` ya tenía `usuario_id`); `AuditoriaService.registrar()` generaliza el
+log de la aprobación de OC y escribe `log_auditoria` (jsonb antes/después, CHECK de
+acciones) en: crear pedido interno, despachar, registrar factura de compra y moderar
+reseña/pregunta; INSERT de log_auditoria otorgado a grp_vendedor/despacho/compras (script
+42; el checkout online NO loguea: grp_cliente sin INSERT a propósito). Trazabilidad futura
+(producto, marketing, historial de ticket) documentada en deuda.
 La deuda técnica acumulada vive en `DEUDA_TECNICA.md` (raíz).
 
-**Pendiente**: aplicación real de descuentos (cupones/promociones a pedidos, alimenta `uso_cupon`);
-módulo de reseñas; orquestación ETL con Airflow.
+**Pendiente**: orquestación ETL con Airflow. El NIVEL TÁCTICO está en análisis (2026-07-17,
+`docs/RetailMind_T11_Analisis_Tactico.pdf`): 25 informes tácticos por departamento — 12 simples
+que salen directo de la BDR PostgreSQL y 13 compuestos (agregaciones/series temporales) que se
+procesarán en ClickHouse vía el ETL orquestado por Airflow; esa es la siguiente fase.
 
 **Deuda técnica conocida** (tablas huérfanas, requieren bloque dedicado):
 

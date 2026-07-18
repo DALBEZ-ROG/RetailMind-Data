@@ -69,9 +69,19 @@ public class CarritoController {
     }
 
     /**
+     * Valida un código de cupón contra el carrito actual (script 40): responde
+     * {valido, motivo?, descuento?} sin aplicar nada. La aplicación real
+     * ocurre al confirmar el checkout, recalculada en backend.
+     */
+    @PostMapping("/cupon/validar")
+    public Map<String, Object> validarCupon(@RequestBody Map<String, String> body) {
+        return service.validarCupon(body != null ? body.get("codigo") : null);
+    }
+
+    /**
      * Checkout online completo: dirección + método de pago (tarjeta simulada
-     * o transferencia) + cupón (preparado; se valida en la fase de
-     * descuentos). El pedido nace PAGADO.
+     * o transferencia) + cupón (validado y aplicado en backend, con su uso
+     * registrado en uso_cupon). El pedido nace PAGADO.
      */
     @PostMapping("/checkout")
     public ResponseEntity<?> checkout(@RequestBody CarritoService.CheckoutReq req) {

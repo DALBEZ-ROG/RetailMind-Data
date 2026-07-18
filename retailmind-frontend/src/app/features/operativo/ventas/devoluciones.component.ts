@@ -55,8 +55,6 @@ export class DevolucionesComponent implements OnInit {
   metodoReembolso: string | null = null;
   referenciaReembolso = '';
 
-  columnas = ['numero', 'pedido', 'cliente', 'motivo', 'monto', 'estado', 'fecha', 'acciones'];
-
   constructor(private rma: DevolucionesService, private auth: AuthService,
               private snackBar: MatSnackBar) {}
 
@@ -66,6 +64,23 @@ export class DevolucionesComponent implements OnInit {
   get esDespacho(): boolean { return this.esAdmin || this.auth.hasRole('DESPACHO'); }
   get esBodega(): boolean   { return this.esAdmin || this.auth.hasRole('BODEGA'); }
   get esGerente(): boolean  { return this.esAdmin || this.auth.hasRole('GERENTE'); }
+
+  /** Segregación financiera: BODEGA/DESPACHO puros no ven montos ni precios. */
+  get veMontos(): boolean {
+    return !(this.auth.hasRole('BODEGA') || this.auth.hasRole('DESPACHO'));
+  }
+
+  get columnas(): string[] {
+    return this.veMontos
+      ? ['numero', 'pedido', 'cliente', 'motivo', 'monto', 'estado', 'fecha', 'acciones']
+      : ['numero', 'pedido', 'cliente', 'motivo', 'estado', 'fecha', 'acciones'];
+  }
+
+  get columnasItems(): string[] {
+    return this.veMontos
+      ? ['sku', 'producto', 'cantidad', 'precio', 'inspeccion']
+      : ['sku', 'producto', 'cantidad', 'inspeccion'];
+  }
 
   ngOnInit(): void {
     this.cargar();
@@ -110,7 +125,7 @@ export class DevolucionesComponent implements OnInit {
     if (!this.detalle) return 0;
     return this.detalle.detalles
       .filter(d => ['apto_reventa', 'defectuoso'].includes(d.resultado_inspeccion || ''))
-      .reduce((acc, d) => acc + d.precio_unitario * d.cantidad, 0);
+      .reduce((acc, d) => acc + (d.precio_unitario ?? 0) * d.cantidad, 0);
   }
 
   revision(): void  { this.transicion(this.rma.revision(this.detalle!.id), 'Revisión iniciada'); }

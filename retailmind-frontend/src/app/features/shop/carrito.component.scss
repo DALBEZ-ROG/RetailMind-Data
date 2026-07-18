@@ -184,3 +184,29 @@
 
 ::ng-deep .snack-success { --mdc-snackbar-container-color: #2e7d32; --mdc-snackbar-supporting-text-color: white; }
 ::ng-deep .snack-error { --mdc-snackbar-container-color: #c62828; --mdc-snackbar-supporting-text-color: white; }
+
+// Promociones vigentes (script 40): precio rebajado + etiqueta de la promo
+.promo-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #fff3e0;
+  color: #e65100;
+  border-radius: 12px;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 600;
+
+  mat-icon {
+    font-size: 14px !important;
+    width: 14px !important;
+    height: 14px !important;
+  }
+}
+
+.price-original {
+  display: block;
+  font-size: 13px;
+  color: #90a4ae;
+  text-decoration: line-through;
+}

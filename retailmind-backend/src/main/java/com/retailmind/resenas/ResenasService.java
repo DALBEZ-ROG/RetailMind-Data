@@ -13,6 +13,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.retailmind.auditoria.AuditoriaService;
 import com.retailmind.auth.AppUserPrincipal;
 
 /**
@@ -36,14 +37,24 @@ import com.retailmind.auth.AppUserPrincipal;
  *    el nombre de otros clientes se degrada a "Cliente" (RLS sobre cliente).
  *
  * Nunca se escriben fecha_creacion (default) ni fecha_actualizacion (trigger
- * touch). compra_verificada sí es de la app: se calcula al crear la reseña
- * contra los pedidos no cancelados del propio cliente.
+ * touch). Reseñar EXIGE compra verificada: solo se acepta la reseña si existe
+ * un pedido pagado/entregado del propio cliente que contenga el producto
+ * (ESTADOS_COMPRA); compra_verificada queda siempre en true para las nuevas.
  */
 @Service
 public class ResenasService {
 
     /** Espeja el CHECK reporte_resena_motivo_check. */
     private static final Set<String> MOTIVOS_REPORTE = Set.of("ofensivo", "spam", "falso", "otro");
+
+    /**
+     * Estados de pedido que cuentan como COMPRA para reseñar (compra
+     * verificada): pagado en adelante, incluido 'devuelto' (compró y devolvió:
+     * su opinión sigue siendo legítima). Excluye pendiente/confirmado (aún no
+     * paga) y cancelado. Lista blanca embebida en SQL, nunca input del usuario.
+     */
+    private static final String ESTADOS_COMPRA =
+            "('pagado','facturado','en_preparacion','preparado','despachado','entregado','devuelto')";
 
     /** Transiciones de moderación de reseña (CHECK: pendiente/aprobada/rechazada). */
     private static final Map<String, Set<String>> TRANSICIONES_RESENA = Map.of(
@@ -64,9 +75,12 @@ public class ResenasService {
             "descartado", Set.of());
 
     private final JdbcTemplate pg;
+    private final AuditoriaService auditoria;
 
-    public ResenasService(@Qualifier("pgJdbcTemplate") JdbcTemplate pg) {
+    public ResenasService(@Qualifier("pgJdbcTemplate") JdbcTemplate pg,
+                          AuditoriaService auditoria) {
         this.pg = pg;
+        this.auditoria = auditoria;
     }
 
     // ── Reseñas ──────────────────────────────────────────────────────────
@@ -156,8 +170,9 @@ public class ResenasService {
         if (repetida != null && repetida > 0) {
             throw new IllegalStateException("Ya escribiste una reseña de este producto");
         }
-        // Pedido no cancelado del propio cliente que contenga el producto:
-        // marca compra_verificada y ancla pedido_id (RLS limita a sus pedidos).
+        // COMPRA VERIFICADA obligatoria: solo se reseña un producto contenido
+        // en un pedido PAGADO del propio cliente (ESTADOS_COMPRA; RLS limita a
+        // sus pedidos). Sin compra no hay reseña.
         List<Long> pedidos = pg.queryForList("""
                 SELECT p.id
                 FROM pedido p
@@ -165,18 +180,22 @@ public class ResenasService {
                 JOIN producto_variante pv ON pv.id = pd.producto_variante_id
                 JOIN estado_pedido ep ON ep.id = p.estado_pedido_id
                 WHERE p.cliente_id = ? AND pv.producto_id = ?
-                  AND ep.codigo NOT IN ('cancelado', 'devuelto')
+                  AND ep.codigo IN """ + ESTADOS_COMPRA + """
+
                 ORDER BY p.fecha_pedido DESC, p.id DESC
                 LIMIT 1""", Long.class, clienteId, productoId);
-        Long pedidoId = pedidos.isEmpty() ? null : pedidos.get(0);
+        if (pedidos.isEmpty()) {
+            throw new IllegalStateException("Solo puedes reseñar productos que has comprado");
+        }
+        Long pedidoId = pedidos.get(0);
         return idDe(pg.queryForObject("""
                 INSERT INTO resena (producto_id, cliente_id, pedido_id, calificacion,
                                     titulo, comentario, compra_verificada)
-                VALUES (?, ?, ?::bigint, ?, NULLIF(?, ''), NULLIF(?, ''), ?)
+                VALUES (?, ?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), true)
                 RETURNING id""",
                 Long.class, productoId, clienteId, pedidoId, calificacion,
                 titulo == null ? null : titulo.trim(),
-                comentario == null ? null : comentario.trim(), pedidoId != null));
+                comentario == null ? null : comentario.trim()));
     }
 
     /** Moderación (personal): aprobar/rechazar validando la transición. */
@@ -192,7 +211,13 @@ public class ResenasService {
             throw new IllegalStateException("Transición inválida: '" + actual + "' → '"
                     + estado + "'. Permitidas: " + String.join(", ", permitidas.stream().sorted().toList()));
         }
-        pg.update("UPDATE resena SET estado = ? WHERE id = ?", estado, id);
+        // moderado_por/fecha_moderacion = autor del JWT (trazabilidad, script
+        // 42); fecha_actualizacion NO se escribe (trigger touch).
+        pg.update("""
+                UPDATE resena SET estado = ?, moderado_por = ?, fecha_moderacion = now()
+                WHERE id = ?""", estado, usuarioActualId(), id);
+        auditoria.registrar("resena", id, "UPDATE",
+                Map.of("estado", actual), Map.of("estado", estado));
     }
 
     // ── Votos de utilidad ────────────────────────────────────────────────
@@ -383,7 +408,13 @@ public class ResenasService {
                 VALUES (?, ?, ?, true) RETURNING id""",
                 Long.class, preguntaId, usuarioActualId(), respuesta.trim()));
         if ("pendiente".equals(estado)) {
-            pg.update("UPDATE pregunta_producto SET estado = 'publicada' WHERE id = ?", preguntaId);
+            // Contestar implica aprobar: el que responde queda como moderador
+            pg.update("""
+                    UPDATE pregunta_producto
+                    SET estado = 'publicada', moderado_por = ?, fecha_moderacion = now()
+                    WHERE id = ?""", usuarioActualId(), preguntaId);
+            auditoria.registrar("pregunta_producto", preguntaId, "UPDATE",
+                    Map.of("estado", "pendiente"), Map.of("estado", "publicada"));
         }
         return id;
     }
@@ -401,7 +432,12 @@ public class ResenasService {
             throw new IllegalStateException("Transición inválida: '" + actual + "' → '"
                     + estado + "'. Permitidas: " + String.join(", ", permitidas.stream().sorted().toList()));
         }
-        pg.update("UPDATE pregunta_producto SET estado = ? WHERE id = ?", estado, id);
+        pg.update("""
+                UPDATE pregunta_producto
+                SET estado = ?, moderado_por = ?, fecha_moderacion = now()
+                WHERE id = ?""", estado, usuarioActualId(), id);
+        auditoria.registrar("pregunta_producto", id, "UPDATE",
+                Map.of("estado", actual), Map.of("estado", estado));
     }
 
     // ── Referencias ──────────────────────────────────────────────────────
@@ -411,6 +447,27 @@ public class ResenasService {
     public List<Map<String, Object>> listarProductosRef() {
         return pg.queryForList(
                 "SELECT id, nombre FROM producto WHERE activo ORDER BY nombre");
+    }
+
+    /**
+     * Productos que el CLIENTE autenticado ha COMPRADO (mismo criterio
+     * ESTADOS_COMPRA de crearResena): alimenta el selector del formulario de
+     * reseña para ofrecer solo lo reseñable. RLS sobre pedido refuerza la
+     * propiedad.
+     */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> listarProductosComprados() {
+        return pg.queryForList("""
+                SELECT DISTINCT p.id, p.nombre
+                FROM producto p
+                JOIN producto_variante pv ON pv.producto_id = p.id
+                JOIN pedido_detalle pd ON pd.producto_variante_id = pv.id
+                JOIN pedido pe ON pe.id = pd.pedido_id
+                JOIN estado_pedido ep ON ep.id = pe.estado_pedido_id
+                WHERE pe.cliente_id = ? AND p.activo
+                  AND ep.codigo IN """ + ESTADOS_COMPRA + """
+
+                ORDER BY p.nombre""", clienteActualId());
     }
 
     // ── Utilitarios ──────────────────────────────────────────────────────

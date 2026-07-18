@@ -13,8 +13,10 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.retailmind.auditoria.AuditoriaService;
 import com.retailmind.auth.AppUserPrincipal;
 import com.retailmind.inventario.StockService;
+import com.retailmind.marketing.DescuentosService;
 
 /**
  * Ciclo de venta (Order-to-Cash) con compuertas enforzadas en backend:
@@ -41,10 +43,15 @@ public class VentasService {
 
     private final JdbcTemplate pg;
     private final StockService stock;
+    private final DescuentosService descuentos;
+    private final AuditoriaService auditoria;
 
-    public VentasService(@Qualifier("pgJdbcTemplate") JdbcTemplate pg, StockService stock) {
+    public VentasService(@Qualifier("pgJdbcTemplate") JdbcTemplate pg, StockService stock,
+                         DescuentosService descuentos, AuditoriaService auditoria) {
         this.pg = pg;
         this.stock = stock;
+        this.descuentos = descuentos;
+        this.auditoria = auditoria;
     }
 
     // ── Caso 7: realizar pedido ──────────────────────────────────────────
@@ -64,16 +71,27 @@ public class VentasService {
             throw new IllegalArgumentException("El pedido requiere al menos un item");
         }
         String numero = siguienteNumero("PED");
+        String canalFinal = canal != null && List.of("web", "tienda", "telefono").contains(canal)
+                ? canal : "web";
+        // Trazabilidad (script 42): vendedor_id = usuario del JWT que crea el
+        // pedido INTERNO. En el checkout online (rol CLIENTE) queda NULL: el
+        // autor es el cliente y ya está trazado por cliente_id + canal 'web'
+        // + la primera fila del historial.
+        Long vendedorId = "CLIENTE".equalsIgnoreCase(rolActual()) ? null : usuarioActualId();
         Long pedidoId = pg.queryForObject("""
                 INSERT INTO pedido (numero, cliente_id, estado_pedido_id, moneda_id, canal,
-                                    direccion_envio_id)
+                                    direccion_envio_id, vendedor_id)
                 VALUES (?, ?, (SELECT id FROM estado_pedido WHERE codigo = 'confirmado'),
-                        (SELECT id FROM moneda WHERE es_base LIMIT 1), ?, ?::bigint)
+                        (SELECT id FROM moneda WHERE es_base LIMIT 1), ?, ?::bigint, ?::bigint)
                 RETURNING id""",
-                Long.class, numero, clienteId,
-                canal != null && List.of("web", "tienda", "telefono").contains(canal) ? canal : "web",
-                direccionEnvioId);
+                Long.class, numero, clienteId, canalFinal, direccionEnvioId, vendedorId);
+        if (vendedorId != null) {
+            auditoria.registrar("pedido", pedidoId, "INSERT", null,
+                    Map.of("numero", numero, "canal", canalFinal,
+                           "cliente_id", clienteId, "vendedor_id", vendedorId));
+        }
 
+        List<String> promosAplicadas = new java.util.ArrayList<>();
         for (ItemPedido it : items) {
             if (it.cantidad() <= 0) {
                 throw new IllegalArgumentException(
@@ -90,17 +108,29 @@ public class VentasService {
             }
             Map<String, Object> v = variantes.get(0);
             BigDecimal precio = (BigDecimal) v.get("precio");
-            BigDecimal impuesto = precio.multiply(BigDecimal.valueOf(it.cantidad()))
-                    .multiply(IVA_DEFECTO).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+
+            // Promoción vigente del producto: descuento AUTOMÁTICO por línea
+            // (script 40). El IVA se calcula sobre la base ya rebajada.
+            Map<String, Object> promo = descuentos.descuentoPromocional(
+                    it.varianteId(), precio, it.cantidad());
+            BigDecimal descPromo = (BigDecimal) promo.get("monto");
+            BigDecimal baseLinea = precio.multiply(BigDecimal.valueOf(it.cantidad()))
+                    .subtract(descPromo);
+            BigDecimal impuesto = baseLinea.multiply(IVA_DEFECTO)
+                    .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
 
             // subtotal NO se inserta (columna generada)
             pg.update("""
                     INSERT INTO pedido_detalle
                         (pedido_id, producto_variante_id, nombre_producto, sku,
-                         cantidad, precio_unitario, monto_impuesto)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                         cantidad, precio_unitario, monto_descuento, monto_impuesto)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                     pedidoId, it.varianteId(), v.get("nombre"), v.get("sku"),
-                    it.cantidad(), precio, impuesto);
+                    it.cantidad(), precio, descPromo, impuesto);
+            if (descPromo.signum() > 0) {
+                promosAplicadas.add(v.get("nombre") + ": " + promo.get("promocion")
+                        + " (−$" + descPromo + ")");
+            }
 
             // Descuento directo de stock con kardex (decisión documentada arriba)
             stock.mover(it.varianteId(), bodegaId, "salida_venta", it.cantidad(),
@@ -108,6 +138,9 @@ public class VentasService {
         }
 
         registrarHistorial(pedidoId, "confirmado", "Pedido creado y stock descontado");
+        for (String nota : promosAplicadas) {
+            registrarHistorial(pedidoId, "confirmado", "Promoción aplicada — " + nota);
+        }
         asignarEnvioPorZona(pedidoId, clienteId, direccionEnvioId);
         return obtenerPedido(pedidoId);
     }
@@ -162,7 +195,7 @@ public class VentasService {
     public Map<String, Object> obtenerPedido(long pedidoId) {
         Map<String, Object> pedido = pg.queryForMap("""
                 SELECT p.id, p.numero, ep.codigo AS estado, p.canal, p.fecha_pedido,
-                       p.subtotal, p.monto_impuesto, p.costo_envio, p.total,
+                       p.subtotal, p.monto_descuento, p.monto_impuesto, p.costo_envio, p.total,
                        c.nombre || ' ' || COALESCE(c.apellido,'') AS cliente, c.email AS cliente_email,
                        t.nombre AS transportista, me.nombre AS metodo_envio,
                        me.dias_entrega_min, me.dias_entrega_max
@@ -172,9 +205,22 @@ public class VentasService {
                 LEFT JOIN transportista t ON t.id = p.transportista_id
                 LEFT JOIN metodo_envio me ON me.id = p.metodo_envio_id
                 WHERE p.id = ?""", pedidoId);
+        // producto_id (del catálogo) viaja por línea para que Mis Pedidos pueda
+        // ofrecer "Reseñar" sobre productos comprados (reseña de compra verificada)
         pedido.put("detalles", pg.queryForList("""
-                SELECT id, sku, nombre_producto, cantidad, precio_unitario, subtotal, monto_impuesto
-                FROM pedido_detalle WHERE pedido_id = ? ORDER BY id""", pedidoId));
+                SELECT pd.id, pd.sku, pd.nombre_producto, pd.cantidad, pd.precio_unitario,
+                       pd.subtotal, pd.monto_descuento, pd.monto_impuesto,
+                       pv.producto_id
+                FROM pedido_detalle pd
+                JOIN producto_variante pv ON pv.id = pd.producto_variante_id
+                WHERE pd.pedido_id = ? ORDER BY pd.id""", pedidoId));
+        // Cupón aplicado en el checkout (script 40): todos los roles que llegan
+        // aquí (ADMIN/GERENTE/VENDEDOR/CLIENTE) tienen SELECT sobre uso_cupon.
+        List<Map<String, Object>> cupones = pg.queryForList("""
+                SELECT cu.codigo, uc.monto_descontado
+                FROM uso_cupon uc JOIN cupon cu ON cu.id = uc.cupon_id
+                WHERE uc.pedido_id = ?""", pedidoId);
+        pedido.put("cupon", cupones.isEmpty() ? null : cupones.get(0));
         // grp_cliente ya tiene SELECT sobre historial_estado_pedido con RLS de
         // propiedad (script 30): la misma consulta sirve para todos los roles y
         // al cliente el motor lo limita al historial de SUS pedidos.
@@ -254,6 +300,21 @@ public class VentasService {
 
     @Transactional(readOnly = true)
     public List<Map<String, Object>> listarPedidos() {
+        // Segregación financiera: BODEGA/DESPACHO listan pedidos SIN montos
+        // (sus grants de columna ya no incluyen total; su trabajo no lo necesita)
+        if (esRolLogistico()) {
+            return pg.queryForList("""
+                    SELECT p.id, p.numero, ep.codigo AS estado, p.canal, p.fecha_pedido,
+                           c.nombre || ' ' || COALESCE(c.apellido,'') AS cliente,
+                           t.nombre AS transportista,
+                           EXISTS (SELECT 1 FROM factura_venta fv
+                                   WHERE fv.pedido_id = p.id) AS tiene_factura
+                    FROM pedido p
+                    JOIN estado_pedido ep ON ep.id = p.estado_pedido_id
+                    JOIN cliente c ON c.id = p.cliente_id
+                    LEFT JOIN transportista t ON t.id = p.transportista_id
+                    ORDER BY p.id DESC""");
+        }
         // tiene_factura permite a los selectores ofrecer solo pedidos válidos
         return pg.queryForList("""
                 SELECT p.id, p.numero, ep.codigo AS estado, p.canal, p.total, p.fecha_pedido,
@@ -466,13 +527,44 @@ public class VentasService {
                 (String) datos.get("direccion"));
 
         // Detalle copiado del pedido (snapshot). subtotal = columna generada.
-        pg.update("""
-                INSERT INTO factura_venta_detalle
-                    (factura_venta_id, pedido_detalle_id, producto_variante_id,
-                     descripcion, cantidad, precio_unitario, monto_impuesto)
-                SELECT ?, id, producto_variante_id, nombre_producto || ' (' || sku || ')',
-                       cantidad, precio_unitario, monto_impuesto
-                FROM pedido_detalle WHERE pedido_id = ?""", facturaId, pedidoId);
+        // El descuento de línea arrastra la promoción y PRORRATEA el cupón de
+        // cabecera (pedido.monto_descuento) entre las líneas: el trigger
+        // SECURITY DEFINER de la factura recalcula sus totales solo desde el
+        // detalle, así el total facturado coincide con el total del pedido.
+        BigDecimal cupon = pg.queryForObject(
+                "SELECT monto_descuento FROM pedido WHERE id = ?", BigDecimal.class, pedidoId);
+        List<Map<String, Object>> lineas = pg.queryForList("""
+                SELECT id, producto_variante_id, nombre_producto, sku, cantidad,
+                       precio_unitario, subtotal, monto_descuento, monto_impuesto
+                FROM pedido_detalle WHERE pedido_id = ? ORDER BY id""", pedidoId);
+        BigDecimal baseNeta = lineas.stream()
+                .map(l -> ((BigDecimal) l.get("subtotal")).subtract((BigDecimal) l.get("monto_descuento")))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal cuponRepartido = BigDecimal.ZERO;
+        for (int i = 0; i < lineas.size(); i++) {
+            Map<String, Object> l = lineas.get(i);
+            BigDecimal neto = ((BigDecimal) l.get("subtotal"))
+                    .subtract((BigDecimal) l.get("monto_descuento"));
+            BigDecimal prorrateo = BigDecimal.ZERO;
+            if (cupon != null && cupon.signum() > 0 && baseNeta.signum() > 0) {
+                prorrateo = i == lineas.size() - 1
+                        ? cupon.subtract(cuponRepartido)   // última línea: ajuste de redondeo
+                        : cupon.multiply(neto).divide(baseNeta, 2, RoundingMode.HALF_UP);
+                cuponRepartido = cuponRepartido.add(prorrateo);
+            }
+            pg.update("""
+                    INSERT INTO factura_venta_detalle
+                        (factura_venta_id, pedido_detalle_id, producto_variante_id,
+                         descripcion, cantidad, precio_unitario, monto_descuento, monto_impuesto)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                    facturaId, ((Number) l.get("id")).longValue(),
+                    ((Number) l.get("producto_variante_id")).longValue(),
+                    l.get("nombre_producto") + " (" + l.get("sku") + ")",
+                    ((Number) l.get("cantidad")).intValue(),
+                    l.get("precio_unitario"),
+                    ((BigDecimal) l.get("monto_descuento")).add(prorrateo),
+                    l.get("monto_impuesto"));
+        }
 
         // El pedido pasa a 'facturado': entra a la cola de preparación de bodega
         cambiarEstadoPedido(pedidoId, "facturado", "Factura de venta " + numero
@@ -514,18 +606,20 @@ public class VentasService {
                 FROM factura_venta fv JOIN pedido p ON p.id = fv.pedido_id
                 WHERE fv.id = ?""", facturaId);
         f.put("detalles", pg.queryForList("""
-                SELECT id, descripcion, cantidad, precio_unitario, subtotal, monto_impuesto
+                SELECT id, descripcion, cantidad, precio_unitario, subtotal,
+                       monto_descuento, monto_impuesto
                 FROM factura_venta_detalle WHERE factura_venta_id = ? ORDER BY id""", facturaId));
         return f;
     }
 
     // ── Preparación por BODEGA (picking/empaque, script 39) ──────────────
 
-    /** Cola de preparación: pedidos facturados (por tomar) y en preparación. */
+    /** Cola de preparación: pedidos facturados (por tomar) y en preparación.
+     *  SIN montos: es una vista operativa de BODEGA (segregación financiera). */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> colaPreparacion() {
         return pg.queryForList("""
-                SELECT p.id, p.numero, ep.codigo AS estado, p.canal, p.fecha_pedido, p.total,
+                SELECT p.id, p.numero, ep.codigo AS estado, p.canal, p.fecha_pedido,
                        c.nombre || ' ' || COALESCE(c.apellido,'') AS cliente,
                        fv.numero AS factura, t.nombre AS transportista,
                        me.nombre AS metodo_envio,
@@ -548,12 +642,13 @@ public class VentasService {
      * Detalle del pedido a preparar / despachar: ítems con cantidades,
      * cliente, dirección de entrega y transportista asignado. Consulta
      * dedicada (no obtenerPedido) para que corra con los grants de
-     * grp_bodega / grp_despacho, que no leen pagos ni notas.
+     * grp_bodega / grp_despacho, que no leen pagos, notas NI MONTOS
+     * (segregación financiera: cantidades sí, precios no).
      */
     @Transactional(readOnly = true)
     public Map<String, Object> detalleLogistico(long pedidoId) {
         List<Map<String, Object>> pedidos = pg.queryForList("""
-                SELECT p.id, p.numero, ep.codigo AS estado, p.canal, p.fecha_pedido, p.total,
+                SELECT p.id, p.numero, ep.codigo AS estado, p.canal, p.fecha_pedido,
                        c.nombre || ' ' || COALESCE(c.apellido,'') AS cliente,
                        c.telefono AS cliente_telefono,
                        p.transportista_id, t.nombre AS transportista,
@@ -583,7 +678,7 @@ public class VentasService {
         }
         Map<String, Object> pedido = pedidos.get(0);
         pedido.put("detalles", pg.queryForList("""
-                SELECT id, sku, nombre_producto, cantidad, precio_unitario, subtotal
+                SELECT id, sku, nombre_producto, cantidad
                 FROM pedido_detalle WHERE pedido_id = ? ORDER BY id""", pedidoId));
         return pedido;
     }
@@ -718,16 +813,22 @@ public class VentasService {
 
         String numero = siguienteNumero("EN");
         String guia = "GUIA-" + numero.substring(3);
+        // despachado_por = autor del JWT (trazabilidad, script 42)
         Long envioId = pg.queryForObject("""
                 INSERT INTO envio (numero, pedido_id, transportista_id, metodo_envio_id,
                                    bodega_id, direccion_entrega, numero_guia, estado,
-                                   fecha_despacho, fecha_entrega_estimada)
+                                   fecha_despacho, fecha_entrega_estimada, despachado_por)
                 VALUES (?, ?, ?, ?, ?, ?, ?, 'en_transito', now(),
                         current_date + COALESCE((SELECT dias_entrega_max FROM metodo_envio
-                                                 WHERE id = ?), 3)::int)
+                                                 WHERE id = ?), 3)::int, ?)
                 RETURNING id""",
                 Long.class, numero, pedidoId, transportistaFinal, metodoFinal,
-                bodegaId, direccion, guia, metodoFinal);
+                bodegaId, direccion, guia, metodoFinal, usuarioActualId());
+        auditoria.registrar("envio", envioId, "INSERT",
+                Map.of("estado_pedido", "preparado"),
+                Map.of("pedido_id", pedidoId, "numero_guia", guia,
+                       "transportista_id", transportistaFinal,
+                       "estado_pedido", "despachado"));
 
         pg.update("""
                 INSERT INTO envio_detalle (envio_id, pedido_detalle_id, cantidad)
@@ -806,6 +907,19 @@ public class VentasService {
         }
         cambiarEstadoPedido(pedidoId, "entregado",
                 "Pedido entregado al cliente" + (guia != null ? " (guia " + guia + ")" : ""));
+        // DESPACHO no lee pagos ni montos (segregación financiera): respuesta
+        // operativa ligera; el resto de roles recibe el pedido completo.
+        if (esRolLogistico()) {
+            Map<String, Object> res = new java.util.LinkedHashMap<>();
+            res.put("id", pedidoId);
+            res.put("numero", pg.queryForObject(
+                    "SELECT numero FROM pedido WHERE id = ?", String.class, pedidoId));
+            res.put("estado", "entregado");
+            res.put("envio", envios.isEmpty() ? null
+                    : Map.of("id", envios.get(0).get("id"), "numero_guia",
+                             guia == null ? "" : guia, "estado", "entregado"));
+            return res;
+        }
         return obtenerPedido(pedidoId);
     }
 
@@ -863,5 +977,11 @@ public class VentasService {
             return p.getRolCodigo();
         }
         return null;
+    }
+
+    /** BODEGA/DESPACHO: roles operativos SIN acceso a montos (segregación financiera). */
+    private boolean esRolLogistico() {
+        String rol = rolActual();
+        return "BODEGA".equalsIgnoreCase(rol) || "DESPACHO".equalsIgnoreCase(rol);
     }
 }

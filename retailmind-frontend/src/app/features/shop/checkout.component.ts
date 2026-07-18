@@ -54,9 +54,11 @@ export class CheckoutComponent implements OnInit {
     alias: '', esPredeterminada: false
   };
 
-  // Paso 2 — cupón (la validación real llega con la fase de descuentos)
+  // Paso 2 — cupón: se valida contra el backend y se re-aplica al confirmar
   cupon = '';
-  cuponInfo = '';
+  cuponAplicado: any = null;
+  cuponError = '';
+  validandoCupon = false;
 
   // Paso 3 — método de pago
   metodos: any[] = [];
@@ -106,12 +108,22 @@ export class CheckoutComponent implements OnInit {
     this.shop.getCiudades().subscribe({ next: c => this.ciudades = c, error: () => {} });
   }
 
-  // ── Totales (mismo cálculo que el backend: IVA 15% por línea) ─────────
+  // ── Totales (mismo cálculo que el backend: promos por línea, IVA 15%
+  //    sobre la base rebajada, cupón sobre el subtotal neto) ─────────────
   get subtotal(): number {
     return this.items.reduce((s, i) => s + i.precioUnitario * i.cantidad, 0);
   }
-  get impuesto(): number { return this.subtotal * this.IVA; }
-  get total(): number { return this.subtotal + this.impuesto; }
+  get descuentoPromos(): number {
+    return this.items.reduce((s, i) => s + (i.descuentoPromo || 0), 0);
+  }
+  get subtotalNeto(): number { return this.subtotal - this.descuentoPromos; }
+  get descuentoCupon(): number {
+    return this.cuponAplicado ? Number(this.cuponAplicado.descuento) || 0 : 0;
+  }
+  get impuesto(): number { return this.subtotalNeto * this.IVA; }
+  get total(): number {
+    return Math.max(0, this.subtotalNeto - this.descuentoCupon + this.impuesto);
+  }
 
   get metodoSeleccionado(): any {
     return this.metodos.find(m => m.id === this.metodoPagoId) || null;
@@ -161,11 +173,34 @@ export class CheckoutComponent implements OnInit {
     this.tarjeta.vencimiento = v.slice(0, 5);
   }
 
+  /** Valida el código contra el backend; el monto lo decide SIEMPRE el servidor. */
   aplicarCupon(): void {
-    // Enganche de la fase de descuentos: hoy solo informa, nunca bloquea.
-    this.cuponInfo = this.cupon.trim()
-      ? `El código "${this.cupon.trim()}" se validará cuando el módulo de descuentos esté activo; tu pedido se procesará sin descuento.`
-      : '';
+    const codigo = this.cupon.trim();
+    if (!codigo || this.validandoCupon) return;
+    this.validandoCupon = true;
+    this.cuponError = '';
+    this.shop.validarCupon(codigo).subscribe({
+      next: res => {
+        this.validandoCupon = false;
+        if (res.valido) {
+          this.cuponAplicado = res;
+        } else {
+          this.cuponAplicado = null;
+          this.cuponError = res.motivo || 'El cupón no es válido';
+        }
+      },
+      error: e => {
+        this.validandoCupon = false;
+        this.cuponAplicado = null;
+        this.cuponError = mensajeError(e, 'No se pudo validar el cupón');
+      }
+    });
+  }
+
+  quitarCupon(): void {
+    this.cupon = '';
+    this.cuponAplicado = null;
+    this.cuponError = '';
   }
 
   guardarDireccion(): void {
@@ -195,10 +230,12 @@ export class CheckoutComponent implements OnInit {
   confirmar(): void {
     if (!this.puedeConfirmar) return;
     this.procesando = true;
+    // Solo viaja el CÓDIGO del cupón aplicado: el backend re-valida y
+    // recalcula el descuento (nunca se envía el monto desde el cliente).
     const body: any = {
       direccionId: this.direccionId,
       metodoPagoId: this.metodoPagoId,
-      cupon: this.cupon.trim() || undefined
+      cupon: this.cuponAplicado ? this.cuponAplicado.codigo : undefined
     };
     if (this.esTarjeta) {
       body.tarjeta = { ...this.tarjeta, numero: this.tarjeta.numero.replace(/\s/g, '') };

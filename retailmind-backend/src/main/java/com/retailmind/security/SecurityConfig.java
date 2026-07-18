@@ -170,7 +170,8 @@ public class SecurityConfig {
                         "/api/resenas/productos-ref", "/api/resenas/producto/*",
                         "/api/resenas/preguntas/producto/*")
                     .hasAnyAuthority("ADMIN", "GERENTE", "CLIENTE")
-                .requestMatchers(HttpMethod.GET, "/api/resenas/mias").hasAuthority("CLIENTE")
+                .requestMatchers(HttpMethod.GET, "/api/resenas/mias",
+                        "/api/resenas/productos-comprados").hasAuthority("CLIENTE")
                 .requestMatchers(HttpMethod.POST,
                         "/api/resenas/*/voto", "/api/resenas/*/reporte",
                         "/api/resenas/preguntas", "/api/resenas")

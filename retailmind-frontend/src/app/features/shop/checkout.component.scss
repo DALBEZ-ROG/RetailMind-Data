@@ -189,3 +189,35 @@
 
 ::ng-deep .snack-success { --mdc-snackbar-container-color: #2e7d32; --mdc-snackbar-supporting-text-color: white; }
 ::ng-deep .snack-error { --mdc-snackbar-container-color: #c62828; --mdc-snackbar-supporting-text-color: white; }
+
+// ── Fase de descuentos (script 40): cupón validado + promos en el resumen ──
+.cupon-error {
+  display: flex; align-items: flex-start; gap: 6px;
+  font-size: 13px; color: #c62828; background: #ffebee;
+  border: 1px solid #ffcdd2; border-radius: 10px; padding: 8px 12px; margin: 4px 0 0;
+  mat-icon { font-size: 18px; width: 18px; height: 18px; flex-shrink: 0; }
+}
+
+.cupon-aplicado {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 14px; color: #2e7d32; background: #e8f5e9;
+  border: 1px solid #a5d6a7; border-radius: 10px; padding: 8px 12px;
+  mat-icon { font-size: 20px; width: 20px; height: 20px; }
+  button { margin-left: auto; }
+}
+
+.ri-promo {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 11px; font-weight: 700; color: #e65100;
+  background: #fff3e0; border-radius: 10px; padding: 1px 8px; margin-left: 6px;
+  mat-icon { font-size: 12px !important; width: 12px !important; height: 12px !important; }
+}
+
+.ri-tachado {
+  color: #90a4ae; text-decoration: line-through; font-weight: 400;
+  margin-right: 6px; font-size: 12px;
+}
+
+.linea-descuento span { color: #2e7d32; font-weight: 700; }
+
+.success-chips .chip-descuento { background: #fff3e0; color: #e65100; }

@@ -6,7 +6,8 @@
 
   <div class="op-card">
     <div class="form-actions">
-      <button class="btn-aplicar" (click)="showForm = !showForm; ordenCreada = null">
+      <!-- BODEGA solo consulta para recibir: no emite órdenes (y no ve costos) -->
+      <button class="btn-aplicar" *ngIf="!esBodega" (click)="showForm = !showForm; ordenCreada = null">
         <mat-icon>{{ showForm ? 'close' : 'add' }}</mat-icon>
         {{ showForm ? 'Cancelar' : 'Nueva Orden de Compra' }}
       </button>
@@ -152,11 +153,11 @@
           <th mat-header-cell *matHeaderCellDef>Subtotal</th>
           <td mat-cell *matCellDef="let d">{{ d.subtotal | currency:'USD' }}</td>
         </ng-container>
-        <tr mat-header-row *matHeaderRowDef="['sku','producto','cantidad','recibida','precio','subtotal']"></tr>
-        <tr mat-row *matRowDef="let d; columns: ['sku','producto','cantidad','recibida','precio','subtotal']"></tr>
+        <tr mat-header-row *matHeaderRowDef="columnasDetalle"></tr>
+        <tr mat-row *matRowDef="let d; columns: columnasDetalle"></tr>
       </table>
     </div>
-    <div class="total-banner">
+    <div class="total-banner" *ngIf="!esBodega">
       <div class="total-item"><div class="lbl">Subtotal</div><div class="val">{{ detalleOrden.subtotal | currency:'USD' }}</div></div>
       <div class="total-item"><div class="lbl">IVA</div><div class="val">{{ detalleOrden.monto_impuesto | currency:'USD' }}</div></div>
       <div class="total-item"><div class="lbl">Total</div><div class="val">{{ detalleOrden.total | currency:'USD' }}</div></div>

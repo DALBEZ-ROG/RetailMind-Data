@@ -70,6 +70,15 @@ export class ShopService {
   }
 
   /**
+   * Valida un código de cupón contra el carrito SIN aplicarlo: el backend
+   * responde {valido, motivo?, descuento?}. El descuento definitivo se
+   * recalcula en el servidor al confirmar el checkout.
+   */
+  validarCupon(codigo: string): Observable<any> {
+    return this.http.post(`${this.base}/api/carrito/cupon/validar`, { codigo });
+  }
+
+  /**
    * Checkout completo: dirección + método de pago + cupón (preparado para la
    * fase de descuentos). La tarjeta viaja solo para VALIDAR formato: el
    * backend guarda únicamente marca + últimos 4 dígitos (nunca PAN/CVV).

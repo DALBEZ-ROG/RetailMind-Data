@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.retailmind.auth.AppUserPrincipal;
 import com.retailmind.catalogo.EventoTiendaService;
+import com.retailmind.marketing.DescuentosService;
 import com.retailmind.ventas.VentasService;
 
 /**
@@ -34,19 +35,22 @@ public class CarritoService {
     private final JdbcTemplate pg;
     private final VentasService ventas;
     private final EventoTiendaService eventos;
+    private final DescuentosService descuentos;
 
     public CarritoService(@Qualifier("pgJdbcTemplate") JdbcTemplate pg,
                           VentasService ventas,
-                          EventoTiendaService eventos) {
+                          EventoTiendaService eventos,
+                          DescuentosService descuentos) {
         this.pg = pg;
         this.ventas = ventas;
         this.eventos = eventos;
+        this.descuentos = descuentos;
     }
 
     @Transactional(readOnly = true)
     public List<Map<String, Object>> getItems() {
         List<Long> ids = carritosActivos();
-        return ids.isEmpty() ? List.of() : itemsDe(ids.get(0));
+        return ids.isEmpty() ? List.of() : conPromociones(itemsDe(ids.get(0)));
     }
 
     @Transactional
@@ -145,10 +149,11 @@ public class CarritoService {
      * CVV 3-4 dígitos) pero NO hay pasarela real y NUNCA se persiste el número
      * completo ni el CVV: solo marca + últimos 4 como referencia.
      *
-     * Cupón: el campo viaja en la request pero su validación/aplicación es de
-     * la fase de descuentos. Enganche futuro: validar contra cupon/uso_cupon
-     * (marketing) ANTES de crearPedido y pasar el descuento al pedido. Hoy
-     * solo se informa que aún no aplica, sin romper el checkout.
+     * Cupón: el front envía SOLO el código; el descuento se recalcula aquí
+     * (DescuentosService.aplicarCupon) sobre el pedido recién creado, se
+     * escribe en pedido.monto_descuento (el trigger de cabecera rehace el
+     * total) y el uso queda en uso_cupon ANTES del pago, todo en esta misma
+     * transacción. Un cupón inválido revierte el checkout con su motivo.
      */
     @Transactional
     public Map<String, Object> checkout(CheckoutReq req) {
@@ -224,12 +229,23 @@ public class CarritoService {
         }
 
         // Pedido real del ciclo de venta (descuenta stock, asigna transportista
-        // por zona) + pago simulado + factura AUTOMÁTICA: el pedido ONLINE
-        // nace PAGADO y FACTURADO, y entra directo a la cola de preparación.
+        // por zona, aplica promociones vigentes por línea) + cupón + pago
+        // simulado + factura AUTOMÁTICA: el pedido ONLINE nace PAGADO y
+        // FACTURADO, y entra directo a la cola de preparación.
         Map<String, Object> pedido = ventas.crearPedido(
                 principal.getClienteId(), bodegas.get(0), "web", itemsPedido,
                 req.direccionId());
         long pedidoId = ((Number) pedido.get("id")).longValue();
+
+        // Cupón: se RECALCULA y valida en backend sobre el pedido recién
+        // creado (el front solo envía el código); si no aplica, TODO el
+        // checkout se revierte con el motivo claro. El uso queda en uso_cupon
+        // y el trigger de la BD enforza los límites bajo lock.
+        Map<String, Object> cuponAplicado = null;
+        if (req.cupon() != null && !req.cupon().isBlank()) {
+            cuponAplicado = descuentos.aplicarCupon(
+                    pedidoId, req.cupon(), principal.getClienteId());
+        }
         Map<String, Object> pago = ventas.pagarCheckoutOnline(pedidoId, req.metodoPagoId(),
                 referencia, autorizacion, detalleJson);
 
@@ -241,10 +257,22 @@ public class CarritoService {
                     ((BigDecimal) it.get("precio_unitario")).doubleValue(), null);
         }
 
+        // Desglose final re-leído de la BD: el cupón cambió el total y los
+        // triggers de cabecera ya lo recalcularon.
+        Map<String, Object> totales = pg.queryForMap("""
+                SELECT subtotal, monto_descuento, monto_impuesto, total
+                FROM pedido WHERE id = ?""", pedidoId);
+
         Map<String, Object> res = new LinkedHashMap<>();
         res.put("pedidoId", pedidoId);
         res.put("ordenId", pedido.get("numero"));
-        res.put("total", pedido.get("total"));
+        res.put("subtotal", totales.get("subtotal"));
+        res.put("descuento", totales.get("monto_descuento"));
+        res.put("impuesto", totales.get("monto_impuesto"));
+        res.put("total", totales.get("total"));
+        if (cuponAplicado != null) {
+            res.put("cuponCodigo", cuponAplicado.get("codigo"));
+        }
         res.put("items", items.size());
         res.put("estado", "facturado");
         res.put("metodoPago", metodos.get(0).get("nombre"));
@@ -256,12 +284,6 @@ public class CarritoService {
         res.put("metodoEnvio", pedido.get("metodo_envio"));
         res.put("diasEntregaMin", pedido.get("dias_entrega_min"));
         res.put("diasEntregaMax", pedido.get("dias_entrega_max"));
-        if (req.cupon() != null && !req.cupon().isBlank()) {
-            // Fase de descuentos pendiente: no rompe el checkout, solo informa
-            res.put("cuponMensaje", "El cupon '" + req.cupon().trim()
-                    + "' se validara cuando el modulo de descuentos este activo; "
-                    + "tu pedido se proceso sin descuento");
-        }
         return res;
     }
 
@@ -356,6 +378,58 @@ public class CarritoService {
                     r.put("stock", rs.getLong("stock"));
                     return r;
                 }, carritoId);
+    }
+
+    /**
+     * Ítems del carrito con su promoción vigente aplicada (script 40): agrega
+     * descuentoPromo (monto de la línea), promocion (nombre) y precioFinal
+     * (unitario rebajado) para que carrito/checkout muestren el precio real
+     * con el que se creará el pedido.
+     */
+    private List<Map<String, Object>> conPromociones(List<Map<String, Object>> items) {
+        for (Map<String, Object> it : items) {
+            BigDecimal precio = (BigDecimal) it.get("precioUnitario");
+            int cantidad = (Integer) it.get("cantidad");
+            Map<String, Object> promo = descuentos.descuentoPromocional(
+                    ((Number) it.get("productoId")).longValue(), precio, cantidad);
+            BigDecimal monto = (BigDecimal) promo.get("monto");
+            it.put("descuentoPromo", monto);
+            it.put("promocion", promo.get("promocion"));
+            it.put("precioFinal", precio.multiply(BigDecimal.valueOf(cantidad))
+                    .subtract(monto)
+                    .divide(BigDecimal.valueOf(cantidad), 2, java.math.RoundingMode.HALF_UP));
+        }
+        return items;
+    }
+
+    /**
+     * Valida un código de cupón contra el carrito actual SIN aplicarlo:
+     * responde válido/inválido con motivo claro y el descuento calculado
+     * sobre el subtotal con promociones (la misma base que usará el
+     * checkout). La aplicación real y el registro de uso ocurren SOLO al
+     * confirmar el pedido, recalculados en backend.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> validarCupon(String codigo) {
+        AppUserPrincipal principal = principal();
+        if (principal == null || principal.getClienteId() == null) {
+            throw new IllegalStateException("Solo un cliente puede validar cupones");
+        }
+        List<Long> ids = carritosActivos();
+        List<Map<String, Object>> items = ids.isEmpty() ? List.of()
+                : conPromociones(itemsDe(ids.get(0)));
+        if (items.isEmpty()) {
+            throw new IllegalStateException("El carrito esta vacio");
+        }
+        BigDecimal base = items.stream()
+                .map(i -> ((BigDecimal) i.get("precioUnitario"))
+                        .multiply(BigDecimal.valueOf((Integer) i.get("cantidad")))
+                        .subtract((BigDecimal) i.get("descuentoPromo")))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        Map<String, Object> res = descuentos.validarCupon(
+                codigo, principal.getClienteId(), base, BigDecimal.ZERO);
+        res.put("baseCompra", base);
+        return res;
     }
 
     private AppUserPrincipal principal() {

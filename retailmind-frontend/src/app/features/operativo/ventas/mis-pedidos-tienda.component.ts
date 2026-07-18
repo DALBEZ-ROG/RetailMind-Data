@@ -108,6 +108,12 @@ export class MisPedidosTiendaComponent implements OnInit {
     return !!this.detalle && ['entregado', 'devuelto', 'despachado'].includes(this.detalle.estado);
   }
 
+  /** Reseñar exige compra: pedido pagado en adelante (espeja ESTADOS_COMPRA del backend). */
+  get puedeResenar(): boolean {
+    return !!this.detalle && ['pagado', 'facturado', 'en_preparacion', 'preparado',
+      'despachado', 'entregado', 'devuelto'].includes(this.detalle.estado);
+  }
+
   prepararDevolucion(): void {
     if (!this.detalle) return;
     this.rma.elegibilidad(this.detalle.id).subscribe({

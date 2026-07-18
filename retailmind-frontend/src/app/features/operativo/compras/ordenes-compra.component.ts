@@ -48,8 +48,6 @@ export class OrdenesCompraComponent implements OnInit {
   detalleOrden: OrdenCompraDetalle | null = null;
   procesando = false;
 
-  columnas = ['numero', 'proveedor', 'bodega', 'estado', 'total', 'acciones'];
-
   constructor(private compras: ComprasService, private referencias: ReferenciasService,
               private auth: AuthService, private snackBar: MatSnackBar) {}
 
@@ -57,6 +55,23 @@ export class OrdenesCompraComponent implements OnInit {
   get puedeAprobar(): boolean {
     const user = this.auth.getCurrentUser();
     return !!user && ['ADMIN', 'GERENTE'].includes(user.rol);
+  }
+
+  /** Segregación financiera: BODEGA consulta órdenes para RECIBIR, sin montos. */
+  get esBodega(): boolean {
+    return this.auth.hasRole('BODEGA');
+  }
+
+  get columnas(): string[] {
+    return this.esBodega
+      ? ['numero', 'proveedor', 'bodega', 'estado', 'acciones']
+      : ['numero', 'proveedor', 'bodega', 'estado', 'total', 'acciones'];
+  }
+
+  get columnasDetalle(): string[] {
+    return this.esBodega
+      ? ['sku', 'producto', 'cantidad', 'recibida']
+      : ['sku', 'producto', 'cantidad', 'recibida', 'precio', 'subtotal'];
   }
 
   ngOnInit(): void {

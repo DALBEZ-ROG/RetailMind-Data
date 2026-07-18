@@ -175,6 +175,10 @@ public class DocumentoPdfService {
         PdfPTable caja = new PdfPTable(new float[]{50, 50});
         caja.setWidthPercentage(100);
         agregarFilaTotal(caja, "Subtotal", t.simboloMoneda() + " " + monto(t.subtotal()), false);
+        if (t.descuento() != null && t.descuento().signum() > 0) {
+            agregarFilaTotal(caja, "Descuento",
+                    "- " + t.simboloMoneda() + " " + monto(t.descuento()), false);
+        }
         agregarFilaTotal(caja, "IVA", t.simboloMoneda() + " " + monto(t.impuesto()), false);
         agregarFilaTotal(caja, "TOTAL", t.simboloMoneda() + " " + monto(t.total()), true);
 

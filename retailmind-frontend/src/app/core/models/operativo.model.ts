@@ -43,14 +43,15 @@ export interface CategoriaAdmin {
 export interface ItemOrdenReq { varianteId: number; cantidad: number; precioUnitario: number; ivaPorcentaje?: number; }
 export interface OrdenCompraRow {
   id: number; numero: string; estado: string; fecha_emision: string;
-  total: number; proveedor: string; bodega: string; tiene_factura?: boolean;
+  // montos ausentes para BODEGA (segregación financiera)
+  total?: number; proveedor: string; bodega: string; tiene_factura?: boolean;
 }
 export interface OrdenCompraDetalle extends OrdenCompraRow {
-  subtotal: number; monto_impuesto: number; fecha_entrega_esperada: string;
+  subtotal?: number; monto_impuesto?: number; fecha_entrega_esperada: string;
   detalles: {
     id: number; producto_variante_id: number; sku: string; producto: string;
-    cantidad: number; precio_unitario: number; subtotal: number;
-    monto_impuesto: number; cantidad_recibida: number;
+    cantidad: number; precio_unitario?: number; subtotal?: number;
+    monto_impuesto?: number; cantidad_recibida: number;
   }[];
 }
 export interface ItemRecepcionReq {
@@ -92,7 +93,8 @@ export interface KardexRow {
 // ── Ventas ───────────────────────────────────────────────────────────────
 export interface ItemPedidoReq { varianteId: number; cantidad: number; }
 export interface PedidoVentaRow {
-  id: number; numero: string; estado: string; total: number;
+  // total ausente para BODEGA/DESPACHO (segregación financiera)
+  id: number; numero: string; estado: string; total?: number;
   fecha_pedido: string; cliente: string; tiene_factura?: boolean;
   // 'web' = tienda online (nace pagado+facturado en el checkout); 'tienda'/'telefono' = interno
   canal: string;
@@ -101,11 +103,16 @@ export interface PedidoVentaRow {
 }
 export interface PedidoVentaDetalle extends PedidoVentaRow {
   subtotal: number; monto_impuesto: number;
+  // Fase de descuentos (script 40): cupón de cabecera y promo por línea
+  monto_descuento: number;
+  cupon: { codigo: string; monto_descontado: number } | null;
   metodo_envio?: string | null;
   dias_entrega_min?: number | null; dias_entrega_max?: number | null;
   detalles: {
     id: number; sku: string; nombre_producto: string; cantidad: number;
-    precio_unitario: number; subtotal: number;
+    precio_unitario: number; subtotal: number; monto_descuento: number;
+    // producto del catálogo (para "Reseñar" desde Mis Pedidos)
+    producto_id: number;
   }[];
   historial: { estado: string; comentario: string; fecha_creacion: string }[];
   notas: NotaPedidoRow[];
@@ -151,22 +158,22 @@ export interface EnvioDetalle {
 }
 export interface SeguimientoRow { estado: string; descripcion: string; ubicacion: string; fecha_evento: string; }
 // ── Tramo de salida: preparación de bodega y despacho con detalle (script 39) ─
+// Sin montos: son vistas OPERATIVAS de bodega/despacho (segregación financiera)
 export interface PreparacionRow {
   id: number; numero: string; estado: string; canal: string; fecha_pedido: string;
-  total: number; cliente: string; factura: string | null;
+  cliente: string; factura: string | null;
   transportista: string | null; metodo_envio: string | null;
   items: number; unidades: number;
 }
 export interface DetalleLogistico {
   id: number; numero: string; estado: string; canal: string; fecha_pedido: string;
-  total: number; cliente: string; cliente_telefono: string | null;
+  cliente: string; cliente_telefono: string | null;
   transportista_id: number | null; transportista: string | null;
   metodo_envio_id: number | null; metodo_envio: string | null;
   dias_entrega_min: number | null; dias_entrega_max: number | null;
   factura: string | null; direccion_entrega: string;
   detalles: {
     id: number; sku: string; nombre_producto: string; cantidad: number;
-    precio_unitario: number; subtotal: number;
   }[];
 }
 // ── Devoluciones RMA / logística inversa (script 38) ─────────────────────
@@ -174,8 +181,10 @@ export interface ItemDevolucionReq {
   pedidoDetalleId: number; cantidad: number; estadoProducto?: string;
 }
 export interface DevolucionRow {
-  id: number; numero: string; estado: string; monto_total: number;
-  monto_reembolsado: number | null; guia_retorno: string | null;
+  id: number; numero: string; estado: string;
+  // Ausentes para BODEGA/DESPACHO (segregación financiera)
+  monto_total?: number;
+  monto_reembolsado?: number | null; guia_retorno: string | null;
   fecha_creacion: string; ticket_soporte_id: number | null;
   motivo: string; numero_pedido: string; cliente?: string;
   transportista?: string | null;
@@ -183,7 +192,8 @@ export interface DevolucionRow {
 export interface DevolucionItemRma {
   id: number; cantidad: number; estado_producto: string; accion: string;
   resultado_inspeccion: string | null; nota_inspeccion: string | null;
-  sku: string; nombre_producto: string; precio_unitario: number;
+  // precio ausente para BODEGA/DESPACHO (segregación financiera)
+  sku: string; nombre_producto: string; precio_unitario?: number;
 }
 export interface HistorialDevolucionRow {
   estado: string; comentario: string; fecha_creacion: string; autor: string;

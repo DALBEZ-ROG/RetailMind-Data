@@ -69,4 +69,8 @@ export class ResenasService {
   productosRef(): Observable<ProductoResenaRef[]> {
     return this.http.get<ProductoResenaRef[]>(`${this.base}/productos-ref`);
   }
+  /** Productos comprados por el cliente: los únicos reseñables. */
+  productosComprados(): Observable<ProductoResenaRef[]> {
+    return this.http.get<ProductoResenaRef[]>(`${this.base}/productos-comprados`);
+  }
 }

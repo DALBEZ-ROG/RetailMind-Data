@@ -11,7 +11,8 @@ export type PermisoNav =
   | 'cliente'          // CLIENTE
   | 'autenticado'      // cualquier usuario logueado
   | 'catalogo'         // productos y variantes
-  | 'compras'          // órdenes / recepciones / facturas de compra
+  | 'compras'          // órdenes / recepciones
+  | 'facturasCompra'   // facturas de proveedor y pagos (SIN bodega: segregación financiera)
   | 'inventario'       // transferencias de stock
   | 'ajustes'          // ajustes de inventario
   | 'kardex'           // kardex
@@ -32,6 +33,8 @@ export const ROLES_POR_PERMISO: Record<PermisoNav, readonly string[]> = {
   autenticado:      ['ADMIN', 'GERENTE', 'VENDEDOR', 'COMPRAS', 'BODEGA', 'DESPACHO', 'CLIENTE', 'ANALISTA', 'SOPORTE'],
   catalogo:         ['ADMIN'],
   compras:          ['ADMIN', 'GERENTE', 'COMPRAS', 'BODEGA'],
+  // Facturas de compra = documento 100% financiero: BODEGA fuera (segregación)
+  facturasCompra:   ['ADMIN', 'GERENTE', 'COMPRAS'],
   inventario:       ['ADMIN', 'GERENTE', 'BODEGA'],
   ajustes:          ['ADMIN', 'BODEGA'],
   kardex:           ['ADMIN', 'GERENTE', 'BODEGA', 'ANALISTA'],
@@ -136,7 +139,7 @@ export const DASHBOARD_AREAS: AreaNav[] = [
       { titulo: 'Recepciones', descripcion: 'Registrar la mercancía recibida',
         icono: 'move_to_inbox', ruta: '/operativo/compras/recepciones', permiso: 'compras' },
       { titulo: 'Facturas de Compra', descripcion: 'Facturas de proveedor y pagos',
-        icono: 'request_quote', ruta: '/operativo/compras/facturas', permiso: 'compras' }
+        icono: 'request_quote', ruta: '/operativo/compras/facturas', permiso: 'facturasCompra' }
     ]
   },
   {

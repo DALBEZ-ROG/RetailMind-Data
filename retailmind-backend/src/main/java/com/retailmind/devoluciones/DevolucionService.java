@@ -102,6 +102,24 @@ public class DevolucionService {
                     WHERE d.cliente_id = ? AND (?::text IS NULL OR d.estado = ?::text)
                     ORDER BY d.id DESC""", clienteActualId(), filtro, filtro);
         }
+        // Segregación financiera: BODEGA/DESPACHO mueven paquetes e inspeccionan;
+        // no leen montos (sus grants de columna sobre devolucion lo espejan)
+        if (esRolLogistico()) {
+            return pg.queryForList("""
+                    SELECT d.id, d.numero, d.estado,
+                           d.guia_retorno, d.fecha_creacion, d.ticket_soporte_id,
+                           md.nombre AS motivo, p.numero AS numero_pedido,
+                           c.nombre || ' ' || COALESCE(c.apellido,'') AS cliente,
+                           t.nombre AS transportista
+                    FROM devolucion d
+                    JOIN motivo_devolucion md ON md.id = d.motivo_devolucion_id
+                    JOIN pedido p ON p.id = d.pedido_id
+                    LEFT JOIN cliente c ON c.id = d.cliente_id
+                    LEFT JOIN transportista t ON t.id = d.transportista_id
+                    WHERE (?::text IS NULL OR d.estado = ?::text)
+                    ORDER BY CASE d.estado WHEN 'cerrada' THEN 1 WHEN 'rechazada' THEN 1 ELSE 0 END,
+                             d.id DESC""", filtro, filtro);
+        }
         return pg.queryForList("""
                 SELECT d.id, d.numero, d.estado, d.monto_total, d.monto_reembolsado,
                        d.guia_retorno, d.fecha_creacion, d.ticket_soporte_id,
@@ -139,6 +157,24 @@ public class DevolucionService {
                     LEFT JOIN transportista t ON t.id = d.transportista_id
                     LEFT JOIN bodega b ON b.id = d.bodega_id
                     WHERE d.id = ? AND d.cliente_id = ?""", id, clienteActualId());
+        } else if (esRolLogistico()) {
+            // Segregación financiera: BODEGA/DESPACHO ven el proceso, no montos
+            filas = pg.queryForList("""
+                    SELECT d.id, d.numero, d.estado, d.descripcion,
+                           d.guia_retorno, d.motivo_rechazo, d.fecha_creacion,
+                           d.ticket_soporte_id, d.pedido_id,
+                           md.nombre AS motivo, p.numero AS numero_pedido,
+                           c.nombre || ' ' || COALESCE(c.apellido,'') AS cliente,
+                           c.email AS cliente_email,
+                           t.nombre AS transportista, b.nombre AS bodega,
+                           b.direccion AS bodega_direccion
+                    FROM devolucion d
+                    JOIN motivo_devolucion md ON md.id = d.motivo_devolucion_id
+                    JOIN pedido p ON p.id = d.pedido_id
+                    LEFT JOIN cliente c ON c.id = d.cliente_id
+                    LEFT JOIN transportista t ON t.id = d.transportista_id
+                    LEFT JOIN bodega b ON b.id = d.bodega_id
+                    WHERE d.id = ?""", id);
         } else {
             filas = pg.queryForList("""
                     SELECT d.id, d.numero, d.estado, d.descripcion, d.monto_total,
@@ -162,13 +198,22 @@ public class DevolucionService {
             throw new NoSuchElementException("No existe la devolución " + id);
         }
         Map<String, Object> d = filas.get(0);
-        d.put("detalles", pg.queryForList("""
-                SELECT dd.id, dd.cantidad, dd.estado_producto, dd.accion,
-                       dd.resultado_inspeccion, dd.nota_inspeccion,
-                       pd.sku, pd.nombre_producto, pd.precio_unitario
-                FROM devolucion_detalle dd
-                JOIN pedido_detalle pd ON pd.id = dd.pedido_detalle_id
-                WHERE dd.devolucion_id = ? ORDER BY dd.id""", id));
+        // Ítems: BODEGA/DESPACHO sin precio (cantidades y calidad, no valores)
+        d.put("detalles", esRolLogistico()
+                ? pg.queryForList("""
+                        SELECT dd.id, dd.cantidad, dd.estado_producto, dd.accion,
+                               dd.resultado_inspeccion, dd.nota_inspeccion,
+                               pd.sku, pd.nombre_producto
+                        FROM devolucion_detalle dd
+                        JOIN pedido_detalle pd ON pd.id = dd.pedido_detalle_id
+                        WHERE dd.devolucion_id = ? ORDER BY dd.id""", id)
+                : pg.queryForList("""
+                        SELECT dd.id, dd.cantidad, dd.estado_producto, dd.accion,
+                               dd.resultado_inspeccion, dd.nota_inspeccion,
+                               pd.sku, pd.nombre_producto, pd.precio_unitario
+                        FROM devolucion_detalle dd
+                        JOIN pedido_detalle pd ON pd.id = dd.pedido_detalle_id
+                        WHERE dd.devolucion_id = ? ORDER BY dd.id""", id));
         // Línea de tiempo: quién hizo qué y cuándo. grp_cliente no lee usuario,
         // así que su consulta no la toca (autor genérico), patrón de soporte.
         if (esCliente()) {
@@ -749,6 +794,12 @@ public class DevolucionService {
 
     private boolean esCliente() {
         return "CLIENTE".equalsIgnoreCase(rolActual());
+    }
+
+    /** BODEGA/DESPACHO: pipeline físico del RMA sin acceso a montos. */
+    private boolean esRolLogistico() {
+        return "BODEGA".equalsIgnoreCase(rolActual())
+                || "DESPACHO".equalsIgnoreCase(rolActual());
     }
 
     private Long clienteActualId() {
