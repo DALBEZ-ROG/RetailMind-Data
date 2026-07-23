@@ -30,8 +30,9 @@ public class SoporteController {
     public record CategoriaReq(String nombre, String descripcion, String prioridadDefecto) {}
     // Sin prioridad: es AUTOMÁTICA por categoría. Si un cliente la manda por
     // API, Jackson la descarta (campo inexistente) y el backend no la mira.
+    // productoVarianteId es OPCIONAL (script 50): no todo reclamo es de producto.
     public record TicketReq(Long clienteId, Long categoriaId, Long pedidoId,
-                            String asunto, String descripcion) {}
+                            Long productoVarianteId, String asunto, String descripcion) {}
     public record MensajeReq(String mensaje, Boolean esInterno) {}
     public record EstadoReq(String estado) {}
     public record PrioridadReq(String prioridad) {}
@@ -83,7 +84,7 @@ public class SoporteController {
     @PostMapping("/tickets")
     public ResponseEntity<?> crearTicket(@RequestBody TicketReq r) {
         Map<String, Object> creado = servicio.crearTicket(r.clienteId(), r.categoriaId(),
-                r.pedidoId(), r.asunto(), r.descripcion());
+                r.pedidoId(), r.productoVarianteId(), r.asunto(), r.descripcion());
         return ResponseEntity.status(HttpStatus.CREATED).body(creado);
     }
 
@@ -129,6 +130,17 @@ public class SoporteController {
     public List<Map<String, Object>> pedidosRef(
             @RequestParam(required = false) Long clienteId) {
         return servicio.listarPedidosRef(clienteId);
+    }
+
+    /**
+     * Buscador del selector "producto relacionado" (script 50): el catálogo
+     * tiene ~1.221 variantes, así que se busca en servidor (mín. 2 letras,
+     * tope 20) en lugar de cargar la lista completa.
+     */
+    @GetMapping("/productos-ref")
+    public List<Map<String, Object>> productosRef(
+            @RequestParam(required = false) String q) {
+        return servicio.buscarProductosRef(q);
     }
 
     // ── FAQ ──────────────────────────────────────────────────────────────

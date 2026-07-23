@@ -7,17 +7,19 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { Subject, debounceTime, distinctUntilChanged, switchMap, of } from 'rxjs';
 import { SoporteService } from '../../../core/services/soporte.service';
 import { ReferenciasService } from '../../../core/services/referencias.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { mensajeError } from '../../../core/services/api-error.util';
 import {
   TicketRow, TicketDetalle, MensajeTicketRow, CategoriaTicketRef,
-  UsuarioSoporteRef, PedidoSoporteRef, ClienteRef
+  UsuarioSoporteRef, PedidoSoporteRef, ProductoTicketRef, ClienteRef
 } from '../../../core/models/operativo.model';
 
 /** Espeja las transiciones del backend (SoporteService.TRANSICIONES). */
@@ -41,8 +43,8 @@ const TRANSICIONES: Record<string, string[]> = {
   selector: 'app-tickets',
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
-    MatFormFieldModule, MatInputModule, MatSelectModule, MatCheckboxModule,
-    MatSnackBarModule, MatTooltipModule, MatButtonToggleModule],
+    MatFormFieldModule, MatInputModule, MatSelectModule, MatAutocompleteModule,
+    MatCheckboxModule, MatSnackBarModule, MatTooltipModule, MatButtonToggleModule],
   templateUrl: './tickets.component.html',
   styleUrl: '../operativo-shared.scss'
 })
@@ -65,6 +67,12 @@ export class TicketsComponent implements OnInit {
   clientesRef: ClienteRef[] = [];
   usuariosRef: UsuarioSoporteRef[] = [];
   pedidosRef: PedidoSoporteRef[] = [];
+
+  // Buscador del producto del reclamo (script 50): el catálogo tiene ~1.221
+  // variantes, así que se busca en servidor con debounce (nunca lista completa)
+  productosRef: ProductoTicketRef[] = [];
+  productoBusqueda: string | ProductoTicketRef = '';
+  private buscarProducto$ = new Subject<string>();
 
   prioridades = ['baja', 'media', 'alta', 'urgente'];
   estadosFiltro = ['abierto', 'en_proceso', 'esperando_cliente', 'resuelto', 'cerrado'];
@@ -121,12 +129,18 @@ export class TicketsComponent implements OnInit {
       this.referencias.clientes().subscribe({ next: c => this.clientesRef = c, error: () => {} });
       this.soporte.usuariosRef().subscribe({ next: u => this.usuariosRef = u, error: () => {} });
     }
+    this.buscarProducto$.pipe(
+      debounceTime(300),
+      distinctUntilChanged(),
+      switchMap(q => q.trim().length >= 2 ? this.soporte.productosRef(q.trim()) : of([]))
+    ).subscribe({ next: p => this.productosRef = p, error: () => this.productosRef = [] });
   }
 
   private formVacio() {
     // Sin prioridad: la asigna el backend según la categoría elegida
     return { clienteId: null as number | null, categoriaId: null as number | null,
-             pedidoId: null as number | null, asunto: '', descripcion: '' };
+             pedidoId: null as number | null,
+             productoVarianteId: null as number | null, asunto: '', descripcion: '' };
   }
 
   cargar(): void {
@@ -141,11 +155,37 @@ export class TicketsComponent implements OnInit {
     this.form = this.formVacio();
     this.showForm = true;
     this.pedidosRef = [];
+    this.productosRef = [];
+    this.productoBusqueda = '';
     // El cliente elige entre SUS pedidos; el personal espera a elegir cliente
     if (this.esCliente) {
       this.soporte.pedidosRef().subscribe({ next: p => this.pedidosRef = p, error: () => {} });
     }
   }
+
+  // ── Buscador del producto del reclamo (script 50) ────────────────────
+
+  buscarProducto(texto: string | ProductoTicketRef): void {
+    // Mientras se escribe llega texto; al elegir una opción llega el objeto
+    if (typeof texto === 'string') {
+      this.form.productoVarianteId = null;
+      this.buscarProducto$.next(texto);
+    }
+  }
+
+  productoElegido(p: ProductoTicketRef): void {
+    this.form.productoVarianteId = p.id;
+  }
+
+  limpiarProducto(): void {
+    this.form.productoVarianteId = null;
+    this.productoBusqueda = '';
+    this.productosRef = [];
+  }
+
+  /** Cómo se muestra la opción elegida en el input del autocomplete. */
+  nombreProducto = (p: ProductoTicketRef | string | null): string =>
+    typeof p === 'object' && p ? `${p.nombre} (${p.sku})` : (p || '');
 
   /** El personal cambió el cliente del ticket: recargar sus pedidos. */
   clienteCambiado(): void {
@@ -272,11 +312,15 @@ export class TicketsComponent implements OnInit {
     return '';
   }
 
-  /** Texto del SLA: "vence en 3 h" / "vence en 25 min" / "VENCIDO" / "—". */
-  slaTexto(t: { sla_vence?: string; sla_vencido?: boolean; estado: string }): string {
-    if (['resuelto', 'cerrado'].includes(t.estado) || !t.sla_vence) return '—';
+  /**
+   * Texto del SLA: "vence en 3 h" / "vence en 25 min" / "VENCIDO" / "—".
+   * Lee ticket_soporte.fecha_limite (columna persistida, script 49), ya no un
+   * cálculo al vuelo del cliente.
+   */
+  slaTexto(t: { fecha_limite?: string; sla_vencido?: boolean; estado: string }): string {
+    if (['resuelto', 'cerrado'].includes(t.estado) || !t.fecha_limite) return '—';
     if (t.sla_vencido) return 'VENCIDO';
-    const min = Math.round((new Date(t.sla_vence).getTime() - Date.now()) / 60000);
+    const min = Math.round((new Date(t.fecha_limite).getTime() - Date.now()) / 60000);
     if (min >= 60) {
       const h = Math.floor(min / 60);
       return h >= 48 ? `vence en ${Math.floor(h / 24)} d` : `vence en ${h} h`;

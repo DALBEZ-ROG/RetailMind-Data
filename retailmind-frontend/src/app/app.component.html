@@ -153,6 +153,12 @@
           <mat-icon>request_quote</mat-icon>
           <span>Facturas de Compra</span>
         </a>
+        <!-- Catálogo proveedor-producto: contiene costo — BODEGA no lo ve (script 51) -->
+        <a class="nav-item" *ngIf="canProveedores"
+           routerLink="/operativo/compras/proveedores" routerLinkActive="active">
+          <mat-icon>storefront</mat-icon>
+          <span>Proveedores</span>
+        </a>
         <a class="nav-item" routerLink="/operativo/compras/devoluciones-proveedor" routerLinkActive="active">
           <mat-icon>assignment_return</mat-icon>
           <span>Devolución a Proveedor</span>
@@ -226,6 +232,16 @@
       <a class="nav-item" routerLink="/operativo/marketing/newsletter" routerLinkActive="active">
         <mat-icon>mail</mat-icon>
         <span>Newsletter</span>
+      </a>
+    </ng-container>
+
+    <!-- Gerencia Section (metas: fija ADMIN/GERENTE; vendedor/analista leen) -->
+    <ng-container *ngIf="canMetas">
+      <div class="sidebar-section-label">Gerencia</div>
+
+      <a class="nav-item" routerLink="/operativo/gerencia/metas" routerLinkActive="active">
+        <mat-icon>flag</mat-icon>
+        <span>Metas de Venta</span>
       </a>
     </ng-container>
 

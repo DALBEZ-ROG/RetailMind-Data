@@ -4,7 +4,8 @@ import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
   ItemOrdenReq, ItemRecepcionReq, OrdenCompraRow, OrdenCompraDetalle,
-  FacturaCompra, CuentaPorPagarRow
+  FacturaCompra, CuentaPorPagarRow, ProveedorFichaRow, ProductoProveedorRow,
+  ProductoCompraRef
 } from '../models/operativo.model';
 
 @Injectable({ providedIn: 'root' })
@@ -83,6 +84,27 @@ export class ComprasService {
   }
   cerrarDevolucionProveedor(id: number, nota?: string): Observable<any> {
     return this.http.post<any>(`${this.base}/devoluciones-proveedor/${id}/cerrar`, { nota });
+  }
+
+  // ── Catálogo proveedor-producto (OTD-COM-10, script 51) ───────────────
+  proveedores(): Observable<ProveedorFichaRow[]> {
+    return this.http.get<ProveedorFichaRow[]>(`${this.base}/proveedores`);
+  }
+  productosDeProveedor(proveedorId: number): Observable<ProductoProveedorRow[]> {
+    return this.http.get<ProductoProveedorRow[]>(`${this.base}/proveedores/${proveedorId}/productos`);
+  }
+  asociarProducto(proveedorId: number, body: unknown): Observable<{ id: number }> {
+    return this.http.post<{ id: number }>(`${this.base}/proveedores/${proveedorId}/productos`, body);
+  }
+  editarProductoProveedor(id: number, body: unknown): Observable<unknown> {
+    return this.http.put(`${this.base}/productos-proveedor/${id}`, body);
+  }
+  activarProductoProveedor(id: number, activo: boolean): Observable<unknown> {
+    return this.http.patch(`${this.base}/productos-proveedor/${id}/activo`, { activo });
+  }
+  /** Buscador de producto en servidor (nunca la lista completa). */
+  productosRef(q: string): Observable<ProductoCompraRef[]> {
+    return this.http.get<ProductoCompraRef[]>(`${this.base}/productos-ref`, { params: { q } });
   }
 
   cuentasPorPagar(): Observable<CuentaPorPagarRow[]> {

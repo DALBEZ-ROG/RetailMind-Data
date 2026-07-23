@@ -48,8 +48,8 @@ public class ComprasService {
 
     @Transactional
     public Map<String, Object> emitirOrden(long proveedorId, long bodegaId, Long monedaId,
-                                           String fechaEntregaEsperada, String observacion,
-                                           List<ItemOrden> items) {
+                                           String fechaEmision, String fechaEntregaEsperada,
+                                           String observacion, List<ItemOrden> items) {
         if (items == null || items.isEmpty()) {
             throw new IllegalArgumentException("La orden requiere al menos un item");
         }
@@ -63,16 +63,53 @@ public class ComprasService {
                         "El precio unitario de cada item debe ser mayor a cero");
             }
         }
+        // Fecha de emisión: OPCIONAL. El formulario NO la envía y la orden nace
+        // HOY (comportamiento intacto); solo la carga de órdenes históricas por
+        // API la informa (siembra de datos de meses pasados). Nunca futura.
+        java.time.LocalDate emision = java.time.LocalDate.now();
+        if (fechaEmision != null && !fechaEmision.isBlank()) {
+            try {
+                emision = java.time.LocalDate.parse(fechaEmision.trim());
+            } catch (java.time.format.DateTimeParseException e) {
+                throw new IllegalArgumentException(
+                        "La fecha de emisión no es válida (formato AAAA-MM-DD)");
+            }
+            if (emision.isAfter(java.time.LocalDate.now())) {
+                throw new IllegalArgumentException(
+                        "La fecha de emisión no puede ser futura");
+            }
+        }
+        // Fecha prometida por el proveedor (OTD-COM-05): OPCIONAL — el proveedor
+        // puede no comprometer fecha al emitir. DECISIÓN (2026-07-22): se valida
+        // contra la fecha de EMISIÓN de la orden, no contra hoy — para la captura
+        // por formulario son equivalentes (la orden nace hoy) y una orden
+        // histórica puede traer fechas prometidas de meses pasados sin bloquearse.
+        if (fechaEntregaEsperada != null && !fechaEntregaEsperada.isBlank()) {
+            java.time.LocalDate prometida;
+            try {
+                prometida = java.time.LocalDate.parse(fechaEntregaEsperada.trim());
+            } catch (java.time.format.DateTimeParseException e) {
+                throw new IllegalArgumentException(
+                        "La fecha de entrega prometida no es válida (formato AAAA-MM-DD)");
+            }
+            if (prometida.isBefore(emision)) {
+                throw new IllegalArgumentException(
+                        "La fecha de entrega prometida no puede ser anterior a la "
+                        + "fecha de emisión de la orden (" + emision + ")");
+            }
+        } else {
+            fechaEntregaEsperada = null;
+        }
         String numero = siguienteNumero("OC");
         Long ordenId = pg.queryForObject("""
                 INSERT INTO orden_compra
                     (numero, proveedor_id, bodega_id, moneda_id, usuario_id, estado,
-                     fecha_entrega_esperada, observacion)
-                VALUES (?, ?, ?, ?, ?, 'enviada', ?::date, ?)
+                     fecha_emision, fecha_entrega_esperada, observacion)
+                VALUES (?, ?, ?, ?, ?, 'enviada', ?::date, ?::date, ?)
                 RETURNING id""",
                 Long.class, numero, proveedorId, bodegaId,
                 monedaId != null ? monedaId : monedaBaseId(), usuarioActualId(),
-                fechaEntregaEsperada, observacion);
+                emision.toString(), fechaEntregaEsperada, observacion);
 
         for (ItemOrden it : items) {
             BigDecimal pct = it.ivaPorcentaje() != null ? it.ivaPorcentaje() : IVA_DEFECTO;
@@ -318,6 +355,16 @@ public class ComprasService {
             pg.update("""
                     UPDATE orden_compra_detalle SET cantidad_recibida = cantidad_recibida + ?
                     WHERE id = ?""", it.cantidadRecibida(), it.ordenCompraDetalleId());
+
+            // Catálogo proveedor-producto (OTD-COM-10, script 51): cada
+            // recepción registra/actualiza AUTOMÁTICAMENTE el par
+            // proveedor-variante con el costo realmente recibido (pactado en
+            // la OC aprobada: no hay nada que confirmar). SECURITY DEFINER:
+            // también corre bajo grp_bodega sin abrirle la tabla (contiene
+            // costo, segregación financiera). Nunca pisa los datos comerciales
+            // manuales de COMPRAS (preferido, cantidad mínima, plazo).
+            pg.queryForObject("SELECT fn_upsert_producto_proveedor(?, ?, ?)", Long.class,
+                    ((Number) orden.get("proveedor_id")).longValue(), varianteId, costo);
         }
 
         Boolean completa = pg.queryForObject("""

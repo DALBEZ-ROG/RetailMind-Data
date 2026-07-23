@@ -2,7 +2,9 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { TransferenciaRow, AjusteRow, AjusteResultado, KardexRow } from '../models/operativo.model';
+import {
+  TransferenciaRow, AjusteRow, AjusteResultado, KardexRow, StockRow
+} from '../models/operativo.model';
 
 @Injectable({ providedIn: 'root' })
 export class InventarioService {
@@ -34,6 +36,13 @@ export class InventarioService {
 
   anularAjuste(id: number, motivo: string): Observable<{ id: number; estado: string }> {
     return this.http.post<{ id: number; estado: string }>(`${this.base}/ajustes/${id}/anular`, { motivo });
+  }
+
+  /** OTD-INV-08: fija stock mínimo y máximo de una variante en una bodega. */
+  actualizarNiveles(body: {
+    varianteId: number; bodegaId: number; stockMinimo: number; stockMaximo: number | null;
+  }): Observable<StockRow> {
+    return this.http.put<StockRow>(`${this.base}/niveles`, body);
   }
 
   kardex(varianteId?: number | null, bodegaId?: number | null): Observable<KardexRow[]> {

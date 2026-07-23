@@ -46,6 +46,26 @@
           </mat-select>
           <mat-hint *ngIf="esGestion && !form.clienteId">Elige primero el cliente</mat-hint>
         </mat-form-field>
+        <!-- Producto del reclamo (script 50): búsqueda en servidor con debounce,
+             el catálogo tiene ~1.221 variantes y no se carga completo -->
+        <mat-form-field appearance="outline">
+          <mat-label>Producto relacionado (opcional)</mat-label>
+          <input matInput [(ngModel)]="productoBusqueda"
+                 (ngModelChange)="buscarProducto($event)"
+                 [matAutocomplete]="autoProducto"
+                 placeholder="Busca por nombre o SKU…">
+          <mat-autocomplete #autoProducto="matAutocomplete" [displayWith]="nombreProducto"
+                            (optionSelected)="productoElegido($event.option.value)">
+            <mat-option *ngFor="let p of productosRef" [value]="p">
+              {{ p.nombre }} <span style="font-size: 11px; opacity: 0.7;">({{ p.sku }})</span>
+            </mat-option>
+          </mat-autocomplete>
+          <button matSuffix mat-icon-button *ngIf="form.productoVarianteId"
+                  matTooltip="Quitar producto" (click)="limpiarProducto()">
+            <mat-icon>close</mat-icon>
+          </button>
+          <mat-hint>{{ form.productoVarianteId ? 'Producto seleccionado' : 'Escribe al menos 2 letras' }}</mat-hint>
+        </mat-form-field>
         <mat-form-field appearance="outline" style="grid-column: 1 / -1;">
           <mat-label>Asunto</mat-label>
           <input matInput [(ngModel)]="form.asunto" maxlength="200">
@@ -131,7 +151,7 @@
             <span class="stat-chip" [class.chip-warning]="t.sla_vencido"
                   [style.background]="t.sla_vencido ? '#ffebee' : ''"
                   [style.color]="t.sla_vencido ? '#c62828' : ''"
-                  matTooltip="Límite de respuesta: {{ t.sla_vence | date:'dd/MM/yy HH:mm' }} (urgente 2h · alta 4h · media 24h · baja 72h)">
+                  matTooltip="Límite de atención: {{ t.fecha_limite | date:'dd/MM/yy HH:mm' }} (urgente 2h · alta 4h · media 24h · baja 72h)">
               {{ slaTexto(t) }}
             </span>
           </td>
@@ -211,6 +231,11 @@
         SLA: {{ slaTexto(detalle) }}
       </span>
       <span class="stat-chip chip-info" *ngIf="detalle.categoria">{{ detalle.categoria }}</span>
+      <span class="stat-chip chip-info" *ngIf="detalle.producto"
+            matTooltip="Producto sobre el que trata el reclamo">
+        <mat-icon style="font-size: 13px; height: 13px; width: 13px;">inventory_2</mat-icon>
+        {{ detalle.producto }}
+      </span>
       <span class="stat-chip chip-info" *ngIf="detalle.pedido_id">pedido #{{ detalle.pedido_id }}</span>
       <span class="stat-chip chip-info" *ngIf="!esCliente && detalle.cliente">cliente: {{ detalle.cliente }}</span>
       <span class="stat-chip chip-info" *ngIf="!esCliente">

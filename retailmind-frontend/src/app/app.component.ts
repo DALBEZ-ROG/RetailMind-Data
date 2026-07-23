@@ -66,6 +66,7 @@ export class AppComponent {
     '/operativo/compras/ordenes': 'Órdenes de Compra',
     '/operativo/compras/recepciones': 'Recepción de Mercancía',
     '/operativo/compras/facturas': 'Facturas de Compra',
+    '/operativo/compras/proveedores': 'Proveedores',
     '/operativo/compras/devoluciones-proveedor': 'Devolución a Proveedor',
     '/operativo/inventario/transferencias': 'Transferencias de Stock',
     '/operativo/inventario/ajustes': 'Ajustes de Inventario',
@@ -76,6 +77,7 @@ export class AppComponent {
     '/operativo/ventas/preparacion': 'Preparación de Pedidos',
     '/operativo/ventas/despachos': 'Despachos',
     '/operativo/ventas/devoluciones': 'Devoluciones',
+    '/operativo/gerencia/metas': 'Metas de Venta',
     '/operativo/marketing/cupones': 'Cupones de Descuento',
     '/operativo/marketing/promociones': 'Promociones',
     '/operativo/marketing/campanas': 'Campañas de Marketing',
@@ -130,6 +132,7 @@ export class AppComponent {
   get canCatalogo(): boolean   { return this.nav.can('catalogo'); }
   get canCompras(): boolean    { return this.nav.can('compras'); }
   get canFacturasCompra(): boolean { return this.nav.can('facturasCompra'); }
+  get canProveedores(): boolean { return this.nav.can('proveedores'); }
   get canInventario(): boolean { return this.nav.can('inventario'); }
   get canAjustes(): boolean    { return this.nav.can('ajustes'); }
   get canKardex(): boolean     { return this.nav.can('kardex'); }
@@ -139,6 +142,7 @@ export class AppComponent {
   get canDespachar(): boolean  { return this.nav.can('despachar'); }
   get canDevoluciones(): boolean { return this.nav.can('devoluciones'); }
   get canMarketing(): boolean  { return this.nav.can('marketing'); }
+  get canMetas(): boolean      { return this.nav.can('metas'); }
   get canTickets(): boolean    { return this.nav.can('tickets'); }
   get canCategoriasTicket(): boolean { return this.nav.can('categoriasTicket'); }
   get canFaq(): boolean        { return this.nav.can('faq'); }

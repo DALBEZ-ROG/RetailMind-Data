@@ -185,6 +185,14 @@ export const routes: Routes = [
       import('./features/operativo/compras/devoluciones-proveedor.component').then(m => m.DevolucionesProveedorComponent)
   },
   {
+    // Ficha del proveedor + catálogo proveedor-producto (OTD-COM-10, script 51):
+    // contiene costo — BODEGA fuera (segregación financiera)
+    path: 'operativo/compras/proveedores',
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'COMPRAS'])],
+    loadComponent: () =>
+      import('./features/operativo/compras/proveedores.component').then(m => m.ProveedoresComponent)
+  },
+  {
     // Facturas de compra: documento financiero — BODEGA fuera (segregación)
     path: 'operativo/compras/facturas',
     canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'COMPRAS'])],
@@ -248,6 +256,14 @@ export const routes: Routes = [
     canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'VENDEDOR', 'DESPACHO', 'BODEGA', 'SOPORTE'])],
     loadComponent: () =>
       import('./features/operativo/ventas/devoluciones.component').then(m => m.DevolucionesComponent)
+  },
+  // ── Módulo gerencia: metas de venta (OTD-VEN-15, script 48) — fija
+  //    GERENTE/ADMIN; VENDEDOR/ANALISTA leen el avance (espeja SecurityConfig)
+  {
+    path: 'operativo/gerencia/metas',
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'VENDEDOR', 'ANALISTA'])],
+    loadComponent: () =>
+      import('./features/operativo/gerencia/metas-venta.component').then(m => m.MetasVentaComponent)
   },
   // ── Módulo marketing (lectura ADMIN/GERENTE; escrituras solo ADMIN, espeja SecurityConfig)
   {

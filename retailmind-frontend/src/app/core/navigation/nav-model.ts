@@ -13,6 +13,7 @@ export type PermisoNav =
   | 'catalogo'         // productos y variantes
   | 'compras'          // órdenes / recepciones
   | 'facturasCompra'   // facturas de proveedor y pagos (SIN bodega: segregación financiera)
+  | 'proveedores'      // ficha del proveedor + catálogo proveedor-producto (script 51)
   | 'inventario'       // transferencias de stock
   | 'ajustes'          // ajustes de inventario
   | 'kardex'           // kardex
@@ -22,6 +23,7 @@ export type PermisoNav =
   | 'despachar'        // despachos
   | 'devoluciones'     // RMA / logística inversa (pipeline multi-rol)
   | 'marketing'        // cupones / promos / campañas / banners / newsletter
+  | 'metas'            // metas de venta por período (OTD-VEN-15, script 48)
   | 'tickets'          // tickets de soporte
   | 'categoriasTicket' // categorías de ticket
   | 'faq'              // preguntas frecuentes
@@ -35,6 +37,8 @@ export const ROLES_POR_PERMISO: Record<PermisoNav, readonly string[]> = {
   compras:          ['ADMIN', 'GERENTE', 'COMPRAS', 'BODEGA'],
   // Facturas de compra = documento 100% financiero: BODEGA fuera (segregación)
   facturasCompra:   ['ADMIN', 'GERENTE', 'COMPRAS'],
+  // Catálogo proveedor-producto (script 51): contiene costo — BODEGA fuera
+  proveedores:      ['ADMIN', 'GERENTE', 'COMPRAS'],
   inventario:       ['ADMIN', 'GERENTE', 'BODEGA'],
   ajustes:          ['ADMIN', 'BODEGA'],
   kardex:           ['ADMIN', 'GERENTE', 'BODEGA', 'ANALISTA'],
@@ -47,6 +51,8 @@ export const ROLES_POR_PERMISO: Record<PermisoNav, readonly string[]> = {
   // el CLIENTE no: su devolución nace y se sigue desde Mis Pedidos
   devoluciones:     ['ADMIN', 'GERENTE', 'VENDEDOR', 'DESPACHO', 'BODEGA', 'SOPORTE'],
   marketing:        ['ADMIN', 'GERENTE'],
+  // Metas: fija gerencia; vendedor/analista leen el avance (script 48)
+  metas:            ['ADMIN', 'GERENTE', 'VENDEDOR', 'ANALISTA'],
   // SOPORTE (9º rol, script 37): bandeja de tickets + FAQ; nada más
   tickets:          ['ADMIN', 'GERENTE', 'CLIENTE', 'SOPORTE'],
   categoriasTicket: ['ADMIN'],
@@ -141,7 +147,9 @@ export const DASHBOARD_AREAS: AreaNav[] = [
       { titulo: 'Facturas de Compra', descripcion: 'Facturas de proveedor y pagos',
         icono: 'request_quote', ruta: '/operativo/compras/facturas', permiso: 'facturasCompra' },
       { titulo: 'Devolución a Proveedor', descripcion: 'Producto defectuoso devuelto al proveedor',
-        icono: 'assignment_return', ruta: '/operativo/compras/devoluciones-proveedor', permiso: 'compras' }
+        icono: 'assignment_return', ruta: '/operativo/compras/devoluciones-proveedor', permiso: 'compras' },
+      { titulo: 'Proveedores', descripcion: 'Ficha del proveedor y los productos que ofrece',
+        icono: 'storefront', ruta: '/operativo/compras/proveedores', permiso: 'proveedores' }
     ]
   },
   {
@@ -218,6 +226,18 @@ export const DASHBOARD_AREAS: AreaNav[] = [
         icono: 'view_carousel', ruta: '/operativo/marketing/banners', permiso: 'marketing' },
       { titulo: 'Newsletter', descripcion: 'Suscriptores y envíos de boletín',
         icono: 'mail', ruta: '/operativo/marketing/newsletter', permiso: 'marketing' }
+    ]
+  },
+  {
+    id: 'gerencia',
+    titulo: 'Gerencia',
+    descripcion: 'Dirección táctica del negocio',
+    icono: 'flag',
+    acento: '#c62828',
+    gradiente: 'linear-gradient(135deg, #b71c1c, #ef5350)',
+    acciones: [
+      { titulo: 'Metas de Venta', descripcion: 'Meta por período y departamento vs. venta real',
+        icono: 'flag', ruta: '/operativo/gerencia/metas', permiso: 'metas' }
     ]
   },
   {

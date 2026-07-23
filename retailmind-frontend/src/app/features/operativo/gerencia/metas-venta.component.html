@@ -1,0 +1,130 @@
+<div class="op-page">
+  <div class="section-header">
+    <h2><mat-icon>flag</mat-icon> Metas de Venta</h2>
+    <p *ngIf="esGestion">Fija la meta por período y departamento; el avance compara contra lo facturado del mes.</p>
+    <p *ngIf="!esGestion">Metas fijadas por Gerencia y su avance contra lo facturado del mes.</p>
+  </div>
+
+  <div class="op-card" *ngIf="esGestion">
+    <div class="form-actions">
+      <button class="btn-aplicar" (click)="showForm ? showForm = false : nuevo()">
+        <mat-icon>{{ showForm ? 'close' : 'add' }}</mat-icon>
+        {{ showForm ? 'Cancelar' : 'Nueva Meta' }}
+      </button>
+      <button class="btn-limpiar" (click)="cargar()">
+        <mat-icon>refresh</mat-icon> Actualizar
+      </button>
+    </div>
+
+    <div *ngIf="showForm" style="margin-top: 20px;">
+      <h3 *ngIf="editandoId !== null"><mat-icon>edit</mat-icon> Editando meta #{{ editandoId }}</h3>
+      <div class="form-grid">
+        <mat-form-field appearance="outline">
+          <mat-label>Año</mat-label>
+          <input matInput type="number" min="2000" max="2100" [(ngModel)]="form.anio">
+          <!-- Sin validación de futuro: se cargan metas de meses pasados (histórico) -->
+          <mat-hint>Admite períodos pasados (metas históricas)</mat-hint>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Mes</mat-label>
+          <mat-select [(ngModel)]="form.mes">
+            <mat-option *ngFor="let m of meses; let i = index" [value]="i + 1">{{ m }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Departamento</mat-label>
+          <mat-select [(ngModel)]="form.departamento">
+            <mat-option *ngFor="let d of departamentos" [value]="d">{{ d }}</mat-option>
+          </mat-select>
+          <mat-hint>«general» = meta global de la tienda</mat-hint>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Monto de la meta (USD)</mat-label>
+          <input matInput type="number" min="0.01" step="0.01" [(ngModel)]="form.montoMeta">
+        </mat-form-field>
+        <mat-form-field appearance="outline" style="grid-column: 1 / -1;">
+          <mat-label>Notas (opcional)</mat-label>
+          <input matInput [(ngModel)]="form.notas" maxlength="500">
+        </mat-form-field>
+      </div>
+      <div class="form-actions">
+        <button class="btn-aplicar" (click)="guardar()">
+          <mat-icon>save</mat-icon> {{ editandoId === null ? 'Crear Meta' : 'Guardar Cambios' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="op-card">
+    <h3><mat-icon>list</mat-icon> Metas ({{ metas.length }})</h3>
+    <div class="table-wrapper" *ngIf="metas.length; else vacio">
+      <table mat-table [dataSource]="metas">
+        <ng-container matColumnDef="periodo">
+          <th mat-header-cell *matHeaderCellDef>Período</th>
+          <td mat-cell *matCellDef="let m">
+            <strong>{{ nombreMes(m.mes) }} {{ m.anio }}</strong>
+            <div style="font-size: 11px; opacity: 0.7;" *ngIf="m.notas">{{ m.notas }}</div>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="departamento">
+          <th mat-header-cell *matHeaderCellDef>Departamento</th>
+          <td mat-cell *matCellDef="let m"><span class="stat-chip chip-info">{{ m.departamento }}</span></td>
+        </ng-container>
+        <ng-container matColumnDef="meta">
+          <th mat-header-cell *matHeaderCellDef>Meta</th>
+          <td mat-cell *matCellDef="let m"><strong>{{ m.monto_meta | currency:'USD' }}</strong></td>
+        </ng-container>
+        <ng-container matColumnDef="avance">
+          <th mat-header-cell *matHeaderCellDef>Avance del mes</th>
+          <td mat-cell *matCellDef="let m">
+            <ng-container *ngIf="cumplimiento(m) !== null; else sinAvance">
+              {{ m.venta_real | currency:'USD' }}
+              <span class="stat-chip" [class.chip-warning]="cumplimiento(m)! < 100"
+                    [class.chip-info]="cumplimiento(m)! >= 100"
+                    matTooltip="Facturado del mes vs. meta">
+                {{ cumplimiento(m) }} %
+              </span>
+            </ng-container>
+            <ng-template #sinAvance><span style="opacity: 0.55;">—</span></ng-template>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="fijada">
+          <th mat-header-cell *matHeaderCellDef>Fijada por</th>
+          <td mat-cell *matCellDef="let m">
+            {{ m.fijada_por || '—' }}
+            <div style="font-size: 11px; opacity: 0.7;">{{ m.fecha_creacion | date:'dd/MM/yy HH:mm' }}</div>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="activo">
+          <th mat-header-cell *matHeaderCellDef>Vigente</th>
+          <td mat-cell *matCellDef="let m">
+            <span class="estado-chip" [class.ok]="m.activo" [class.error]="!m.activo">
+              {{ m.activo ? 'Vigente' : 'Inactiva' }}
+            </span>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="acciones">
+          <th mat-header-cell *matHeaderCellDef>Acciones</th>
+          <td mat-cell *matCellDef="let m">
+            <ng-container *ngIf="esGestion">
+              <button mat-icon-button matTooltip="Editar" (click)="editar(m)">
+                <mat-icon>edit</mat-icon>
+              </button>
+              <button mat-icon-button matTooltip="Activar / desactivar" (click)="toggleActivo(m)">
+                <mat-icon>{{ m.activo ? 'toggle_on' : 'toggle_off' }}</mat-icon>
+              </button>
+            </ng-container>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="columnas"></tr>
+        <tr mat-row *matRowDef="let m; columns: columnas"></tr>
+      </table>
+    </div>
+    <ng-template #vacio>
+      <div class="empty-state" *ngIf="!loading">
+        <mat-icon>flag</mat-icon>
+        <p>No hay metas todavía.{{ esGestion ? ' Crea la primera.' : '' }}</p>
+      </div>
+    </ng-template>
+  </div>
+</div>

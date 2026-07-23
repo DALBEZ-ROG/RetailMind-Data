@@ -4,7 +4,7 @@ import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
   CategoriaTicketRow, CategoriaTicketRef, TicketRow, TicketDetalle,
-  UsuarioSoporteRef, PedidoSoporteRef, FaqRow, FaqActiva
+  UsuarioSoporteRef, PedidoSoporteRef, ProductoTicketRef, FaqRow, FaqActiva
 } from '../models/operativo.model';
 
 @Injectable({ providedIn: 'root' })
@@ -63,6 +63,10 @@ export class SoporteService {
   pedidosRef(clienteId?: number | null): Observable<PedidoSoporteRef[]> {
     return this.http.get<PedidoSoporteRef[]>(`${this.base}/pedidos-ref`,
       { params: clienteId ? { clienteId } : {} });
+  }
+  /** Buscador del producto del reclamo (script 50): búsqueda en servidor. */
+  productosRef(q: string): Observable<ProductoTicketRef[]> {
+    return this.http.get<ProductoTicketRef[]>(`${this.base}/productos-ref`, { params: { q } });
   }
 
   // FAQ

@@ -79,6 +79,16 @@ public class SecurityConfig {
                         "/api/compras/devoluciones-proveedor/*/resolver",
                         "/api/compras/devoluciones-proveedor/*/cerrar")
                     .hasAnyAuthority("ADMIN", "COMPRAS")
+                // Catálogo proveedor-producto (OTD-COM-10, script 51): contiene
+                // COSTO, así que BODEGA queda fuera (segregación financiera).
+                // Lectura ADMIN/GERENTE/COMPRAS; escritura ADMIN/COMPRAS
+                // (espeja los GRANTs de producto_proveedor).
+                .requestMatchers(HttpMethod.GET, "/api/compras/proveedores",
+                        "/api/compras/proveedores/*/productos", "/api/compras/productos-ref")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "COMPRAS")
+                .requestMatchers("/api/compras/proveedores/*/productos",
+                        "/api/compras/productos-proveedor/**")
+                    .hasAnyAuthority("ADMIN", "COMPRAS")
                 // Ciclo de compra: roles operativos (la BD afina por SET LOCAL ROLE)
                 .requestMatchers("/api/compras/**")
                     .hasAnyAuthority("ADMIN", "GERENTE", "COMPRAS", "BODEGA")
@@ -145,12 +155,23 @@ public class SecurityConfig {
                 // Ajuste de inventario (CU-O-16): solo bodega/admin
                 .requestMatchers("/api/inventario/ajustes/**")
                     .hasAnyAuthority("ADMIN", "BODEGA")
+                // Niveles mín/máx (OTD-INV-08): solo bodega/admin (espeja el
+                // UPDATE de inventario en BD; gerente solo tiene SELECT)
+                .requestMatchers("/api/inventario/niveles")
+                    .hasAnyAuthority("ADMIN", "BODEGA")
                 // Kardex (CU-O-17): lectura ampliada a gerencia y analista
                 .requestMatchers(HttpMethod.GET, "/api/inventario/kardex")
                     .hasAnyAuthority("ADMIN", "GERENTE", "BODEGA", "ANALISTA")
                 // Transferencias de inventario: bodega
                 .requestMatchers("/api/inventario/**")
                     .hasAnyAuthority("ADMIN", "GERENTE", "BODEGA")
+                // Metas de venta (OTD-VEN-15, script 48): fijar/editar es
+                // atribución de gerencia; vendedor/analista solo leen el
+                // avance (espeja los GRANTs de meta_venta)
+                .requestMatchers(HttpMethod.GET, "/api/gerencia/metas", "/api/gerencia/metas/**")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "VENDEDOR", "ANALISTA")
+                .requestMatchers("/api/gerencia/metas", "/api/gerencia/metas/**")
+                    .hasAnyAuthority("ADMIN", "GERENTE")
                 // Marketing: lectura ADMIN/GERENTE; escritura solo ADMIN
                 // (espeja la BD: grp_gerente solo SELECT en cupon/promocion/campana/banner)
                 .requestMatchers(HttpMethod.GET, "/api/marketing/**")
@@ -164,6 +185,10 @@ public class SecurityConfig {
                 // Selector "pedido relacionado" del ticket: personal + cliente
                 // (CLIENTE queda aislado a sus pedidos por RLS)
                 .requestMatchers(HttpMethod.GET, "/api/soporte/pedidos-ref")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "CLIENTE", "SOPORTE")
+                // Buscador "producto relacionado" del ticket (script 50):
+                // mismos roles; grp_soporte busca con grants de columna sin dinero
+                .requestMatchers(HttpMethod.GET, "/api/soporte/productos-ref")
                     .hasAnyAuthority("ADMIN", "GERENTE", "CLIENTE", "SOPORTE")
                 // Tomar (auto-asignarse) y cambiar prioridad: agente de soporte
                 // y ADMIN (la prioridad NACE automática según la categoría)

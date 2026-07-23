@@ -39,11 +39,24 @@
       </button>
     </div>
 
-    <!-- Stock actual de la variante en cada bodega -->
+    <!-- Stock actual y niveles mín/máx de la variante en cada bodega (OTD-INV-08) -->
     <div *ngIf="stockVariante.length" style="margin-top:16px;">
-      <span class="stat-chip chip-info" *ngFor="let s of stockVariante" style="margin-right:8px;">
-        {{ s.bodega }}: {{ s.stock_actual }}
-      </span>
+      <h3><mat-icon>swap_vert</mat-icon> Stock y niveles por bodega</h3>
+      <div class="linea-item" *ngFor="let s of stockVariante">
+        <span class="stat-chip chip-info">{{ s.bodega }}: {{ s.stock_actual }}</span>
+        <mat-form-field appearance="outline">
+          <mat-label>Stock mínimo</mat-label>
+          <input matInput type="number" min="0" [(ngModel)]="s.stock_minimo">
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Stock máximo (opcional)</mat-label>
+          <input matInput type="number" min="1" [(ngModel)]="s.stock_maximo">
+        </mat-form-field>
+        <button mat-icon-button color="primary" matTooltip="Guardar niveles mín/máx"
+                (click)="guardarNiveles(s)">
+          <mat-icon>save</mat-icon>
+        </button>
+      </div>
     </div>
 
     <div class="resultado-box" *ngIf="resultado">

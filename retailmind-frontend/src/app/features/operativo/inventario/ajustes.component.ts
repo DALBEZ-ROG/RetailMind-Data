@@ -98,6 +98,33 @@ export class AjustesComponent implements OnInit {
     });
   }
 
+  /** OTD-INV-08: fija los niveles mín/máx del inventario de una bodega. */
+  guardarNiveles(s: StockRow): void {
+    const min = Number(s.stock_minimo) || 0;
+    const max = s.stock_maximo != null && `${s.stock_maximo}` !== '' ? Number(s.stock_maximo) : null;
+    if (min < 0) {
+      this.snackBar.open('El stock mínimo no puede ser negativo', 'Cerrar', { duration: 3500 });
+      return;
+    }
+    if (max != null && max <= min) {
+      this.snackBar.open(`El stock máximo (${max}) debe ser mayor que el mínimo (${min})`,
+        'Cerrar', { duration: 4000 });
+      return;
+    }
+    this.inventario.actualizarNiveles({
+      varianteId: s.producto_variante_id, bodegaId: s.bodega_id,
+      stockMinimo: min, stockMaximo: max
+    }).subscribe({
+      next: r => {
+        this.snackBar.open(`Niveles de ${r.sku} en ${r.bodega} guardados — mín ${r.stock_minimo}`
+          + (r.stock_maximo != null ? `, máx ${r.stock_maximo}` : ', sin tope máximo'), 'OK',
+          { duration: 3500, panelClass: ['snack-success'] });
+      },
+      error: e => this.snackBar.open(mensajeError(e, 'No se pudieron guardar los niveles'),
+        'Cerrar', { duration: 5000 })
+    });
+  }
+
   anularAjuste(): void {
     if (!this.anulando) return;
     if (!this.motivoAnulacion.trim()) {

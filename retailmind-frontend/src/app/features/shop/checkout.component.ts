@@ -68,6 +68,9 @@ export class CheckoutComponent implements OnInit {
 
   // Resultado
   exito: any = null;
+  // Rechazo del pago simulado (OTD-VEN-12): motivo visible y reintento sin
+  // perder el carrito (el backend revirtió todo salvo el rastro del intento)
+  errorPago: string | null = null;
 
   constructor(
     private shop: ShopService,
@@ -235,6 +238,7 @@ export class CheckoutComponent implements OnInit {
   confirmar(): void {
     if (!this.puedeConfirmar) return;
     this.procesando = true;
+    this.errorPago = null;
     // Solo viaja el CÓDIGO del cupón aplicado: el backend re-valida y
     // recalcula el descuento (nunca se envía el monto desde el cliente).
     const body: any = {
@@ -257,7 +261,10 @@ export class CheckoutComponent implements OnInit {
       },
       error: e => {
         this.procesando = false;
-        this.snackBar.open(mensajeError(e, 'No se pudo completar la compra'), 'Cerrar',
+        // El motivo queda visible junto al botón: el carrito y el formulario
+        // siguen intactos, así que reintentar es volver a pulsar "Pagar"
+        this.errorPago = mensajeError(e, 'No se pudo completar la compra');
+        this.snackBar.open(this.errorPago, 'Cerrar',
           { duration: 6000, panelClass: ['snack-error'] });
       }
     });

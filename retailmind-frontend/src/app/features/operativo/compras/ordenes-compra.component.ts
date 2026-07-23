@@ -41,6 +41,8 @@ export class OrdenesCompraComponent implements OnInit {
   showForm = false;
   proveedorId: number | null = null;
   bodegaId: number | null = null;
+  /** Fecha de entrega prometida por el proveedor (OTD-COM-05); opcional. */
+  fechaEntregaEsperada: string | null = null;
   observacion = '';
   lineas: LineaOrden[] = [{ varianteId: null, cantidad: 1, precioUnitario: 0 }];
 
@@ -117,6 +119,7 @@ export class OrdenesCompraComponent implements OnInit {
     this.procesando = true;
     this.compras.emitirOrden({
       proveedorId: this.proveedorId, bodegaId: this.bodegaId,
+      fechaEntregaEsperada: this.fechaEntregaEsperada || null,
       observacion: this.observacion, items
     }).subscribe({
       next: orden => {
@@ -126,6 +129,7 @@ export class OrdenesCompraComponent implements OnInit {
           { duration: 3500, panelClass: ['snack-success'] });
         this.showForm = false;
         this.proveedorId = null; this.bodegaId = null; this.observacion = '';
+        this.fechaEntregaEsperada = null;
         this.lineas = [{ varianteId: null, cantidad: 1, precioUnitario: 0 }];
         this.cargarOrdenes();
       },

@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -27,6 +28,8 @@ public class InventarioController {
     public record AjusteReq(long varianteId, long bodegaId, String tipo,
                             int cantidad, String motivo) {}
     public record AnularAjusteReq(String motivo) {}
+    public record NivelesReq(long varianteId, long bodegaId,
+                             int stockMinimo, Integer stockMaximo) {}
 
     private final InventarioService servicio;
 
@@ -62,6 +65,13 @@ public class InventarioController {
     public ResponseEntity<?> anularAjuste(@PathVariable long id,
                                           @RequestBody AnularAjusteReq r) {
         return ResponseEntity.ok(servicio.anularAjuste(id, r.motivo()));
+    }
+
+    // Cierre de brechas OTD-INV-08: niveles mín/máx por variante y bodega
+    @PutMapping("/niveles")
+    public Map<String, Object> actualizarNiveles(@RequestBody NivelesReq r) {
+        return servicio.actualizarNiveles(r.varianteId(), r.bodegaId(),
+                r.stockMinimo(), r.stockMaximo());
     }
 
     // CU-O-17: kardex de solo lectura, filtrable por variante y/o bodega

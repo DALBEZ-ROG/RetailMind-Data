@@ -409,7 +409,9 @@ public class DevolucionService {
                 WHERE lower(nombre) = 'devolución' AND activo""", Long.class);
         Long categoriaId = categorias.isEmpty() ? null : categorias.get(0);
         String numero = siguienteNumero("DV");
-        Map<String, Object> ticket = soporte.crearTicket(null, categoriaId, pedidoId,
+        // Sin producto asociado (script 50): la devolución puede traer varios
+        // ítems; el detalle por producto vive en devolucion_detalle
+        Map<String, Object> ticket = soporte.crearTicket(null, categoriaId, pedidoId, null,
                 "Devolución " + numero + " del pedido " + ped.get("numero"),
                 (descripcion == null || descripcion.isBlank()
                         ? "Solicitud de devolución" : descripcion.trim())
@@ -664,6 +666,32 @@ public class DevolucionService {
                 SET estado = 'reembolsada', monto_reembolsado = ?, metodo_reembolso = ?,
                     fecha_reembolso = now()
                 WHERE id = ?""", monto, metodo, id);
+        // Registro transaccional del reembolso (OTD-LOG-10): la tabla `reembolso`
+        // es el asiento formal (monto, referencias, fecha); la VÍA sigue viviendo
+        // en devolucion.metodo_reembolso (reembolso no tiene columna de método),
+        // por eso las columnas de devolucion se CONSERVAN, no son redundancia.
+        Map<String, Object> devolucion = pg.queryForMap("""
+                SELECT d.numero, d.pedido_id, md.nombre AS motivo
+                FROM devolucion d
+                JOIN motivo_devolucion md ON md.id = d.motivo_devolucion_id
+                WHERE d.id = ?""", id);
+        List<Long> pagos = pg.queryForList("""
+                SELECT id FROM pago
+                WHERE pedido_id = ? AND estado = 'completado'
+                ORDER BY fecha_pago DESC NULLS LAST, id DESC LIMIT 1""",
+                Long.class, ((Number) devolucion.get("pedido_id")).longValue());
+        if (pagos.isEmpty()) {
+            throw new IllegalStateException("El pedido de la devolución no tiene un pago "
+                    + "completado registrado; no se puede asentar el reembolso");
+        }
+        pg.update("""
+                INSERT INTO reembolso (pago_id, devolucion_id, monto, motivo, estado,
+                                       referencia_externa, fecha_procesado)
+                VALUES (?, ?, ?, ?, 'procesado', NULLIF(?, ''), now())""",
+                pagos.get(0), id, monto,
+                "Devolución " + devolucion.get("numero") + " — " + devolucion.get("motivo")
+                        + " · vía " + metodo,
+                referencia == null ? "" : referencia.trim());
         historial(id, "reembolsada", "Reembolso procesado (simulado) por $" + monto
                 + " vía " + metodo
                 + (referencia != null && !referencia.isBlank() ? " · ref. " + referencia.trim() : ""));

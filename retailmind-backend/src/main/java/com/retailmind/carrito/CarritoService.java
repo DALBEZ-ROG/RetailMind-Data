@@ -205,6 +205,31 @@ public class CarritoService {
         String autorizacion = "SIM-" + siglasAleatorias();
         if ("tarjeta".equals(tipoMetodo)) {
             referencia = validarTarjeta(req.tarjeta());   // "VISA ****1234"
+
+            // Pasarela SIMULADA (OTD-VEN-12, script 52): rechazo DETERMINISTA
+            // por número de prueba (ver motivoRechazoSimulado). El intento se
+            // registra en su PROPIA transacción (REQUIRES_NEW) y LUEGO se
+            // lanza el error: el rastro sobrevive y todo lo demás se revierte
+            // — aquí aún no se creó pedido, ni movió stock, ni facturó nada.
+            String numeroLimpio = req.tarjeta().numero().replaceAll("[\\s-]", "");
+            String motivoRechazo = motivoRechazoSimulado(numeroLimpio);
+            if (motivoRechazo != null) {
+                // Monto que se estaba cobrando: subtotal del carrito (sin
+                // promos/cupón, que se calculan recién al crear el pedido)
+                BigDecimal montoIntento = BigDecimal.ZERO;
+                for (Map<String, Object> it : items) {
+                    montoIntento = montoIntento.add(
+                            ((BigDecimal) it.get("precio_unitario"))
+                                    .multiply(BigDecimal.valueOf(
+                                            ((Number) it.get("cantidad")).intValue())));
+                }
+                ventas.registrarIntentoPagoFallido(principal.getClienteId(),
+                        req.metodoPagoId(), montoIntento, referencia,
+                        motivoRechazo, carritoId);
+                throw new IllegalStateException("Pago rechazado: " + motivoRechazo
+                        + ". Tu carrito sigue intacto: verifica los datos o intenta"
+                        + " con otra tarjeta.");
+            }
             detalleJson = "{\"simulado\": true, \"tipo\": \"tarjeta\", \"referencia\": \""
                     + referencia + "\"}";
         } else {
@@ -315,6 +340,28 @@ public class CarritoService {
             throw new IllegalArgumentException("El CVV debe tener 3 o 4 digitos");
         }
         return marcaDe(numero) + " ****" + numero.substring(numero.length() - 4);
+    }
+
+    /**
+     * Condiciones de rechazo de la pasarela SIMULADA (OTD-VEN-12):
+     * DETERMINISTAS y reproducibles para poder demostrar el informe de
+     * intentos fallidos — nunca aleatorias. Con formato válido (16 dígitos),
+     * el número de prueba decide por sus ÚLTIMOS 4 dígitos:
+     *
+     *   ····0002 → "Tarjeta rechazada por el emisor"      (ej. 4000000000000002)
+     *   ····9995 → "Fondos insuficientes"                 (ej. 4000000000009995)
+     *   ····9987 → "Tarjeta reportada como perdida o robada" (ej. 4000000000009987)
+     *
+     * Cualquier otro número con formato válido se APRUEBA. Los errores de
+     * FORMATO (dígitos, MM/AA, CVV) no llegan a la pasarela: son validación
+     * previa (validarTarjeta) y no se registran como intento — decisión
+     * documentada: el intento fallido es el que la pasarela rechaza.
+     */
+    private static String motivoRechazoSimulado(String numero) {
+        if (numero.endsWith("0002")) return "Tarjeta rechazada por el emisor";
+        if (numero.endsWith("9995")) return "Fondos insuficientes";
+        if (numero.endsWith("9987")) return "Tarjeta reportada como perdida o robada";
+        return null;
     }
 
     private static String marcaDe(String numero) {

@@ -79,7 +79,8 @@ public class ReferenciasService {
     public List<Map<String, Object>> stock(Long varianteId, Long bodegaId) {
         StringBuilder sql = new StringBuilder("""
                 SELECT i.producto_variante_id, pv.sku, pr.nombre AS producto,
-                       i.bodega_id, b.nombre AS bodega, i.stock_actual
+                       i.bodega_id, b.nombre AS bodega, i.stock_actual,
+                       i.stock_minimo, i.stock_maximo
                 FROM inventario i
                 JOIN producto_variante pv ON pv.id = i.producto_variante_id
                 JOIN producto pr ON pr.id = pv.producto_id

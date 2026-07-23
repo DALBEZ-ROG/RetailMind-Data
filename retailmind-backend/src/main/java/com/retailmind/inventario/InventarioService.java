@@ -74,6 +74,42 @@ public class InventarioService {
                 ORDER BY t.id DESC""");
     }
 
+    // ── Niveles mín/máx de existencias (cierre de brechas OTD-INV-08) ────
+
+    /**
+     * Fija stock_minimo y stock_maximo del registro de inventario de una
+     * variante en una bodega (BODEGA/ADMIN). El máximo es opcional (null =
+     * sin tope definido, como las filas históricas); si se informa debe ser
+     * mayor que el mínimo. No toca stock_actual: eso es del kardex.
+     */
+    @Transactional
+    public Map<String, Object> actualizarNiveles(long varianteId, long bodegaId,
+                                                 int stockMinimo, Integer stockMaximo) {
+        if (stockMinimo < 0) {
+            throw new IllegalArgumentException("El stock mínimo no puede ser negativo");
+        }
+        if (stockMaximo != null && stockMaximo <= stockMinimo) {
+            throw new IllegalArgumentException("El stock máximo (" + stockMaximo
+                    + ") debe ser mayor que el stock mínimo (" + stockMinimo + ")");
+        }
+        int filas = pg.update("""
+                UPDATE inventario SET stock_minimo = ?, stock_maximo = ?::int
+                WHERE producto_variante_id = ? AND bodega_id = ?""",
+                stockMinimo, stockMaximo, varianteId, bodegaId);
+        if (filas == 0) {
+            throw new NoSuchElementException(
+                    "No existe registro de inventario para esa variante en esa bodega");
+        }
+        return pg.queryForMap("""
+                SELECT i.producto_variante_id, pv.sku, i.bodega_id, b.nombre AS bodega,
+                       i.stock_actual, i.stock_minimo, i.stock_maximo
+                FROM inventario i
+                JOIN producto_variante pv ON pv.id = i.producto_variante_id
+                JOIN bodega b ON b.id = i.bodega_id
+                WHERE i.producto_variante_id = ? AND i.bodega_id = ?""",
+                varianteId, bodegaId);
+    }
+
     // ── Ajuste de inventario (CU-O-16) ───────────────────────────────────
 
     /**

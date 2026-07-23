@@ -1,0 +1,192 @@
+<div class="op-page">
+  <div class="section-header">
+    <h2><mat-icon>storefront</mat-icon> Proveedores</h2>
+    <p>Ficha del proveedor y su catálogo: qué productos ofrece, a qué costo y en qué plazo.
+      La recepción de mercancía actualiza el costo automáticamente.</p>
+  </div>
+
+  <div class="op-card">
+    <h3><mat-icon>list</mat-icon> Proveedores ({{ proveedores.length }})</h3>
+    <div class="table-wrapper" *ngIf="proveedores.length; else vacio">
+      <table mat-table [dataSource]="proveedores">
+        <ng-container matColumnDef="proveedor">
+          <th mat-header-cell *matHeaderCellDef>Proveedor</th>
+          <td mat-cell *matCellDef="let p">
+            <strong>{{ nombreDe(p) }}</strong>
+            <div style="font-size: 11px; opacity: 0.7;">{{ p.razon_social }} · RUC {{ p.ruc }}</div>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="contacto">
+          <th mat-header-cell *matHeaderCellDef>Contacto</th>
+          <td mat-cell *matCellDef="let p">
+            {{ p.email || '—' }}
+            <div style="font-size: 11px; opacity: 0.7;">{{ p.telefono || '' }}</div>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="credito">
+          <th mat-header-cell *matHeaderCellDef>Crédito</th>
+          <td mat-cell *matCellDef="let p">{{ p.dias_credito }} días</td>
+        </ng-container>
+        <ng-container matColumnDef="productos">
+          <th mat-header-cell *matHeaderCellDef>Productos</th>
+          <td mat-cell *matCellDef="let p">
+            <span class="stat-chip chip-info">{{ p.productos }}</span>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="acciones">
+          <th mat-header-cell *matHeaderCellDef>Acciones</th>
+          <td mat-cell *matCellDef="let p">
+            <button mat-icon-button matTooltip="Ver productos que ofrece" (click)="ver(p)">
+              <mat-icon>inventory_2</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="columnasProveedor"></tr>
+        <tr mat-row *matRowDef="let p; columns: columnasProveedor"
+            [class.fila-seleccionada]="seleccionado?.id === p.id"></tr>
+      </table>
+    </div>
+    <ng-template #vacio>
+      <div class="empty-state" *ngIf="!loading">
+        <mat-icon>storefront</mat-icon>
+        <p>No hay proveedores registrados.</p>
+      </div>
+    </ng-template>
+  </div>
+
+  <!-- Productos que ofrece el proveedor seleccionado -->
+  <div class="op-card" *ngIf="seleccionado">
+    <h3>
+      <mat-icon>inventory_2</mat-icon> Productos que ofrece «{{ nombreDe(seleccionado) }}»
+      ({{ productos.length }})
+      <button mat-icon-button matTooltip="Cerrar ficha" style="float: right;"
+              (click)="seleccionado = null">
+        <mat-icon>close</mat-icon>
+      </button>
+    </h3>
+
+    <div class="form-actions" *ngIf="puedeEditar">
+      <button class="btn-aplicar" (click)="showForm ? showForm = false : nuevo()">
+        <mat-icon>{{ showForm ? 'close' : 'add' }}</mat-icon>
+        {{ showForm ? 'Cancelar' : 'Asociar Producto' }}
+      </button>
+      <button class="btn-limpiar" (click)="ver(seleccionado)">
+        <mat-icon>refresh</mat-icon> Actualizar
+      </button>
+    </div>
+
+    <div *ngIf="showForm && puedeEditar" style="margin-top: 20px;">
+      <h3 *ngIf="editandoId !== null"><mat-icon>edit</mat-icon> Editando condiciones</h3>
+      <div class="form-grid">
+        <mat-form-field appearance="outline" style="grid-column: 1 / -1;">
+          <mat-label>Producto (variante)</mat-label>
+          <input matInput [(ngModel)]="productoBusqueda"
+                 (ngModelChange)="buscarProducto($event)"
+                 [matAutocomplete]="autoProducto"
+                 [disabled]="editandoId !== null"
+                 placeholder="Busca por nombre o SKU…">
+          <mat-autocomplete #autoProducto="matAutocomplete" [displayWith]="nombreProducto"
+                            (optionSelected)="productoElegido($event.option.value)">
+            <mat-option *ngFor="let p of productosRef" [value]="p">
+              {{ p.nombre }} <span style="font-size: 11px; opacity: 0.7;">({{ p.sku }})</span>
+            </mat-option>
+          </mat-autocomplete>
+          <mat-hint>{{ editandoId !== null ? 'El producto no se cambia al editar'
+            : (form.productoVarianteId ? 'Producto seleccionado' : 'Escribe al menos 2 letras') }}</mat-hint>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Costo (USD)</mat-label>
+          <input matInput type="number" min="0" step="0.01" [(ngModel)]="form.costo">
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Plazo de entrega (días)</mat-label>
+          <input matInput type="number" min="0" [(ngModel)]="form.tiempoEntregaDias">
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Cantidad mínima</mat-label>
+          <input matInput type="number" min="1" [(ngModel)]="form.cantidadMinima">
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Código del proveedor (opcional)</mat-label>
+          <input matInput [(ngModel)]="form.codigoProveedor" maxlength="50">
+        </mat-form-field>
+        <mat-checkbox [(ngModel)]="form.esPreferido" style="align-self: center;">
+          Proveedor preferido para este producto (solo uno por producto)
+        </mat-checkbox>
+      </div>
+      <div class="form-actions">
+        <button class="btn-aplicar" (click)="guardar()">
+          <mat-icon>save</mat-icon> {{ editandoId === null ? 'Asociar' : 'Guardar Cambios' }}
+        </button>
+      </div>
+    </div>
+
+    <div class="table-wrapper" *ngIf="productos.length; else sinProductos">
+      <table mat-table [dataSource]="productos">
+        <ng-container matColumnDef="producto">
+          <th mat-header-cell *matHeaderCellDef>Producto</th>
+          <td mat-cell *matCellDef="let pp">
+            <strong>{{ pp.producto }}</strong>
+            <div style="font-size: 11px; opacity: 0.7;">
+              {{ pp.sku }}<span *ngIf="pp.codigo_proveedor"> · cód. prov. {{ pp.codigo_proveedor }}</span>
+            </div>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="costo">
+          <th mat-header-cell *matHeaderCellDef>Costo</th>
+          <td mat-cell *matCellDef="let pp"><strong>{{ pp.costo | currency:'USD' }}</strong></td>
+        </ng-container>
+        <ng-container matColumnDef="plazo">
+          <th mat-header-cell *matHeaderCellDef>Plazo</th>
+          <td mat-cell *matCellDef="let pp">
+            {{ pp.tiempo_entrega_dias !== null ? pp.tiempo_entrega_dias + ' días' : '—' }}
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="minimo">
+          <th mat-header-cell *matHeaderCellDef>Mínimo</th>
+          <td mat-cell *matCellDef="let pp">{{ pp.cantidad_minima }}</td>
+        </ng-container>
+        <ng-container matColumnDef="preferido">
+          <th mat-header-cell *matHeaderCellDef>Preferido</th>
+          <td mat-cell *matCellDef="let pp">
+            <span class="stat-chip" [class.chip-info]="pp.es_preferido" *ngIf="pp.es_preferido"
+                  matTooltip="Proveedor preferido para este producto">
+              <mat-icon style="font-size: 13px; height: 13px; width: 13px;">star</mat-icon> preferido
+            </span>
+            <span *ngIf="!pp.es_preferido" style="opacity: 0.5;">—</span>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="activo">
+          <th mat-header-cell *matHeaderCellDef>Activo</th>
+          <td mat-cell *matCellDef="let pp">
+            <span class="estado-chip" [class.ok]="pp.activo" [class.error]="!pp.activo">
+              {{ pp.activo ? 'Activo' : 'Inactivo' }}
+            </span>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="acciones">
+          <th mat-header-cell *matHeaderCellDef>Acciones</th>
+          <td mat-cell *matCellDef="let pp">
+            <ng-container *ngIf="puedeEditar">
+              <button mat-icon-button matTooltip="Editar condiciones" (click)="editar(pp)">
+                <mat-icon>edit</mat-icon>
+              </button>
+              <button mat-icon-button matTooltip="Activar / desactivar" (click)="toggleActivo(pp)">
+                <mat-icon>{{ pp.activo ? 'toggle_on' : 'toggle_off' }}</mat-icon>
+              </button>
+            </ng-container>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="columnasProducto"></tr>
+        <tr mat-row *matRowDef="let pp; columns: columnasProducto"></tr>
+      </table>
+    </div>
+    <ng-template #sinProductos>
+      <div class="empty-state">
+        <mat-icon>inventory_2</mat-icon>
+        <p>Este proveedor aún no tiene productos asociados.
+          {{ puedeEditar ? 'Asócialos aquí o recibe una orden de compra (se registran solos).' : '' }}</p>
+      </div>
+    </ng-template>
+  </div>
+</div>

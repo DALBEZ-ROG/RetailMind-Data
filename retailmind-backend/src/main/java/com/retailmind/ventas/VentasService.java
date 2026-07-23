@@ -11,6 +11,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.retailmind.auditoria.AuditoriaService;
@@ -189,6 +190,73 @@ public class VentasService {
                 + a.get("zona") + ": " + a.get("transportista") + " — " + a.get("metodo")
                 + " (" + a.get("dias_entrega_min") + "-" + a.get("dias_entrega_max")
                 + " días hábiles)");
+    }
+
+    /**
+     * Peso total del envío: Σ producto_variante.peso_kg × cantidad de las
+     * líneas del pedido. TODO-O-NADA: si alguna línea no tiene peso (> 0)
+     * devuelve null — un total parcial distorsionaría el costo por kg en
+     * silencio; null = «peso desconocido» y el costo aplica solo costo_base.
+     * (Cobertura verificada vía MCP 2026-07-22: peso_kg está NULL en las
+     * 1221 variantes, así que hoy todo envío nace con peso NULL; el cálculo
+     * queda listo para cuando el catálogo capture pesos. grp_despacho lee
+     * SOLO id y peso_kg de producto_variante — script 47.)
+     */
+    private BigDecimal pesoTotalPedido(long pedidoId) {
+        return pg.queryForObject("""
+                SELECT CASE WHEN COUNT(*) > 0 AND COUNT(*) FILTER
+                            (WHERE pv.peso_kg IS NULL OR pv.peso_kg <= 0) = 0
+                       THEN SUM(pv.peso_kg * pd.cantidad) END
+                FROM pedido_detalle pd
+                JOIN producto_variante pv ON pv.id = pd.producto_variante_id
+                WHERE pd.pedido_id = ?""", BigDecimal.class, pedidoId);
+    }
+
+    /**
+     * Costo REAL del envío (OTD-LOG-11): tarifa activa de la zona de la
+     * dirección del pedido — misma cadena ciudad > provincia > país que la
+     * asignación de transportista — para el MÉTODO con el que se despacha
+     * (el asignado por zona o el override de despacho). Con peso conocido el
+     * costo es costo_base + costo_por_kg × peso; con peso desconocido
+     * (pesoTotalKg null) aplica solo costo_base, el comportamiento previo.
+     * Sin dirección, zona o tarifa aplicable devuelve
+     * 0.00 EXPLÍCITO (queda auditado en log_auditoria como costo_envio 0):
+     * se prefiere un cero visible en el informe táctico a inventar un costo.
+     */
+    private BigDecimal costoEnvioPorTarifa(long pedidoId, long metodoEnvioId,
+                                           BigDecimal pesoTotalKg) {
+        List<Map<String, Object>> tarifas = pg.queryForList("""
+                WITH dir AS (
+                    SELECT ci.id AS ciudad_id, ci.provincia_id, pr.pais_id
+                    FROM pedido p
+                    JOIN direccion d ON d.id = COALESCE(p.direccion_envio_id,
+                          (SELECT d2.id FROM direccion d2
+                           JOIN cliente c ON c.usuario_id = d2.usuario_id
+                           WHERE c.id = p.cliente_id AND d2.activo
+                           ORDER BY d2.es_predeterminada DESC, d2.id LIMIT 1))
+                    JOIN ciudad ci ON ci.id = d.ciudad_id
+                    JOIN provincia pr ON pr.id = ci.provincia_id
+                    WHERE p.id = ?
+                )
+                SELECT tf.costo_base, tf.costo_por_kg
+                FROM dir
+                JOIN zona_envio z ON z.activo AND z.pais_id = dir.pais_id
+                     AND (z.provincia_id IS NULL OR z.provincia_id = dir.provincia_id)
+                     AND (z.ciudad_id IS NULL OR z.ciudad_id = dir.ciudad_id)
+                JOIN tarifa_envio tf ON tf.zona_envio_id = z.id AND tf.activo
+                     AND tf.metodo_envio_id = ?
+                ORDER BY (z.ciudad_id IS NOT NULL) DESC,
+                         (z.provincia_id IS NOT NULL) DESC, tf.costo_base
+                LIMIT 1""", pedidoId, metodoEnvioId);
+        if (tarifas.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal base = (BigDecimal) tarifas.get(0).get("costo_base");
+        BigDecimal porKg = (BigDecimal) tarifas.get(0).get("costo_por_kg");
+        if (pesoTotalKg == null || porKg == null || porKg.signum() == 0) {
+            return base;
+        }
+        return base.add(porKg.multiply(pesoTotalKg)).setScale(2, RoundingMode.HALF_UP);
     }
 
     @Transactional(readOnly = true)
@@ -457,6 +525,31 @@ public class VentasService {
         Map<String, Object> factura = emitirFactura(pedidoId, true);
         return Map.of("pagoId", pagoId, "monto", total, "metodo", metodos.get(0),
                 "facturaId", factura.get("id"), "facturaNumero", factura.get("numero"));
+    }
+
+    /**
+     * Rastro de un intento de cobro RECHAZADO por la pasarela simulada
+     * (OTD-VEN-12, script 52): pago 'fallido' SIN pedido (el checkout es una
+     * sola transacción y al rechazar no se crea pedido, ni stock, ni factura)
+     * + transaccion_pago 'autorizacion'/'fallida' con el motivo y el contexto
+     * (cliente, carrito) en respuesta_pasarela.
+     *
+     * REQUIRES_NEW: corre en su PROPIA transacción (PgSessionRoleAspect asume
+     * grp_cliente también en ella) y se confirma ANTES de que el checkout
+     * propague el error y revierta todo lo demás. La función SECURITY DEFINER
+     * existe porque pol_cliente_pago exige pedido propio y aquí no hay pedido.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public long registrarIntentoPagoFallido(long clienteId, long metodoPagoId,
+                                            BigDecimal monto, String referencia,
+                                            String motivo, long carritoId) {
+        Long id = pg.queryForObject(
+                "SELECT fn_registrar_intento_pago_fallido(?, ?, ?, ?, ?, ?)",
+                Long.class, clienteId, metodoPagoId, monto, referencia, motivo, carritoId);
+        if (id == null) {
+            throw new IllegalStateException("No se pudo registrar el intento de pago fallido");
+        }
+        return id;
     }
 
     /** Suma de pagos completados del pedido. */
@@ -816,21 +909,26 @@ public class VentasService {
 
         String numero = siguienteNumero("EN");
         String guia = "GUIA-" + numero.substring(3);
+        BigDecimal pesoTotal = pesoTotalPedido(pedidoId);
+        BigDecimal costoEnvio = costoEnvioPorTarifa(pedidoId, metodoFinal, pesoTotal);
         // despachado_por = autor del JWT (trazabilidad, script 42)
         Long envioId = pg.queryForObject("""
                 INSERT INTO envio (numero, pedido_id, transportista_id, metodo_envio_id,
-                                   bodega_id, direccion_entrega, numero_guia, estado,
-                                   fecha_despacho, fecha_entrega_estimada, despachado_por)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 'en_transito', now(),
+                                   bodega_id, direccion_entrega, numero_guia, estado, costo,
+                                   peso_total_kg, fecha_despacho, fecha_entrega_estimada,
+                                   despachado_por)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'en_transito', ?, ?::numeric, now(),
                         current_date + COALESCE((SELECT dias_entrega_max FROM metodo_envio
                                                  WHERE id = ?), 3)::int, ?)
                 RETURNING id""",
                 Long.class, numero, pedidoId, transportistaFinal, metodoFinal,
-                bodegaId, direccion, guia, metodoFinal, usuarioActualId());
+                bodegaId, direccion, guia, costoEnvio, pesoTotal, metodoFinal,
+                usuarioActualId());
         auditoria.registrar("envio", envioId, "INSERT",
                 Map.of("estado_pedido", "preparado"),
                 Map.of("pedido_id", pedidoId, "numero_guia", guia,
                        "transportista_id", transportistaFinal,
+                       "costo_envio", costoEnvio,
                        "estado_pedido", "despachado"));
 
         pg.update("""

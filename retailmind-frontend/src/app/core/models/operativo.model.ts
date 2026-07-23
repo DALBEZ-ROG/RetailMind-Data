@@ -10,6 +10,7 @@ export interface VarianteRef    { id: number; sku: string; producto: string; pre
 export interface StockRow {
   producto_variante_id: number; sku: string; producto: string;
   bodega_id: number; bodega: string; stock_actual: number;
+  stock_minimo: number; stock_maximo: number | null;
 }
 
 // ── Catálogo admin ───────────────────────────────────────────────────────
@@ -277,6 +278,30 @@ export interface SuscriptorRow {
   confirmado: boolean; fecha_suscripcion: string; fecha_baja: string | null; activo: boolean;
 }
 
+// ── Catálogo proveedor-producto (OTD-COM-10, script 51) ──────────────────
+export interface ProveedorFichaRow {
+  id: number; ruc: string; razon_social: string; nombre_comercial: string | null;
+  email: string | null; telefono: string | null; dias_credito: number;
+  activo: boolean; productos: number;
+}
+export interface ProductoProveedorRow {
+  id: number; producto_variante_id: number; producto: string; sku: string;
+  codigo_proveedor: string | null; costo: number; tiempo_entrega_dias: number | null;
+  cantidad_minima: number; es_preferido: boolean; activo: boolean;
+  fecha_creacion: string; fecha_actualizacion: string | null;
+}
+/** Resultado del buscador de producto para asociar (id = variante). */
+export interface ProductoCompraRef { id: number; nombre: string; sku: string; }
+
+// ── Gerencia: metas de venta (OTD-VEN-15, script 48) ─────────────────────
+export interface MetaVentaRow {
+  id: number; anio: number; mes: number; departamento: string;
+  monto_meta: number; notas: string | null; activo: boolean;
+  fecha_creacion: string; fecha_actualizacion: string | null;
+  fijada_por: string | null;
+  venta_real: number | null; // solo metas 'general'/'ventas' (facturado del mes)
+}
+
 // ── Soporte ──────────────────────────────────────────────────────────────
 export interface CategoriaTicketRow {
   id: number; nombre: string; descripcion: string | null; activo: boolean;
@@ -292,7 +317,8 @@ export interface TicketRow {
   cliente_id?: number; cliente?: string | null;
   asignado_usuario_id?: number | null; asignado?: string | null;
   asignado_a_mi?: boolean;
-  sla_vence?: string; sla_vencido?: boolean; // SLA por prioridad (2/4/24/72 h)
+  // SLA persistido en BD (script 49): ticket_soporte.fecha_limite
+  fecha_limite?: string; sla_vencido?: boolean;
 }
 export interface MensajeTicketRow {
   id: number; mensaje: string; fecha_creacion: string; de_cliente: boolean;
@@ -304,13 +330,17 @@ export interface TicketDetalle {
   fecha_creacion: string; fecha_cierre: string | null; categoria: string | null;
   cliente_id?: number; cliente?: string | null;
   asignado_usuario_id?: number | null; asignado?: string | null;
-  sla_vence?: string; sla_vencido?: boolean;
+  fecha_limite?: string; sla_vencido?: boolean; // columna de BD (script 49)
+  // Producto del reclamo (script 50, opcional)
+  producto_variante_id?: number | null; producto?: string | null;
   mensajes: MensajeTicketRow[];
 }
 export interface UsuarioSoporteRef { id: number; nombre: string; rol: string; }
 export interface PedidoSoporteRef {
   id: number; numero: string; total: number; fecha_pedido: string; estado: string;
 }
+/** Resultado del buscador de producto del ticket (script 50; id = variante). */
+export interface ProductoTicketRef { id: number; nombre: string; sku: string; }
 export interface FaqRow {
   id: number; categoria_ticket_id: number | null; categoria: string | null;
   pregunta: string; respuesta: string; orden: number; activo: boolean; fecha_creacion: string;

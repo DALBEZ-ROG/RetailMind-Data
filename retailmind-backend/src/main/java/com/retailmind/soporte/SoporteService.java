@@ -38,15 +38,18 @@ public class SoporteService {
     private static final Set<String> PRIORIDADES = Set.of("baja", "media", "alta", "urgente");
 
     /**
-     * SLA básico: horas máximas para la primera respuesta según prioridad.
-     * Documentado: urgente=2h, alta=4h, media=24h, baja=72h. El vencimiento se
-     * calcula en SQL (fecha_creacion + intervalo) y solo es indicador visual.
+     * SLA: horas máximas de atención según prioridad (urgente=2h, alta=4h,
+     * media=24h, baja=72h). ÚNICO punto con el mapeo prioridad→horas
+     * (parametrizado con ?): desde el script 49 el vencimiento ya no se
+     * calcula al vuelo — se PERSISTE en ticket_soporte.fecha_limite al crear
+     * el ticket y se RECALCULA al cambiar la prioridad; las consultas leen la
+     * columna (OTD-SOP-02: plazo consultable para medir cumplimiento).
      */
     private static final String SLA_SQL = """
-            CASE t.prioridad WHEN 'urgente' THEN interval '2 hours'
-                             WHEN 'alta'    THEN interval '4 hours'
-                             WHEN 'media'   THEN interval '24 hours'
-                             ELSE                interval '72 hours' END""";
+            CASE ? WHEN 'urgente' THEN interval '2 hours'
+                   WHEN 'alta'    THEN interval '4 hours'
+                   WHEN 'media'   THEN interval '24 hours'
+                   ELSE                interval '72 hours' END""";
 
     /** Transiciones válidas del ciclo de vida del ticket; cerrado es terminal. */
     private static final Map<String, Set<String>> TRANSICIONES = Map.of(
@@ -155,9 +158,8 @@ public class SoporteService {
                         AND t.asignado_usuario_id = ?::bigint) AS asignado_a_mi,
                        (SELECT count(*) FROM mensaje_ticket m
                         WHERE m.ticket_soporte_id = t.id) AS mensajes,
-                       t.fecha_creacion + """ + SLA_SQL + """
-                        AS sla_vence,
-                       (now() > t.fecha_creacion + """ + SLA_SQL + """
+                       t.fecha_limite,
+                       (now() > t.fecha_limite
                         AND t.estado NOT IN ('resuelto', 'cerrado')) AS sla_vencido
                 FROM ticket_soporte t
                 LEFT JOIN categoria_ticket ct ON ct.id = t.categoria_ticket_id
@@ -181,7 +183,8 @@ public class SoporteService {
      */
     @Transactional
     public Map<String, Object> crearTicket(Long clienteId, Long categoriaId, Long pedidoId,
-                                           String asunto, String descripcion) {
+                                           Long productoVarianteId, String asunto,
+                                           String descripcion) {
         exigirTexto(asunto, "El asunto del ticket es requerido");
 
         long duenio;
@@ -218,6 +221,18 @@ public class SoporteService {
                         "El pedido no existe o no pertenece al cliente del ticket");
             }
         }
+        if (productoVarianteId != null) {
+            // Opcional (script 50): si viene, debe existir. Se admite variante
+            // inactiva a propósito: el reclamo puede ser de un producto ya
+            // retirado del catálogo que el cliente compró en su momento.
+            Integer existe = pg.queryForObject(
+                    "SELECT count(*) FROM producto_variante WHERE id = ?",
+                    Integer.class, productoVarianteId);
+            if (existe == null || existe == 0) {
+                throw new IllegalArgumentException(
+                        "No existe el producto indicado en el ticket");
+            }
+        }
         // Prioridad automática según la categoría (sin categoría → media)
         String prio = "media";
         if (categoriaId != null) {
@@ -231,12 +246,16 @@ public class SoporteService {
         // fila: dos creaciones simultáneas se serializan sin chocar.
         String numero = pg.queryForObject(
                 "SELECT fn_siguiente_numero_ticket()", String.class);
+        // fecha_limite = fecha_creacion + horas(prioridad): now() es estable en
+        // la transacción, así que coincide con el default de fecha_creacion
         long id = idDe(pg.queryForObject("""
                 INSERT INTO ticket_soporte (numero, cliente_id, categoria_ticket_id, pedido_id,
-                                            asunto, descripcion, prioridad)
-                VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id""",
-                Long.class, numero, duenio, categoriaId, pedidoId, asunto.trim(),
-                descripcion, prio));
+                                            producto_variante_id, asunto, descripcion,
+                                            prioridad, fecha_limite)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, now() + """ + SLA_SQL + """
+                ) RETURNING id""",
+                Long.class, numero, duenio, categoriaId, pedidoId, productoVarianteId,
+                asunto.trim(), descripcion, prio, prio));
         return Map.of("id", id, "numero", numero, "prioridad", prio);
     }
 
@@ -247,7 +266,10 @@ public class SoporteService {
             List<Map<String, Object>> filas = pg.queryForList("""
                     SELECT t.id, t.numero, t.asunto, t.descripcion, t.prioridad, t.estado,
                            t.pedido_id, t.fecha_creacion, t.fecha_cierre,
-                           ct.nombre AS categoria
+                           ct.nombre AS categoria, t.producto_variante_id,
+                           (SELECT p.nombre FROM producto_variante pv
+                            JOIN producto p ON p.id = pv.producto_id
+                            WHERE pv.id = t.producto_variante_id) AS producto
                     FROM ticket_soporte t
                     LEFT JOIN categoria_ticket ct ON ct.id = t.categoria_ticket_id
                     WHERE t.id = ? AND t.cliente_id = ?""", id, clienteActualId());
@@ -270,11 +292,14 @@ public class SoporteService {
                 SELECT t.id, t.numero, t.asunto, t.descripcion, t.prioridad, t.estado,
                        t.pedido_id, t.fecha_creacion, t.fecha_cierre,
                        ct.nombre AS categoria, t.cliente_id, c.nombre AS cliente,
+                       t.producto_variante_id,
+                       (SELECT p.nombre FROM producto_variante pv
+                        JOIN producto p ON p.id = pv.producto_id
+                        WHERE pv.id = t.producto_variante_id) AS producto,
                        t.asignado_usuario_id,
                        trim(concat(u.nombre, ' ', COALESCE(u.apellido, ''))) AS asignado,
-                       t.fecha_creacion + """ + SLA_SQL + """
-                        AS sla_vence,
-                       (now() > t.fecha_creacion + """ + SLA_SQL + """
+                       t.fecha_limite,
+                       (now() > t.fecha_limite
                         AND t.estado NOT IN ('resuelto', 'cerrado')) AS sla_vencido
                 FROM ticket_soporte t
                 LEFT JOIN categoria_ticket ct ON ct.id = t.categoria_ticket_id
@@ -361,9 +386,13 @@ public class SoporteService {
         if ("cerrado".equals(estado)) {
             throw new IllegalStateException("Un ticket cerrado no admite cambios de prioridad");
         }
-        int filas = pg.update(
-                "UPDATE ticket_soporte SET prioridad = ? WHERE id = ? AND prioridad <> ?",
-                prioridad, id, prioridad);
+        // El cambio de prioridad recalcula el SLA sobre la fecha de creación
+        // (misma regla del alta): la fecha límite queda consultable (script 49)
+        int filas = pg.update("""
+                UPDATE ticket_soporte
+                SET prioridad = ?, fecha_limite = fecha_creacion + """ + SLA_SQL + """
+                WHERE id = ? AND prioridad <> ?""",
+                prioridad, prioridad, id, prioridad);
         if (filas == 0) {
             throw new IllegalStateException("El ticket ya tiene prioridad '" + prioridad + "'");
         }
@@ -444,6 +473,28 @@ public class SoporteService {
                 JOIN estado_pedido ep ON ep.id = p.estado_pedido_id
                 WHERE p.cliente_id = ?
                 ORDER BY p.fecha_pedido DESC, p.id DESC""", duenio);
+    }
+
+    /**
+     * Buscador del selector "producto relacionado" del ticket (script 50):
+     * búsqueda en servidor por nombre o SKU (el catálogo tiene ~1.221
+     * variantes; no se carga completo). Mínimo 2 caracteres, tope 20 filas.
+     * grp_soporte busca con sus grants de columna sin dinero (script 50).
+     */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> buscarProductosRef(String q) {
+        String filtro = q == null ? "" : q.trim();
+        if (filtro.length() < 2) {
+            return List.of();
+        }
+        return pg.queryForList("""
+                SELECT pv.id, p.nombre, pv.sku
+                FROM producto_variante pv
+                JOIN producto p ON p.id = pv.producto_id
+                WHERE pv.activo AND p.activo
+                  AND (p.nombre ILIKE '%' || ? || '%' OR pv.sku ILIKE '%' || ? || '%')
+                ORDER BY p.nombre, pv.sku
+                LIMIT 20""", filtro, filtro);
     }
 
     /** Personal interno activo para el selector de asignación. */
