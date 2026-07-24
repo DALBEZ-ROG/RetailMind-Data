@@ -59,6 +59,7 @@ public class MetasVentaService {
                        m.activo, m.fecha_creacion, m.fecha_actualizacion,
                        trim(concat(u.nombre, ' ', COALESCE(u.apellido, ''))) AS fijada_por,
                        """ + VENTA_REAL_SQL + """
+
                 FROM meta_venta m
                 LEFT JOIN usuario u ON u.id = m.fijada_por
                 ORDER BY m.anio DESC, m.mes DESC, m.departamento""");
