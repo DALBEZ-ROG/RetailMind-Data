@@ -24,6 +24,7 @@ export type PermisoNav =
   | 'devoluciones'     // RMA / logística inversa (pipeline multi-rol)
   | 'marketing'        // cupones / promos / campañas / banners / newsletter
   | 'metas'            // metas de venta por período (OTD-VEN-15, script 48)
+  | 'accesos'          // intentos de acceso al sistema (OTD-GER-09, script 53)
   | 'tickets'          // tickets de soporte
   | 'categoriasTicket' // categorías de ticket
   | 'faq'              // preguntas frecuentes
@@ -53,6 +54,8 @@ export const ROLES_POR_PERMISO: Record<PermisoNav, readonly string[]> = {
   marketing:        ['ADMIN', 'GERENTE'],
   // Metas: fija gerencia; vendedor/analista leen el avance (script 48)
   metas:            ['ADMIN', 'GERENTE', 'VENDEDOR', 'ANALISTA'],
+  // Intentos de acceso (OTD-GER-09, script 53): informe solo Admin/Gerencia
+  accesos:          ['ADMIN', 'GERENTE'],
   // SOPORTE (9º rol, script 37): bandeja de tickets + FAQ; nada más
   tickets:          ['ADMIN', 'GERENTE', 'CLIENTE', 'SOPORTE'],
   categoriasTicket: ['ADMIN'],
@@ -281,7 +284,9 @@ export const DASHBOARD_AREAS: AreaNav[] = [
     gradiente: 'linear-gradient(135deg, #37474f, #78909c)',
     acciones: [
       { titulo: 'Horarios de Acceso', descripcion: 'Ventanas horarias por grupo de rol',
-        icono: 'schedule', ruta: '/operativo/horarios', permiso: 'admin' }
+        icono: 'schedule', ruta: '/operativo/horarios', permiso: 'admin' },
+      { titulo: 'Intentos de Acceso', descripcion: 'Quién intentó entrar y falló, desde dónde y por qué',
+        icono: 'login', ruta: '/operativo/seguridad/accesos', permiso: 'accesos' }
     ]
   },
   {

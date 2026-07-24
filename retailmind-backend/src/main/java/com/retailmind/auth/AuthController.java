@@ -22,6 +22,8 @@ import com.retailmind.dto.LoginRequestDTO;
 import com.retailmind.dto.LoginResponseDTO;
 import com.retailmind.dto.RefreshTokenRequestDTO;
 
+import jakarta.servlet.http.HttpServletRequest;
+
 /**
  * Autenticación y gestión de usuarios contra PostgreSQL.
  * El identificador de login es el EMAIL (el campo "username" del DTO se
@@ -45,14 +47,28 @@ public class AuthController {
 
     /** POST /api/auth/login */
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequestDTO request) {
+    public ResponseEntity<?> login(@RequestBody LoginRequestDTO request,
+                                   HttpServletRequest http) {
         try {
-            LoginResponseDTO response = authService.login(request);
+            LoginResponseDTO response = authService.login(request, ipCliente(http),
+                    http.getHeader("User-Agent"));
             return ResponseEntity.ok(response);
         } catch (Exception e) {
+            // Respuesta GENÉRICA e idéntica para todo fallo (correo inexistente,
+            // contraseña incorrecta, usuario inactivo, fuera de horario): el
+            // motivo detallado va a log_acceso, nunca al cliente.
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("error", "Credenciales incorrectas"));
         }
+    }
+
+    /** IP de origen del intento (respeta un proxy si lo hubiera; en dev = localhost). */
+    private static String ipCliente(HttpServletRequest http) {
+        String xff = http.getHeader("X-Forwarded-For");
+        if (xff != null && !xff.isBlank()) {
+            return xff.split(",")[0].trim();
+        }
+        return http.getRemoteAddr();
     }
 
     /** POST /api/auth/refresh */

@@ -138,6 +138,12 @@
         </a>
       </ng-container>
 
+      <!-- Intentos de acceso (OTD-GER-09, script 53): ADMIN/GERENTE -->
+      <a *ngIf="canAccesos" class="nav-item" routerLink="/operativo/seguridad/accesos" routerLinkActive="active">
+        <mat-icon>login</mat-icon>
+        <span>Intentos de Acceso</span>
+      </a>
+
       <ng-container *ngIf="canCompras">
         <a class="nav-item" routerLink="/operativo/compras/ordenes" routerLinkActive="active">
           <mat-icon>shopping_cart_checkout</mat-icon>

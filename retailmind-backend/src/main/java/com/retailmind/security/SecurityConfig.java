@@ -236,6 +236,11 @@ public class SecurityConfig {
                 .requestMatchers("/api/reportes/**").hasAuthority("ADMIN")
                 // Dashboard refrescar vistas solo ADMIN
                 .requestMatchers(HttpMethod.POST, "/api/dashboard/refrescar-vistas").hasAuthority("ADMIN")
+                // Intentos de acceso al sistema (OTD-GER-09, script 53): informe
+                // de seguridad — solo Administración y Gerencia (espeja los GRANTs
+                // de log_acceso). El REGISTRO lo escribe el flujo de login (público).
+                .requestMatchers(HttpMethod.GET, "/api/seguridad/accesos")
+                    .hasAnyAuthority("ADMIN", "GERENTE")
                 // Perfil (ficha básica) — usuario autenticado (cualquier rol)
                 .requestMatchers("/api/perfil/**").authenticated()
                 // Todo lo demas requiere autenticacion

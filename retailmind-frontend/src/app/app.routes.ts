@@ -265,6 +265,14 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/operativo/gerencia/metas-venta.component').then(m => m.MetasVentaComponent)
   },
+  // ── Seguridad: intentos de acceso al sistema (OTD-GER-09, script 53) —
+  //    informe solo ADMIN/GERENTE (espeja SecurityConfig y los GRANTs)
+  {
+    path: 'operativo/seguridad/accesos',
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE'])],
+    loadComponent: () =>
+      import('./features/operativo/seguridad/accesos.component').then(m => m.AccesosComponent)
+  },
   // ── Módulo marketing (lectura ADMIN/GERENTE; escrituras solo ADMIN, espeja SecurityConfig)
   {
     path: 'operativo/marketing/cupones',

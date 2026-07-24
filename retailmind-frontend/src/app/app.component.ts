@@ -88,7 +88,8 @@ export class AppComponent {
     '/operativo/soporte/faq': 'Preguntas Frecuentes',
     '/operativo/resenas': 'Reseñas de Productos',
     '/operativo/resenas/preguntas': 'Preguntas de Productos',
-    '/operativo/horarios': 'Horarios de Acceso'
+    '/operativo/horarios': 'Horarios de Acceso',
+    '/operativo/seguridad/accesos': 'Intentos de Acceso'
   };
 
   constructor(
@@ -143,6 +144,7 @@ export class AppComponent {
   get canDevoluciones(): boolean { return this.nav.can('devoluciones'); }
   get canMarketing(): boolean  { return this.nav.can('marketing'); }
   get canMetas(): boolean      { return this.nav.can('metas'); }
+  get canAccesos(): boolean    { return this.nav.can('accesos'); }
   get canTickets(): boolean    { return this.nav.can('tickets'); }
   get canCategoriasTicket(): boolean { return this.nav.can('categoriasTicket'); }
   get canFaq(): boolean        { return this.nav.can('faq'); }

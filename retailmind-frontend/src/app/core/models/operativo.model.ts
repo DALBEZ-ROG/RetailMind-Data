@@ -302,6 +302,22 @@ export interface MetaVentaRow {
   venta_real: number | null; // solo metas 'general'/'ventas' (facturado del mes)
 }
 
+// ── Seguridad: intentos de acceso (OTD-GER-09, script 53) ────────────────
+export interface LogAccesoRow {
+  id: number;
+  fecha_creacion: string;
+  email_intentado: string | null;
+  exitoso: boolean;
+  motivo_fallo: string | null;
+  ip_origen: string | null;
+  user_agent: string | null;
+  usuario_id: number | null;
+  usuario: string | null; // nombre del usuario si se identificó
+}
+export interface LogAccesoPage {
+  items: LogAccesoRow[]; total: number; page: number; size: number;
+}
+
 // ── Soporte ──────────────────────────────────────────────────────────────
 export interface CategoriaTicketRow {
   id: number; nombre: string; descripcion: string | null; activo: boolean;
