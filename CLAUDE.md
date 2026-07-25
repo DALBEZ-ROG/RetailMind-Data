@@ -257,6 +257,42 @@ ahora arma el pool con `connectionTimeout=3s`, `validationTimeout=1.5s`,
 como healthcheck de contenedores. **Tipo 1 vigentes = 0**; la foto completa de deuda vive en
 `DEUDA_TECNICA.md` (raíz) + `docs/INVENTARIO_DEUDA_CONSOLIDADO.md` (re-verificado).
 
+**CONTRASTE DE CATÁLOGO Y DEMANDA (2026-07-24, scripts 67 y 68-70)**: corrige los hallazgos
+A2/A3/A5/A6/B4 de `docs/tactico/AUDITORIA_TRANSVERSAL_SEED.md` (§11 lleva el estado).
+El **67** reasigna solo `producto_variante.costo` con banda por categoría (mayorista:
+Electrónica ~9 % … Belleza ~36 %): NO hay COGS almacenado, el margen se computa en vivo contra
+`producto_variante.costo`, así que no altera ninguna transacción. El **Bloque D (68 respaldo →
+69 curva/mapeo → 70 aplicación**, reversión `99_revert_bloque_d_demanda.sql`) **redistribuye**
+la demanda ya sembrada sin crear ni borrar ventas: reasigna *qué variante* se vendió en 9.167 de
+10.384 líneas dejando `cantidad` y `precio_unitario` INTACTOS, por lo que el impacto monetario
+es **$0,00 exacto** (16 agregados y 19 meses sin mover un centavo). top 20 % de variantes
+45,9 % → 62,2 %; Abarrotes líder con 3,69× Accesorios en venta. Si vas a tocar esto:
+(1) el destino de una línea debe cumplir `precio_unitario/precio ∈ [0,90;1,00]`, invariante del
+seed; (2) `factura_venta_detalle` tiene su PROPIO `producto_variante_id` y hay que moverlo en
+paralelo o la factura queda apuntando a otro producto; (3) `uq_pedido_detalle` NO es deferrable
+⇒ UPDATE en pasadas iterativas; (4) para el kardex el balance final NO basta: hay que respetar
+la cronología (el 70 lo deja encadenado por fecha, no por id). Respaldos en el esquema
+`seed_backup`, fuera de `public`.
+
+**DESCUENTOS SEMBRADOS QUE SÍ MUEVEN EL DINERO (2026-07-25, scripts 71-73)**: cierra A8/A9 de
+`docs/tactico/AUDITORIA_TRANSVERSAL_SEED.md`. Los cupones y promociones del Bloque C ahora
+descuentan de verdad: **71** respalda en `seed_backup.dsc71_*` con huella md5 por tabla
+(reversión `99_revert_descuentos.sql`, probada aplicar→revertir→bit-idéntico), **72** aplica el
+cupón a 535 pedidos y **73** la promoción a 120 líneas de 119 pedidos (+ recálculo del cupón en
+los 24 con solape). Se aplicó por el camino del sistema real: se escriben SOLO
+`pedido.monto_descuento`, `pedido_detalle.monto_descuento/monto_impuesto` y
+`factura_venta_detalle.monto_descuento/monto_impuesto` — los totales de pedido y factura los
+rehacen sus triggers y `pago.monto` es el ÚNICO ajuste manual (no tiene trigger de recálculo).
+Si vas a tocar esto: (1) el invariante real es **`factura_venta.total = pedido.total −
+pedido.costo_envio`** (la factura no factura el flete), no `= pedido.total`; (2) un cupón
+`envio_gratis` NO reescala IVA pero SÍ se prorratea en `factura_venta_detalle.monto_descuento`,
+porque `emitirFactura` lee `pedido.monto_descuento` sin mirar el tipo — omitirlo desalinea la
+factura; (3) el descuento arrastra su IVA: el total cae **1,15×** el descuento (ingreso
+$5.780.474,00 → $5.716.436,55 = −$64.037,45 = cupón $50.537,34 + promo $5.205,94 + IVA liberado
+$8.294,17); (4) alcance = solo pedidos con pago `completado`; los 176 pagos fallidos, el kardex
+(12.396 movs) y el inventario quedan intactos. Excepción declarada: pedidos **20 y 21** (legacy,
+con factura pero sin fila en `pago`) siguen con su cupón sin reflejar.
+
 **Pendiente**: contenerización completa (PostgreSQL sigue local, fuera de compose) y
 orquestación ETL con Airflow. El NIVEL TÁCTICO está en análisis (2026-07-17,
 `docs/RetailMind_T11_Analisis_Tactico.pdf`): 25 informes tácticos por departamento — 12 simples
