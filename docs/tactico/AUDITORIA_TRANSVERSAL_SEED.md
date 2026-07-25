@@ -533,6 +533,9 @@ reproduce** — el archivo actual tiene el salto de línea correcto en
 
 ### Siguen sin datos suficientes — 7 de 30
 
+> **Actualización 2026-07-25 (scripts 79-84):** seis de estos siete quedaron **CERRADOS**;
+> el séptimo (OTD-GER-07) se documenta como **limitación conocida y aceptada**. Ver §12.
+
 | # | Objetivo | Qué sigue faltando | Causa |
 |---|---|---|---|
 | 1 | **OTD-INV-05** — Ajustes de inventario y motivos | Sigue con **3 filas** en `ajuste_inventario` | Los 1.216 movimientos de apertura entraron como kardex huérfano (`referencia_tipo='inventario_inicial'`), sin documento de ajuste que los respalde. El informe de ajustes no los ve |
@@ -709,4 +712,121 @@ rehacen sus triggers, y `pago.monto` (tabla sin trigger de recálculo) es el ún
   variante se vendió *después* de que el Bloque C eligiera los 176 productos en promoción.
   Ampliarla exigiría sembrar más `promocion_producto`, que es otra decisión.
 
-Siguen **sin corregir**: A1, A4, A7 y toda la familia MEDIA/BAJA (M10 sigue trivial y pendiente).
+### Rebalanceo del abastecimiento — A1 / M1 / B2 (2026-07-25, scripts 74-78)
+
+| Hallazgo | Estado | Script | Resultado medido |
+|---|---|---|---|
+| **A1** la compra no abastece la venta | **CORREGIDO** | 74-78 | apertura 120.160 uds (**78,54 %** de las entradas) → **34.210 uds (22,36 %)**; compras 32.523 → **118.473 uds (77,43 %)**. Variantes vendidas sin ninguna compra **557 → 184** |
+| **B2** pico de 1.216 movimientos en un día | **CORREGIDO** | 74-78 | día más alto del kardex **1.216 → 83 movimientos**; la apertura pasa de 1 día a **10 días** (2 al 11 de enero de 2025) |
+| **M1** compradas y jamás vendidas | **EMPEORA (declarado)** | 74-78 | 139 → **386**. Es la contrapartida aritmética de A1: las 386 variantes que nunca salieron del almacén ahora tienen su compra documentada en vez de aparecer de la nada |
+| **M2** filas de inventario intactas en 100 | **sin cambio** | — | 268. `inventario` no se escribe: el rebalanceo cambia el ORIGEN del stock, no su cantidad |
+
+**Cómo se rebalanceó sin mover una sola unidad de stock** (74 respaldo → 75 plan/factibilidad →
+76 OC+recepciones → 77 facturas+CxP+pagos → 78 kardex; reversión `99_revert_abastecimiento.sql`,
+probada tres veces con ciclo aplicar→revertir→**bit-idéntico** sobre 16 huellas md5):
+
+- **Principio**: por cada unidad de apertura que se convierte en compra se resta de la apertura y
+  se suma como `entrada_compra` **antes de la primera salida** de esa variante. El balance por
+  variante no cambia: `inventario.stock_actual` es idéntico al respaldo en las **1.372 filas**.
+- **Segmentación** de las 1.216 variantes con apertura: **temprana** (343 var, 34.210 uds, primera
+  salida antes del 2025-03-01) conserva su apertura — no hay espacio temporal para una compra
+  previa creíble; **tardía** (487 var, 47.980 uds) y **sin salida** (386 var, 37.970 uds) migran
+  el 100 %. Migradas: **85.950 uds** en **529 OC / 1.610 líneas**, repartidas entre los 11
+  proveedores por giro de categoría y en los 19 meses (3.137–10.008 uds/mes, sin picos).
+- **Factibilidad temporal**: cada variante recibe un lote 1 anterior a su primera salida y, si su
+  apertura ≥ 40 uds, un lote 2 más adelante acotado por el mínimo balance del tramo
+  (`max_seguro`). **0 variantes** necesitaron conservar apertura extra: el mínimo disponible fue
+  de 79 uds frente a peticiones de ≤ 49 %. Resultado: **0 saldos negativos** y **0 eslabones
+  rotos** en 13.133 movimientos.
+- **Ventas intactas**: las huellas md5 de `pedido`, `pedido_detalle`, `factura_venta` y `pago`
+  son idénticas al respaldo, y las 9.798 salidas de kardex conservan fila, cantidad y fecha. En
+  1.006 de ellas cambió solo el **saldo corrido** (`stock_anterior/stock_nuevo`), que es la
+  consecuencia inevitable de recomponer las entradas anteriores.
+- **Consecuencia financiera declarada** (no evitable con `stock_actual` congelado): documentar
+  85.950 uds de apertura como compra real multiplica el ciclo de compra. Facturas de compra
+  **$3.815.107,62 → $22.467.387,27**, pagos **$2.803.140,54 → $16.084.462,74**, saldo CxP
+  **$1.011.967,08 → $6.382.924,53**, y el cuadre `facturas − pagos = saldo` sigue exacto al
+  centavo (descuadre $0,00). La compra queda muy por encima de la venta ($5,7 M) porque el
+  inventario sembrado ya era de ~6,8 años de rotación (ese es el defecto de fondo de M2, que
+  exigiría bajar el stock y está fuera de este alcance).
+
+Siguen **sin corregir**: A4, A7 y el resto de la familia MEDIA/BAJA. M2 y M3 quedan como el
+siguiente bloque natural: el stock plano es ahora la única pieza del abastecimiento que no tiene
+historia detrás.
+
+---
+
+## 12. Cierre de los objetivos sin datos — §8 (2026-07-25, scripts 79-84)
+
+Los **7 objetivos** que el seed dejó vacíos (§8) eran seis tablas pequeñas más un séptimo caso
+que no se puede resolver sin tocar ventas. Se cerraron los seis; el séptimo se documenta.
+
+| # | Objetivo | Antes | Ahora | Script |
+|---|---|---|---|---|
+| 1 | **OTD-INV-06** transferencias entre bodegas | 10, todas `recibida`, todas de jul-2026, **0 en camino** | **71** en 19 meses: 57 `recibida`, 7 `en_transito`, 4 `pendiente`, 3 `cancelada` → **11 en camino** | 80 |
+| 2 | **OTD-VEN-10** preguntas de producto | 1 pregunta, 1 respuesta | **49 preguntas** (jun-2025 → jul-2026) y **29 respuestas**; **16 sin responder** (13 `pendiente` + 3 `publicada`), 4 `rechazada` | 81 |
+| 3 | **OTD-GER-09** log de acceso | 39 filas, **1 mes** | **1.439 filas en 19 meses**, 88 usuarios, 86,2 % exitosos y los **4 motivos** de fallo poblados | 82 |
+| 4 | **OTD-GER-06** marketing vigente | 1 promo / 2 campañas / 2 banners / 4 cupones | **6 promos / 6 campañas / 8 banners / 8 cupones** vigentes hoy (M10 cerrado) | 83 |
+| 5 | **OTD-INV-05** ajustes con motivo | 3 filas | **53 ajustes** en 19 meses, 3 tipos (`negativo`/`positivo`/`conteo`), 2 estados (`aplicado`/`anulado`) y **7 motivos** | 80 |
+| 6 | **OTD-VEN-15** metas por departamento | 38 metas, **2 de 7** departamentos | **133 metas**, los **7 departamentos** de la lista blanca × 19 meses | 84 |
+| 7 | **OTD-GER-07** efecto de las promociones | 123 líneas con descuento de promoción | **sin cambio — limitación aceptada (ver abajo)** | — |
+
+### Cómo se sembró el stock sin descuadrar el kardex (script 80)
+
+Transferencias y ajustes son los **dos únicos** objetivos de este bloque que mueven stock. Se
+sembraron por el camino del sistema real (`InventarioService` + `StockService`): ambas tablas son
+**solo cabecera**, así que la variante y la cantidad viven en el kardex
+(`referencia_tipo = 'transferencia_bodega' | 'ajuste_inventario'`) y, en texto, en la
+observación/motivo con el formato `[SKU xN] …`.
+
+- **No-negatividad cronológica**: para cada SALIDA nueva en el pasado se calculó, sobre la cadena
+  **pristina** de esa `(variante, bodega)`, el `max_seguro` = mínimo saldo desde esa fecha hasta
+  hoy (*suffix-min*). Solo se sembró si `cantidad ≤ max_seguro`. El balance final no basta: hay
+  que respetar la cronología completa (misma lección del script 78). **1 evento** de 112 se
+  descartó por no encontrar variante con saldo suficiente, y quedó contado en la marca.
+- **Una sola salida por `(variante, bodega)`**, para que el `max_seguro` calculado sobre la cadena
+  pristina siga siendo válido en todos los eventos (las entradas solo suben el saldo).
+- **Reencadenado** de las **150 cadenas** afectadas (el kardex se encadena por
+  `(fecha_creacion, id)` y toda cadena arranca en 0).
+- Resultado medido: **13.287 movimientos**, **0 saldos negativos**, **0 desalineados**,
+  **0 eslabones rotos**, y `kardex = inventario.stock_actual` en las **1.406 filas**.
+- `inventario.stock_actual` **sí cambia aquí** (a diferencia del 78): una merma y una
+  transferencia en tránsito son pérdidas y traslados reales. Total **133.379 → 133.220 uds
+  (−159)**, que se descompone exacto: ajustes **−48** (85 de entrada − 133 de salida) y
+  transferencias **−111** (748 despachadas − 637 recibidas = las 7 en tránsito).
+- Efecto colateral favorable sobre **M2/OTD-INV-02**: Bodega Norte pasa de 152 filas / 4.530 uds
+  a **186 filas / 5.056 uds**.
+- **Ventas, compras y dinero intactos al centavo**: las 9 huellas md5 (`pedido`,
+  `pedido_detalle`, `factura_venta`, `pago`, `uso_cupon`, `orden_compra`, `factura_compra`,
+  `cuenta_por_pagar`, `pago_proveedor`) son idénticas al respaldo del script 79.
+
+Modelado declarado: `en_transito` = solo la salida en origen (la mercadería salió y no llegó);
+`pendiente` y `cancelada` = **ningún** movimiento de kardex. El sistema real no tiene endpoint de
+recepción diferida (`transferir` crea la transferencia ya `recibida`), así que esos tres estados
+son **dato histórico**, no un flujo vivo que la UI pueda avanzar.
+
+### OTD-GER-07 — limitación conocida y aceptada (no se corrige)
+
+**Efecto de las promociones**: siguen siendo **123 líneas de 10.384** con
+`pedido_detalle.monto_descuento > 0` proveniente de promoción (17 promociones con al menos una
+venta rebajada, script 73). El informe carga y muestra casos reales, pero la muestra es demasiado
+delgada para medir el efecto de una promoción con solidez estadística.
+
+- **Por qué queda así**: la cobertura no la limita el método sino los datos. Las ventanas de las
+  promociones históricas son de 10–20 días, y el Bloque D (script 70) reasignó *qué variante* se
+  vendió **después** de que el Bloque C eligiera los 176 `promocion_producto`. Densificarlo
+  exigiría (a) sembrar más `promocion_producto` — otra decisión de negocio — o (b) **reasignar
+  ventas** para hacerlas caer dentro de las ventanas de promoción, que es tocar el ciclo de venta
+  y el dinero ya cuadrado por los scripts 71-73 y 74-78.
+- **Decisión**: fuera de alcance. Se prefiere un informe con 123 casos verdaderos y un sistema
+  monetariamente coherente, antes que inflar la muestra moviendo ventas.
+- Las **5 promociones vigentes** creadas por el script 83 no cambian este número a propósito: son
+  de vigencia futura y solo rebajarán pedidos que se creen desde hoy, por el motor real
+  (`marketing/DescuentosService`).
+
+### Limitación de backend anotada (no es del dato)
+
+`MetasVentaService.VENTA_REAL_SQL` calcula el avance contra la meta **solo** para `general` y
+`ventas` (el `CASE` deja NULL en los otros cinco departamentos). Las 95 metas nuevas pueblan el
+catálogo por departamento; medir su avance exige ampliar ese `CASE`, que es cambio de código y
+quedó fuera de este alcance.

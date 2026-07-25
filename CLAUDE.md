@@ -293,6 +293,54 @@ $8.294,17); (4) alcance = solo pedidos con pago `completado`; los 176 pagos fall
 (12.396 movs) y el inventario quedan intactos. Excepción declarada: pedidos **20 y 21** (legacy,
 con factura pero sin fila en `pago`) siguen con su cupón sin reflejar.
 
+**REBALANCEO DEL ABASTECIMIENTO (2026-07-25, scripts 74-78)**: cierra A1/B2 de
+`docs/tactico/AUDITORIA_TRANSVERSAL_SEED.md` (§11 lleva el estado). El 78,5 % de las unidades
+que entraban al almacén lo hacían como una apertura ficticia de un solo día (2025-01-01,
+1.216 movs, 120.160 uds); ahora la apertura baja a **34.210 uds (22,4 %)** y las compras a
+proveedores suben a **118.473 uds (77,4 %)** repartidas en los 19 meses. **74** respalda
+(`seed_backup.reb74_*`, filas completas de `movimiento_inventario` + 16 huellas md5; reversión
+`99_revert_abastecimiento.sql`, probada aplicar→revertir→bit-idéntico 3 veces), **75** calcula
+el plan y demuestra su factibilidad temporal SIN escribir en public, **76** crea 529 OC +
+recepciones (+566 `producto_proveedor`), **77** sus facturas/CxP/pagos y **78** recompone el
+kardex. Si vas a tocar esto: (1) el principio es que **`inventario.stock_actual` NO se escribe** —
+solo cambia el ORIGEN de las entradas (menos `inventario_inicial`, más `entrada_compra`), así que
+por cada unidad retirada de la apertura hay una `entrada_compra` anterior a la primera salida de
+esa variante; (2) la factibilidad se prueba por tramos, no por balance final: un segundo lote más
+tarde solo puede llevarse el **mínimo saldo del tramo** `[T1,T2)` (columna `max_seguro` de
+`reb75_factibilidad`); (3) el kardex se encadena por **`(fecha_creacion, id)`** y toda cadena
+arranca en 0 — insertar en el pasado obliga a reencadenar `stock_anterior/stock_nuevo` de la
+cadena completa (2.234 filas reescritas, 1.006 de ellas salidas de venta: cambia su saldo
+corrido, NUNCA su cantidad ni su fecha); (4) las variantes con primera salida antes del
+2025-03-01 (343) CONSERVAN su apertura a propósito — no hay espacio para una compra previa
+creíble — y esa apertura se reparte del 2 al 11 de enero de 2025. Consecuencia declarada:
+facturas de compra $3,82 M → **$22,47 M**, pagos → **$16,08 M**, saldo CxP → **$6,38 M**, cuadre
+exacto ($0,00 de descuadre); la compra supera con mucho la venta porque el stock sembrado ya era
+de ~6,8 años de rotación (M2, fuera de alcance). Ventas intactas al centavo (huellas md5 de
+`pedido`/`pedido_detalle`/`factura_venta`/`pago` idénticas).
+
+**CIERRE DE LOS OBJETIVOS SIN DATOS (2026-07-25, scripts 79-84)**: cierra 6 de los 7 objetivos
+que la §8 de `docs/tactico/AUDITORIA_TRANSVERSAL_SEED.md` dejaba vacíos (§12 lleva el estado).
+**79** respalda (`seed_backup.op79_*` con filas completas de `movimiento_inventario`/`inventario`
++ 11 huellas md5; reversión `99_revert_objetivos_pendientes.sql`, probada
+aplicar→revertir→bit-idéntico→re-aplicar con conteos idénticos). **80** es el ÚNICO que mueve
+stock: 61 transferencias (`recibida`/`en_transito`/`pendiente`/`cancelada`) + 50 ajustes
+(7 motivos, `aplicado`/`anulado` con contramovimiento) repartidos en 19 meses. **81** siembra
+49 preguntas de producto con 29 respuestas (+ `log_auditoria` de la moderación, que es lo ÚNICO
+que el sistema audita de este bloque). **82** 1.400 accesos históricos con los 4 motivos de
+`LoginFallidoException`. **83** el marketing VIGENTE de hoy (5 promos + 4 campañas + 6 banners +
+4 cupones, con % por debajo del margen real de cada categoría). **84** las metas de los 5
+departamentos faltantes × 19 meses. Si vas a tocar esto: (1) `transferencia_bodega` y
+`ajuste_inventario` son **solo cabecera** — variante y cantidad viven en el kardex y en el texto
+`[SKU xN] …`; (2) para insertar una SALIDA en el pasado hay que verificar el **suffix-min** de la
+cadena pristina de esa `(variante, bodega)` (el balance final NO basta) y usar **una sola salida
+por par**, o el `max_seguro` deja de ser válido; (3) el kardex se reencadena por
+`(fecha_creacion, id)` — 150 cadenas reescritas; (4) aquí `inventario.stock_actual` SÍ cambia
+(−159 uds: merma −48 + 111 en tránsito), a diferencia del 78. Ventas/compras/dinero intactos
+(9 huellas md5 idénticas). `en_transito` = solo la salida en origen; `pendiente`/`cancelada` sin
+kardex: son dato histórico, no un flujo vivo (el sistema real crea la transferencia ya
+`recibida`). **OTD-GER-07** (efecto de promociones, 123 líneas) queda documentado como
+limitación aceptada: densificarlo exigiría reasignar ventas.
+
 **Pendiente**: contenerización completa (PostgreSQL sigue local, fuera de compose) y
 orquestación ETL con Airflow. El NIVEL TÁCTICO está en análisis (2026-07-17,
 `docs/RetailMind_T11_Analisis_Tactico.pdf`): 25 informes tácticos por departamento — 12 simples
