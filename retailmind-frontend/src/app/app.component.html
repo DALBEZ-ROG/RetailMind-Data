@@ -251,6 +251,26 @@
       </a>
     </ng-container>
 
+    <!-- Informes Tácticos (uno por departamento, ver docs/tactico/PATRON_INFORMES.md).
+         Ventas lleva monto ⇒ sin BODEGA/DESPACHO. Inventario sí incluye a BODEGA:
+         seis de sus siete informes son de cantidades, y el de valorización (dinero)
+         queda oculto dentro de la pantalla y negado por SecurityConfig. -->
+    <ng-container *ngIf="canInformesVentas || canInformesInventario">
+      <div class="sidebar-section-label">Informes Tácticos</div>
+
+      <a class="nav-item" *ngIf="canInformesVentas"
+         routerLink="/operativo/informes/ventas" routerLinkActive="active">
+        <mat-icon>insights</mat-icon>
+        <span>Informes de Ventas</span>
+      </a>
+
+      <a class="nav-item" *ngIf="canInformesInventario"
+         routerLink="/operativo/informes/inventario" routerLinkActive="active">
+        <mat-icon>warehouse</mat-icon>
+        <span>Informes de Inventario</span>
+      </a>
+    </ng-container>
+
     <!-- Soporte Section (tickets ADMIN/GERENTE/CLIENTE; categorías ADMIN; FAQ según SELECT en BD) -->
     <ng-container *ngIf="canTickets || canFaq">
       <div class="sidebar-section-label">Soporte</div>

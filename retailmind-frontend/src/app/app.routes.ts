@@ -265,6 +265,32 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/operativo/gerencia/metas-venta.component').then(m => m.MetasVentaComponent)
   },
+  // ── Informes tácticos por departamento (docs/tactico/PATRON_INFORMES.md).
+  //    UNA sola pantalla genérica parametrizada por `data.departamento`; los
+  //    informes y sus filtros salen del archivo de definiciones del área.
+  //    Ventas: espeja SecurityConfig (/api/informes/ventas/**) — BODEGA y
+  //    DESPACHO fuera por segregación financiera.
+  {
+    path: 'operativo/informes/ventas',
+    data: { departamento: 'ventas' },
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'VENDEDOR'])],
+    loadComponent: () =>
+      import('./features/operativo/informes/informes-departamento.component')
+        .then(m => m.InformesDepartamentoComponent)
+  },
+  //    Inventario: espeja SecurityConfig (/api/informes/inventario/**). La lista
+  //    es la UNIÓN de quien ve al menos un informe — BODEGA sí entra, porque seis
+  //    de los siete son de cantidades; el de valorización (OTD-INV-07, dinero) se
+  //    le oculta dentro de la pantalla y su ruta REST se lo niega igualmente.
+  {
+    path: 'operativo/informes/inventario',
+    data: { departamento: 'inventario' },
+    canActivate: [authGuard,
+      roleGuard(['ADMIN', 'GERENTE', 'BODEGA', 'COMPRAS', 'VENDEDOR', 'ANALISTA'])],
+    loadComponent: () =>
+      import('./features/operativo/informes/informes-departamento.component')
+        .then(m => m.InformesDepartamentoComponent)
+  },
   // ── Seguridad: intentos de acceso al sistema (OTD-GER-09, script 53) —
   //    informe solo ADMIN/GERENTE (espeja SecurityConfig y los GRANTs)
   {

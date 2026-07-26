@@ -24,6 +24,8 @@ export type PermisoNav =
   | 'devoluciones'     // RMA / logística inversa (pipeline multi-rol)
   | 'marketing'        // cupones / promos / campañas / banners / newsletter
   | 'metas'            // metas de venta por período (OTD-VEN-15, script 48)
+  | 'informesVentas'   // informes tácticos de Ventas (OTD-VEN-01/02/08/10/15)
+  | 'informesInventario' // informes tácticos de Inventario (OTD-INV-01/02/03/05/06/07/08)
   | 'accesos'          // intentos de acceso al sistema (OTD-GER-09, script 53)
   | 'tickets'          // tickets de soporte
   | 'categoriasTicket' // categorías de ticket
@@ -54,6 +56,17 @@ export const ROLES_POR_PERMISO: Record<PermisoNav, readonly string[]> = {
   marketing:        ['ADMIN', 'GERENTE'],
   // Metas: fija gerencia; vendedor/analista leen el avance (script 48)
   metas:            ['ADMIN', 'GERENTE', 'VENDEDOR', 'ANALISTA'],
+  // Informes tácticos de Ventas: llevan MONTO, así que BODEGA y DESPACHO
+  // quedan fuera por segregación financiera (espeja SecurityConfig y los
+  // GRANTs: no tienen SELECT sobre pedido.total, carrito ni meta_venta).
+  // Dentro de la pantalla, OTD-VEN-10 (moderación) solo lo ve ADMIN/GERENTE.
+  informesVentas:   ['ADMIN', 'GERENTE', 'VENDEDOR'],
+  // Informes tácticos de Inventario: al revés que Ventas, seis de los siete son
+  // de CANTIDADES y BODEGA es su destinataria natural. La lista es la UNIÓN de
+  // quien ve al menos un informe; dentro de la pantalla cada informe declara sus
+  // roles y el de VALORIZACIÓN (OTD-INV-07, el único con dinero) deja fuera a
+  // BODEGA y DESPACHO. Espeja SecurityConfig, que es quien realmente decide.
+  informesInventario: ['ADMIN', 'GERENTE', 'BODEGA', 'COMPRAS', 'VENDEDOR', 'ANALISTA'],
   // Intentos de acceso (OTD-GER-09, script 53): informe solo Admin/Gerencia
   accesos:          ['ADMIN', 'GERENTE'],
   // SOPORTE (9º rol, script 37): bandeja de tickets + FAQ; nada más
@@ -241,6 +254,25 @@ export const DASHBOARD_AREAS: AreaNav[] = [
     acciones: [
       { titulo: 'Metas de Venta', descripcion: 'Meta por período y departamento vs. venta real',
         icono: 'flag', ruta: '/operativo/gerencia/metas', permiso: 'metas' }
+    ]
+  },
+  {
+    // Informes tácticos por departamento (docs/tactico/CATALOGO_OBJETIVOS_TACTICOS.md).
+    // Cada departamento añade UNA acción aquí cuando se implementen sus informes
+    // simples; la pantalla es la misma para todos (ver docs/tactico/PATRON_INFORMES.md).
+    id: 'informes',
+    titulo: 'Informes Tácticos',
+    descripcion: 'Dirección y control por departamento, consultado por pantalla',
+    icono: 'insights',
+    acento: '#00838f',
+    gradiente: 'linear-gradient(135deg, #006064, #00acc1)',
+    acciones: [
+      { titulo: 'Informes de Ventas',
+        descripcion: 'Cartera, equipo comercial, carritos, moderación y meta del mes',
+        icono: 'insights', ruta: '/operativo/informes/ventas', permiso: 'informesVentas' },
+      { titulo: 'Informes de Inventario',
+        descripcion: 'Reposición, existencias, kardex, ajustes, transferencias y capital almacenado',
+        icono: 'warehouse', ruta: '/operativo/informes/inventario', permiso: 'informesInventario' }
     ]
   },
   {

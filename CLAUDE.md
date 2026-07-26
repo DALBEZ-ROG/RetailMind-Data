@@ -341,11 +341,32 @@ kardex: son dato histórico, no un flujo vivo (el sistema real crea la transfere
 `recibida`). **OTD-GER-07** (efecto de promociones, 123 líneas) queda documentado como
 limitación aceptada: densificarlo exigiría reasignar ventas.
 
+**INFORMES TÁCTICOS — VENTAS + PATRÓN REUTILIZABLE (2026-07-25, solo código, sin script)**:
+primer módulo del nivel táctico. Se implementaron los CINCO objetivos SIMPLES de Ventas del
+`docs/tactico/CATALOGO_OBJETIVOS_TACTICOS.md` — OTD-VEN-01 (cartera de pedidos por estado),
+02 (ventas por vendedor), 08 (carritos abandonados), 10 (cola de moderación) y 15 (venta contra
+la meta del mes) — bajo la convención `/api/informes/{departamento}/{informe}`, todos GET de
+solo lectura y todos devolviendo el MISMO sobre `{items, total, page, size, resumen[]}`.
+Backend: `informes/InformeServiceBase` (molde: lista blanca de filtros → 400, paginación
+server-side, KPIs, `rolActual()/usuarioActualId()`) + `InformesVentasService/Controller`.
+Frontend: UNA pantalla genérica `features/operativo/informes/informes-departamento.component`
+parametrizada por `data.departamento` de la ruta, que se pinta desde el archivo declarativo
+`definiciones/ventas.informes.ts`; un departamento nuevo = 2 clases Java + 1 archivo TS + 5
+líneas de enganche, sin componentes ni servicios Angular nuevos. Si vas a tocar esto: (1) TODO
+método de informe va en `@Transactional(readOnly = true)` o corre sin `SET LOCAL ROLE`; (2) los
+filtros usan guarda NULL por parámetro `(?::tipo IS NULL OR col = ?::tipo)` con el valor pasado
+DOS veces — jamás se concatena texto del usuario; (3) la antigüedad del carrito se mide con
+`COALESCE(fecha_actualizacion, fecha_creacion)` porque el trigger touch no dispara en los
+abandonados; (4) VEN-02 recorta al VENDEDOR a lo suyo desde el JWT y devuelve
+`alcance: "propio"`; (5) NADA de PDF: el nivel táctico se consulta por pantalla. Segregación
+financiera verificada: BODEGA y DESPACHO reciben 403 en los cinco informes. El patrón está
+documentado en `docs/tactico/PATRON_INFORMES.md`.
+
 **Pendiente**: contenerización completa (PostgreSQL sigue local, fuera de compose) y
-orquestación ETL con Airflow. El NIVEL TÁCTICO está en análisis (2026-07-17,
-`docs/RetailMind_T11_Analisis_Tactico.pdf`): 25 informes tácticos por departamento — 12 simples
-que salen directo de la BDR PostgreSQL y 13 compuestos (agregaciones/series temporales) que se
-procesarán en ClickHouse vía el ETL orquestado por Airflow; esa es la siguiente fase.
+orquestación ETL con Airflow. Del NIVEL TÁCTICO (`docs/RetailMind_T11_Analisis_Tactico.pdf` +
+catálogo ampliado a 68 objetivos) queda: los informes SIMPLES de los otros cinco departamentos
+(Compras, Inventario, Logística, Soporte, Gerencia), que repiten el patrón ya establecido, y
+los COMPUESTOS, que se procesarán en ClickHouse vía el ETL orquestado por Airflow.
 
 **Deuda técnica conocida** (tablas huérfanas, requieren bloque dedicado):
 

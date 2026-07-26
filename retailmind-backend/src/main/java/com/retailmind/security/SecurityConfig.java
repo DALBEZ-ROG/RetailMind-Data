@@ -241,6 +241,45 @@ public class SecurityConfig {
                 // de log_acceso). El REGISTRO lo escribe el flujo de login (público).
                 .requestMatchers(HttpMethod.GET, "/api/seguridad/accesos")
                     .hasAnyAuthority("ADMIN", "GERENTE")
+                // ── INFORMES TÁCTICOS (docs/tactico/CATALOGO_OBJETIVOS_TACTICOS.md) ──
+                // Convención: /api/informes/{departamento}/{informe}, todos GET de
+                // solo lectura. Se declaran del más específico al más general.
+                //
+                // VENTAS — OTD-VEN-10 (cola de moderación) es atribución de los
+                // moderadores del sistema: ADMIN/GERENTE (espeja el SELECT de
+                // resena/pregunta_producto, que el VENDEDOR no tiene en el motor).
+                .requestMatchers(HttpMethod.GET, "/api/informes/ventas/moderacion")
+                    .hasAnyAuthority("ADMIN", "GERENTE")
+                // Resto de informes de Ventas (VEN-01/02/08/15): llevan MONTO, por
+                // lo que BODEGA y DESPACHO quedan fuera por segregación financiera
+                // (el motor lo respalda: sin SELECT sobre pedido.total, carrito ni
+                // meta_venta). El VENDEDOR entra, y VEN-02 lo acota a lo suyo.
+                .requestMatchers(HttpMethod.GET, "/api/informes/ventas/**")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "VENDEDOR")
+                // INVENTARIO / BODEGA — aquí BODEGA sí es la destinataria natural,
+                // porque seis de los siete informes son de CANTIDADES. La excepción
+                // es OTD-INV-07 (valor del inventario), que es DINERO: se cierra a
+                // ADMIN/GERENTE/ANALISTA. Ese corte lo hace ESTA ruta y no el motor,
+                // porque grp_bodega conserva SELECT sobre producto_variante.costo
+                // por la excepción declarada del script 41 (valoriza su kardex).
+                .requestMatchers(HttpMethod.GET, "/api/informes/inventario/valor-inventario")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "ANALISTA")
+                // OTD-INV-02: existencias — COMPRAS y VENDEDOR también necesitan
+                // saber qué hay antes de comprar o de vender.
+                .requestMatchers(HttpMethod.GET, "/api/informes/inventario/stock-bodega")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "BODEGA", "COMPRAS", "VENDEDOR")
+                // OTD-INV-01 y OTD-INV-08: las dos listas que disparan y frenan la
+                // reposición, así que COMPRAS entra.
+                .requestMatchers(HttpMethod.GET, "/api/informes/inventario/bajo-minimo",
+                        "/api/informes/inventario/sobre-stock")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "BODEGA", "COMPRAS")
+                // OTD-INV-03/05/06 (kardex, ajustes, transferencias): operación
+                // interna del almacén.
+                .requestMatchers(HttpMethod.GET, "/api/informes/inventario/**")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "BODEGA")
+                // Los informes son SOLO consulta: cualquier método que no sea GET
+                // sobre /api/informes se rechaza de plano.
+                .requestMatchers("/api/informes/**").denyAll()
                 // Perfil (ficha básica) — usuario autenticado (cualquier rol)
                 .requestMatchers("/api/perfil/**").authenticated()
                 // Todo lo demas requiere autenticacion

@@ -1,0 +1,163 @@
+// Estilos propios de la pantalla genérica de informes tácticos.
+// Complementa operativo-shared.scss y las clases del diseño "Dubai"
+// (glass-card, premium-card, fuente Inter, variables de styles.scss).
+
+// ── Selector de informe: una píldora de vidrio por objetivo táctico ──────
+.informe-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.informe-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: var(--border-radius);
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  box-shadow: var(--shadow-soft);
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  text-align: left;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+
+  mat-icon {
+    color: var(--primary-light);
+    font-size: 22px;
+    width: 22px;
+    height: 22px;
+  }
+
+  .chip-texto { display: flex; flex-direction: column; line-height: 1.25; }
+
+  .chip-id {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.6px;
+    color: var(--text-light);
+  }
+
+  .chip-titulo {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-medium);
+  }
+
+  &.activo {
+    background: var(--primary-gradient);
+    border-color: transparent;
+    box-shadow: var(--shadow-medium);
+
+    mat-icon      { color: white; }
+    .chip-id      { color: rgba(255, 255, 255, 0.7); }
+    .chip-titulo  { color: white; }
+  }
+}
+
+// ── Tarjetas de resumen que el backend adjunta al sobre ─────────────────
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.kpi-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px 22px;
+  border-radius: var(--border-radius);
+  background: var(--primary-gradient);
+  color: white;
+  box-shadow: var(--shadow-medium);
+
+  .kpi-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    opacity: 0.82;
+  }
+
+  .kpi-value {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.4px;
+  }
+}
+
+// ── Cuerpo del informe ──────────────────────────────────────────────────
+.informe-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: -8px 0 16px;
+}
+
+.conteo {
+  font-weight: 700;
+  color: var(--text-light);
+}
+
+.objetivo-tag {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  color: var(--text-light);
+}
+
+.campo-ancho { grid-column: span 2; }
+
+.celda-monto {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--text-primary) !important;
+}
+
+.estado-chip.info { background: #e3f2fd; color: #1565c0; }
+
+.aviso-alcance {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  border-left: 4px solid var(--accent);
+  border-radius: var(--border-radius-sm);
+  background: #e0f7fa;
+  color: #006064;
+  font-size: 12.5px;
+
+  mat-icon { font-size: 20px; width: 20px; height: 20px; }
+}
+
+.cargando {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 32px;
+  color: var(--text-light);
+  font-size: 13px;
+}
+
+.avance-card {
+  mat-progress-bar { height: 12px; border-radius: 8px; }
+
+  .avance-nota {
+    margin-top: 10px;
+    font-size: 12.5px;
+    color: var(--text-secondary);
+  }
+}

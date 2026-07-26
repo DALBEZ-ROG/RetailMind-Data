@@ -78,6 +78,8 @@ export class AppComponent {
     '/operativo/ventas/despachos': 'Despachos',
     '/operativo/ventas/devoluciones': 'Devoluciones',
     '/operativo/gerencia/metas': 'Metas de Venta',
+    '/operativo/informes/ventas': 'Informes de Ventas',
+    '/operativo/informes/inventario': 'Informes de Inventario',
     '/operativo/marketing/cupones': 'Cupones de Descuento',
     '/operativo/marketing/promociones': 'Promociones',
     '/operativo/marketing/campanas': 'Campañas de Marketing',
@@ -144,6 +146,8 @@ export class AppComponent {
   get canDevoluciones(): boolean { return this.nav.can('devoluciones'); }
   get canMarketing(): boolean  { return this.nav.can('marketing'); }
   get canMetas(): boolean      { return this.nav.can('metas'); }
+  get canInformesVentas(): boolean { return this.nav.can('informesVentas'); }
+  get canInformesInventario(): boolean { return this.nav.can('informesInventario'); }
   get canAccesos(): boolean    { return this.nav.can('accesos'); }
   get canTickets(): boolean    { return this.nav.can('tickets'); }
   get canCategoriasTicket(): boolean { return this.nav.can('categoriasTicket'); }
