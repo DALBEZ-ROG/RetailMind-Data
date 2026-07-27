@@ -70,6 +70,13 @@ export interface DefinicionInforme {
   vacio: string;
   /** El backend no pagina este informe (pocas filas por naturaleza). */
   sinPaginar?: boolean;
+  /**
+   * Pinta la barra «avance sobre la meta» con el KPI de porcentaje del sobre.
+   * Solo para informes que de verdad miden contra una meta (OTD-VEN-15): un
+   * porcentaje cualquiera —una tasa de resolución, una ocupación media— NO es
+   * un avance, y presentarlo como tal miente.
+   */
+  barraAvance?: boolean;
 }
 
 /** Departamento con sus informes. Un archivo de definiciones por departamento. */

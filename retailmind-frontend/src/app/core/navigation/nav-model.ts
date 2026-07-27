@@ -26,6 +26,10 @@ export type PermisoNav =
   | 'metas'            // metas de venta por período (OTD-VEN-15, script 48)
   | 'informesVentas'   // informes tácticos de Ventas (OTD-VEN-01/02/08/10/15)
   | 'informesInventario' // informes tácticos de Inventario (OTD-INV-01/02/03/05/06/07/08)
+  | 'informesCompras'  // informes tácticos de Compras (OTD-COM-01/02/08/10)
+  | 'informesLogistica' // informes tácticos de Logística (OTD-LOG-01/02/06/11)
+  | 'informesSoporte'  // informes tácticos de Soporte (OTD-SOP-01/04/05)
+  | 'informesGerencia' // informes tácticos de Gerencia (OTD-GER-01/04/06/08/09)
   | 'accesos'          // intentos de acceso al sistema (OTD-GER-09, script 53)
   | 'tickets'          // tickets de soporte
   | 'categoriasTicket' // categorías de ticket
@@ -67,6 +71,23 @@ export const ROLES_POR_PERMISO: Record<PermisoNav, readonly string[]> = {
   // roles y el de VALORIZACIÓN (OTD-INV-07, el único con dinero) deja fuera a
   // BODEGA y DESPACHO. Espeja SecurityConfig, que es quien realmente decide.
   informesInventario: ['ADMIN', 'GERENTE', 'BODEGA', 'COMPRAS', 'VENDEDOR', 'ANALISTA'],
+  // Informes tácticos de Compras: tres de los cuatro llevan MONTO o COSTO. La
+  // lista es la UNIÓN de quien ve al menos uno; BODEGA entra SOLO por
+  // OTD-COM-08 (pool de defectuosos, sin dinero) y dentro de la pantalla no ve
+  // los otros tres. Espeja SecurityConfig, que es quien realmente decide.
+  informesCompras:  ['ADMIN', 'GERENTE', 'COMPRAS', 'BODEGA'],
+  // Informes tácticos de Logística: DESPACHO es el destinatario natural de los
+  // tres de estados y cantidades y queda FUERA de OTD-LOG-11 (costo del envío,
+  // el único con dinero). SOPORTE y BODEGA entran solo por el tablero de RMA.
+  informesLogistica: ['ADMIN', 'GERENTE', 'DESPACHO', 'SOPORTE', 'BODEGA'],
+  // Informes tácticos de Soporte: ninguno lleva dinero, así que no hay corte
+  // financiero; los destinatarios son la propia mesa de ayuda y la jefatura.
+  informesSoporte:  ['ADMIN', 'GERENTE', 'SOPORTE'],
+  // Informes tácticos de Gerencia: los cinco son de dirección. Dos de ellos
+  // (OTD-GER-08 auditoría y OTD-GER-09 accesos) son DATOS SENSIBLES DE
+  // SEGURIDAD — el corte más estricto del sistema — y por eso el departamento
+  // entero queda en ADMIN + GERENTE. Espeja SecurityConfig.
+  informesGerencia: ['ADMIN', 'GERENTE'],
   // Intentos de acceso (OTD-GER-09, script 53): informe solo Admin/Gerencia
   accesos:          ['ADMIN', 'GERENTE'],
   // SOPORTE (9º rol, script 37): bandeja de tickets + FAQ; nada más
@@ -272,7 +293,19 @@ export const DASHBOARD_AREAS: AreaNav[] = [
         icono: 'insights', ruta: '/operativo/informes/ventas', permiso: 'informesVentas' },
       { titulo: 'Informes de Inventario',
         descripcion: 'Reposición, existencias, kardex, ajustes, transferencias y capital almacenado',
-        icono: 'warehouse', ruta: '/operativo/informes/inventario', permiso: 'informesInventario' }
+        icono: 'warehouse', ruta: '/operativo/informes/inventario', permiso: 'informesInventario' },
+      { titulo: 'Informes de Compras',
+        descripcion: 'Órdenes y aprobaciones, cuentas por pagar, defectuosos y catálogo de proveedores',
+        icono: 'shopping_cart', ruta: '/operativo/informes/compras', permiso: 'informesCompras' },
+      { titulo: 'Informes de Logística',
+        descripcion: 'Cola de despacho, envíos, devoluciones en curso y costo del transporte',
+        icono: 'local_shipping', ruta: '/operativo/informes/logistica', permiso: 'informesLogistica' },
+      { titulo: 'Informes de Soporte',
+        descripcion: 'Bandeja de tickets, causas por categoría y carga del equipo',
+        icono: 'support_agent', ruta: '/operativo/informes/soporte', permiso: 'informesSoporte' },
+      { titulo: 'Informes de Gerencia',
+        descripcion: 'Foto del día, cupones y marketing vigentes, auditoría y accesos al sistema',
+        icono: 'flag', ruta: '/operativo/informes/gerencia', permiso: 'informesGerencia' }
     ]
   },
   {

@@ -362,11 +362,59 @@ abandonados; (4) VEN-02 recorta al VENDEDOR a lo suyo desde el JWT y devuelve
 financiera verificada: BODEGA y DESPACHO reciben 403 en los cinco informes. El patrón está
 documentado en `docs/tactico/PATRON_INFORMES.md`.
 
+**INFORMES TÁCTICOS — COMPRAS Y LOGÍSTICA (2026-07-26, solo código, sin script)**: cuarto y
+quinto módulo del nivel táctico, con el mismo coste que el patrón promete (2 clases Java +
+1 archivo TS + enganche por departamento; cero componentes, servicios o estilos nuevos).
+**Compras**: OTD-COM-01 (`ordenes`, 865), 02 (`cuentas-por-pagar`, 839), 08 (`defectuosos`, 38)
+y 10 (`catalogo-proveedor`, 1.106). **Logística**: OTD-LOG-01 (`cola-despacho`, 48),
+02 (`envios`, 2.872), 06 (`devoluciones`, 196) y 11 (`costo-envio`, 9 filas agregadas).
+Si vas a tocar esto: (1) en COM-01 el estado sintético `pendiente_aprobacion` agrupa
+'borrador'+'enviada' — NO existe un estado 'aprobada', aprobar deja la orden en 'confirmada';
+(2) en COM-02 conviven DOS clasificaciones: `estado` (columna real) y `situacion` (recalculada
+hoy contra `fecha_vencimiento`), y lo pagado es `monto_original − saldo_pendiente`;
+(3) **COM-08 estrena el tercer lugar donde vive el corte financiero: la CONSULTA** — BODEGA
+entra al informe y el motor NO lo impide (script 45 le dio SELECT sobre
+`item_defectuoso.costo_unitario` y `devolucion_proveedor.monto_credito`), así que la barrera es
+que el SQL no selecciona monto alguno; (4) la ZONA de LOG-11 no es una columna del envío: se
+resuelve desde la dirección del pedido por ciudad > provincia > país, la MISMA cadena de
+`VentasService.asignarEnvioPorZona` — agrupar por país miente; (5) LOG-11 lo cierra la RUTA y no
+el motor (grp_despacho lee `envio.costo` porque lo escribe al despachar), igual que INV-07;
+(6) los informes con agregado por fila usan el triple `tabla + lateral + filtro` — el LATERAL va
+ANTES del WHERE y el conteo reutiliza solo `tabla + filtro`. Matriz verificada por API
+(8 endpoints × 8 roles): DESPACHO 200 en LOG-01/02/06 y 403 en `/costo-envio`; BODEGA solo en
+`/defectuosos` y `/devoluciones`; SOPORTE solo en `/devoluciones`; VENDEDOR y ANALISTA 403 en
+los ocho. Detalle en `docs/tactico/PATRON_INFORMES.md` §10.
+
+**INFORMES TÁCTICOS — SOPORTE Y GERENCIA: NIVEL TÁCTICO COMPLETO (2026-07-26, solo código,
+sin script)**: sexto y último módulo, mismo coste del patrón (2 clases Java + 1 archivo TS +
+enganche por departamento). **Soporte**: OTD-SOP-01 (`bandeja`, 248 tickets / 128 vivos),
+04 (`por-categoria`, 8 filas) y 05 (`por-agente`, 7 filas). **Gerencia**: OTD-GER-01
+(`foto-dia`, 20 filas agregadas), 04 (`cupones`, 33 / 7 vigentes), 06 (`marketing`, 65 / 20
+vigentes), 08 (`auditoria`, 7.073) y 09 (`accesos`, ~1.500). Con esto los SEIS departamentos
+tienen sus informes SIMPLES. Si vas a tocar esto: (1) **GER-08 y GER-09 son DATOS SENSIBLES DE
+SEGURIDAD** (solo ADMIN/GERENTE, el corte más estricto) y cada uno se apoya en una capa
+distinta — en `/accesos` motor + ruta coinciden (solo grp_administrador y grp_gerente leen
+`log_acceso`), pero en `/auditoria` **grp_analista SÍ lee `log_auditoria`** (script 19), así que
+ahí el corte lo hace la RUTA, como en INV-07 y LOG-11; por eso van en su propia línea de
+`SecurityConfig`; (2) el valor por DEFECTO de un filtro es diseño: SOP-01 arranca en el estado
+sintético `pendientes` (= `estado NOT IN ('resuelto','cerrado')`, traducido en el servicio, nunca
+concatenado), GER-04 en `situacion=vigente` y GER-06 en `vigencia=vigente`; (3) la `situacion`
+del cupón replica las TRES condiciones de canje de `DescuentosService` (activo + ventana +
+`usos_maximos`), no `activo`; (4) GER-01 emite una fila explícita «Día sin movimiento» y un KPI
+«Último día con pedidos» porque el seed llega al 2026-07-22 (pedidos) / 07-23 (cobros) y
+consultar hoy sale vacío — limitación temporal declarada, no un fallo; su bloque de
+**pendientes es AL MOMENTO**, no del día consultado; (5) un `date` puro se serializa
+«AAAA-MM-DD» y el formateador de la pantalla lo lee como UTC restando un día: las fechas-día del
+resumen viajan ya formateadas con `to_char` y tipo `texto` (las columnas de los demás informes
+son timestamptz y no sufren esto). Detalle en `docs/tactico/PATRON_INFORMES.md` §11. De paso se
+corrigió en la pantalla genérica la barra «avance sobre la meta», que aparecía en CUALQUIER
+informe con un KPI de porcentaje (afectaba ya a INV-08): ahora es opt-in con `barraAvance: true`
+y solo OTD-VEN-15 la declara.
+
 **Pendiente**: contenerización completa (PostgreSQL sigue local, fuera de compose) y
 orquestación ETL con Airflow. Del NIVEL TÁCTICO (`docs/RetailMind_T11_Analisis_Tactico.pdf` +
-catálogo ampliado a 68 objetivos) queda: los informes SIMPLES de los otros cinco departamentos
-(Compras, Inventario, Logística, Soporte, Gerencia), que repiten el patrón ya establecido, y
-los COMPUESTOS, que se procesarán en ClickHouse vía el ETL orquestado por Airflow.
+catálogo ampliado a 68 objetivos) quedan SOLO los objetivos COMPUESTOS, que se procesarán en
+ClickHouse vía el ETL orquestado por Airflow.
 
 **Deuda técnica conocida** (tablas huérfanas, requieren bloque dedicado):
 

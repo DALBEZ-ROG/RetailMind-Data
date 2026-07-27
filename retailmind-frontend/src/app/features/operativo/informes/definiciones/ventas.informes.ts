@@ -197,6 +197,9 @@ export const INFORMES_VENTAS: DefinicionDepartamento = {
       icono: 'flag',
       roles: ['ADMIN', 'GERENTE', 'VENDEDOR'],
       sinPaginar: true,
+      // ÚNICO informe con barra de avance: aquí el porcentaje SÍ es el avance
+      // sobre una meta fijada. En el resto un porcentaje es solo un ratio.
+      barraAvance: true,
       vacio: 'No hay meta de ventas fijada para ese período.',
       filtros: [
         { param: 'periodo', etiqueta: 'Período', tipo: 'periodo' }

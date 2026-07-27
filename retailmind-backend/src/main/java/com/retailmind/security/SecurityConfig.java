@@ -277,6 +277,59 @@ public class SecurityConfig {
                 // interna del almacén.
                 .requestMatchers(HttpMethod.GET, "/api/informes/inventario/**")
                     .hasAnyAuthority("ADMIN", "GERENTE", "BODEGA")
+                // COMPRAS — OTD-COM-08 (pool de defectuosos y devoluciones al
+                // proveedor) es el único SIN dinero, y BODEGA es quien marca e
+                // inspecciona la mercancía mala: entra. El informe no selecciona
+                // ninguna columna de monto — el motor NO lo impediría, porque el
+                // script 45 dio a grp_bodega SELECT sobre item_defectuoso
+                // .costo_unitario para el flujo operativo; el control es la consulta.
+                .requestMatchers(HttpMethod.GET, "/api/informes/compras/defectuosos")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "COMPRAS", "BODEGA")
+                // Resto de informes de Compras (COM-01 órdenes, COM-02 cuentas por
+                // pagar, COM-10 catálogo proveedor-producto): llevan MONTO o COSTO,
+                // así que BODEGA y DESPACHO quedan fuera. Aquí el motor SÍ respalda
+                // el corte (sin SELECT sobre orden_compra.total, cuenta_por_pagar ni
+                // producto_proveedor).
+                .requestMatchers(HttpMethod.GET, "/api/informes/compras/**")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "COMPRAS")
+                // LOGÍSTICA / DESPACHO — OTD-LOG-11 (costo del envío por zona) es
+                // DINERO: se cierra a ADMIN/GERENTE. Ese corte lo hace ESTA ruta y
+                // no el motor, porque grp_despacho conserva SELECT sobre envio.costo
+                // (lo escribe al despachar, script 47). Mismo caso declarado que
+                // OTD-INV-07.
+                .requestMatchers(HttpMethod.GET, "/api/informes/logistica/costo-envio")
+                    .hasAnyAuthority("ADMIN", "GERENTE")
+                // OTD-LOG-06: el ciclo RMA lo comparten DESPACHO (tránsito y
+                // recepción), SOPORTE (valida y cierra) y BODEGA (inspección, en
+                // cantidades). Sin columnas de monto: el motor lo respalda.
+                .requestMatchers(HttpMethod.GET, "/api/informes/logistica/devoluciones")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "DESPACHO", "SOPORTE", "BODEGA")
+                // OTD-LOG-01 y OTD-LOG-02: la operación diaria de salida, en estados
+                // y cantidades.
+                .requestMatchers(HttpMethod.GET, "/api/informes/logistica/**")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "DESPACHO")
+                // SOPORTE — los tres informes de la mesa de ayuda (OTD-SOP-01/04/05).
+                // Ninguno lleva dinero, así que no hay corte financiero: los
+                // destinatarios del catálogo son el propio SOPORTE y la jefatura.
+                .requestMatchers(HttpMethod.GET, "/api/informes/soporte/**")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "SOPORTE")
+                // GERENCIA / DIRECCIÓN — OTD-GER-08 (auditoría del sistema) y
+                // OTD-GER-09 (intentos de acceso) son DATOS SENSIBLES DE SEGURIDAD:
+                // el corte más estricto del sistema, solo ADMIN y GERENTE. Se
+                // declaran en su propia línea aunque hoy coincida con la del
+                // departamento, para que ampliar Gerencia a otro rol no los
+                // arrastre por descuido. En /accesos el motor respalda la ruta
+                // (solo esos dos grupos tienen SELECT sobre log_acceso, script 53);
+                // en /auditoria NO, porque grp_analista sí lee log_auditoria: ahí
+                // el corte lo hace ESTA ruta, como en OTD-INV-07 y OTD-LOG-11.
+                .requestMatchers(HttpMethod.GET, "/api/informes/gerencia/auditoria",
+                        "/api/informes/gerencia/accesos")
+                    .hasAnyAuthority("ADMIN", "GERENTE")
+                // Resto de informes de Gerencia (GER-01 foto del día, GER-04
+                // cupones, GER-06 marketing vigente): dirección del negocio, con
+                // montos y presupuesto — ADMIN y GERENTE.
+                .requestMatchers(HttpMethod.GET, "/api/informes/gerencia/**")
+                    .hasAnyAuthority("ADMIN", "GERENTE")
                 // Los informes son SOLO consulta: cualquier método que no sea GET
                 // sobre /api/informes se rechaza de plano.
                 .requestMatchers("/api/informes/**").denyAll()

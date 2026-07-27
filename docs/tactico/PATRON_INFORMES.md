@@ -3,8 +3,12 @@
 **Estado**: establecido el 2026-07-25 con el módulo de **Ventas** (OTD-VEN-01, 02, 08, 10, 15) y
 confirmado el mismo día con **Inventario** (OTD-INV-01, 02, 03, 05, 06, 07, 08), que se construyó
 con 2 clases Java + 1 archivo TS + el enganche, sin tocar la pantalla, el servicio ni los estilos.
-Quedan por construir los otros cuatro departamentos (Compras, Logística, Soporte, Gerencia)
-repitiendo este molde.
+El 2026-07-26 se sumaron **Compras** (OTD-COM-01, 02, 08, 10) y **Logística** (OTD-LOG-01, 02,
+06, 11) con el mismo coste: 4 clases Java + 2 archivos TS + el enganche, cero componentes,
+servicios o estilos nuevos. Ese mismo día cerraron el nivel táctico **Soporte** (OTD-SOP-01, 04,
+05) y **Gerencia** (OTD-GER-01, 04, 06, 08, 09), otra vez con 4 clases Java + 2 archivos TS + el
+enganche. **Los SEIS departamentos están cubiertos**: lo que queda del nivel táctico son los
+objetivos COMPUESTOS, que son trabajo de ETL → ClickHouse y no de este patrón.
 
 **Fuente de verdad de QUÉ informe existe**: `docs/tactico/CATALOGO_OBJETIVOS_TACTICOS.md`.
 Este documento explica CÓMO se construye.
@@ -253,3 +257,92 @@ de cantidades y **403** en `/valor-inventario`; Gerencia y Administración 200 e
 Despacho 403 en los siete. Con la ventana horaria de bodega cerrada, un JWT todavía válido recibe
 **200 con 0 filas** — la RLS `pol_horario` actuando en el motor, que es la prueba de que
 `SET LOCAL ROLE` se está asumiendo de verdad.
+
+## 10. Compras y Logística: cuándo el corte financiero es la CONSULTA
+
+Estos dos módulos (2026-07-26) añaden el tercer caso de segregación. Hasta aquí había dos: el
+motor la respalda (Ventas) o la respalda la RUTA porque el motor no puede (OTD-INV-07). Compras
+aporta el tercero: **el corte lo hace el SQL**.
+
+| Objetivo | Endpoint | Filtros | Notas de implementación |
+|---|---|---|---|
+| OTD-COM-01 Órdenes de compra | `ordenes` | estado, proveedor, desde, hasta | Paginado (865). El estado sintético `pendiente_aprobacion` agrupa 'borrador'+'enviada': NO existe un estado 'aprobada' — aprobar deja la orden en 'confirmada'. Avance de recepción desde el DETALLE |
+| OTD-COM-02 Cuentas por pagar | `cuentas-por-pagar` | estado, situacion, proveedor | Paginado (839). `estado` es la columna; `situacion` se recalcula HOY contra `fecha_vencimiento` (vencida / por_vencer ≤7d / vigente / saldada). Lo pagado = `monto_original − saldo_pendiente` |
+| OTD-COM-08 Defectuosos | `defectuosos` | estado, origen, proveedor, buscar | Paginado (38). **SIN dinero** ⇒ BODEGA entra. Proveedor NULL = «(por asignar)», el cuello de botella real |
+| OTD-COM-10 Catálogo proveedor–producto | `catalogo-proveedor` | buscar, proveedor, oferta | Paginado (1.106). `es_mas_barato` sale de un LATERAL sobre TODAS las ofertas activas, no de una ventana sobre la página filtrada |
+| OTD-LOG-01 Cola de despacho | `cola-despacho` | estado, canal, transportista, buscar | Paginado (48). El universo son los TRES estados del tramo de salida, no solo 'preparado' |
+| OTD-LOG-02 Envíos | `envios` | estado, transportista, desde, hasta, buscar | Paginado (2.872). `atrasado` solo para lo que sigue en tránsito; novedades abiertas aparte porque BLOQUEAN la entrega |
+| OTD-LOG-06 Devoluciones de cliente | `devoluciones` | estado, motivo, desde, hasta, buscar | Paginado (196). Apto/defectuoso/rechazado en columnas separadas: cada uno tiene destino distinto |
+| OTD-LOG-11 Costo de envío | `costo-envio` | zona, transportista, desde, hasta | Sin paginar (9 filas). **CON MONTO**: ADMIN/GERENTE |
+
+Tres lecciones que estos módulos añaden:
+
+1. **Un tercer lugar donde puede vivir el corte financiero: la CONSULTA.** OTD-COM-08 incluye a
+   BODEGA «en cantidades, sin montos», pero el motor no lo impone — el script 45 dio a grp_bodega
+   y grp_compras SELECT sobre `item_defectuoso.costo_unitario` y
+   `devolucion_proveedor.monto_credito` porque el flujo operativo de la devolución al proveedor los
+   necesita. Como el informe comparte endpoint entre roles con y sin dinero, la barrera no puede
+   ser la ruta: es que el SQL **no selecciona** ninguna columna de monto. Queda declarado en el
+   javadoc para que nadie la añada «porque la BD lo deja».
+2. **La ZONA de un envío no es una columna: es una resolución.** `envio` no guarda zona; se deriva
+   de la dirección del pedido por especificidad **ciudad > provincia > país**, la misma cadena de
+   `VentasService.asignarEnvioPorZona`. Agrupar por país daría un promedio sin sentido, porque una
+   zona nacional y una local cubren a la vez la misma dirección y solo la más específica aplicó la
+   tarifa. Los envíos sin zona configurada salen como fila propia con costo 0.00 en vez de
+   esconderse.
+3. **El LATERAL va ANTES del WHERE.** Los informes con agregado por fila (líneas de la orden,
+   novedades del envío, inspección de la devolución) se arman con el triple
+   `tabla + lateral + filtro` de Inventario, no con un `from` monolítico: el conteo de la
+   paginación reutiliza `tabla + filtro` sin pagar el agregado, y concatenar el LATERAL después
+   del WHERE es un error de sintaxis que solo aparece en ejecución.
+
+Verificación de las tres capas (2026-07-26, ocho endpoints × ocho roles): COMPRAS 200 en sus
+cuatro; DESPACHO 200 en LOG-01/02/06 y **403 en `/costo-envio`**; BODEGA 200 solo en
+`/defectuosos` y `/devoluciones`; SOPORTE 200 solo en `/devoluciones`; ADMIN y GERENTE 200 en los
+ocho; VENDEDOR y ANALISTA 403 en los ocho. Un valor fuera de lista blanca devuelve **400** con el
+listado de permitidos, y un POST sobre cualquier ruta de informes **403** por el `denyAll()`.
+
+## 11. Soporte y Gerencia: el dato sensible de seguridad
+
+Estos dos módulos (2026-07-26) cierran el nivel táctico relacional y añaden el caso que faltaba:
+un informe cuyo dato no es dinero sino **seguridad**.
+
+| Objetivo | Endpoint | Filtros | Notas de implementación |
+|---|---|---|---|
+| OTD-SOP-01 Bandeja de tickets | `soporte/bandeja` | estado, prioridad, categoria, agente, buscar | Paginado (248; 128 vivos). El estado sintético `pendientes` —los tres estados no terminales— es el valor por DEFECTO: la bandeja se abre por lo que sigue vivo. Orden por vencimiento, no por fecha |
+| OTD-SOP-04 Tickets por categoría | `soporte/por-categoria` | desde, hasta | Sin paginar (8). Parte de `categoria_ticket` con LEFT JOIN: una categoría en cero es información. El `%` se calcula sobre el total DEL PERÍODO con `sum(count(*)) OVER ()` |
+| OTD-SOP-05 Carga por agente | `soporte/por-agente` | desde, hasta | Sin paginar (7). Parte de los TICKETS, no de los usuarios: la fila «(sin asignar)» es el dato más accionable y va primera |
+| OTD-GER-01 Foto del día | `gerencia/foto-dia` | fecha | Sin paginar (20). CUATRO bloques de agregados en una tabla; el bloque de pendientes es AL MOMENTO, no del día |
+| OTD-GER-04 Cupones | `gerencia/cupones` | situacion, tipo, buscar | Paginado (33; 7 vigentes). `situacion` replica las tres condiciones de canje de `DescuentosService`, no `activo` |
+| OTD-GER-06 Marketing vigente | `gerencia/marketing` | tipo, vigencia, buscar | Paginado (65; 20 vigentes = 6 promos + 6 campañas + 8 banners). UNION de tres tablas bajo una misma definición de vigencia |
+| OTD-GER-08 Auditoría | `gerencia/auditoria` | usuario, tabla, accion, desde, hasta | Paginado (7.073). **SENSIBLE**. jsonb devuelto como texto, sin aplanar |
+| OTD-GER-09 Intentos de acceso | `gerencia/accesos` | resultado, correo, desde, hasta | Paginado (~1.500). **SENSIBLE**. Un solo filtro `resultado` cubre desenlace y motivo |
+
+Tres lecciones que estos módulos añaden:
+
+1. **El dato sensible de seguridad se corta con las DOS capas, aunque una baste.** GER-08 y
+   GER-09 son ADMIN/GERENTE, el corte más estricto del sistema, y cada uno se apoya en una capa
+   distinta: en `/accesos` la RUTA y el MOTOR dicen lo mismo (solo grp_administrador y grp_gerente
+   tienen SELECT sobre `log_acceso`, script 53), pero en `/auditoria` **el motor no alcanza** —
+   grp_analista también lee `log_auditoria` (script 19), así que ahí el corte lo hace la RUTA,
+   igual que en INV-07 y LOG-11. Por eso los dos van en su **propia línea** de `SecurityConfig`
+   aunque hoy coincida con la del departamento: ampliar Gerencia a otro rol no debe arrastrarlos.
+2. **El valor por defecto de un filtro es una decisión de diseño, no un detalle.** SOP-01 arranca
+   en el estado sintético `pendientes`, GER-04 en `situacion=vigente` y GER-06 en
+   `vigencia=vigente`, porque el informe debe abrirse respondiendo la pregunta que lo motiva y no
+   volcando el histórico. Se declara con `valorInicial` en el frontend y la lista blanca del
+   backend lo acepta como un valor más — el sintético se traduce a la condición real en el
+   servicio (`pendientes` → `estado NOT IN ('resuelto','cerrado')`), nunca concatenando SQL.
+3. **Un informe «del día» tiene que decir cuándo el día está vacío.** Los datos del sistema
+   llegan al 2026-07-22 en pedidos y al 23 en cobros; consultar hoy devuelve los bloques del día
+   en cero, que es la verdad, pero una tabla con solo pendientes se lee como una avería. GER-01
+   emite una fila explícita («Sin pedidos, cobros ni facturas en la fecha consultada») cuando los
+   tres bloques del día están vacíos, y el resumen incluye SIEMPRE **«Último día con pedidos»**
+   para saber a dónde mover el filtro. El estado vacío se resuelve con datos, no con un texto fijo.
+
+Verificación de las tres capas (2026-07-26, ocho endpoints × ocho roles): SOPORTE 200 en sus tres
+informes y **403 en los cinco de Gerencia**; ADMIN y GERENTE 200 en los ocho; VENDEDOR, COMPRAS,
+BODEGA, DESPACHO y ANALISTA **403 en los ocho**. En particular, `/gerencia/auditoria` y
+`/gerencia/accesos` responden 200 **solo** a ADMIN y GERENTE, y 403 a los otros seis roles y al
+anónimo. Un valor fuera de lista blanca devuelve **400** con el listado de permitidos en los ocho
+informes, y POST/PUT/DELETE sobre cualquier ruta de informes **403** por el `denyAll()`.

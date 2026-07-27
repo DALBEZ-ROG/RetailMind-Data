@@ -254,8 +254,14 @@
     <!-- Informes Tácticos (uno por departamento, ver docs/tactico/PATRON_INFORMES.md).
          Ventas lleva monto ⇒ sin BODEGA/DESPACHO. Inventario sí incluye a BODEGA:
          seis de sus siete informes son de cantidades, y el de valorización (dinero)
-         queda oculto dentro de la pantalla y negado por SecurityConfig. -->
-    <ng-container *ngIf="canInformesVentas || canInformesInventario">
+         queda oculto dentro de la pantalla y negado por SecurityConfig. Compras
+         admite a BODEGA solo por el pool de defectuosos; Logística admite a
+         DESPACHO en todo menos en el costo del envío, que es dinero. Soporte no
+         tiene dinero en ninguno; Gerencia queda en ADMIN/GERENTE porque incluye
+         los dos informes SENSIBLES de seguridad (auditoría y accesos). -->
+    <ng-container *ngIf="canInformesVentas || canInformesInventario
+                      || canInformesCompras || canInformesLogistica
+                      || canInformesSoporte || canInformesGerencia">
       <div class="sidebar-section-label">Informes Tácticos</div>
 
       <a class="nav-item" *ngIf="canInformesVentas"
@@ -268,6 +274,30 @@
          routerLink="/operativo/informes/inventario" routerLinkActive="active">
         <mat-icon>warehouse</mat-icon>
         <span>Informes de Inventario</span>
+      </a>
+
+      <a class="nav-item" *ngIf="canInformesCompras"
+         routerLink="/operativo/informes/compras" routerLinkActive="active">
+        <mat-icon>shopping_cart</mat-icon>
+        <span>Informes de Compras</span>
+      </a>
+
+      <a class="nav-item" *ngIf="canInformesLogistica"
+         routerLink="/operativo/informes/logistica" routerLinkActive="active">
+        <mat-icon>local_shipping</mat-icon>
+        <span>Informes de Logística</span>
+      </a>
+
+      <a class="nav-item" *ngIf="canInformesSoporte"
+         routerLink="/operativo/informes/soporte" routerLinkActive="active">
+        <mat-icon>support_agent</mat-icon>
+        <span>Informes de Soporte</span>
+      </a>
+
+      <a class="nav-item" *ngIf="canInformesGerencia"
+         routerLink="/operativo/informes/gerencia" routerLinkActive="active">
+        <mat-icon>flag</mat-icon>
+        <span>Informes de Gerencia</span>
       </a>
     </ng-container>
 

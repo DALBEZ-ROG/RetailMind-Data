@@ -291,6 +291,52 @@ export const routes: Routes = [
       import('./features/operativo/informes/informes-departamento.component')
         .then(m => m.InformesDepartamentoComponent)
   },
+  //    Compras: espeja SecurityConfig (/api/informes/compras/**). BODEGA entra a
+  //    la pantalla SOLO por OTD-COM-08 (pool de defectuosos, sin dinero); los
+  //    otros tres llevan monto y su ruta REST se los niega.
+  {
+    path: 'operativo/informes/compras',
+    data: { departamento: 'compras' },
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'COMPRAS', 'BODEGA'])],
+    loadComponent: () =>
+      import('./features/operativo/informes/informes-departamento.component')
+        .then(m => m.InformesDepartamentoComponent)
+  },
+  //    Logística: espeja SecurityConfig (/api/informes/logistica/**). DESPACHO es
+  //    el destinatario de los tres informes de estados y cantidades y queda fuera
+  //    de OTD-LOG-11 (costo del envío, dinero), que su ruta REST le niega.
+  {
+    path: 'operativo/informes/logistica',
+    data: { departamento: 'logistica' },
+    canActivate: [authGuard,
+      roleGuard(['ADMIN', 'GERENTE', 'DESPACHO', 'SOPORTE', 'BODEGA'])],
+    loadComponent: () =>
+      import('./features/operativo/informes/informes-departamento.component')
+        .then(m => m.InformesDepartamentoComponent)
+  },
+  //    Soporte: espeja SecurityConfig (/api/informes/soporte/**). Ningún informe
+  //    de la mesa de ayuda lleva dinero, así que no hay corte financiero: los
+  //    destinatarios son el propio SOPORTE y la jefatura.
+  {
+    path: 'operativo/informes/soporte',
+    data: { departamento: 'soporte' },
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'SOPORTE'])],
+    loadComponent: () =>
+      import('./features/operativo/informes/informes-departamento.component')
+        .then(m => m.InformesDepartamentoComponent)
+  },
+  //    Gerencia: espeja SecurityConfig (/api/informes/gerencia/**). Los cinco son
+  //    de dirección y dos de ellos (OTD-GER-08 auditoría y OTD-GER-09 accesos)
+  //    son DATOS SENSIBLES DE SEGURIDAD, el corte más estricto del sistema: el
+  //    departamento entero queda en ADMIN + GERENTE.
+  {
+    path: 'operativo/informes/gerencia',
+    data: { departamento: 'gerencia' },
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE'])],
+    loadComponent: () =>
+      import('./features/operativo/informes/informes-departamento.component')
+        .then(m => m.InformesDepartamentoComponent)
+  },
   // ── Seguridad: intentos de acceso al sistema (OTD-GER-09, script 53) —
   //    informe solo ADMIN/GERENTE (espeja SecurityConfig y los GRANTs)
   {

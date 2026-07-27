@@ -232,8 +232,14 @@ export class InformesDepartamentoComponent implements OnInit {
     return col.color ? col.color(fila) : 'neutral';
   }
 
-  /** Barra de avance: solo cuando el resumen trae un porcentaje (VEN-15). */
+  /**
+   * Barra de avance: solo para los informes que la piden (`barraAvance`) y que
+   * traen un porcentaje en el resumen. No basta con que HAYA un porcentaje —
+   * una tasa de resolución (SOP-05) o una ocupación media (INV-08) no son un
+   * avance sobre una meta, y pintarlas como tal sería un dato falso.
+   */
   get avance(): number | null {
+    if (!this.actual?.barraAvance) { return null; }
     const k = this.resumen.find(r => r.tipo === 'porcentaje');
     return k ? Math.min(Number(k.valor), 100) : null;
   }
