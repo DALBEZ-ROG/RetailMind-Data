@@ -250,6 +250,14 @@ public class SecurityConfig {
                 // resena/pregunta_producto, que el VENDEDOR no tiene en el motor).
                 .requestMatchers(HttpMethod.GET, "/api/informes/ventas/moderacion")
                     .hasAnyAuthority("ADMIN", "GERENTE")
+                // OTD-VEN-16 (participación de la venta por canal) es una lectura de
+                // DIRECCIÓN, no de gestión de cartera: sostiene el objetivo
+                // estratégico OE-06 y entra el ANALISTA, que en el resto de Ventas no
+                // participa. El VENDEDOR queda fuera: la composición del ingreso por
+                // canal no es su atribución. Lleva MONTO, así que BODEGA y DESPACHO
+                // tampoco entran (el motor lo respalda: sin SELECT sobre pedido.total).
+                .requestMatchers(HttpMethod.GET, "/api/informes/ventas/participacion-canal")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "ANALISTA")
                 // Resto de informes de Ventas (VEN-01/02/08/15): llevan MONTO, por
                 // lo que BODEGA y DESPACHO quedan fuera por segregación financiera
                 // (el motor lo respalda: sin SELECT sobre pedido.total, carrito ni

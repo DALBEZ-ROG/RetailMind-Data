@@ -1,7 +1,7 @@
 import { ColorChip, DefinicionDepartamento } from '../../../../core/models/informe.model';
 
 /**
- * INFORMES TÁCTICOS DE VENTAS — los cinco objetivos SIMPLES del catálogo
+ * INFORMES TÁCTICOS DE VENTAS — los seis objetivos SIMPLES del catálogo
  * (`docs/tactico/CATALOGO_OBJETIVOS_TACTICOS.md` §3).
  *
  * Este archivo es TODO lo que hay que escribir para la pantalla: la
@@ -40,7 +40,8 @@ const MOTIVO_MODERACION: Record<string, string> = {
 export const INFORMES_VENTAS: DefinicionDepartamento = {
   departamento: 'ventas',
   titulo: 'Informes de Ventas',
-  descripcion: 'Dirección y control de la cartera, el equipo comercial y la voz del cliente',
+  descripcion: 'Dirección y control de la cartera, el equipo comercial, la voz del cliente y '
+             + 'la composición de la venta por canal',
   icono: 'insights',
   informes: [
 
@@ -214,6 +215,48 @@ export const INFORMES_VENTAS: DefinicionDepartamento = {
         { campo: 'dias_transcurridos', titulo: 'Días corridos', tipo: 'numero' },
         { campo: 'dias_del_periodo',  titulo: 'Días del mes',  tipo: 'numero' },
         { campo: 'fijada_por',        titulo: 'Fijada por',    tipo: 'texto', recortar: 22 }
+      ]
+    },
+
+    // ── OTD-VEN-16 ────────────────────────────────────────────────────
+    // Sostiene el objetivo estratégico OE-06. Es la FOTO del período; la
+    // evolución mensual de esta misma participación es OTD-VEN-13, COMPUESTO,
+    // y se resuelve en ClickHouse por el ETL.
+    {
+      id: 'OTD-VEN-16',
+      endpoint: 'participacion-canal',
+      titulo: 'Participación de la venta por canal',
+      descripcion: 'Cuánto pone cada canal en la venta del período: pedidos, monto, ticket '
+                 + 'promedio y porcentaje de participación. No separa B2B de B2C: el segmento '
+                 + 'del comprador no está capturado en la base (la columna «Clientes negocio» '
+                 + 'mide esa ausencia).',
+      icono: 'donut_large',
+      roles: ['ADMIN', 'GERENTE', 'ANALISTA'],
+      sinPaginar: true,
+      vacio: 'No hay pedidos registrados en el período elegido.',
+      filtros: [
+        { param: 'canal', etiqueta: 'Canal', tipo: 'select', opciones: [
+          { valor: '',         etiqueta: 'Todos los canales' },
+          { valor: 'web',      etiqueta: 'Tienda en línea' },
+          { valor: 'tienda',   etiqueta: 'Mostrador' },
+          { valor: 'telefono', etiqueta: 'Teléfono' }
+        ] },
+        { param: 'desde', etiqueta: 'Desde', tipo: 'fecha' },
+        { param: 'hasta', etiqueta: 'Hasta', tipo: 'fecha' }
+      ],
+      columnas: [
+        { campo: 'canal',            titulo: 'Canal',   tipo: 'chip',
+          color: f => f['canal'] === 'web' ? 'info' : 'neutral',
+          etiqueta: v => CANAL[v] || v },
+        { campo: 'pedidos',          titulo: 'Pedidos', tipo: 'numero' },
+        { campo: 'monto_vendido',    titulo: 'Monto vendido',   tipo: 'moneda', monto: true },
+        { campo: 'ticket_promedio',  titulo: 'Ticket promedio', tipo: 'moneda', monto: true },
+        { campo: 'participacion_pedidos_pct', titulo: '% de pedidos', tipo: 'porcentaje' },
+        { campo: 'participacion_monto_pct',   titulo: '% del monto',  tipo: 'porcentaje' },
+        { campo: 'clientes',         titulo: 'Clientes', tipo: 'numero' },
+        { campo: 'clientes_negocio', titulo: 'Clientes negocio (B2B)', tipo: 'numero' },
+        { campo: 'cancelados',       titulo: 'Cancelados',   tipo: 'numero' },
+        { campo: 'ultima_venta',     titulo: 'Última venta', tipo: 'fecha' }
       ]
     }
   ]

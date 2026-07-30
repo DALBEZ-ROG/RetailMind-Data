@@ -1,12 +1,21 @@
 # Catálogo de objetivos tácticos por departamento — RetailMind
 
-**Versión 3 — sincronizada con el estado real del sistema el 2026-07-26.** Reemplaza por completo
+**Versión 4 — sincronizada con el estado real del sistema el 2026-07-29.** Reemplaza por completo
 la tabla de 25 objetivos del documento TA11 original y actualiza la versión ampliada del
 2026-07-21/22. Toda cita de tabla.columna y todo conteo de este catálogo fue **re-verificado vía
 MCP contra la base real `retailmind`** (PostgreSQL, **110 tablas** en el esquema `public`, conteo
 confirmado el 2026-07-26 — eran 109 antes de que el script 48 creara `meta_venta`).
 
-Qué cambió respecto de la versión anterior, y por qué:
+**Qué cambió en la versión 4 (2026-07-29)**: se incorporó **OTD-VEN-16** «Participación de la venta
+por canal» —SIMPLE, ya implementado en pantalla— a pedido de `docs/estrategico/BASE_ESTRATEGICA.md`
+§6.1, para sostener el objetivo estratégico **OE-06 «Desarrollo Omnicanal con foco en expansión
+mayorista»**, que hasta entonces no tenía ningún informe simple propio. El catálogo pasa de 68 a
+**69 objetivos** y de 29 a **30 simples**, con **29 implementados**. Se aclaró además que
+**OTD-VEN-13 es su par COMPUESTO** (la misma participación, pero mes a mes). Queda documentado en la
+ficha de OTD-VEN-16 que el informe **no separa B2B de B2C** y por qué: el dato del segmento no se
+captura en ninguna parte de la base.
+
+Qué cambió en la versión 3 respecto de la anterior, y por qué:
 
 1. **La factibilidad se recalculó por completo.** Entre el 2026-07-22 y el 2026-07-25 se cerraron
    las seis brechas de sistema que quedaban (scripts 46-53) y se sembró la operación histórica de
@@ -23,8 +32,8 @@ Qué cambió respecto de la versión anterior, y por qué:
    volumen a cliente corporativo recurrente, margen de distribución, abastecimiento como centro
    de costo dominante). Los datos no cambian; cambia la lectura de negocio que los enmarca.
 4. **Se marca qué objetivos ya tienen reporte en pantalla implementado** (columna «Reporte»):
-   **28 de los 29 informes SIMPLES** están construidos y consultables en la aplicación, en los
-   seis departamentos.
+   **29 de los 30 informes SIMPLES** están construidos y consultables en la aplicación, en los
+   seis departamentos (28 de 29 al cerrar la versión 3; OTD-VEN-16 sumó uno a cada lado).
 
 ---
 
@@ -51,8 +60,8 @@ tomar, sin mirar el catálogo ni el esquema), se cruzó pregunta por pregunta co
 contra la base real, y de los 20 puntos ciegos detectados se incorporaron los 11 de mayor valor
 de dirección; los 9 restantes quedaron registrados con su motivo en Decisiones de alcance.
 
-Este documento aplica ese proceso: define **68 objetivos**, los contrasta uno a uno contra la
-base real y marca **66** como respondibles hoy, **0** que exijan un cambio en el sistema y **2**
+Este documento aplica ese proceso: define **69 objetivos**, los contrasta uno a uno contra la
+base real y marca **67** como respondibles hoy, **0** que exijan un cambio en el sistema y **2**
 que aún esperan volumen de datos. Los informes tácticos se consultan **por pantalla**, con
 filtros y registros visibles; no se entregan como PDF descargable (los documentos operativos —
 facturas, guías, comprobantes — siguen siendo PDF).
@@ -113,11 +122,18 @@ lista filas antiguas sin agregarlas (el historial de movimientos de UN producto,
 auditoría filtrado) sigue siendo SIMPLE: es una consulta directa filtrada, no un barrido agregado
 del histórico.
 
-Aplicada esta regla, los 68 objetivos se verificaron uno a uno. Los **ocho** simples que
-contienen agregación (OTD-VEN-02, OTD-VEN-15, OTD-COM-11, OTD-INV-07, OTD-LOG-11, OTD-SOP-04,
-OTD-SOP-05, OTD-GER-01) agregan sobre la foto presente sin comparar períodos y permanecen
-SIMPLES. **Un solo objetivo cambió de clasificación en toda la vida del catálogo**: OTD-LOG-11
-(ver sección 6).
+Aplicada esta regla, los 69 objetivos se verificaron uno a uno. Los **nueve** simples que
+contienen agregación (OTD-VEN-02, OTD-VEN-15, **OTD-VEN-16**, OTD-COM-11, OTD-INV-07, OTD-LOG-11,
+OTD-SOP-04, OTD-SOP-05, OTD-GER-01) agregan sobre la foto presente sin comparar períodos y
+permanecen SIMPLES. **Un solo objetivo cambió de clasificación en toda la vida del catálogo**:
+OTD-LOG-11 (ver sección 6).
+
+El par **OTD-VEN-16 / OTD-VEN-13** es el ejemplo más limpio de la regla, y por eso conviene
+retenerlo: la MISMA pregunta de negocio («¿qué participación tiene cada canal en la venta?») cae a
+un lado o al otro según si se responde sobre el período consultado —foto agregada, **SIMPLE**, se
+resuelve con un `GROUP BY canal` en PostgreSQL— o mes a mes a lo largo del histórico —serie
+temporal, **COMPUESTO**, va a ClickHouse—. No es el dato lo que decide, es la forma de la
+pregunta.
 
 La segregación financiera del sistema se respeta en la columna de destinatarios: **Bodega y
 Despacho nunca ven montos de dinero**, solo cantidades y estados.
@@ -150,9 +166,10 @@ negocio: 4.083 pedidos por $5.716.436,55 en 19 meses (2.213 web, 1.030 mostrador
 | OTD-VEN-10 | Atender a tiempo la voz del cliente: reseñas en espera de aprobación y preguntas sobre productos sin responder. | X | — | BDR | `resena.estado` (**344 reseñas, 53 pendientes**), `pregunta_producto.estado` (**49 preguntas, 13 pendientes**) y existencia de `respuesta_pregunta` (29) | FACTIBLE HOY | ✔ implementado | Cola de moderación con antigüedad — Administrador, Gerente (moderadores del sistema) |
 | OTD-VEN-11 | Conocer la calificación que los clientes dan a cada producto y cómo evoluciona. | — | X | BDColumnar | `resena.calificacion/producto_id/fecha_creacion/compra_verificada` — **344 reseñas sobre 268 productos distintos, en 18 meses** | FACTIBLE HOY | — (ETL) | Ranking de productos por calificación — Gerente, Vendedor, Analista |
 | OTD-VEN-12 | Saber cuántos cobros en línea fallan y por qué motivo, para no perder ventas en el paso del pago. | — | X | BDColumnar | Brecha CERRADA (script 52): `pago.estado` registra hoy **'completado' y 'fallido' (176 fallidos)** y `transaccion_pago.tipo` distingue 'autorizacion' (176, todas de pagos fallidos) de 'captura' (3.903); `respuesta_pasarela` guarda el motivo — **6 motivos reales**: fondos_insuficientes 40, datos_incorrectos 38, tarjeta_rechazada 37, error_pasarela 31, limite_excedido 28 | FACTIBLE HOY | — (ETL) | Tabla de intentos fallidos por motivo y período — Gerente, Administrador |
-| OTD-VEN-13 | Saber cuánto vende cada canal — mostrador, teléfono y tienda en línea — y qué parte de la venta total pone cada uno, por período. | — | X | BDColumnar | `pedido.canal/total/fecha_pedido` — poblados en los 4.083 pedidos: web $3.073.238,46 / tienda $1.438.538,94 / teléfono $1.204.659,15 | FACTIBLE HOY | — (ETL) | Participación de cada canal en la venta, por mes — Gerente, Vendedor, Analista, Administrador |
+| OTD-VEN-13 | Saber cómo **evoluciona** mes a mes lo que vende cada canal —mostrador, teléfono y tienda en línea— y cómo cambia en el tiempo la parte que pone cada uno. **Par COMPUESTO de OTD-VEN-16**: misma pregunta de negocio, pero como serie temporal en vez de foto del período. | — | X | BDColumnar | `pedido.canal/total/fecha_pedido` — poblados en los 4.083 pedidos: web $3.073.238,46 / tienda $1.438.538,94 / teléfono $1.204.659,15, repartidos en **19 meses** (es el recorrido del histórico lo que lo hace compuesto) | FACTIBLE HOY | — (ETL) | Evolución mensual de la participación por canal — Gerente, Vendedor, Analista, Administrador |
 | OTD-VEN-14 | Saber cuánto dinero devuelven los clientes al mes y qué porcentaje de la venta representa, para frenar a tiempo si se dispara. | — | X | BDColumnar | `devolucion.monto_total/fecha_creacion` (**196 devoluciones, $95.693,89**, mantenido por el trigger `fn_recalcular_total_devolucion`) contra `pedido.total/fecha_pedido` | FACTIBLE HOY | — (ETL) | Valor devuelto y porcentaje sobre la venta, mensual — Gerente, Administrador, Analista (Bodega y Despacho NO: es dinero) |
 | OTD-VEN-15 | Seguir la venta acumulada del período contra la meta que se fijó, para reaccionar a media quincena y no enterarse al cierre del mes. | X | — | BDR | Brecha CERRADA (script 48 + 84): tabla **`meta_venta` (anio, mes, departamento, monto_meta, fijada_por, activo)** con **133 filas = 7 departamentos × 19 meses**; la venta real se calcula desde `factura_venta` no anulada del mes | FACTIBLE HOY | ✔ implementado | Avance de venta contra la meta del período — Gerente, Vendedor, Administrador |
+| OTD-VEN-16 | Conocer de dónde viene el ingreso: qué participación pone cada canal —mostrador, teléfono y tienda en línea— en la venta del período, con pedidos, monto, ticket promedio y porcentaje, para dirigir el desarrollo omnicanal. | X | — | BDR | `pedido.canal` (CHECK del motor: solo `'web'`/`'tienda'`/`'telefono'`) + `pedido.total/fecha_pedido/cliente_id` + `estado_pedido.codigo` — **4.083 pedidos; neto de 159 cancelados: web 2.132 / $2.962.187,16 (53,87 %), mostrador 990 / $1.388.194,13 (25,25 %), teléfono 802 / $1.148.189,06 (20,88 %)**, suma $5.498.570,35 y 100,00 %. **NO separa B2B de B2C**: `canal` es el MEDIO de entrada, no el segmento del comprador — `grupo_cliente`/`segmento_cliente`/`cliente_segmento` tienen 0 filas, los 72 clientes tienen `grupo_cliente_id` NULL y `tipo_identificacion='cedula'`, y las 3.887 facturas llevan identificación de 10 dígitos (sin RUC). La columna `clientes_negocio` expone esa FK vacía (0 en los tres canales) para MEDIR la ausencia sin inventar la clasificación | FACTIBLE HOY | ✔ implementado | Participación de cada canal en la venta del período — Gerente, Administrador, Analista (**CON MONTO**: Bodega y Despacho NO; el Vendedor tampoco: no es su atribución) |
 
 ## 4. COMPRAS (OTD-COM)
 
@@ -275,38 +292,44 @@ campañas) y el control interno (quién hizo qué en el sistema y quién intenta
 
 ## 9. RESUMEN CUANTITATIVO
 
-**Total: 68 objetivos tácticos** (57 de la primera ronda + 11 incorporados por la auditoría del
-cuestionario de negocio).
+**Total: 69 objetivos tácticos** (57 de la primera ronda + 11 incorporados por la auditoría del
+cuestionario de negocio + 1 incorporado el 2026-07-29 para sostener el objetivo estratégico OE-06).
 
 | Clasificación | Cantidad | Porcentaje |
 |---|---|---|
-| Informes SIMPLES (BDR PostgreSQL) | 29 | 42,6 % |
-| Informes COMPUESTOS (BDColumnar ClickHouse) | 39 | 57,4 % |
+| Informes SIMPLES (BDR PostgreSQL) | 30 | 43,5 % |
+| Informes COMPUESTOS (BDColumnar ClickHouse) | 39 | 56,5 % |
 
 | Departamento | Objetivos | Simples | Compuestos | Reportes implementados |
 |---|---|---|---|---|
-| Ventas | 15 | 5 | 10 | 5 de 5 |
+| Ventas | 16 | 6 | 10 | 6 de 6 |
 | Compras | 12 | 5 | 7 | 4 de 5 |
 | Inventario / Bodega | 10 | 7 | 3 | 7 de 7 |
 | Logística / Despacho | 12 | 4 | 8 | 4 de 4 |
 | Soporte | 8 | 3 | 5 | 3 de 3 |
 | Gerencia / Dirección (incl. Marketing) | 11 | 5 | 6 | 5 de 5 |
-| **Total** | **68** | **29** | **39** | **28 de 29** |
+| **Total** | **69** | **30** | **39** | **29 de 30** |
 
-Verificación aritmética: 15+12+10+12+8+11 = 68; simples 5+5+7+4+3+5 = 29; compuestos
-10+7+3+8+5+6 = 39; 29+39 = 68. Reportes 5+4+7+4+3+5 = 28.
+Verificación aritmética: 16+12+10+12+8+11 = 69; simples 6+5+7+4+3+5 = 30; compuestos
+10+7+3+8+5+6 = 39; 30+39 = 69. Reportes 6+4+7+4+3+5 = 29.
 
-**Cambio respecto de la versión anterior**: eran 28 simples / 40 compuestos. OTD-LOG-11 se
+**Cambio respecto de la versión 3**: se incorporó **OTD-VEN-16** (participación de la venta por
+canal, SIMPLE, ya implementado), pedido por la base estratégica para sostener OE-06 «Desarrollo
+Omnicanal con foco en expansión mayorista». Ventas pasa de 15/5 a 16/6 y el total de simples de 29
+a 30. No se reclasificó ningún objetivo: OTD-VEN-13 sigue COMPUESTO y es el par temporal del nuevo
+(la foto es SIMPLE, la evolución mes a mes no).
+
+**Cambio de la versión 2 a la 3**: eran 28 simples / 40 compuestos. OTD-LOG-11 se
 reclasificó de COMPUESTO a SIMPLE (ver nota en la sección 6), lo que mueve una unidad de
 Logística: de 3/9 a 4/8.
 
 | Estado de factibilidad | Cantidad | Objetivos |
 |---|---|---|
-| FACTIBLE HOY | 66 | Todos salvo los dos listados abajo |
+| FACTIBLE HOY | 67 | Todos salvo los dos listados abajo |
 | REQUIERE CAMBIO EN EL SISTEMA | 0 | — (las 10 brechas históricas están cerradas) |
 | REQUIERE VOLUMEN DE DATOS | 2 | COM-09, GER-07 |
 
-Verificación aritmética: 66 + 0 + 2 = 68.
+Verificación aritmética: 67 + 0 + 2 = 69.
 
 Evolución del estado de factibilidad a lo largo del proyecto:
 
@@ -314,7 +337,8 @@ Evolución del estado de factibilidad a lo largo del proyecto:
 |---|---|---|---|
 | 2026-07-21 (catálogo ampliado) | 44 | 10 | 14 |
 | 2026-07-22 (cierre de 4 brechas) | 45 | 6 | 17 |
-| **2026-07-26 (esta versión)** | **66** | **0** | **2** |
+| 2026-07-26 (versión 3) | 66 | 0 | 2 |
+| **2026-07-29 (esta versión)** | **67** | **0** | **2** |
 
 El salto de 45 a 66 tiene dos causas verificadas: (a) el cierre de las 6 brechas de sistema
 restantes con los scripts 46-53 (metas de venta, pagos fallidos, catálogo proveedor-producto,
@@ -339,7 +363,7 @@ Ningún módulo operativo del sistema queda sin al menos un objetivo que lo recl
 
 | Módulo operativo del sistema | Objetivos que lo cubren |
 |---|---|
-| Ciclo de venta (pedidos, estados, historial) | OTD-VEN-01, VEN-06, VEN-07, VEN-13, VEN-15, LOG-12, GER-01 |
+| Ciclo de venta (pedidos, estados, historial) | OTD-VEN-01, VEN-06, VEN-07, VEN-13, VEN-15, VEN-16, LOG-12, GER-01 |
 | Vendedores / trazabilidad de autor del pedido | OTD-VEN-02 |
 | Catálogo de productos y ranking de ventas | OTD-VEN-03, VEN-04, GER-10 |
 | Clientes (visión desde el cliente) | OTD-VEN-05 |
@@ -412,9 +436,9 @@ representativo.
 | OTD-COM-09 | 8 devoluciones a proveedor, 6 con resolución ($4.196,85 en notas de crédito y 3 reposiciones), repartidas en 6 meses distintos: un agregado «por proveedor y período» sobre 11 proveedores y 19 meses no discrimina | Ninguno — el ciclo completo (pool de defectuosos → devolución → nota de crédito/reposición) ya opera desde el script 45 | BAJO |
 | OTD-GER-07 | 123 líneas efectivamente promocionadas frente a 4.133 líneas de línea base: la ventana «durante» es demasiado pequeña para sostener la comparación antes/durante producto por producto | Ninguno — promociones y descuentos por línea ya se escriben solos (scripts 40, 73). Densificarlo exigiría reasignar ventas ya sembradas: **limitación aceptada y declarada** | BAJO |
 
-## 11.5 REPORTES SIMPLES IMPLEMENTADOS (28 de 29)
+## 11.5 REPORTES SIMPLES IMPLEMENTADOS (29 de 30)
 
-Los 28 informes SIMPLES construidos se consultan **por pantalla** en
+Los 29 informes SIMPLES construidos se consultan **por pantalla** en
 `/operativo/informes/{departamento}`, todos bajo el mismo contrato
 (`GET /api/informes/{departamento}/{informe}` devolviendo `{items, total, page, size, resumen}`).
 No hay exportación a PDF: el nivel táctico se consulta con filtros y registros visibles. La
@@ -428,6 +452,7 @@ PostgreSQL (GRANTs por columna + RLS) y, cuando el motor no alcanza, la propia c
 | OTD-VEN-08 | `ventas/carritos-abandonados` | estado, días mínimos | 216 abandonados | Gerente, Vendedor, Admin |
 | OTD-VEN-10 | `ventas/moderacion` | tipo, días mínimos | 53 reseñas + 13 preguntas pendientes | Admin, Gerente |
 | OTD-VEN-15 | `ventas/avance-meta` | período (mes) | 133 metas | Gerente, Vendedor, Admin |
+| OTD-VEN-16 | `ventas/participacion-canal` | canal, desde/hasta | 3 filas ($5.498.570,35 netos) | **CON MONTO**: Gerente, Admin, Analista (sin Vendedor) |
 | OTD-COM-01 | `compras/ordenes` | estado, proveedor, desde/hasta | 865 | Compras, Gerente, Admin |
 | OTD-COM-02 | `compras/cuentas-por-pagar` | estado, situación, proveedor | 839 (276 vivas) | Compras, Gerente, Admin |
 | OTD-COM-08 | `compras/defectuosos` | estado, origen, proveedor, buscar | 38 | Compras, Gerente, **Bodega** (sin montos: los corta el SQL) |
@@ -457,6 +482,13 @@ catálogo aún no construido; su dato está verificado y disponible (259 líneas
 2.949). Los 39 objetivos COMPUESTOS no se implementan en este nivel: son trabajo del pipeline
 ETL hacia ClickHouse.
 
+**OTD-VEN-16 es la prueba de que el patrón sigue costando lo que promete**: se añadió a un
+departamento YA existente con **un método de servicio, un endpoint, una línea de `SecurityConfig` y
+un objeto de definición** — ningún componente, servicio, estilo ni archivo nuevo en el frontend, y
+cero cambios de esquema. Es también el primer informe de Ventas donde **entra el ANALISTA y sale el
+VENDEDOR**, lo que obligó a darle su propia línea de autorización antes del comodín
+`/api/informes/ventas/**` (el orden importa: de lo específico a lo general).
+
 El detalle de CÓMO se construyen (patrón, contrato, seguridad y lecciones por módulo) vive en
 `docs/tactico/PATRON_INFORMES.md`.
 
@@ -467,11 +499,21 @@ El detalle de CÓMO se construyen (patrón, contrato, seguridad y lecciones por 
   reclama a propósito.
 - **Ubicación física dentro de bodega (pasillo/estante)**: `ubicacion_bodega` sigue vacía. Es una
   necesidad operativa de picking, no de dirección táctica; se excluye del catálogo.
-- **Segmentación de clientes (grupos, edad, género)**: `grupo_cliente`, `segmento_cliente` y
-  `cliente_segmento` siguen con 0 filas, aunque el universo de clientes ya no es el limitante
-  (72 clientes, 70 con fecha de nacimiento). La brecha es de captura, no de volumen: ninguna
-  pantalla asigna cliente a segmento. Se reevaluará junto con OTD-VEN-05 cuando el negocio defina
-  su política de segmentación mayorista (por ejemplo, por escalón de volumen anual).
+- **Segmentación de clientes (grupos, edad, género) — y con ella el corte B2B / B2C**:
+  `grupo_cliente`, `segmento_cliente` y `cliente_segmento` siguen con 0 filas, aunque el universo de
+  clientes ya no es el limitante (72 clientes, 70 con fecha de nacimiento). La brecha es de captura,
+  no de volumen: ninguna pantalla asigna cliente a segmento. Se reevaluará junto con OTD-VEN-05
+  cuando el negocio defina su política de segmentación mayorista (por ejemplo, por escalón de
+  volumen anual). **Esta decisión de alcance es la razón por la que OTD-VEN-16 informa por CANAL y
+  no por segmento**: `pedido.canal` es el medio de entrada del pedido, no el tipo de comprador, y
+  agrupar por canal llamándolo «B2B vs. B2C» sería falsear el dato. Verificado el 2026-07-29 en modo
+  lectura: los 72 clientes con `grupo_cliente_id` NULL y `tipo_identificacion='cedula'`, las 3.887
+  facturas con identificación de 10 dígitos (el RUC ecuatoriano tiene 13), y ningún pedido con
+  conducta mayorista en ningún canal (mediana 4-5 unidades, máximo 24, **cero** pedidos de ≥50
+  unidades). El informe deja la ausencia a la vista en su columna `clientes_negocio` (0 en los tres
+  canales) en vez de disimularla. La versión segmentada está registrada como propuesta
+  **OTD-VEN-17** en `docs/estrategico/BASE_ESTRATEGICA.md` §6.1.b, en REQUIERE CAMBIO EN EL SISTEMA
+  hasta que las tres capas capturen el segmento.
 - **Lista de deseos y comparador de productos**: `wishlist` (2 filas) y `comparacion` (0 filas)
   no sostienen hoy una decisión de dirección; la señal de demanda del cliente ya la aporta el
   módulo de recomendaciones (analítica, fuera de alcance de este catálogo).

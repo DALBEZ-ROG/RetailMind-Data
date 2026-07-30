@@ -99,4 +99,19 @@ public class InformesVentasController {
             @RequestParam(required = false) Integer mes) {
         return servicio.avanceMeta(anio, mes);
     }
+
+    /**
+     * OTD-VEN-16 — Participación de la venta por canal (foto del período).
+     * GET /api/informes/ventas/participacion-canal?canal=&desde=&hasta=
+     *
+     * Sostiene OE-06. NO separa B2B de B2C: el segmento del comprador no está
+     * capturado en la base (ver la limitación declarada en el servicio).
+     */
+    @GetMapping("/participacion-canal")
+    public Map<String, Object> participacionCanal(
+            @RequestParam(required = false) String canal,
+            @RequestParam(required = false) String desde,
+            @RequestParam(required = false) String hasta) {
+        return servicio.participacionCanal(canal, desde, hasta);
+    }
 }

@@ -23,10 +23,13 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li><b>OTD-VEN-08</b> {@link #carritosAbandonados} — carritos dejados a medias.</li>
  *   <li><b>OTD-VEN-10</b> {@link #colaModeracion} — voz del cliente en espera.</li>
  *   <li><b>OTD-VEN-15</b> {@link #avanceMeta} — venta acumulada contra la meta del período.</li>
+ *   <li><b>OTD-VEN-16</b> {@link #participacionCanal} — participación de cada canal en la venta.</li>
  * </ul>
  *
  * Los COMPUESTOS de Ventas (tendencias, top de productos por período, ticket
- * promedio) NO viven aquí: pertenecen a la fase ETL → ClickHouse.
+ * promedio) NO viven aquí: pertenecen a la fase ETL → ClickHouse. En
+ * particular, OTD-VEN-13 —la EVOLUCIÓN MENSUAL de la participación por canal—
+ * es el par compuesto de OTD-VEN-16 y no se resuelve en PostgreSQL.
  *
  * TODO método va en {@code @Transactional(readOnly = true)} para que
  * PgSessionRoleAspect asuma el grp_* del usuario: sin transacción la consulta
@@ -407,6 +410,117 @@ public class InformesVentasService extends InformeServiceBase {
         res.put("mes", m);
         return conResumen(res, kpis);
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // OTD-VEN-16 — Participación de la venta por canal
+    // ─────────────────────────────────────────────────────────────────────
+
+    /**
+     * Foto de la composición de la venta: cuántos pedidos, cuánto dinero, qué
+     * ticket promedio y qué porcentaje de participación pone cada canal en el
+     * período consultado. Sostiene el objetivo estratégico OE-06 (desarrollo
+     * omnicanal con foco en expansión mayorista) mostrando de dónde viene hoy
+     * el ingreso.
+     *
+     * <b>Alcance: SIMPLE.</b> Agrega sobre el presente sin comparar períodos,
+     * como OTD-VEN-02 o OTD-SOP-04. La EVOLUCIÓN MENSUAL de esta misma
+     * participación es OTD-VEN-13, COMPUESTO, y va a ClickHouse por el ETL.
+     *
+     * <b>LIMITACIÓN DECLARADA — este informe NO separa B2B de B2C.</b>
+     * Verificado contra la base real el 2026-07-29: {@code pedido.canal} solo
+     * admite 'web', 'tienda' y 'telefono' (CHECK del motor), que son el MEDIO
+     * por el que entró el pedido, no el tipo de comprador. Y el segmento del
+     * comprador no está capturado en ninguna parte: {@code grupo_cliente},
+     * {@code segmento_cliente} y {@code cliente_segmento} tienen 0 filas, los
+     * 72 clientes tienen {@code grupo_cliente_id} NULL y
+     * {@code tipo_identificacion = 'cedula'} (persona natural; un negocio
+     * ecuatoriano llevaría RUC de 13 dígitos, y las 3.887 facturas de venta
+     * tienen identificación de 10). Por eso el informe agrupa por la dimensión
+     * que SÍ existe —el canal— y expone la columna {@code clientes_negocio}
+     * (clientes distintos con {@code grupo_cliente_id} asignado, la FK prevista
+     * para el segmento mayorista), que hoy vale 0 en los tres canales: así el
+     * informe MIDE la ausencia de B2B en vez de inventar una clasificación que
+     * el dato no soporta. Cerrar esa brecha es cambio de sistema en tres capas
+     * (poblar grupo_cliente, exponer el segmento en el alta de cliente,
+     * selector en la ficha), no un informe.
+     *
+     * Los pedidos cancelados NO cuentan como venta —igual que en OTD-VEN-02—
+     * pero se muestran en columna propia para que no desaparezcan del análisis.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> participacionCanal(String canal, String desde, String hasta) {
+        String can = opcion(canal, CANALES, "canal");
+        String d = fecha(desde, "desde");
+        String h = fecha(hasta, "hasta");
+        exigirRangoValido(d, h);
+
+        // La participación se calcula con sum(...) OVER () sobre los canales
+        // que quedan DENTRO del filtro: si se acota a un canal, ese canal es el
+        // 100 % de lo mostrado, que es la lectura correcta de «lo filtrado».
+        List<Map<String, Object>> items = pg.queryForList("""
+                SELECT p.canal,
+                       count(*) FILTER (WHERE ep.codigo <> 'cancelado') AS pedidos,
+                       COALESCE(sum(p.total) FILTER (WHERE ep.codigo <> 'cancelado'), 0)
+                           AS monto_vendido,
+                       round(COALESCE(avg(p.total) FILTER (WHERE ep.codigo <> 'cancelado'), 0), 2)
+                           AS ticket_promedio,
+                       round(count(*) FILTER (WHERE ep.codigo <> 'cancelado') * 100.0
+                             / NULLIF(sum(count(*) FILTER (WHERE ep.codigo <> 'cancelado'))
+                                      OVER (), 0), 2) AS participacion_pedidos_pct,
+                       round(COALESCE(sum(p.total) FILTER (WHERE ep.codigo <> 'cancelado'), 0)
+                                 * 100.0
+                             / NULLIF(sum(COALESCE(sum(p.total)
+                                   FILTER (WHERE ep.codigo <> 'cancelado'), 0)) OVER (), 0), 2)
+                           AS participacion_monto_pct,
+                       count(DISTINCT p.cliente_id) AS clientes,
+                       -- Medida honesta del B2B: clientes con el segmento
+                       -- mayorista asignado. Hoy 0 en los tres canales.
+                       count(DISTINCT p.cliente_id) FILTER (WHERE c.grupo_cliente_id IS NOT NULL)
+                           AS clientes_negocio,
+                       count(*) FILTER (WHERE ep.codigo = 'cancelado') AS cancelados,
+                       max(p.fecha_pedido) AS ultima_venta
+                FROM pedido p
+                JOIN estado_pedido ep ON ep.id = p.estado_pedido_id
+                LEFT JOIN cliente c ON c.id = p.cliente_id
+                WHERE (?::varchar IS NULL OR p.canal = ?::varchar)
+                  AND (?::date    IS NULL OR p.fecha_pedido >= ?::date)
+                  AND (?::date    IS NULL OR p.fecha_pedido <  (?::date + 1))
+                GROUP BY p.canal
+                HAVING count(*) FILTER (WHERE ep.codigo <> 'cancelado') > 0
+                    OR count(*) FILTER (WHERE ep.codigo = 'cancelado') > 0
+                ORDER BY monto_vendido DESC""",
+                can, can, d, d, h, h);
+
+        BigDecimal monto = BigDecimal.ZERO;
+        long pedidos = 0;
+        long negocio = 0;
+        for (Map<String, Object> fila : items) {
+            monto = monto.add(new BigDecimal(String.valueOf(fila.get("monto_vendido"))));
+            pedidos += ((Number) fila.get("pedidos")).longValue();
+            negocio += ((Number) fila.get("clientes_negocio")).longValue();
+        }
+
+        // El líder es la primera fila: la consulta ya ordena por monto.
+        String lider = items.isEmpty() ? "—"
+                : NOMBRE_CANAL.getOrDefault(String.valueOf(items.get(0).get("canal")),
+                                            String.valueOf(items.get(0).get("canal")));
+        BigDecimal ticket = pedidos == 0 ? BigDecimal.ZERO
+                : monto.divide(BigDecimal.valueOf(pedidos), 2, RoundingMode.HALF_UP);
+
+        return conResumen(sobre(items), List.of(
+                kpi("Pedidos del período", pedidos, "numero"),
+                kpi("Monto vendido", monto, "moneda"),
+                kpi("Ticket promedio", ticket, "moneda"),
+                kpi("Canal líder", lider, "texto"),
+                // KPI del hueco B2B: se informa el 0, no se esconde.
+                kpi("Clientes de tipo negocio (B2B)", negocio, "numero")));
+    }
+
+    /** Nombre de negocio de cada canal, para el KPI de canal líder. */
+    private static final Map<String, String> NOMBRE_CANAL = Map.of(
+            "web", "Tienda en línea",
+            "tienda", "Mostrador",
+            "telefono", "Teléfono");
 
     /** Lista blanca expuesta al frontend para poblar los selects sin adivinar. */
     static Set<String> departamentosMeta() {

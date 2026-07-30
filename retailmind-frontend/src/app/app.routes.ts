@@ -269,11 +269,13 @@ export const routes: Routes = [
   //    UNA sola pantalla genérica parametrizada por `data.departamento`; los
   //    informes y sus filtros salen del archivo de definiciones del área.
   //    Ventas: espeja SecurityConfig (/api/informes/ventas/**) — BODEGA y
-  //    DESPACHO fuera por segregación financiera.
+  //    DESPACHO fuera por segregación financiera. El ANALISTA entra solo por
+  //    OTD-VEN-16 (participación por canal), el único informe de Ventas que le
+  //    corresponde; la pantalla le oculta los otros cinco.
   {
     path: 'operativo/informes/ventas',
     data: { departamento: 'ventas' },
-    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'VENDEDOR'])],
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'VENDEDOR', 'ANALISTA'])],
     loadComponent: () =>
       import('./features/operativo/informes/informes-departamento.component')
         .then(m => m.InformesDepartamentoComponent)
