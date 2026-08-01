@@ -142,6 +142,71 @@
   mat-icon { font-size: 20px; width: 20px; height: 20px; }
 }
 
+/* ── Informes COMPUESTOS (fuente ClickHouse) ─────────────────────────── */
+
+/* Marca de agua «Datos al …». Discreta a propósito: informa del desfase sin
+   competir con el dato. Un informe analítico que no dice de cuándo es su
+   dato miente por omisión (§8.4 del diseño del pipeline). */
+.marca-agua {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 14px;
+  color: var(--text-muted, #6b7280);
+  font-size: 12px;
+
+  mat-icon { font-size: 16px; width: 16px; height: 16px; }
+
+  strong { color: var(--text, #1f2937); font-weight: 600; }
+
+  .marca-fuente { opacity: 0.75; }
+}
+
+/* Degradación de la analítica: aviso, NO error. El resto del sistema sigue
+   funcionando con ClickHouse apagado, y la pantalla debe decirlo así. */
+.aviso-analitica {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  border-left: 4px solid #f59e0b;
+  border-radius: var(--border-radius-sm);
+  background: #fff7ed;
+  color: #92400e;
+  font-size: 12.5px;
+  line-height: 1.5;
+
+  mat-icon { font-size: 20px; width: 20px; height: 20px; flex-shrink: 0; }
+}
+
+/* SALVEDAD metodológica: cómo hay que leer las cifras de ESTE informe.
+   Azul y no ámbar: no es un fallo ni una degradación, es parte del dato —
+   OTD-INV-09 valoriza el pasado a costo de hoy porque no hay costo histórico
+   (§8.3 del diseño). Se pinta encima de la tabla; una advertencia sobre cómo
+   interpretar un número llega tarde si se lee después del número. */
+.salvedad {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  border-left: 4px solid #3b82f6;
+  border-radius: var(--border-radius-sm);
+  background: #eff6ff;
+  color: #1e40af;
+  font-size: 12.5px;
+  line-height: 1.55;
+
+  mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+}
+
 .cargando {
   display: flex;
   align-items: center;
@@ -159,5 +224,115 @@
     margin-top: 10px;
     font-size: 12.5px;
     color: var(--text-secondary);
+  }
+}
+
+// ── Panel de actualización del almacén (ADMIN/GERENTE) ───────────────────
+// Vive en la pantalla de informes porque es donde importa: es el control que
+// mueve la marca «Datos al …» que los informes compuestos enseñan al pie.
+.almacen-card {
+  margin-bottom: 24px;
+
+  .almacen-cabecera {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .almacen-titulo {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+
+    h3 { margin: 0; }
+
+    > mat-icon {
+      color: var(--primary-light);
+      font-size: 26px;
+      width: 26px;
+      height: 26px;
+    }
+  }
+
+  .almacen-acciones {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .btn-actualizar mat-icon { margin-right: 6px; }
+
+  .almacen-progreso {
+    margin-top: 16px;
+
+    mat-progress-bar { height: 10px; border-radius: 8px; }
+  }
+}
+
+.almacen-sub {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+
+  strong { color: var(--text-primary); font-weight: 700; }
+}
+
+.almacen-estado {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 12px 16px;
+  border-radius: var(--border-radius-sm);
+  font-size: 13px;
+
+  mat-icon { font-size: 20px; width: 20px; height: 20px; flex-shrink: 0; }
+
+  &.ok    { background: #e8f5e9; color: #2e7d32; }
+  &.aviso { background: #fff3e0; color: #e65100; }
+}
+
+.almacen-errores {
+  margin-top: 14px;
+
+  .almacen-error {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    font-size: 12.5px;
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+  }
+
+  .almacen-motivo { color: var(--text-secondary); }
+}
+
+.almacen-detalle {
+  margin-top: 16px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  padding-top: 12px;
+
+  .almacen-fila {
+    display: grid;
+    grid-template-columns: 190px 1fr 110px 80px;
+    gap: 12px;
+    align-items: center;
+    padding: 6px 0;
+    font-size: 12.5px;
+  }
+
+  .almacen-tabla { font-weight: 600; color: var(--text-primary); }
+
+  .almacen-filas,
+  .almacen-seg { text-align: right; color: var(--text-secondary); }
+
+  .icono-inline {
+    font-size: 15px;
+    width: 15px;
+    height: 15px;
+    vertical-align: -2px;
   }
 }

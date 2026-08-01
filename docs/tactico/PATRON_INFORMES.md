@@ -346,3 +346,766 @@ BODEGA, DESPACHO y ANALISTA **403 en los ocho**. En particular, `/gerencia/audit
 `/gerencia/accesos` responden 200 **solo** a ADMIN y GERENTE, y 403 a los otros seis roles y al
 anónimo. Un valor fuera de lista blanca devuelve **400** con el listado de permitidos en los ocho
 informes, y POST/PUT/DELETE sobre cualquier ruta de informes **403** por el `denyAll()`.
+
+## 12. Criterio canónico: `canal` es el MEDIO, nunca el tipo de cliente
+
+Regla vinculante para todo informe presente y futuro:
+
+> **`pedido.canal` es el MEDIO por el que entró el pedido (`web` / `tienda` / `telefono`) y NO
+> debe usarse para inferir el tipo de cliente ni para etiquetar B2B/B2C.** Un negocio puede
+> comprar por la tienda en línea y un consumidor final por mostrador: agrupar por `canal` y
+> rotularlo «B2B vs. B2C» es una lectura falsa del dato.
+
+**Estado del corte B2B/B2C: NO ES DERIVABLE — descartado el 2026-07-30.** La clasificación
+B2B/B2C **no está capturada en ninguna columna** y —esto es lo que cambió— **tampoco puede
+derivarse del comportamiento de compra**. El diagnóstico
+`docs/estrategico/DIAGNOSTICO_SEGMENTO_CLIENTE.md` (2026-07-30, solo lectura, 4.083 pedidos ·
+10.384 líneas · 3.887 facturas · 72 clientes) cerró con veredicto **(c) POBLACIÓN HOMOGÉNEA**: no
+hay dos poblaciones de compra en los datos. Las comprobaciones, en dos bloques:
+
+*Lo que no existe en el esquema:*
+
+| Comprobación | Resultado |
+|---|---|
+| `pedido.tipo_venta` | **NO EXISTE** — `pedido` tiene 19 columnas y ninguna es `tipo_venta`; tampoco existe en ninguna de las ~110 tablas |
+| Valores «mayoreo» / «menudeo» | **no existen** en el modelo; el único CHECK de clasificación de pedido es `canal ∈ ('web','tienda','telefono')` |
+| `grupo_cliente` / `segmento_cliente` / `cliente_segmento` | **0, 0 y 0 filas** |
+| `cliente.grupo_cliente_id` poblado | **0 de 72 clientes** |
+| `cliente.tipo_identificacion` | **'cedula' en los 72** — ningún RUC que permita inferir «negocio» |
+| `factura_venta.identificacion` | **10 dígitos en las 3.887 facturas** (el RUC ecuatoriano tiene 13) |
+| Lista de precios por grupo · crédito a cliente | **no existe ninguna tabla**: el 100 % de los pedidos se cobra al contado |
+
+*Lo que el comportamiento tampoco permite derivar:*
+
+| Dimensión | ¿Separa dos poblaciones? |
+|---|---|
+| Unidades por línea | **No — la prueba decisiva**: 10.378 de 10.384 líneas (**99,94 %**) piden 1–4 unidades; techo histórico 12 por línea y 24 por pedido. **No existe ni una sola compra de volumen** |
+| Ticket | **No** — unimodal log-normal, una sola cresta, sin hombro a la derecha |
+| Líneas por pedido | **No** — máximo 5 para todos los clientes y los tres canales |
+| Mezcla de categorías | **No** — Δ máx. **0,62 pp** entre el cliente grande y el pequeño |
+| Método de pago | **No** — Δ máx. **1,44 pp** |
+| Canal | **No** — dispersión del ticket medio entre canales: 3,3 % |
+| Regularidad de compra | **No** — CV 1,34–1,82 en los tres grupos (el más frecuente es el *más* irregular) |
+| Frecuencia / facturación acumulada | **Solo en escala** — top 10 % = 49,34 % del ingreso, pero con el mismo ticket ($1.415,96 vs. $1.258,97) y la misma canasta: es **valor de cliente**, no **tipo de cliente** |
+
+**Qué hacer con esto.** No se inventa la clasificación **ni se deja como pendiente**. El patrón
+vigente es el de **OTD-VEN-16**: agrupar por la dimensión que SÍ existe (el canal, rotulado como
+canal) y exponer la medida honesta de la ausencia — la columna y el KPI, hoy rotulados
+**«Clientes con segmento registrado»**
+(`count(DISTINCT cliente_id) FILTER (WHERE c.grupo_cliente_id IS NOT NULL)`), que valen **0** en
+los tres canales. *Nota de rótulo (2026-07-30)*: antes se llamaban «Clientes negocio (B2B)»; se
+cambió porque ese nombre sugería un segmento pendiente de llenarse, cuando lo que la cifra dice es
+que **no hay segmentación registrada de ninguna clase**.
+
+**Cuándo cambiaría el criterio.** No con un cambio de sistema, sino con un cambio de **negocio**.
+Poblar `grupo_cliente` hoy no capturaría un dato: pondría una etiqueta arbitraria sobre una
+población que se comporta como una sola. El criterio canónico solo pasaría a ser el segmento del
+cliente si la operación cambiara de verdad —clientes con RUC, líneas de decenas o cientos de
+unidades, precio por grupo, crédito comercial—, y en ese escenario el informe se rediseñaría con su
+propia justificación. Por eso el propuesto **OTD-VEN-17** quedó **DESCARTADO** y no pospuesto
+(`CATALOGO_OBJETIVOS_TACTICOS.md` §12, `BASE_ESTRATEGICA.md` §6.1.b).
+
+**Si aparece un requerimiento que afirme que la clasificación vive en `pedido.tipo_venta`,
+está equivocado**: esa columna **no existe** —nunca existió, en ninguna de las ~110 tablas— y un
+informe que la consulte falla en tiempo de ejecución. Aplíquese el Paso 0 (§5) —verificar el dato
+antes de codificar— antes de aceptar cualquier cifra de reparto B2B/B2C: hoy, cualquier cifra de
+ese reparto es inventada.
+
+**Lo que sí es un hecho medido sobre el cliente, y se puede usar:** la **omnicanalidad**. 64 de los
+69 clientes con pedidos compran tanto por la tienda en línea como por un canal interno (mostrador o
+teléfono); solo 2 son exclusivamente web y 3 exclusivamente internos. Un informe puede afirmar eso
+—se deriva del cruce `pedido.cliente_id` × `pedido.canal`— sin salirse de la regla: sigue hablando
+de **medio**, no de tipo de comprador.
+
+---
+
+## 13. Informes COMPUESTOS: el mismo molde, con ClickHouse debajo
+
+*(2026-07-30, Fase 1 del pipeline ETL — primer informe: **OTD-VEN-06**, evolución de la venta mes a
+mes y por categoría, `GET /api/informes/ventas/evolucion-mensual`.)*
+
+La noticia es lo poco que cambia. El **sobre es el mismo**, la **pantalla genérica es la misma** y
+las **definiciones declarativas son las mismas**: añadir OTD-VEN-06 al frontend fue un objeto más en
+`ventas.informes.ts`. Lo que cambia son cuatro cosas, y conviene tenerlas juntas.
+
+**1. Clases nuevas, no un patrón nuevo.** `InformeCompuestoServiceBase` extiende
+`InformeServiceBase` y añade solo lo propio de la capa analítica; los servicios compuestos van en
+un controlador APARTE (`InformesVentasCompuestosController`) que comparte la ruta base. Los 29
+informes simples no se tocaron.
+
+**2. Estos métodos NO llevan `@Transactional`.** La regla de oro del proyecto («todo acceso a
+Postgres va dentro de una transacción o corre sin `SET LOCAL ROLE`») **no aplica**, porque no se
+toca Postgres. Anotarlos abriría una transacción inútil y haría que `PgSessionRoleAspect` asumiera
+un rol de grupo para nada.
+
+**3. El corte financiero lo hace ÍNTEGRAMENTE la RUTA.** ClickHouse no tiene RLS por fila ni GRANT
+por columna: el ETL escribe todas las columnas de dinero en tablas planas. Es el mismo caso ya
+declarado de OTD-INV-07, OTD-LOG-11 y OTD-GER-08, pero aquí **siempre**, no como excepción. Cada
+endpoint compuesto necesita su línea propia en `SecurityConfig`, antes del comodín del
+departamento. Verificado por API en los 8 roles: ADMIN/GERENTE/ANALISTA 200; VENDEDOR, COMPRAS,
+BODEGA, DESPACHO y SOPORTE 403. El VENDEDOR es el caso que importa: pasa el comodín
+`/api/informes/ventas/**` y solo la línea específica lo detiene.
+
+**4. Marca de agua obligatoria.** Todo sobre compuesto viaja con `datosAl` (el `max(fecha_carga)`
+de su tabla) y la pantalla lo pinta. Un informe analítico puede llevar hasta 24 h de desfase; uno
+que no dice de cuándo es su dato miente por omisión.
+
+### Cuatro trampas de ClickHouse que costaron una corrida cada una
+
+Son específicas del motor y no se deducen de saber SQL. Las cuatro se detectaron **probando por
+API**, no leyendo el código.
+
+| Trampa | Síntoma | Regla |
+|---|---|---|
+| **Alias que se llama como una columna** | `ILLEGAL_AGGREGATION: Aggregate function sum(margen) is found inside another aggregate function`, y su variante `... is found in WHERE` | ClickHouse resuelve los alias hacia atrás y sustituye la expresión. **Ningún alias de agregado puede llamarse igual que una columna de la tabla.** Convención adoptada: `t_` para totales, `n_` para conteos, `etiqueta_` para textos; los nombres del contrato de la API se reponen en el SELECT más externo |
+| **División de `Decimal`** | El margen sale «15,00» donde debía decir «15,08» | Dividir dos `Decimal(14,2)` devuelve un `Decimal` con la escala del operando **izquierdo**, y trunca. Los **porcentajes** se calculan con `toFloat64(...)`; el **dinero** sigue siendo `Decimal` y esa regla no se toca |
+| **`%M` en `formatDateTime`** | La marca de agua decía `30/07/2026 18:July` | En ClickHouse el minuto es **`%i`**; `%M` es el NOMBRE DEL MES, al revés que en `strftime` de C y que en Java |
+| **`%` dentro de un bloque de texto que va a `.formatted()`** | 400 con `Conversion = '»'` | Es Java, no ClickHouse: un `%` en un comentario SQL dentro de un text block se lee como especificador de formato. Escríbase `%%` o redáctese sin el signo |
+
+### La trampa de diseño, que es la peor de las cinco
+
+La primera versión capturaba **todo** `DataAccessException` y devolvía «la analítica no está
+disponible». Con eso, un **error de SQL** se presentaba como una caída de ClickHouse: el informe
+salía vacío con el motor perfectamente vivo, y —lo grave— **la prueba por API pasaba en verde**,
+porque el endpoint devolvía 200. El primer bug de alias estuvo a punto de colarse así.
+
+La regla que quedó: **se degrada un fallo de CONEXIÓN; una consulta mal formada se propaga y sale
+como 500.** La clasificación mira la causa raíz (`ConnectException`, `SocketTimeoutException`,
+`SQLTransientConnectionException`…) y no solo el tipo de Spring, porque el driver envuelve el error
+de red dentro de excepciones genéricas — y equivocarse en ese sentido sería el error simétrico:
+devolver 500 con Docker apagado, justo lo que el invariante del sistema prohíbe.
+
+Degradación verificada en vivo con el contenedor detenido: `/api/health` responde en ~5 s con
+`status: UP, analytics: DEGRADED`; OTD-VEN-06 devuelve **200** en ~4 s con el sobre vacío,
+`analiticaDisponible: false` y el aviso; los informes simples y la operación siguen intactos. Al
+reencender ClickHouse el informe se recupera **sin reiniciar el backend**.
+
+### Lo que `dim_fecha` compra, y que un `GROUP BY` no puede
+
+OTD-VEN-06 emite una fila explícita **«(sin ventas)»** por cada mes del rango consultado que no
+tuvo ninguna venta. Es la corrección de una debilidad conocida: OTD-GER-01 tuvo que fabricar a mano
+su fila «Día sin movimiento», porque un `GROUP BY` sobre los hechos solo puede devolver los períodos
+que existen en los hechos. Dos matices que son diseño y no descuido: las filas vacías se emiten solo
+si el usuario **acotó el rango** (si no, se rellenarían cinco meses futuros de ruido), y el
+anti-join respeta **todos** los filtros, de modo que «sin ventas» signifique «sin ventas de lo que
+preguntaste».
+
+---
+
+## 14. Fase 2 del pipeline: ocho informes compuestos sobre el núcleo de la venta
+
+Con `dim_cliente`, `fact_pedido` y `fact_flujo_caja` cargadas (2026-07-30), el nivel COMPUESTO pasa
+de 1 a 9 informes. El coste por informe se mantuvo en lo que el patrón promete: **cero componentes,
+cero servicios y cero estilos nuevos en Angular**; solo dos clases Java por departamento nuevo y
+una entrada declarativa por informe.
+
+| Objetivo | Endpoint | Tabla del DWH | Filas |
+|---|---|---|---:|
+| OTD-VEN-05 | `GET /api/informes/ventas/clientes` | `fact_pedido` ⋈ `dim_cliente` | 69 |
+| OTD-VEN-07 | `GET /api/informes/ventas/ticket-promedio` | `fact_pedido` | 57 |
+| OTD-VEN-09 | `GET /api/informes/ventas/formas-cobro` | `fact_flujo_caja` | 57 |
+| OTD-VEN-12 | `GET /api/informes/ventas/cobros-fallidos` | `fact_flujo_caja` | 80 |
+| OTD-VEN-13 | `GET /api/informes/ventas/evolucion-canal` | `fact_pedido` | 57 |
+| OTD-LOG-12 | `GET /api/informes/logistica/tiempos-ciclo` | `fact_pedido` (hitos) | 4 |
+| OTD-GER-02 | `GET /api/informes/gerencia/balanza` | `fact_flujo_caja` | 19 |
+| OTD-GER-05 | `GET /api/informes/gerencia/descuento-cupones` | `fact_pedido` | 78 |
+
+### 14.1 Lo que hay que saber antes de tocar estos ocho
+
+**(1) El filtro que reparte NO puede aplicarse antes del reparto.** En VEN-13, VEN-09 y GER-05 hay
+una columna de participación calculada con una ventana `PARTITION BY mes`. Si el filtro de canal o
+de forma de pago entra en el `WHERE` del agregado, la única categoría visible se lleva el **100 %**
+en todos los meses — un número perfectamente formateado y perfectamente falso. En esos tres el
+filtro se aplica **después**, sobre el resultado ya repartido, y por eso su SQL lleva dos cláusulas
+`WHERE` y los parámetros viajan concatenados (`base.argsCon(vista.args())`).
+
+**(2) El rango por DÍA se compara sobre `toDate(columna)`, no sobre el `DateTime` crudo.** Dos
+motivos en uno: `toDate` de una columna `DateTime('America/Guayaquil')` resuelve el día en la zona
+del NEGOCIO —comparar contra un `toDateTime(toDate(?))` lo resuelve en la del servidor—, y de paso
+el último día del rango entra COMPLETO. Con la comparación cruda, todo lo ocurrido después de la
+medianoche del día final desaparece del informe sin aviso. Los informes MENSUALES siguen filtrando
+sobre `mes`, que el ETL ya calculó resuelto.
+
+**(3) Un promedio sin su denominador es una trampa, y LOG-12 es el caso.** Las cuatro etapas del
+ciclo se miden sobre poblaciones DISTINTAS: 2.868 pedidos el tramo pago→preparación, 2.856 el de
+preparación→despacho, 2.727 el de despacho→entrega y 3.696 el ciclo completo. La causa es del dato
+—828 pedidos llegaron a 'entregado' sin registro de 'despachado'— y no del informe, pero presentar
+88 h junto a 13 h sin decir sobre cuántos pedidos se calculó cada una señala el cuello de botella
+en el sitio equivocado. Por eso cada fila trae `pedidos_medidos` y `cobertura_pct`, y el KPI «cuello
+de botella» **excluye el ciclo completo**, que por construcción gana siempre.
+
+**(4) La dimensión se lee con `FINAL`.** `dim_cliente` y `dim_producto` son `ReplacingMergeTree`.
+Hoy la carga atómica publica una tabla recién creada y nunca conviven dos versiones de una clave,
+pero el helper `dimension(tabla)` del molde envuelve la lectura en `SELECT * FROM … FINAL` porque es
+lo que el motor de tabla promete: sobre 72 filas el coste es nulo y un cliente duplicado en un JOIN
+duplicaría su fila del informe sin avisar. Nota de sintaxis: `JOIN tabla FINAL` **no** es válido en
+el lado derecho de un JOIN; va como subconsulta.
+
+**(5) Las fechas de día viajan formateadas como texto.** Misma regla del §11: `primera_compra` y
+`ultima_compra` de VEN-05 salen ya como `%d/%m/%Y` desde ClickHouse y se declaran `tipo: 'texto'`.
+Una fecha serializada la interpreta el formateador del frontend como UTC y puede mostrarla un día
+antes — en una columna rotulada «última compra», eso es mentir.
+
+**(6) Un KPI es texto plano y no pasa por el mapa de etiquetas del frontend.** El `etiqueta:` de una
+columna traduce el código a lenguaje de negocio; una tarjeta de resumen no. El KPI «Motivo más
+frecuente» de VEN-12 y los de canal en VEN-07/VEN-13 traducen en el SERVICIO, o la dirección lee
+`fondos_insuficientes` en una tarjeta.
+
+### 14.2 La matriz rol × endpoint, verificada por API
+
+Ocho endpoints × ocho roles, con sesión real de cada rol (ninguna ventana horaria hubo que
+ensanchar: la del jueves ya cubría la hora de la prueba, y se comprobó al terminar que
+`grupo_horario` seguía idéntico en sus 56 filas).
+
+| Objetivo | ADMIN | GERENTE | VENDEDOR | COMPRAS | BODEGA | DESPACHO | ANALISTA | SOPORTE |
+|---|---|---|---|---|---|---|---|---|
+| OTD-VEN-05 | 200 | 200 | **200** | 403 | 403 | 403 | 200 | 403 |
+| OTD-VEN-07 | 200 | 200 | 403 | 403 | 403 | 403 | 200 | 403 |
+| OTD-VEN-09 | 200 | 200 | 403 | 403 | 403 | 403 | 200 | 403 |
+| OTD-VEN-12 | 200 | 200 | 403 | 403 | 403 | 403 | **403** | 403 |
+| OTD-VEN-13 | 200 | 200 | **200** | 403 | 403 | 403 | 200 | 403 |
+| OTD-LOG-12 | 200 | 200 | 403 | 403 | 403 | **200** | 200 | 403 |
+| OTD-GER-02 | 200 | 200 | 403 | 403 | 403 | 403 | 200 | 403 |
+| OTD-GER-05 | 200 | 200 | 403 | 403 | 403 | 403 | 200 | 403 |
+
+**BODEGA queda fuera de los ocho** y **DESPACHO solo entra en LOG-12**, que es el único sin una sola
+columna de monto. Ese 200 de DESPACHO es el caso que conviene mirar con atención: sale de
+`fact_pedido`, que **sí** tiene `total`, `subtotal` y `monto_cupon`. ClickHouse no tiene GRANT por
+columna ni RLS, así que aquí el corte financiero no lo puede hacer el motor y tampoco basta la ruta:
+**lo hace la CONSULTA**, que no selecciona ningún importe. Es el tercer lugar donde vive el corte,
+ya declarado en OTD-COM-08 — y en los compuestos es el único disponible cuando un rol sin acceso al
+dinero necesita leer la misma tabla que lo contiene.
+
+### 14.3 Degradación, verificada otra vez con el contenedor detenido
+
+`/api/health` → `status: UP, analytics: DEGRADED`. Los cuatro compuestos probados (VEN-05, VEN-12,
+LOG-12, GER-02) → **HTTP 200** con sobre vacío, `analiticaDisponible: false` y el aviso legible.
+En la misma corrida, OTD-VEN-01 (simple, PostgreSQL) devolvió sus filas y el catálogo de la tienda
+respondió 200 con productos: con ClickHouse apagado se cae la analítica y **nada más**.
+
+---
+
+## 15. Fase 3B: el inventario reconstruido, y la salvedad que va en pantalla
+
+Los TRES compuestos de Inventario, servidos por `fact_movimiento_inventario` (13.287) y
+`fact_stock_mensual` (21.122):
+
+| Objetivo | Endpoint | Filas | Tabla |
+|---|---|---|---|
+| OTD-INV-04 | `/api/informes/inventario/rotacion` | 10 categorías | stock mensual + kardex |
+| OTD-INV-09 | `/api/informes/inventario/capital-inmovilizado` | 19 meses | `fact_stock_mensual` |
+| OTD-INV-10 | `/api/informes/inventario/mermas` | 11 motivos | `fact_movimiento_inventario` |
+
+Coste del patrón, otra vez cumplido: **2 clases Java + 1 bloque en el archivo de definiciones**. Lo
+único nuevo del molde es `salvedad`, y sirve a cualquier informe futuro.
+
+### 15.1 `salvedad`: la tercera cosa que un informe compuesto puede decir de sí mismo
+
+El sobre ya llevaba `datosAl` («de cuándo es este dato») y `avisoAnalitica` («ahora mismo no hay
+dato»). La Fase 3B añade la tercera: **«así está calculado este dato»**.
+
+OTD-INV-09 valoriza el inventario de meses pasados con el **costo VIGENTE**, porque el sistema no
+guarda costo histórico (§8.3 del diseño; el margen se computa siempre en vivo contra
+`producto_variante.costo`). La serie responde entonces *«cuántas unidades había cada mes, valoradas a
+precio de hoy»* — volumen a moneda constante, que para la pregunta del objetivo («¿la bodega se llena
+o se vacía de capital?») es incluso **más limpio**, porque aísla el efecto volumen del efecto precio.
+Pero **no** es «cuánto valía la bodega aquel mes», y presentarlo como tal sería falso.
+
+Por eso la salvedad se pinta **encima de la tabla y del resumen**, en azul y no en ámbar: no es un
+fallo ni una degradación, es parte del dato. Una advertencia sobre cómo interpretar un número llega
+tarde si se lee después del número. Y viaja además como KPI («Base de valoración: costo vigente») para
+quien solo mire las tarjetas. Documentarla únicamente en el diseño no habría contado: el que lee la
+pantalla no lee el diseño.
+
+OTD-INV-10 arrastra la MISMA salvedad, pero solo en su modo valorizado — y por un motivo que no es
+elegante sino forzado: los 56 movimientos de ajuste son exactamente los que **no traen
+`costo_unitario`** en el origen (corrección C3B.3). Ajustar no valoriza, así que la merma solo se
+puede valorar con el costo de hoy.
+
+### 15.2 El corte financiero, en sus tres sabores a la vez
+
+Este trío es el mejor ejemplo del asunto porque los tres mecanismos conviven:
+
+| Informe | Quién corta | Cómo |
+|---|---|---|
+| OTD-INV-04 | la **CONSULTA** | no selecciona ni un importe, aunque `fact_stock_mensual` tiene `valor_cierre` |
+| OTD-INV-09 | la **RUTA** | `SecurityConfig` deja fuera a BODEGA: es dinero de principio a fin |
+| OTD-INV-10 | el **SERVICIO** | MIXTO: `puedeVerDinero()` sobre el rol del JWT decide si las columnas de valor **se seleccionan siquiera** |
+
+El tercero es nuevo en los compuestos y es lo que el catálogo pedía («Bodega en cantidades;
+valorizado solo Gerente, Administrador»). Verificado por API: con token de BODEGA la respuesta no
+trae `valor_merma`, `valor_sobrante` ni `valor_neto` —no llegan vacías, **no existen**—, ni el KPI
+«Valor perdido», ni la salvedad. Es el mismo criterio role-aware de `VentasService.colaPreparacion`,
+y aquí es la única barrera posible: ClickHouse no tiene GRANT por columna (§8.2).
+
+### 15.3 Matriz rol × endpoint, verificada por API (8 × 3)
+
+| Informe | ADMIN | GERENTE | ANALISTA | BODEGA | VENDEDOR | COMPRAS | DESPACHO | SOPORTE |
+|---|---|---|---|---|---|---|---|---|
+| OTD-INV-04 | 200 | 200 | 200 | **200** | 403 | 403 | 403 | 403 |
+| OTD-INV-09 | 200 | 200 | 200 | **403** | 403 | 403 | 403 | 403 |
+| OTD-INV-10 | 200 | 200 | 200 | **200** (sin importes) | 403 | 403 | 403 | 403 |
+
+BODEGA entra en dos de los tres y queda fuera del que es dinero, que es exactamente lo que dice el
+catálogo. La matriz se probó **sin tocar `grupo_horario`**: se esperó a que abriera la ventana de las
+08:00, porque el script 53 hace que `fuera_horario` **bloquee el login** y los ocho roles necesitan
+un JWT real. Ensanchar el horario para probar habría sido escribir en la base para validar una
+lectura.
+
+### 15.4 Dos trampas de ClickHouse que volvieron a morder
+
+1. **Dividir dos `Decimal` trunca a la escala del izquierdo.** Ya estaba escrito en §13 y volvió a
+   pasar: `variacion_pct` salía en múltiplos enteros (21, 12, 2 …) y parecía un dato redondo en vez
+   de uno truncado. El ratio va en `toFloat64`; el **dinero sigue en `Decimal`**, que es lo que
+   `validar_dwh.py` exige.
+2. **`any(x) OVER (… 1 PRECEDING)` devuelve el DEFECTO del tipo, no NULL, cuando no hay fila
+   anterior.** El primer mes de la serie mostraba su capital entero ($8,38 M) como si fuera el
+   incremento del período. Se guarda con un `count() OVER (… UNBOUNDED PRECEDING AND 1 PRECEDING)`,
+   que cuenta FILAS y no valores — así un mes que de verdad cerrara en 0 se sigue comparando bien.
+
+La misma familia de trampa —el LEFT JOIN que rellena con el defecto del tipo en vez de con NULL—
+es la que obliga a fabricar el NULL desde `movimientos_mes` en la derivación de `fact_stock_mensual`.
+Conviene recordarla: **en ClickHouse, «no hay dato» y «el dato es cero» se parecen demasiado.**
+
+---
+
+## 16. Fase 3C: la última milla, y un departamento con el corte financiero partido en dos
+
+Los CUATRO compuestos que sirven `fact_envio` (2.872) y `fact_novedad_envio` (176):
+
+| Objetivo | Endpoint | Filas | Tabla |
+|---|---|---|---|
+| OTD-LOG-03 | `/api/informes/logistica/cumplimiento-promesa` | 5 transportistas | `fact_envio` |
+| OTD-LOG-04 | `/api/informes/logistica/dias-transito` | 5 / 19 / 3 según el corte | `fact_envio` |
+| OTD-LOG-05 | `/api/informes/logistica/novedades` | 14 (tipo × desenlace) | `fact_novedad_envio` |
+| OTD-LOG-11 · serie | `/api/informes/logistica/costo-envio-mensual` | 19 meses | `fact_envio` |
+
+Coste del patrón, cumplido de nuevo: **0 clases Java nuevas** —los cuatro entran en el servicio y el
+controlador de Logística que ya existían por OTD-LOG-12— y **1 bloque por informe** en el archivo de
+definiciones. Ni un componente, ni un servicio Angular, ni un estilo.
+
+La última fila no es un objetivo del catálogo: es la **serie temporal** que OTD-LOG-11 dejó pendiente
+para ClickHouse al reclasificarse a SIMPLE (§6 del catálogo). El simple da la FOTO («¿dónde nos cuesta
+más caro?»), éste da la SERIE («¿se está encareciendo?»). Son preguntas distintas y conviven: la ruta
+se llama `costo-envio-mensual` y no una variante de `costo-envio` precisamente para que quede claro
+que el informe simple sigue vivo.
+
+### 16.1 La transformación cara vive en el ETL, y esa es la razón de que el ETL exista
+
+`envio` **no tiene columna de zona**. Se resuelve por la cadena ciudad > provincia > país contra
+`zona_envio`, con precedencia por especificidad — la misma lógica de
+`VentasService.asignarEnvioPorZona`. Los cuatro conteos, verificados contra el diseño:
+
+```
+ciudad     Quevedo (local)        181        provincia  Los Rios (provincial)   596
+pais       Ecuador (nacional)   2.078        (ninguno)  sin_zona                 17
+```
+
+**El modo de fallo que acecha**: las tres zonas configuradas cuelgan del mismo país, así que agrupar
+por país —la simplificación que sale sola mirando el esquema— manda **2.855 de 2.872 envíos a UNA
+FILA**. No falla ningún JOIN ni salta ninguna excepción: sale una tabla de una línea con el 99,4 %
+del volumen, y el negocio parece operar en un solo sitio.
+
+Por eso la tabla trae además `zona_nivel`, y los cuatro conteos quedan **auditables desde el propio
+almacén** con un `GROUP BY`. El coste de los tres LEFT JOIN con desempate se paga una vez por
+corrida y no una vez por consulta — que es literalmente para lo que sirve un ETL.
+
+### 16.2 Cada informe declara su denominador, y aquí hay TRES distintos
+
+Lección heredada de OTD-LOG-12 y agravada en esta fase. De los 2.872 envíos:
+
+```
+con fecha de despacho ......... 2.872     con entrega real .............. 2.727
+con fecha estimada ............ 2.856     con real + estimada ........... 2.723
+```
+
+Los 145 que faltan son 120 `devuelto` y 25 `en_transito`: **no llegaron tarde — no llegaron**.
+Contarlos como incumplimiento miente en una dirección; ignorarlos en silencio, en la otra. Por eso
+`entregado_a_tiempo` viaja **NULL** cuando falta cualquiera de las dos fechas (un 0 diría «llegó
+tarde», que no es «no se sabe») y cada fila lleva `medidos` + `cobertura_pct`.
+
+### 16.3 El filtro `agrupar`: una lista blanca que SÍ entra en el SQL
+
+El catálogo pide el tránsito «por transportista **y período**». En vez de duplicar el informe,
+OTD-LOG-04 expone un filtro `agrupar` ∈ {`transportista`, `mes`, `zona`} y llama `grupo` a la primera
+columna en los tres casos, para que la pantalla genérica no sepa cuál está activo.
+
+Es el **único sitio de todo el nivel táctico donde un filtro decide un fragmento de SQL**, así que la
+lista blanca deja de ser higiene y pasa a ser la barrera: el usuario elige la CLAVE de un `Map`, y la
+expresión (`transportista`, `formatDateTime(mes, '%Y-%m')`, `zona`) es una constante del código. Un
+valor no previsto sale como 400 antes de tocar el motor.
+
+El mes se formatea a texto **en el SQL** y no se manda como `Date`: es la lección de §11 (un `date`
+puro lo lee el formateador como UTC y muestra un día menos), y en una columna de agrupación eso
+rotularía la serie con el mes equivocado.
+
+### 16.4 Un mismo departamento, una misma tabla, y el corte financiero partido
+
+Es la primera fase donde **dos informes de la misma tabla tienen destinatarios distintos por dinero**:
+
+| | LOG-03 · LOG-04 | serie de costo |
+|---|---|---|
+| Tabla | `fact_envio` | `fact_envio` |
+| ¿Selecciona importes? | **No** | **Sí** |
+| DESPACHO | 200 | **403** |
+| Barrera efectiva | la **CONSULTA** | la **RUTA** |
+
+`fact_envio` tiene `costo`, y ClickHouse no tiene GRANT por columna: el motor no distingue estos dos
+informes de ninguna manera. Lo único que separa a DESPACHO del dinero es que **una consulta no lo
+selecciona y la otra sí**, más la línea de `SecurityConfig` que cierra la segunda. Mismo mecanismo ya
+declarado en OTD-COM-08 y OTD-LOG-12, ahora sobre la misma tabla y a la vez.
+
+Detalle deliberado: las dos rutas de dinero se enumeran **por nombre** (`costo-envio`,
+`costo-envio-mensual`) y no con un comodín `costo-envio*`. Un endpoint futuro que empezara igual
+heredaría el permiso sin que nadie lo hubiera decidido.
+
+OTD-LOG-05 cambia de reparto otra vez: entra **SOPORTE** —la incidencia de entrega acaba en su
+bandeja— y sale el **ANALISTA**, que no participa en la posventa.
+
+### 16.5 Matriz rol × endpoint, verificada por API (8 × 4 = 32 celdas)
+
+| Informe | ADMIN | GERENTE | ANALISTA | DESPACHO | SOPORTE | BODEGA | VENDEDOR | COMPRAS |
+|---|---|---|---|---|---|---|---|---|
+| OTD-LOG-03 | 200 | 200 | 200 | **200** | 403 | 403 | 403 | 403 |
+| OTD-LOG-04 | 200 | 200 | 200 | **200** | 403 | 403 | 403 | 403 |
+| OTD-LOG-05 | 200 | 200 | **403** | **200** | **200** | 403 | 403 | 403 |
+| serie de costo | 200 | 200 | 403 | **403** | 403 | 403 | 403 | 403 |
+
+**0 discrepancias.** La matriz se probó **sin tocar `grupo_horario`**: la ventana de los ocho roles
+estaba abierta a la hora de correrla. Ensanchar el horario para probar sería escribir en la base para
+validar una lectura.
+
+### 16.6 Degradación, verificada apagando el contenedor
+
+Con `docker stop` sobre ClickHouse y **sin reiniciar el backend**:
+
+```
+/api/health .................... 200 en 4,30 s · status UP · analytics DEGRADED
+los 4 informes nuevos .......... 200 en ~4,1 s · analiticaDisponible=false · aviso legible
+informes SIMPLES (PostgreSQL) .. 200 · costo-envio 9 filas · envios 2.872   ← intactos
+```
+
+Y al volver a levantarlo, los cuatro se recuperan **solos**, sin reinicio. Es el invariante del
+sistema por escrito: con Docker apagado todo funciona y solo la analítica se degrada, con aviso.
+Recordatorio de §13 que sigue vigente: **solo un fallo de CONEXIÓN degrada**; una consulta mal formada
+se propaga como 500, porque disfrazarla de «analítica no disponible» deja la prueba por API en verde
+sobre un bug de SQL.
+
+### 16.7 Los tres supuestos del diseño que no se sostuvieron
+
+Registrados en `docs/estrategico/CORRECCIONES_DISENO_ETL.md` (C3C.1 a C3C.3) **antes de cerrar la
+fase**, como manda la regla de trabajo. El que más golpea al informe:
+
+> §5.9 dice que `accion` vale `reprogramar` / `devolver_almacen`. Son los **verbos del API**; lo
+> guardado es el participio (`reprogramada` / `devuelto_almacen`). Un filtro escrito desde el diseño
+> casa con **cero filas sin dar error**, y OTD-LOG-05 diría que las incidencias se resuelven
+> reprogramando en el 100 % de los casos — ocultando justo las 120 que acaban en venta perdida.
+
+Por eso la lista blanca de este informe (`ACCIONES_NOVEDAD`) sale **de los datos y no del documento**,
+y la carga avisa si aparece un valor no previsto.
+
+---
+
+## 17. Fase 4: la posventa cierra el nivel táctico — 39 de 39
+
+Sexta y **última** fase de CARGA del pipeline (`docs/estrategico/DISENO_ETL_CLICKHOUSE.md` §9.5).
+Con ella las **19 tablas** del modelo están cargadas y validadas, y hay **32 informes compuestos
+en producción** de los 39 del catálogo. Los 7 restantes —COM-03/04/05/06/07/11/12— tienen sus
+tablas cargadas desde la Fase 3A y están pendientes solo de conectar: no necesitan ETL nuevo.
+
+Seis tablas nuevas y dieciséis informes:
+
+| Tabla | Filas | Informes que sirve |
+|---|---:|---|
+| `dim_promocion_producto` | 232 | GER-07 |
+| `fact_devolucion` | 196 | VEN-14 · LOG-07 · LOG-09 · LOG-10 |
+| `fact_devolucion_linea` | 274 | LOG-08 · SOP-08 (mitad devoluciones) |
+| `fact_ticket` | 248 | SOP-02 · SOP-03 · SOP-06 · SOP-07 · SOP-08 |
+| `fact_resena` | 344 | VEN-11 |
+| `fact_devolucion_proveedor` | 38 | COM-09 |
+
+Y cuatro informes más **sin tabla nueva** —GER-03, GER-10 y GER-11 salen de `fact_venta_linea`,
+de la Fase 1, y GER-07 la cruza con el puente—, que es la prueba de que el criterio de
+agrupación del diseño (19 tablas para 39 objetivos) se sostuvo hasta el final.
+
+Coste del patrón, otra vez el prometido: **2 clases Java nuevas** (Soporte y Compras, los dos
+departamentos que aún no tenían servicio compuesto) + 1 bloque por informe en las definiciones.
+Cero componentes, cero servicios Angular, cero estilos.
+
+### 17.1 Cinco informes sobre una tabla de 248 filas
+
+`fact_ticket` es la mejor relación informes/filas del modelo, y no por casualidad: los cinco
+objetivos de Soporte preguntan por el mismo hecho —un ticket— desde ejes distintos, así que
+comparten tabla, filtros y definiciones. La consecuencia práctica es que **una definición mal
+puesta se equivoca cinco veces a la vez**, y de ahí que las dos decisiones del módulo vivan en
+constantes con nombre (`PRIMERA_RESPUESTA`, `SLA_HORAS`) y no repartidas por el SQL.
+
+### 17.2 SOP-02 parte la base en CUATRO, y no publica una tasa
+
+El aviso venía del diseño y los datos lo confirmaron con creces:
+
+```
+cerrados a tiempo ..........  12
+cerrados tarde .............  64
+abiertos dentro de plazo ...   0     ← la categoría vacía se muestra igualmente
+abiertos y YA VENCIDOS ..... 172     ← la accionable
+                             ───
+                             248
+```
+
+El porcentaje de cumplimiento se calcula **solo sobre los 76 cerrados** (15,79 %) y la columna
+«Cerrados» va a su lado. Sobre 248, como si todos hubieran terminado, daría **4,8 %**: un número
+falso que mezcla lo incumplido con lo desconocido.
+
+Que los «abiertos dentro de plazo» sean **0** no es un fallo del informe: el seed llega al
+2026-07 y los plazos son de 2 a 72 horas, así que toda la cola viva está vencida. La fila se
+pinta con su cero — ocultar una categoría vacía hace creer que no existe.
+
+**Las dos columnas de abiertos se calculan en la CONSULTA, no en la carga.** Dependen de
+`now()`, y un veredicto grabado a las 03:00 del ETL estaría equivocado a las 09:00. El almacén
+guarda `fecha_limite` y `fecha_cierre`; la partición la hace el informe al mirarlo.
+
+### 17.3 La definición de «primera respuesta» va en la pantalla, con su coste medido
+
+SOP-06 adopta la del catálogo —primer mensaje del equipo **visible** para el cliente— y la manda
+al sobre en `salvedad`. Lo que el diseño no había hecho es medir la alternativa:
+
+```
+tickets con ALGÚN mensaje del equipo ................ 244
+  cuya primera intervención es una NOTA INTERNA .....  32   (+1,35 h de media)
+  sin ninguna respuesta visible (solo notas) ........  51
+tickets con primera respuesta VISIBLE ............... 193   ← la adoptada
+```
+
+Las dos poblaciones viajan en columnas contiguas del informe. Una advertencia sin cifra no se
+puede poner en una pantalla; con ella, el lector juzga si la definición le sirve.
+
+### 17.4 Los DOS informes de muestra débil la declaran, y no se maquillan
+
+`SobreInforme.salvedad` ya existía desde INV-09. Aquí hace un trabajo distinto: no advierte de
+un método, advierte de que **no hay bastantes casos**.
+
+**OTD-COM-09** (recuperación al proveedor). 38 ítems, 8 devoluciones, **6 resoluciones** en 6
+meses y entre unos pocos de los 11 proveedores. El resumen empieza por el tamaño de la muestra y
+solo después da el dinero, y cada fila trae la columna `resoluciones`, que es el denominador de
+todo lo demás:
+
+```
+Resoluciones (la muestra) ... 6      Costo del pool ......... $9.349,93
+Devoluciones ................ 8      Recuperado ............. $5.220,94
+Meses con casos ............ 15        en nota de crédito ... $4.196,85
+Proveedores implicados ...... 8        en reposición ........ $1.024,09
+```
+
+**OTD-GER-07** (efecto de las promociones). 184 líneas dentro de ventana, 123 con descuento
+aplicado, frente a **3.217 líneas de base**. Tres decisiones para que la debilidad no se lea como
+un hallazgo:
+
+1. la tabla se ordena por **volumen durante la promoción**, NUNCA por la variación — ordenar por
+   la variación pondría arriba exactamente los pares de una o dos ventas;
+2. `lineas_durante` y `lineas_antes` son columnas de la tabla, con semáforo: rojo si son 0,
+   ámbar por debajo de 5;
+3. las medias son **por día de calendario** de cada tramo. Una ventana de 15 días comparada en
+   totales contra los 400 días previos diría que las promociones hunden la venta.
+
+### 17.5 Ocho supuestos del diseño que no se sostuvieron
+
+Registrados en `docs/estrategico/CORRECCIONES_DISENO_ETL.md` (C4.1 a C4.8) **antes de cerrar la
+fase**. Los tres que más golpean al informe:
+
+> **C4.2** — §5.10 mide el ciclo del RMA como «cierre − solicitud», y ese cierre existe en
+> **35 de 196** devoluciones. Las 18 rechazadas también terminaron —y son las más rápidas, porque
+> rechazar no exige recibir la mercancía—, así que LOG-07 muestra las dos medidas con su `n_`.
+> Sin declararlo, el informe publica el ciclo del 17,9 % del proceso y lo presenta como el ciclo.
+
+> **C4.4** — §5.13 manda unir `fact_resena` a `dim_producto` por `producto_id`. La dimensión
+> tiene grano de VARIANTE: el JOIN da **347 filas donde hay 344**, y la reseña de un producto de
+> tres variantes pesa el triple en un ranking de productos. La tabla denormaliza el producto y
+> nunca se une.
+
+> **C4.7** — §5.14 dice que `origen` vale `inspeccion_rma` / `recepcion_compra`. El CHECK del
+> motor admite `rma` y `recepcion`. Un filtro escrito desde el diseño **vacía el informe entero
+> sin dar un error**. Es la segunda reincidencia exacta de C3C.3, y por eso la regla ya no es una
+> nota al pie: la lista blanca sale del CHECK del motor, nunca del documento.
+
+### 17.6 La matriz de permisos, 16 endpoints × 8 roles
+
+Verificada por API: **128 celdas, 0 discrepancias** con el reparto del catálogo. El corte
+financiero deja fuera a BODEGA y DESPACHO de los **seis informes con dinero** —VEN-14, LOG-10,
+GER-03, GER-10, GER-11 y COM-09— y en ninguno lo respalda el motor: ClickHouse no tiene GRANT por
+columna, así que la barrera es la RUTA. Las excepciones que sí entran son deliberadas:
+
+```
+BODEGA   → solo LOG-08 (motivos y destino de la mercancía, «en cantidades»)
+DESPACHO → solo LOG-09 (tasa de devolución, «en conteos»)
+COMPRAS  → SOP-08 (ranking de productos problemáticos) y COM-09
+SOPORTE  → los 5 de su departamento + LOG-07, LOG-08 y LOG-10
+ANALISTA → todo menos LOG-10 y los cuatro de la mesa de ayuda que no son SOP-03
+```
+
+En LOG-08 y LOG-09 la ausencia de dinero **la garantiza la consulta y no el motor** —
+`fact_devolucion` lleva `monto_total`—, mismo mecanismo ya declarado en OTD-COM-08 y OTD-LOG-12.
+Y las dos ampliaciones de Soporte (ANALISTA en SOP-03, COMPRAS en SOP-08) van en línea propia
+ANTES del comodín del departamento: ampliar el comodín habría arrastrado a los otros seis.
+
+### 17.7 Degradación, verificada apagando el contenedor
+
+Con `docker stop` sobre ClickHouse y **sin reiniciar el backend**:
+
+```
+los informes nuevos ............ 200 en ~4,1 s · analiticaDisponible=false · aviso legible
+informes SIMPLES (PostgreSQL) .. 200 · bandeja 248 filas · cartera 4.083   ← intactos
+```
+
+Y al volver a levantarlo se recuperan **solos**. Durante la construcción de esta fase la política
+de §13 hizo su trabajo: cinco consultas fallaron con `ILLEGAL_AGGREGATION` —un alias de agregado
+llamado igual que la columna que agrega— y salieron como **500**, no como «analítica no
+disponible». Con la captura amplia habrían quedado en verde y con la tabla vacía.
+
+---
+
+## 18. Fase 5: los siete de Compras, y el catálogo táctico completo
+
+Última tarea de conexión. **No carga ni una fila**: las cuatro tablas que alimentan estos
+informes —`dim_proveedor`, `fact_orden_compra`, `fact_compra_linea` y `fact_flujo_caja`— llevaban
+validadas desde las Fases 2 y 3A. Con ella el catálogo queda **cerrado**: 30 objetivos SIMPLES y
+39 COMPUESTOS, ninguno pendiente.
+
+| Objetivo | Endpoint | Fuente | Filas | Roles |
+|---|---|---|---|---|
+| OTD-COM-03 | `compras/puntualidad-pago` | `fact_flujo_caja` (egreso) | 11 / 19 / 2 | + ANALISTA |
+| OTD-COM-04 | `compras/gasto-mensual` | `fact_orden_compra` | 19 / 11 / 2 | + ANALISTA |
+| OTD-COM-05 | `compras/cumplimiento-plazo` | `fact_orden_compra` | 11 / 19 | ADMIN·GERENTE·COMPRAS |
+| OTD-COM-06 | `compras/ciclo-compra` | `fact_orden_compra` | 11 / 19 / 2 | + ANALISTA |
+| OTD-COM-07 | `compras/rechazos` | `fact_compra_linea` | 11 / 5 / 19 / 10 | + BODEGA (mixto) |
+| OTD-COM-11 | `compras/entregas-incompletas` | **PostgreSQL** | 11 (paginado) | + BODEGA (mixto) |
+| OTD-COM-12 | `compras/evolucion-costo` | `fact_compra_linea` | 1.041 (paginado) | + ANALISTA |
+
+Coste del patrón, otra vez el prometido: **0 clases Java nuevas** (los servicios y controladores
+de Compras ya existían por COM-01/02/08/10 y COM-09) + 1 bloque de definición por informe + 2
+líneas de `SecurityConfig`. Ni un componente, servicio o estilo de Angular.
+
+### 18.1 OTD-COM-11 es SIMPLE, y respetarlo tuvo consecuencias
+
+Era **el último objetivo SIMPLE del catálogo sin construir**, y la tentación de meterlo con los
+compuestos era fuerte: agrega, compara proveedores y su dato está en el almacén. Pero la regla de
+§3 del catálogo es clara —*agregar sobre la foto presente no convierte un informe en compuesto;
+comparar un período contra otro, sí*— y COM-11 no compara períodos. Va contra PostgreSQL, con
+`@Transactional(readOnly = true)`, y **no tiene eje de mes**: añadirlo lo habría convertido en una
+serie temporal, es decir, en otro informe.
+
+Que sea simple trae además la ventaja de que el motor vuelve a estar debajo: la consulta jamás
+toca `orden_compra.total` ni `cuenta_por_pagar`, sobre los que grp_bodega no tiene privilegio.
+
+### 18.2 Dos informes MIXTOS más, y por qué el motor no basta en ninguno
+
+El catálogo da COM-07 y COM-11 a Bodega «en cantidades, sin montos». Es el patrón de OTD-INV-10:
+la ruta la deja ENTRAR y la **consulta** decide qué columnas se seleccionan, con
+`conValorizacion` en el sobre para que la pantalla lo sepa.
+
+Que el corte no pueda apoyarse en el motor tiene una causa distinta en cada uno, y las dos están
+documentadas desde antes:
+
+* **COM-07** vive en ClickHouse, que no tiene GRANT por columna. Nada nuevo.
+* **COM-11** vive en PostgreSQL y aun así el motor no alcanza: grp_bodega **conserva a propósito**
+  `SELECT` sobre `orden_compra_detalle.precio_unitario` (excepción declarada del script 41 — lo
+  necesita para valorizar el kardex al recibir). La BD le dejaría calcular el valor faltante.
+
+Es el mismo mecanismo de OTD-COM-08, con una diferencia que conviene no perder: COM-08 no tiene
+NINGUNA columna de dinero para nadie; COM-07 y COM-11 sí las tienen, y lo que cambia es a quién se
+le envían.
+
+### 18.3 Lo que hace distinto a cada informe (y que no se ve en el SQL)
+
+1. **COM-03 separa el anticipo del retraso.** `dias_desvio_vencimiento` es negativo cuando se
+   pagó antes, así que un promedio único los cancela. Distribuidora Deportiva Andina tiene un
+   desvío medio de **−9,2 días** —«le pagamos con nueve de adelanto»— y **4 de sus 18 facturas se
+   pagaron tarde**, con 44 días de retraso acumulado. Las tres medidas van en columnas separadas y
+   el conteo de cada grupo al lado.
+2. **COM-04 agrupa por el mes de la FACTURA.** Ver [C5.1](../estrategico/CORRECCIONES_DISENO_ETL.md#c51-el-mes-del-gasto-de-compras-no-es-el-mes-de-la-orden):
+   con el mes de la orden, $4,6 M cambian de mes y el total sigue cuadrando al centavo.
+3. **COM-05 y COM-06 NO miden sobre la misma población,** y es deliberado: 825 pares con promesa y
+   llegada contra 839 órdenes con llegada. Cada uno declara su base en una columna («Medidas») y
+   en su salvedad. Es la lección de C2.7 aplicada antes de tropezar.
+4. **COM-07 divide por lo que LLEGÓ.** C3.2, ya conocida; lo que aporta esta fase es que el
+   informe la DICE en pantalla en vez de dejarla en el docstring.
+5. **COM-11 recorta a las órdenes ya entregadas.** Ver [C5.2](../estrategico/CORRECCIONES_DISENO_ETL.md#c52-las-259-líneas-incompletas-son-tres-cosas-distintas):
+   con las 259 líneas del catálogo, el mejor proveedor pasa a ser el peor.
+6. **COM-12 usa la ventana para la que se invirtió el `ORDER BY` de la tabla.**
+   `fact_compra_linea` es la única ordenada por `(producto_variante_id, proveedor_id,
+   fecha_emision)`: `lagInFrame` recorre esa misma partición. Con un detalle que ClickHouse no
+   perdona: **`lagInFrame` rellena la primera fila de cada partición con el DEFECTO del tipo, no
+   con NULL** — misma familia que el LEFT JOIN de la Fase 3B. Comparar contra ese `0,00` daría
+   «subida del 100 %» en los 1.041 primeros precios y el informe entero diría que todo se ha
+   disparado. La frontera se marca con `row_number() > 1`, que es un hecho de la partición y no un
+   valor que pueda coincidir con un dato real.
+
+### 18.4 Tres trampas de sintaxis, y solo una es de ClickHouse
+
+Las tres reventaron en tiempo de ejecución y ninguna la vio el compilador:
+
+1. **ClickHouse — `ILLEGAL_AGGREGATION`** (tercera fase consecutiva). `countIf(a_tiempo = 1) AS
+   a_tiempo` seguido de `sumIf(monto, a_tiempo = 0)` no compila en el motor; con el alias
+   renombrado a `n_a_tiempo`, sí.
+2. **Java — un bloque de texto RECORTA el espacio final de cada línea.** Concatenar la parte
+   variable de un SELECT con un bloque de texto produce `SELECTpr.razon_social`. Va con una cadena
+   normal, no con un bloque.
+3. **Java — `String.formatted()` lee el bloque ENTERO, comentarios incluidos.** El patrón de fecha
+   de ClickHouse hay que escribirlo con el por-ciento duplicado, o el formateador de Java se come
+   un argumento antes de que el patrón llegue al motor.
+
+La tercera se cobró una víctima que merece quedar escrita: el comentario que explicaba la trampa
+llevaba dentro un especificador suelto, en el mismo bloque de texto, y tumbó la consulta con
+`IllegalFormatConversionException`. **La explicación de la trampa fue la trampa.**
+
+Las tres se manifestaron como error del servidor —500 o 400— y no como «analítica no disponible»,
+que es exactamente lo que la política de §13 existe para conseguir.
+
+### 18.5 Matriz rol × endpoint, verificada por API
+
+56 celdas, **0 discrepancias**:
+
+```
+informe      endpoint                ADMI GERE COMP ANAL BODE DESP VEND SOPO
+OTD-COM-03   puntualidad-pago         200  200  200  200  403  403  403  403
+OTD-COM-04   gasto-mensual            200  200  200  200  403  403  403  403
+OTD-COM-05   cumplimiento-plazo       200  200  200  403  403  403  403  403
+OTD-COM-06   ciclo-compra             200  200  200  200  403  403  403  403
+OTD-COM-07   rechazos                 200  200  200  403  200  403  403  403
+OTD-COM-11   entregas-incompletas     200  200  200  403  200  403  403  403
+OTD-COM-12   evolucion-costo          200  200  200  200  403  403  403  403
+```
+
+Dos detalles del orden de las líneas de `SecurityConfig`, que va de lo específico a lo general:
+
+* Los cuatro con ANALISTA se enumeran **por nombre** y no con un comodín, para que un endpoint
+  futuro de Compras no herede el permiso sin que nadie lo haya decidido. Mismo criterio que las
+  dos rutas de costo de Logística (§16).
+* **COM-05 no lleva ni un importe y aun así excluye al ANALISTA.** No es un descuido: el catálogo
+  lo reserva a Compras y Gerencia porque es material de negociación con el proveedor. Cuando el
+  catálogo y la intuición financiera discrepan, manda el catálogo.
+
+### 18.6 Validación: 41 controles contra PostgreSQL, por API
+
+La cifra se toma de la **respuesta HTTP**, no de ClickHouse directamente, de modo que se valida la
+cadena entera —consulta, servicio, controlador y serialización— y no solo el SQL. **41 de 41 con
+Δ = 0**, incluidos $16.084.462,74 pagados, $22.467.387,27 facturados, 825 pares comparables, 185
+unidades rechazadas y los 1.041 pares de COM-12 con sus precios inicial y final.
+
+Una diferencia esperada y verificada como CORRECTA: contando motivos de rechazo, PostgreSQL en
+crudo da 6 valores y el almacén 5. Es la normalización de C3.3 haciendo su trabajo —el valor
+tecleado a mano se funde con su sinónimo—, y por eso el control se escribe contra los **dos**
+valores del origen.
+
+### 18.7 Degradación, verificada apagando el contenedor
+
+Con `docker stop` sobre ClickHouse y **sin reiniciar el backend**:
+
+```
+los seis compuestos ............ 200 en ~4,1 s · analiticaDisponible=false · aviso legible
+OTD-COM-11 (PostgreSQL) ........ 200 en 0,15 s · 11 filas   ← intacto, como debe ser
+```
+
+Al volver a levantar el contenedor se recuperan **solos**, sin reiniciar nada. Y `validar_dwh.py`
+sigue en **44 de 44**: esta fase no tocó ninguna tabla, y el control lo demuestra en vez de
+suponerlo.

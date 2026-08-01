@@ -9,14 +9,22 @@ import { ColorChip, DefinicionDepartamento, FiltroInforme } from '../../../../co
  * resumen y la paginación a partir de estas declaraciones. Ni un componente,
  * ni un servicio, ni un estilo nuevo (ver `docs/tactico/PATRON_INFORMES.md`).
  *
- * Los COMPUESTOS de Inventario (rotación por categoría en el tiempo —
- * OTD-INV-04, evolución mensual del capital almacenado — OTD-INV-09, acumulado
- * de mermas — OTD-INV-10) NO están aquí: son de la fase ETL → ClickHouse.
+ * Desde la Fase 3B del pipeline ETL (2026-07-31) están también los TRES
+ * objetivos COMPUESTOS del departamento, que se sirven desde ClickHouse
+ * (`retailmind_dwh`) en vez de PostgreSQL: OTD-INV-04 (rotación por
+ * categoría), OTD-INV-09 (capital inmovilizado mes a mes) y OTD-INV-10
+ * (mermas y sobrantes por motivo). Se declaran EXACTAMENTE igual que los
+ * simples —el sobre es el mismo— y la pantalla genérica añade sola lo que
+ * traen de más: la marca de agua «Datos al …», el aviso de degradación si el
+ * almacén analítico no responde, y la SALVEDAD metodológica de OTD-INV-09.
  *
- * SEGREGACIÓN FINANCIERA: BODEGA aparece en `roles` de los SEIS informes de
- * cantidades y NO en el de valorización (OTD-INV-07), que es el único con
- * dinero. Esto espeja SecurityConfig — que es quien realmente decide — y evita
- * disparar una petición que la API negaría con 403.
+ * SEGREGACIÓN FINANCIERA: BODEGA aparece en `roles` de los informes de
+ * cantidades y NO en los DOS con dinero — OTD-INV-07 (valor del inventario) y
+ * OTD-INV-09 (capital inmovilizado). OTD-INV-10 es el caso MIXTO: BODEGA lo ve
+ * en cantidades y las columnas `monto: true` llegan vacías porque el backend
+ * ni siquiera las selecciona para su rol. Esto espeja SecurityConfig — que es
+ * quien realmente decide — y evita disparar una petición que la API negaría
+ * con 403.
  */
 
 /** Bodegas activas del sistema (`bodega.codigo`). El backend filtra por código. */
@@ -33,6 +41,10 @@ const FILTRO_PRODUCTO: FiltroInforme = {
   param: 'buscar', etiqueta: 'SKU o nombre del producto', tipo: 'texto',
   debounce: true, ancho: 'ancho'
 };
+
+/** Rango del período, común a los tres informes COMPUESTOS. */
+const FILTRO_DESDE: FiltroInforme = { param: 'desde', etiqueta: 'Desde', tipo: 'fecha' };
+const FILTRO_HASTA: FiltroInforme = { param: 'hasta', etiqueta: 'Hasta', tipo: 'fecha' };
 
 /** Rojo cuando la variante está agotada; ámbar mientras solo esté por debajo. */
 function colorFaltante(fila: Record<string, any>): ColorChip {
@@ -52,6 +64,45 @@ function colorMovimiento(fila: Record<string, any>): ColorChip {
 function colorAjuste(fila: Record<string, any>): ColorChip {
   if (fila['estado'] === 'anulado') { return 'neutral'; }
   return Number(fila['unidades_netas']) < 0 ? 'error' : 'ok';
+}
+
+// ── Colores de los informes COMPUESTOS (Fase 3B del ETL) ────────────────
+
+/**
+ * Rotación: rojo cuando la categoría está PARADA (cero ventas en el período),
+ * que es media respuesta de OTD-INV-04 y la fila que hay que mirar primero.
+ * Ámbar por debajo de media vuelta, verde a partir de ahí.
+ */
+function colorRotacion(fila: Record<string, any>): ColorChip {
+  const r = Number(fila['rotacion_veces']);
+  if (!r) { return 'error'; }
+  return r < 0.5 ? 'warn' : 'ok';
+}
+
+/**
+ * Variación del capital inmovilizado. NO se pinta el crecimiento de verde:
+ * que la bodega acumule más capital no es bueno ni malo por sí mismo, y
+ * colorearlo tomaría partido. Azul sube, neutro estable, ámbar baja fuerte.
+ */
+function colorVariacion(fila: Record<string, any>): ColorChip {
+  const v = fila['variacion_pct'];
+  if (v === null || v === undefined) { return 'neutral'; }
+  const n = Number(v);
+  if (n > 5) { return 'info'; }
+  if (n < -5) { return 'warn'; }
+  return 'neutral';
+}
+
+/** Un ajuste anulado no cuenta: su contramovimiento ya lo dejó en cero. */
+function colorEstadoAjuste(fila: Record<string, any>): ColorChip {
+  return fila['estado'] === 'anulado' ? 'neutral' : 'info';
+}
+
+/** Neto del motivo: perdió (rojo), ganó (verde) o quedó en nada (neutro). */
+function colorNetoAjuste(fila: Record<string, any>): ColorChip {
+  const n = Number(fila['unidades_netas']);
+  if (n < 0) { return 'error'; }
+  return n > 0 ? 'ok' : 'neutral';
 }
 
 function colorTransferencia(fila: Record<string, any>): ColorChip {
@@ -337,6 +388,136 @@ export const INFORMES_INVENTARIO: DefinicionDepartamento = {
         { campo: 'stock_maximo',    titulo: 'Máximo',     tipo: 'numero' },
         { campo: 'exceso',          titulo: 'Exceso',     tipo: 'numero' },
         { campo: 'ocupacion_pct',   titulo: 'Ocupación',  tipo: 'porcentaje' }
+      ]
+    },
+
+    // ══════════════════════════════════════════════════════════════════
+    // INFORMES COMPUESTOS — fuente ClickHouse (`retailmind_dwh`)
+    // Fase 3B del pipeline: fact_movimiento_inventario + fact_stock_mensual.
+    //
+    // Se distinguen de los simples en tres cosas que la pantalla ya sabe
+    // pintar sola: marca de agua «Datos al …», degradación con aviso si el
+    // almacén no responde, y —OTD-INV-09— la SALVEDAD metodológica.
+    // ══════════════════════════════════════════════════════════════════
+
+    // ── OTD-INV-04 ────────────────────────────────────────────────────
+    // Sin dinero: BODEGA entra. El backend tampoco selecciona importes.
+    {
+      id: 'OTD-INV-04',
+      endpoint: 'rotacion',
+      titulo: 'Rotación por categoría',
+      descripcion: 'Qué categorías rotan y cuáles se quedan paradas. La rotación son las '
+                 + 'unidades VENDIDAS del período divididas por el stock promedio mensual; '
+                 + 'las transferencias entre bodegas y los ajustes no cuentan como rotación.',
+      icono: 'autorenew',
+      roles: ['ADMIN', 'GERENTE', 'ANALISTA', 'BODEGA'],
+      sinPaginar: true,
+      vacio: 'No hay mercancía almacenada en el período y los filtros elegidos.',
+      filtros: [
+        FILTRO_DESDE, FILTRO_HASTA, FILTRO_BODEGA,
+        { param: 'categoria', etiqueta: 'Categoría', tipo: 'texto',
+          debounce: true, ancho: 'ancho' }
+      ],
+      columnas: [
+        { campo: 'categoria',             titulo: 'Categoría',   tipo: 'texto', recortar: 26 },
+        { campo: 'rotacion_veces',        titulo: 'Rotación',    tipo: 'chip',
+          color: colorRotacion,
+          etiqueta: (v: any) => `${Number(v).toFixed(2)} ×` },
+        { campo: 'dias_cobertura',        titulo: 'Cobertura',   tipo: 'dias' },
+        { campo: 'unidades_vendidas',     titulo: 'Uds. vendidas', tipo: 'numero' },
+        { campo: 'stock_promedio',        titulo: 'Stock promedio', tipo: 'numero' },
+        { campo: 'stock_final',           titulo: 'Stock al cierre', tipo: 'numero' },
+        { campo: 'posiciones',            titulo: 'Variantes',   tipo: 'numero' },
+        // La diferencia con `unidades_vendidas` son transferencias y ajustes:
+        // se muestra para que el criterio del numerador sea comprobable y no
+        // haya que creerse la descripción.
+        { campo: 'unidades_salida_total', titulo: 'Salidas totales', tipo: 'numero' },
+        { campo: 'meses',                 titulo: 'Meses',       tipo: 'numero' }
+      ]
+    },
+
+    // ── OTD-INV-09 ────────────────────────────────────────────────────
+    // DINERO de principio a fin: sin BODEGA, igual que OTD-INV-07.
+    // El sobre trae `salvedad` y la pantalla la pinta encima de la tabla.
+    {
+      id: 'OTD-INV-09',
+      endpoint: 'capital-inmovilizado',
+      titulo: 'Capital inmovilizado mes a mes',
+      descripcion: 'Cómo evoluciona el dinero parado en mercancía almacenada, mes a mes, '
+                 + 'para saber si la bodega se está llenando o vaciando de capital. '
+                 + 'Valorizado a costo VIGENTE: lee la advertencia antes de la tabla.',
+      icono: 'trending_up',
+      roles: ['ADMIN', 'GERENTE', 'ANALISTA'],
+      sinPaginar: true,
+      vacio: 'No hay stock reconstruido en el período y los filtros elegidos.',
+      filtros: [
+        FILTRO_DESDE, FILTRO_HASTA, FILTRO_BODEGA,
+        { param: 'categoria', etiqueta: 'Categoría', tipo: 'texto',
+          debounce: true, ancho: 'ancho' }
+      ],
+      columnas: [
+        { campo: 'mes',                       titulo: 'Mes',        tipo: 'texto' },
+        { campo: 'valor_cierre',              titulo: 'Capital al cierre',
+          tipo: 'moneda', monto: true },
+        { campo: 'variacion_valor',           titulo: 'Variación',  tipo: 'moneda',
+          monto: true },
+        { campo: 'variacion_pct',             titulo: 'Variación %', tipo: 'chip',
+          color: colorVariacion,
+          etiqueta: (v: any) => (v === null || v === undefined)
+            ? '—' : `${Number(v) > 0 ? '+' : ''}${Number(v).toFixed(2)} %` },
+        { campo: 'unidades',                  titulo: 'Unidades',   tipo: 'numero' },
+        { campo: 'posiciones',                titulo: 'Posiciones', tipo: 'numero' },
+        // Cuánta parte del capital de ese mes es mercancía que no se movió.
+        { campo: 'posiciones_sin_movimiento', titulo: 'Quietas',    tipo: 'numero' },
+        { campo: 'unidades_entradas',         titulo: 'Entradas',   tipo: 'numero' },
+        { campo: 'unidades_salidas',          titulo: 'Salidas',    tipo: 'numero' }
+      ]
+    },
+
+    // ── OTD-INV-10 ────────────────────────────────────────────────────
+    // MIXTO: BODEGA ve las cantidades; las columnas de valor solo llegan a
+    // ADMIN y GERENTE (el backend ni siquiera las selecciona para el resto,
+    // y las columnas `monto: true` se ocultan solas cuando no vienen).
+    {
+      id: 'OTD-INV-10',
+      endpoint: 'mermas',
+      titulo: 'Mermas y sobrantes por motivo',
+      descripcion: 'Mercancía perdida y sobrante acumulada por período y motivo, para '
+                 + 'atacar las causas de la pérdida. Solo ajustes de inventario reales: '
+                 + 'la apertura del almacén no es un sobrante.',
+      icono: 'report_problem',
+      roles: ['ADMIN', 'GERENTE', 'ANALISTA', 'BODEGA'],
+      sinPaginar: true,
+      vacio: 'No se registraron ajustes de inventario en el período elegido.',
+      filtros: [
+        FILTRO_DESDE, FILTRO_HASTA, FILTRO_BODEGA,
+        { param: 'tipo', etiqueta: 'Tipo de ajuste', tipo: 'select', opciones: [
+          { valor: '',         etiqueta: 'Todos los tipos' },
+          { valor: 'negativo', etiqueta: 'Negativo (merma)' },
+          { valor: 'positivo', etiqueta: 'Positivo (sobrante)' },
+          { valor: 'conteo',   etiqueta: 'Conteo físico' }
+        ] },
+        { param: 'estado', etiqueta: 'Estado', tipo: 'select', opciones: [
+          { valor: '',         etiqueta: 'Todos' },
+          { valor: 'aplicado', etiqueta: 'Aplicado' },
+          { valor: 'anulado',  etiqueta: 'Anulado' }
+        ] }
+      ],
+      columnas: [
+        { campo: 'motivo',            titulo: 'Motivo',     tipo: 'texto', recortar: 40 },
+        { campo: 'tipo',              titulo: 'Tipo',       tipo: 'texto' },
+        { campo: 'estado',            titulo: 'Estado',     tipo: 'chip',
+          color: colorEstadoAjuste },
+        { campo: 'movimientos',       titulo: 'Movs.',      tipo: 'numero' },
+        { campo: 'productos',         titulo: 'Productos',  tipo: 'numero' },
+        { campo: 'unidades_merma',    titulo: 'Uds. perdidas',  tipo: 'numero' },
+        { campo: 'unidades_sobrante', titulo: 'Uds. sobrantes', tipo: 'numero' },
+        { campo: 'unidades_netas',    titulo: 'Neto',       tipo: 'chip',
+          color: colorNetoAjuste },
+        { campo: 'valor_merma',       titulo: 'Valor perdido', tipo: 'moneda', monto: true },
+        { campo: 'valor_neto',        titulo: 'Valor neto',    tipo: 'moneda', monto: true },
+        { campo: 'primera',           titulo: 'Primero',    tipo: 'fecha' },
+        { campo: 'ultima',            titulo: 'Último',     tipo: 'fecha' }
       ]
     }
   ]

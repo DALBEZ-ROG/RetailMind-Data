@@ -1,4 +1,35 @@
 # -*- coding: utf-8 -*-
+# =============================================================================
+# !!! ADVERTENCIA — NO REGENERAR ESTE DOCUMENTO SIN ACTUALIZARLO ANTES !!!
+# -----------------------------------------------------------------------------
+# El contenido que este script genera describe el negocio como "distribuidora
+# mayorista B2B" (ver la seccion 1.1, mas abajo). Ese marco fue REFUTADO por
+# docs/estrategico/DIAGNOSTICO_SEGMENTO_CLIENTE.md (2026-07-30), que midio las
+# siete dimensiones de compra y cerro con veredicto (c) POBLACION HOMOGENEA:
+# no existe segmentacion B2B/B2C en los datos ni forma honesta de derivarla
+# (99,94 % de las 10.384 lineas de pedido piden entre 1 y 4 unidades; 0 RUC en
+# 3.887 facturas; grupo_cliente / segmento_cliente / cliente_segmento vacias).
+#
+# El .docx y el .pdf YA ENTREGADOS se conservan TAL CUAL, de forma deliberada:
+# son el entregable de su fecha (2026-07-26) y no se reescriben a posteriori.
+# Por eso este script tampoco se modifico en su contenido: solo lleva este
+# aviso.
+#
+# ANTES de volver a ejecutarlo hay que, como minimo:
+#   1. Cambiar la caracterizacion del negocio a "comercio minorista multicanal
+#      de ticket alto" (seccion 1.1 y toda narrativa de jefatura que hable de
+#      cliente mayorista, corporativo o de volumen). OJO: la compra POR VOLUMEN
+#      al proveedor si es real y se conserva; lo que cambia es el lado de la
+#      VENTA.
+#   2. Sincronizar los conteos y la factibilidad con la version VIGENTE de
+#      docs/tactico/CATALOGO_OBJETIVOS_TACTICOS.md (este script quedo en 68
+#      objetivos / 29 simples de la version 3; el catalogo va por la version 5,
+#      con 69 objetivos y 30 simples tras incorporarse OTD-VEN-16).
+#   3. Revisar docs/estrategico/BASE_ESTRATEGICA.md (version vigente) para los
+#      nombres y textos de los objetivos estrategicos, que cambiaron.
+# Regenerar sin hacer lo anterior reintroduciria en un entregable un marco de
+# negocio que la evidencia ya descarto.
+# =============================================================================
 """
 Generador del documento RetailMind_T11_Analisis_Tactico.docx (version Word EDITABLE).
 
@@ -770,6 +801,14 @@ p("Los objetivos tácticos se levantaron para los SEIS departamentos del negocio
   "también Marketing). El número de objetivos por departamento no es una cuota: sale de lo que "
   "cada área realmente necesita dirigir, y por eso es asimétrico.")
 
+# ── ADVERTENCIA (ver cabecera del archivo) ────────────────────────────────
+# ESTA es la seccion refutada. El texto de abajo caracteriza el negocio como
+# "distribuidora mayorista B2B"; el diagnostico del 2026-07-30
+# (docs/estrategico/DIAGNOSTICO_SEGMENTO_CLIENTE.md, veredicto (c) poblacion
+# homogenea) probo que RetailMind es un COMERCIO MINORISTA MULTICANAL DE
+# TICKET ALTO ($1.400,06 por pedido formado por un precio unitario de $276,36,
+# no por cantidad). Se deja intacto porque el entregable ya se presento; si se
+# regenera el documento, este bloque DEBE reescribirse primero.
 h(2, "1.1. El negocio que se dirige: distribuidora mayorista B2B")
 p("RetailMind opera como distribuidora mayorista ecuatoriana con sede en Quevedo: compra volumen "
   "a proveedores, almacena en dos bodegas y revende a clientes corporativos y minoristas "

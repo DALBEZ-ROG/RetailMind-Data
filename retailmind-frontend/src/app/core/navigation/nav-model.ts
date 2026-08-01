@@ -26,7 +26,7 @@ export type PermisoNav =
   | 'metas'            // metas de venta por período (OTD-VEN-15, script 48)
   | 'informesVentas'   // informes tácticos de Ventas (OTD-VEN-01/02/08/10/15/16)
   | 'informesInventario' // informes tácticos de Inventario (OTD-INV-01/02/03/05/06/07/08)
-  | 'informesCompras'  // informes tácticos de Compras (OTD-COM-01/02/08/10)
+  | 'informesCompras'  // informes tácticos de Compras (los 12: OTD-COM-01..12)
   | 'informesLogistica' // informes tácticos de Logística (OTD-LOG-01/02/06/11)
   | 'informesSoporte'  // informes tácticos de Soporte (OTD-SOP-01/04/05)
   | 'informesGerencia' // informes tácticos de Gerencia (OTD-GER-01/04/06/08/09)
@@ -73,11 +73,14 @@ export const ROLES_POR_PERMISO: Record<PermisoNav, readonly string[]> = {
   // roles y el de VALORIZACIÓN (OTD-INV-07, el único con dinero) deja fuera a
   // BODEGA y DESPACHO. Espeja SecurityConfig, que es quien realmente decide.
   informesInventario: ['ADMIN', 'GERENTE', 'BODEGA', 'COMPRAS', 'VENDEDOR', 'ANALISTA'],
-  // Informes tácticos de Compras: tres de los cuatro llevan MONTO o COSTO. La
-  // lista es la UNIÓN de quien ve al menos uno; BODEGA entra SOLO por
-  // OTD-COM-08 (pool de defectuosos, sin dinero) y dentro de la pantalla no ve
-  // los otros tres. Espeja SecurityConfig, que es quien realmente decide.
-  informesCompras:  ['ADMIN', 'GERENTE', 'COMPRAS', 'BODEGA'],
+  // Informes tácticos de Compras: los 12 del departamento. La lista es la UNIÓN
+  // de quien ve al menos uno, y dentro de la pantalla cada rol solo encuentra
+  // los suyos. BODEGA entra por los TRES «en cantidades, sin montos»
+  // (OTD-COM-08, COM-07 y COM-11) y ANALISTA por los cuatro compuestos en que el
+  // catálogo lo incluye (COM-03, COM-04, COM-06 y COM-12) — no por COM-05, que
+  // no lleva ni un importe pero el catálogo reserva a Compras y Gerencia.
+  // Espeja SecurityConfig, que es quien realmente decide.
+  informesCompras:  ['ADMIN', 'GERENTE', 'COMPRAS', 'BODEGA', 'ANALISTA'],
   // Informes tácticos de Logística: DESPACHO es el destinatario natural de los
   // tres de estados y cantidades y queda FUERA de OTD-LOG-11 (costo del envío,
   // el único con dinero). SOPORTE y BODEGA entran solo por el tablero de RMA.

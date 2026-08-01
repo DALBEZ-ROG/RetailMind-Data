@@ -23,6 +23,7 @@ import {
   KpiInforme, TipoValor
 } from '../../../core/models/informe.model';
 import { definicionDepartamento } from './definiciones/catalogo-informes';
+import { ActualizacionAlmacenComponent } from './actualizacion-almacen.component';
 
 /**
  * PANTALLA GENÉRICA de informes tácticos — sirve a los seis departamentos.
@@ -46,7 +47,8 @@ import { definicionDepartamento } from './definiciones/catalogo-informes';
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule,
-    MatTooltipModule, MatPaginatorModule, MatProgressBarModule],
+    MatTooltipModule, MatPaginatorModule, MatProgressBarModule,
+    ActualizacionAlmacenComponent],
   templateUrl: './informes-departamento.component.html',
   styleUrls: ['../operativo-shared.scss', './informes.scss']
 })
@@ -67,6 +69,20 @@ export class InformesDepartamentoComponent implements OnInit {
   loading = false;
   /** Aviso cuando el backend recortó el informe (VEN-02 para un vendedor). */
   avisoAlcance = '';
+
+  // ── Informes COMPUESTOS (fuente ClickHouse) ──────────────────────────
+  /** Marca de agua «Datos al …»: última carga del ETL. Vacío en los simples. */
+  datosAl = '';
+  fuente = '';
+  /** Aviso de degradación cuando el almacén analítico no responde. */
+  avisoAnalitica = '';
+
+  /**
+   * Salvedad metodológica del informe (§8.3 del diseño del pipeline). Hoy la
+   * envía OTD-INV-09: la valorización del inventario de meses pasados usa el
+   * costo VIGENTE porque no existe costo histórico en el sistema.
+   */
+  salvedad = '';
 
   /** Valores actuales de los filtros del informe seleccionado. */
   valores: Record<string, string> = {};
@@ -120,6 +136,10 @@ export class InformesDepartamentoComponent implements OnInit {
     const informe = this.actual;
     this.loading = true;
     this.avisoAlcance = '';
+    this.avisoAnalitica = '';
+    this.datosAl = '';
+    this.fuente = '';
+    this.salvedad = '';
 
     const filtros: Record<string, string | number> = { ...this.valores };
     // El filtro de período se envía descompuesto en año y mes.
@@ -142,6 +162,18 @@ export class InformesDepartamentoComponent implements OnInit {
         if (sobre.alcance === 'propio') {
           this.avisoAlcance = 'Estás viendo únicamente tus propias ventas: '
                             + 'el detalle del resto del equipo es atribución de Gerencia.';
+        }
+        // Informes compuestos: marca de agua y degradación. Los simples no
+        // envían estos campos y todo queda vacío, así que no se pinta nada.
+        this.datosAl = sobre.datosAl ?? '';
+        this.fuente = sobre.fuente ?? '';
+        // Salvedad metodológica (OTD-INV-09 y el modo valorizado de INV-10):
+        // se pinta ENCIMA de la tabla, no debajo, porque es una advertencia
+        // sobre cómo leer las cifras y llega tarde después de haberlas leído.
+        this.salvedad = sobre.salvedad ?? '';
+        if (sobre.analiticaDisponible === false) {
+          this.avisoAnalitica = sobre.avisoAnalitica
+            ?? 'La analítica no está disponible en este momento.';
         }
         this.loading = false;
       },

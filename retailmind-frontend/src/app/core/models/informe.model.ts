@@ -105,5 +105,38 @@ export interface SobreInforme {
   resumen?: KpiInforme[];
   /** VEN-02: 'propio' cuando el backend recortó el informe al vendedor. */
   alcance?: string;
+
+  // ── Solo en los informes COMPUESTOS (fuente ClickHouse) ────────────────
+  /**
+   * `false` cuando el almacén analítico no respondió. El sobre llega vacío y
+   * con `avisoAnalitica`; NO es un error y no rompe la aplicación — es la
+   * degradación declarada: con Docker apagado todo el sistema funciona y solo
+   * la analítica se cae, con aviso.
+   */
+  analiticaDisponible?: boolean;
+  avisoAnalitica?: string;
+  /**
+   * Marca de agua: momento de la última carga del ETL, ya formateado como
+   * texto. Un informe analítico puede llevar hasta 24 h de desfase, y uno que
+   * no dice de cuándo es su dato miente por omisión.
+   */
+  datosAl?: string;
+  /** Origen del dato, p. ej. 'ClickHouse · retailmind_dwh'. */
+  fuente?: string;
+  /**
+   * SALVEDAD METODOLÓGICA del informe: una limitación de cómo está calculado
+   * el dato que hay que leer ANTES que la tabla, no en la documentación.
+   *
+   * Hoy la envía OTD-INV-09 (y OTD-INV-10 en su modo valorizado): el inventario
+   * de meses pasados se valoriza con el costo VIGENTE porque el sistema no
+   * guarda costo histórico, así que la serie es «unidades de cada mes a precio
+   * de hoy» y NO «lo que valía la bodega aquel mes». Presentarla sin decirlo
+   * sería falso, y decirlo solo en el diseño no cuenta: el que lee la pantalla
+   * no lee el diseño.
+   */
+  salvedad?: string;
+  /** OTD-INV-10: si el rol recibió además las columnas de valorización. */
+  conValorizacion?: boolean;
+
   [extra: string]: any;
 }

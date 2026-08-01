@@ -104,8 +104,10 @@ public class InformesVentasController {
      * OTD-VEN-16 — Participación de la venta por canal (foto del período).
      * GET /api/informes/ventas/participacion-canal?canal=&desde=&hasta=
      *
-     * Sostiene OE-06. NO separa B2B de B2C: el segmento del comprador no está
-     * capturado en la base (ver la limitación declarada en el servicio).
+     * Sostiene OE-06 (Consolidación de la Experiencia Omnicanal). Agrupa por el
+     * MEDIO de entrada del pedido, nunca por tipo de cliente: la segmentación
+     * B2B/B2C no existe en los datos ni es derivable (ver el detalle en el
+     * servicio y el diagnóstico que lo descarta).
      */
     @GetMapping("/participacion-canal")
     public Map<String, Object> participacionCanal(

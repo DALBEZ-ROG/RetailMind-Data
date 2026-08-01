@@ -5,6 +5,11 @@
     <p>{{ depto.descripcion }} · Consulta por pantalla con filtros en vivo.</p>
   </div>
 
+  <!-- Actualización del almacén analítico (solo ADMIN/GERENTE). Va ARRIBA del
+       selector porque decide de cuándo es el dato de todo lo que hay debajo;
+       al terminar, recarga el informe abierto. -->
+  <app-actualizacion-almacen (actualizado)="cargar()"></app-actualizacion-almacen>
+
   <!-- Selector de informe: una tarjeta por objetivo táctico disponible al rol -->
   <div class="informe-selector">
     <button type="button" class="informe-chip" *ngFor="let inf of disponibles"
@@ -99,6 +104,29 @@
         <mat-icon>visibility_lock</mat-icon> {{ avisoAlcance }}
       </div>
 
+      <!-- Informes COMPUESTOS: marca de agua de la última carga del ETL.
+           Un informe analítico puede llevar hasta 24 h de desfase; decirlo
+           es parte del dato. Los informes simples no la envían. -->
+      <div class="marca-agua" *ngIf="datosAl">
+        <mat-icon>update</mat-icon>
+        <span>Datos al <strong>{{ datosAl }}</strong></span>
+        <span class="marca-fuente" *ngIf="fuente">· {{ fuente }}</span>
+      </div>
+
+      <!-- Degradación: el almacén analítico no responde. NO es un error de la
+           aplicación, y por eso se pinta como aviso y no como fallo. -->
+      <div class="aviso-analitica" *ngIf="avisoAnalitica">
+        <mat-icon>cloud_off</mat-icon> {{ avisoAnalitica }}
+      </div>
+
+      <!-- SALVEDAD metodológica: cómo hay que leer estas cifras. Va ENCIMA de
+           la tabla y del resumen a propósito — una advertencia sobre cómo
+           interpretar un número llega tarde si se lee después del número. -->
+      <div class="salvedad" *ngIf="salvedad">
+        <mat-icon>info</mat-icon>
+        <span><strong>Cómo leer este informe.</strong> {{ salvedad }}</span>
+      </div>
+
       <div class="cargando" *ngIf="loading">
         <mat-icon>hourglass_top</mat-icon> Consultando…
       </div>
@@ -127,7 +155,9 @@
         [pageSizeOptions]="tamanos" (page)="alPaginar($event)" showFirstLastButtons>
       </mat-paginator>
 
-      <div class="empty-state" *ngIf="!loading && !filas.length">
+      <!-- El estado vacío se calla cuando la analítica está caída: la tabla no
+           está vacía porque no haya datos, sino porque no se pudo preguntar. -->
+      <div class="empty-state" *ngIf="!loading && !filas.length && !avisoAnalitica">
         <mat-icon>{{ informe.icono }}</mat-icon>
         <p>{{ informe.vacio }}</p>
       </div>

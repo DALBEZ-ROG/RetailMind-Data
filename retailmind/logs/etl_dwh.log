@@ -1,0 +1,963 @@
+[2026-07-30 12:17:08] [INFO] [smoke_prueba] staging 'smoke_prueba_new' creada
+[2026-07-30 12:17:10] [INFO] [smoke_prueba] 100 filas insertadas
+[2026-07-30 12:17:10] [INFO] [smoke_prueba] primera carga — RENAME TABLE
+[2026-07-30 12:17:11] [INFO] [smoke_prueba] staging 'smoke_prueba_new' creada
+[2026-07-30 12:17:11] [INFO] [smoke_prueba] 250 filas insertadas
+[2026-07-30 12:17:11] [INFO] [smoke_prueba] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-30 12:17:11] [INFO] [smoke_prueba] staging 'smoke_prueba_new' creada
+[2026-07-30 12:17:11] [INFO] [smoke_prueba] staging 'smoke_prueba_new' creada
+[2026-07-30 12:17:11] [INFO] [smoke_prueba] 249 filas insertadas
+[2026-07-30 18:12:53] [INFO] [dim_fecha] staging 'dim_fecha_new' creada
+[2026-07-30 18:12:53] [INFO] [dim_fecha] 730 días generados (2025-01-01 → 2026-12-31)
+[2026-07-30 18:12:53] [INFO] [dim_fecha] primera carga — RENAME TABLE
+[2026-07-30 18:12:57] [INFO] [dim_producto] staging 'dim_producto_new' creada
+[2026-07-30 18:12:57] [INFO] [dim_producto] 1,221 filas insertadas
+[2026-07-30 18:12:57] [INFO] [dim_producto] primera carga — RENAME TABLE
+[2026-07-30 18:12:58] [INFO] [fact_venta_linea] staging 'fact_venta_linea_new' creada
+[2026-07-30 18:12:59] [INFO] [fact_venta_linea] 10,384 filas insertadas
+[2026-07-30 18:12:59] [INFO] [fact_venta_linea] primera carga — RENAME TABLE
+[2026-07-30 18:13:09] [INFO] [dim_fecha] staging 'dim_fecha_new' creada
+[2026-07-30 18:13:09] [INFO] [dim_fecha] 730 días generados (2025-01-01 → 2026-12-31)
+[2026-07-30 18:13:09] [INFO] [dim_fecha] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-30 18:13:11] [INFO] [dim_producto] staging 'dim_producto_new' creada
+[2026-07-30 18:13:11] [INFO] [dim_producto] 1,221 filas insertadas
+[2026-07-30 18:13:11] [INFO] [dim_producto] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-30 18:13:12] [INFO] [fact_venta_linea] staging 'fact_venta_linea_new' creada
+[2026-07-30 18:13:13] [INFO] [fact_venta_linea] 10,384 filas insertadas
+[2026-07-30 18:13:13] [INFO] [fact_venta_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-30 18:16:52] [INFO] [fact_venta_linea] staging 'fact_venta_linea_new' creada
+[2026-07-30 18:16:53] [INFO] [fact_venta_linea] 10,384 filas insertadas
+[2026-07-30 18:16:53] [INFO] [fact_venta_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-30 20:17:16] [INFO] [dim_fecha] staging 'dim_fecha_new' creada
+[2026-07-30 20:17:16] [INFO] [dim_fecha] 730 días generados (2025-01-01 → 2026-12-31)
+[2026-07-30 20:17:16] [INFO] [dim_fecha] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-30 20:17:18] [INFO] [dim_producto] staging 'dim_producto_new' creada
+[2026-07-30 20:17:19] [INFO] [dim_producto] 1,221 filas insertadas
+[2026-07-30 20:17:19] [INFO] [dim_producto] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-30 20:17:20] [INFO] [fact_venta_linea] staging 'fact_venta_linea_new' creada
+[2026-07-30 20:17:21] [INFO] [fact_venta_linea] 10,384 filas insertadas
+[2026-07-30 20:17:21] [INFO] [fact_venta_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-30 21:09:32] [INFO] [dim_cliente] staging 'dim_cliente_new' creada
+[2026-07-30 21:09:33] [INFO] [dim_cliente] 72 filas insertadas
+[2026-07-30 21:09:33] [INFO] [dim_cliente] primera carga — RENAME TABLE
+[2026-07-30 21:09:41] [INFO] [fact_pedido] staging 'fact_pedido_new' creada
+[2026-07-30 21:09:41] [INFO] [fact_pedido] 4,083 filas insertadas
+[2026-07-30 21:09:42] [INFO] [fact_pedido] primera carga — RENAME TABLE
+[2026-07-30 21:10:25] [INFO] [fact_flujo_caja] staging 'fact_flujo_caja_new' creada
+[2026-07-30 21:10:26] [INFO] [fact_flujo_caja] 4,981 filas insertadas
+[2026-07-30 21:10:26] [INFO] [fact_flujo_caja] primera carga — RENAME TABLE
+[2026-07-30 21:16:14] [INFO] [fact_venta_linea] staging 'fact_venta_linea_new' creada
+[2026-07-30 21:16:15] [INFO] [fact_venta_linea] 10,384 filas insertadas
+[2026-07-30 21:16:15] [INFO] [fact_venta_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-30 23:00:14] [INFO] [dim_proveedor] staging 'dim_proveedor_new' creada
+[2026-07-30 23:00:17] [INFO] [dim_proveedor] 11 filas insertadas
+[2026-07-30 23:00:17] [INFO] [dim_proveedor] primera carga — RENAME TABLE
+[2026-07-30 23:00:24] [INFO] [fact_orden_compra] staging 'fact_orden_compra_new' creada
+[2026-07-30 23:00:24] [INFO] [fact_orden_compra] 865 filas insertadas
+[2026-07-30 23:00:25] [INFO] [fact_orden_compra] primera carga — RENAME TABLE
+[2026-07-30 23:00:43] [INFO] [fact_compra_linea] staging 'fact_compra_linea_new' creada
+[2026-07-30 23:00:44] [INFO] [fact_compra_linea] 2,949 filas insertadas
+[2026-07-30 23:00:44] [INFO] [fact_compra_linea] primera carga — RENAME TABLE
+[2026-07-30 23:03:04] [INFO] [dim_proveedor] staging 'dim_proveedor_new' creada
+[2026-07-30 23:03:04] [INFO] [dim_proveedor] 11 filas insertadas
+[2026-07-30 23:03:05] [INFO] [dim_proveedor] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-30 23:03:05] [INFO] [fact_orden_compra] staging 'fact_orden_compra_new' creada
+[2026-07-30 23:03:06] [INFO] [fact_orden_compra] 865 filas insertadas
+[2026-07-30 23:03:06] [INFO] [fact_orden_compra] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-30 23:03:07] [INFO] [fact_compra_linea] staging 'fact_compra_linea_new' creada
+[2026-07-30 23:03:08] [INFO] [fact_compra_linea] 2,949 filas insertadas
+[2026-07-30 23:03:08] [INFO] [fact_compra_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-30 23:15:32] [INFO] [fact_movimiento_inventario] staging 'fact_movimiento_inventario_new' creada
+[2026-07-30 23:15:33] [INFO] [fact_movimiento_inventario] 13,287 filas insertadas
+[2026-07-30 23:15:34] [INFO] [fact_movimiento_inventario] primera carga — RENAME TABLE
+[2026-07-30 23:18:49] [INFO] [fact_stock_mensual] staging 'fact_stock_mensual_new' creada
+[2026-07-30 23:18:49] [INFO] [fact_stock_mensual] 21,122 filas derivadas dentro de retailmind_dwh
+[2026-07-30 23:18:50] [INFO] [fact_stock_mensual] primera carga — RENAME TABLE
+[2026-07-30 23:24:50] [INFO] [fact_movimiento_inventario] staging 'fact_movimiento_inventario_new' creada
+[2026-07-30 23:24:51] [INFO] [fact_movimiento_inventario] 13,287 filas insertadas
+[2026-07-30 23:24:51] [INFO] [fact_movimiento_inventario] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-30 23:24:52] [INFO] [fact_stock_mensual] staging 'fact_stock_mensual_new' creada
+[2026-07-30 23:24:52] [INFO] [fact_stock_mensual] 21,122 filas derivadas dentro de retailmind_dwh
+[2026-07-30 23:24:52] [INFO] [fact_stock_mensual] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-30 23:26:29] [INFO] [fact_movimiento_inventario] staging 'fact_movimiento_inventario_new' creada
+[2026-07-30 23:26:31] [INFO] [fact_movimiento_inventario] 13,287 filas insertadas
+[2026-07-30 23:26:31] [INFO] [fact_movimiento_inventario] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-30 23:26:32] [INFO] [fact_stock_mensual] staging 'fact_stock_mensual_new' creada
+[2026-07-30 23:26:32] [INFO] [fact_stock_mensual] 21,122 filas derivadas dentro de retailmind_dwh
+[2026-07-30 23:26:33] [INFO] [fact_stock_mensual] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 08:53:00] [INFO] [fact_envio] staging 'fact_envio_new' creada
+[2026-07-31 08:53:02] [INFO] [fact_envio] 2,872 filas insertadas
+[2026-07-31 08:53:02] [INFO] [fact_envio] primera carga — RENAME TABLE
+[2026-07-31 08:54:10] [INFO] [fact_novedad_envio] staging 'fact_novedad_envio_new' creada
+[2026-07-31 08:54:11] [INFO] [fact_novedad_envio] 176 filas insertadas
+[2026-07-31 08:54:11] [ERROR] [fact_novedad_envio] ABORTADA sin publicar: suma_horas: PostgreSQL 4482.09 vs ClickHouse 4482.05 (diferencia -0.04).
+[2026-07-31 09:03:54] [INFO] [fact_novedad_envio] staging 'fact_novedad_envio_new' creada
+[2026-07-31 09:03:55] [INFO] [fact_novedad_envio] 176 filas insertadas
+[2026-07-31 09:03:55] [INFO] [fact_novedad_envio] primera carga — RENAME TABLE
+[2026-07-31 16:42:07] [INFO] [dim_promocion_producto] staging 'dim_promocion_producto_new' creada
+[2026-07-31 16:42:10] [INFO] [dim_promocion_producto] 232 filas insertadas
+[2026-07-31 16:42:10] [INFO] [dim_promocion_producto] primera carga — RENAME TABLE
+[2026-07-31 16:42:14] [INFO] [fact_devolucion] staging 'fact_devolucion_new' creada
+[2026-07-31 16:42:15] [INFO] [fact_devolucion] 196 filas insertadas
+[2026-07-31 16:42:15] [INFO] [fact_devolucion] primera carga — RENAME TABLE
+[2026-07-31 16:42:38] [INFO] [fact_devolucion_linea] staging 'fact_devolucion_linea_new' creada
+[2026-07-31 16:42:38] [INFO] [fact_devolucion_linea] 274 filas insertadas
+[2026-07-31 16:42:39] [INFO] [fact_devolucion_linea] primera carga — RENAME TABLE
+[2026-07-31 16:42:40] [INFO] [fact_ticket] staging 'fact_ticket_new' creada
+[2026-07-31 16:42:40] [INFO] [fact_ticket] 248 filas insertadas
+[2026-07-31 16:42:40] [INFO] [fact_ticket] primera carga — RENAME TABLE
+[2026-07-31 16:42:41] [INFO] [fact_resena] staging 'fact_resena_new' creada
+[2026-07-31 16:42:42] [INFO] [fact_resena] 344 filas insertadas
+[2026-07-31 16:42:42] [INFO] [fact_resena] primera carga — RENAME TABLE
+[2026-07-31 16:42:43] [INFO] [fact_devolucion_proveedor] staging 'fact_devolucion_proveedor_new' creada
+[2026-07-31 16:42:44] [INFO] [fact_devolucion_proveedor] 38 filas insertadas
+[2026-07-31 16:42:44] [ERROR] [fact_devolucion_proveedor] ABORTADA sin publicar: 18 ítems resueltos antes de haberse detectado. | 18 ítems con días hasta la resolución NEGATIVOS.
+[2026-07-31 16:45:44] [INFO] [fact_devolucion_proveedor] staging 'fact_devolucion_proveedor_new' creada
+[2026-07-31 16:45:45] [INFO] [fact_devolucion_proveedor] 38 filas insertadas
+[2026-07-31 16:45:45] [INFO] [fact_devolucion_proveedor] primera carga — RENAME TABLE
+[2026-07-31 19:57:48] [INFO] [dim_fecha] staging 'dim_fecha_new' creada
+[2026-07-31 19:57:48] [INFO] [dim_fecha] 730 días generados (2025-01-01 → 2026-12-31)
+[2026-07-31 19:57:48] [INFO] [dim_fecha] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:57:48] [INFO] [dim_producto] staging 'dim_producto_new' creada
+[2026-07-31 19:57:48] [INFO] [dim_producto] 1,221 filas insertadas
+[2026-07-31 19:57:49] [INFO] [dim_producto] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:57:49] [INFO] [dim_cliente] staging 'dim_cliente_new' creada
+[2026-07-31 19:57:49] [INFO] [dim_cliente] 72 filas insertadas
+[2026-07-31 19:57:49] [INFO] [dim_cliente] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:57:49] [INFO] [dim_proveedor] staging 'dim_proveedor_new' creada
+[2026-07-31 19:57:50] [INFO] [dim_proveedor] 11 filas insertadas
+[2026-07-31 19:57:50] [INFO] [dim_proveedor] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:57:50] [INFO] [dim_promocion_producto] staging 'dim_promocion_producto_new' creada
+[2026-07-31 19:57:50] [INFO] [dim_promocion_producto] 232 filas insertadas
+[2026-07-31 19:57:51] [INFO] [dim_promocion_producto] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:57:51] [INFO] [fact_pedido] staging 'fact_pedido_new' creada
+[2026-07-31 19:57:51] [INFO] [fact_pedido] 4,083 filas insertadas
+[2026-07-31 19:57:51] [INFO] [fact_pedido] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:57:52] [INFO] [fact_venta_linea] staging 'fact_venta_linea_new' creada
+[2026-07-31 19:57:52] [INFO] [fact_venta_linea] 10,384 filas insertadas
+[2026-07-31 19:57:52] [INFO] [fact_venta_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:57:53] [INFO] [fact_flujo_caja] staging 'fact_flujo_caja_new' creada
+[2026-07-31 19:57:53] [INFO] [fact_flujo_caja] 4,981 filas insertadas
+[2026-07-31 19:57:53] [INFO] [fact_flujo_caja] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:57:54] [INFO] [fact_orden_compra] staging 'fact_orden_compra_new' creada
+[2026-07-31 19:57:54] [INFO] [fact_orden_compra] 865 filas insertadas
+[2026-07-31 19:57:54] [INFO] [fact_orden_compra] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:57:54] [INFO] [fact_compra_linea] staging 'fact_compra_linea_new' creada
+[2026-07-31 19:57:55] [INFO] [fact_compra_linea] 2,949 filas insertadas
+[2026-07-31 19:57:55] [INFO] [fact_compra_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:57:55] [INFO] [fact_movimiento_inventario] staging 'fact_movimiento_inventario_new' creada
+[2026-07-31 19:57:56] [INFO] [fact_movimiento_inventario] 13,287 filas insertadas
+[2026-07-31 19:57:56] [INFO] [fact_movimiento_inventario] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:57:56] [INFO] [fact_envio] staging 'fact_envio_new' creada
+[2026-07-31 19:57:56] [INFO] [fact_envio] 2,872 filas insertadas
+[2026-07-31 19:57:57] [INFO] [fact_envio] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:57:57] [INFO] [fact_novedad_envio] staging 'fact_novedad_envio_new' creada
+[2026-07-31 19:57:57] [INFO] [fact_novedad_envio] 176 filas insertadas
+[2026-07-31 19:57:57] [INFO] [fact_novedad_envio] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:57:58] [INFO] [fact_devolucion] staging 'fact_devolucion_new' creada
+[2026-07-31 19:57:58] [INFO] [fact_devolucion] 196 filas insertadas
+[2026-07-31 19:57:58] [INFO] [fact_devolucion] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:57:58] [INFO] [fact_devolucion_linea] staging 'fact_devolucion_linea_new' creada
+[2026-07-31 19:57:59] [INFO] [fact_devolucion_linea] 274 filas insertadas
+[2026-07-31 19:57:59] [INFO] [fact_devolucion_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:57:59] [INFO] [fact_ticket] staging 'fact_ticket_new' creada
+[2026-07-31 19:57:59] [INFO] [fact_ticket] 248 filas insertadas
+[2026-07-31 19:58:00] [INFO] [fact_ticket] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:58:00] [INFO] [fact_resena] staging 'fact_resena_new' creada
+[2026-07-31 19:58:00] [INFO] [fact_resena] 344 filas insertadas
+[2026-07-31 19:58:00] [INFO] [fact_resena] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:58:01] [INFO] [fact_devolucion_proveedor] staging 'fact_devolucion_proveedor_new' creada
+[2026-07-31 19:58:01] [INFO] [fact_devolucion_proveedor] 38 filas insertadas
+[2026-07-31 19:58:01] [INFO] [fact_devolucion_proveedor] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:58:01] [INFO] [fact_stock_mensual] staging 'fact_stock_mensual_new' creada
+[2026-07-31 19:58:02] [INFO] [fact_stock_mensual] 21,122 filas derivadas dentro de retailmind_dwh
+[2026-07-31 19:58:02] [INFO] [fact_stock_mensual] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:58:16] [INFO] [dim_fecha] staging 'dim_fecha_new' creada
+[2026-07-31 19:58:16] [INFO] [dim_fecha] 730 días generados (2025-01-01 → 2026-12-31)
+[2026-07-31 19:58:16] [INFO] [dim_fecha] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:58:16] [INFO] [dim_producto] staging 'dim_producto_new' creada
+[2026-07-31 19:58:16] [INFO] [dim_producto] 1,221 filas insertadas
+[2026-07-31 19:58:17] [INFO] [dim_producto] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:58:17] [INFO] [dim_cliente] staging 'dim_cliente_new' creada
+[2026-07-31 19:58:17] [INFO] [dim_cliente] 72 filas insertadas
+[2026-07-31 19:58:17] [INFO] [dim_cliente] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:58:18] [INFO] [dim_proveedor] staging 'dim_proveedor_new' creada
+[2026-07-31 19:58:18] [INFO] [dim_proveedor] 11 filas insertadas
+[2026-07-31 19:58:18] [INFO] [dim_proveedor] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:58:18] [INFO] [dim_promocion_producto] staging 'dim_promocion_producto_new' creada
+[2026-07-31 19:58:18] [INFO] [dim_promocion_producto] 232 filas insertadas
+[2026-07-31 19:58:19] [INFO] [dim_promocion_producto] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:58:19] [INFO] [fact_pedido] staging 'fact_pedido_new' creada
+[2026-07-31 19:58:19] [INFO] [fact_pedido] 4,083 filas insertadas
+[2026-07-31 19:58:20] [INFO] [fact_pedido] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:58:20] [INFO] [fact_venta_linea] staging 'fact_venta_linea_new' creada
+[2026-07-31 19:58:20] [INFO] [fact_venta_linea] 10,384 filas insertadas
+[2026-07-31 19:58:20] [INFO] [fact_venta_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:58:21] [INFO] [fact_flujo_caja] staging 'fact_flujo_caja_new' creada
+[2026-07-31 19:58:21] [INFO] [fact_flujo_caja] 4,981 filas insertadas
+[2026-07-31 19:58:21] [INFO] [fact_flujo_caja] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:58:22] [INFO] [fact_orden_compra] staging 'fact_orden_compra_new' creada
+[2026-07-31 19:58:22] [INFO] [fact_orden_compra] 865 filas insertadas
+[2026-07-31 19:58:22] [INFO] [fact_orden_compra] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:58:23] [INFO] [fact_compra_linea] staging 'fact_compra_linea_new' creada
+[2026-07-31 19:58:23] [INFO] [fact_compra_linea] 2,949 filas insertadas
+[2026-07-31 19:58:23] [INFO] [fact_compra_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:58:23] [INFO] [fact_movimiento_inventario] staging 'fact_movimiento_inventario_new' creada
+[2026-07-31 19:58:24] [INFO] [fact_movimiento_inventario] 13,287 filas insertadas
+[2026-07-31 19:58:24] [INFO] [fact_movimiento_inventario] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:58:24] [INFO] [fact_envio] staging 'fact_envio_new' creada
+[2026-07-31 19:58:25] [INFO] [fact_envio] 2,872 filas insertadas
+[2026-07-31 19:58:25] [INFO] [fact_envio] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:58:25] [INFO] [fact_novedad_envio] staging 'fact_novedad_envio_new' creada
+[2026-07-31 19:58:25] [INFO] [fact_novedad_envio] 176 filas insertadas
+[2026-07-31 19:58:26] [INFO] [fact_novedad_envio] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:58:26] [INFO] [fact_devolucion] staging 'fact_devolucion_new' creada
+[2026-07-31 19:58:26] [INFO] [fact_devolucion] 196 filas insertadas
+[2026-07-31 19:58:26] [INFO] [fact_devolucion] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:58:27] [INFO] [fact_devolucion_linea] staging 'fact_devolucion_linea_new' creada
+[2026-07-31 19:58:27] [INFO] [fact_devolucion_linea] 274 filas insertadas
+[2026-07-31 19:58:27] [INFO] [fact_devolucion_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:58:27] [INFO] [fact_ticket] staging 'fact_ticket_new' creada
+[2026-07-31 19:58:28] [INFO] [fact_ticket] 248 filas insertadas
+[2026-07-31 19:58:28] [INFO] [fact_ticket] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:58:28] [INFO] [fact_resena] staging 'fact_resena_new' creada
+[2026-07-31 19:58:28] [INFO] [fact_resena] 344 filas insertadas
+[2026-07-31 19:58:29] [INFO] [fact_resena] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:58:29] [INFO] [fact_devolucion_proveedor] staging 'fact_devolucion_proveedor_new' creada
+[2026-07-31 19:58:29] [INFO] [fact_devolucion_proveedor] 38 filas insertadas
+[2026-07-31 19:58:29] [INFO] [fact_devolucion_proveedor] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:58:30] [INFO] [fact_stock_mensual] staging 'fact_stock_mensual_new' creada
+[2026-07-31 19:58:30] [INFO] [fact_stock_mensual] 21,122 filas derivadas dentro de retailmind_dwh
+[2026-07-31 19:58:30] [INFO] [fact_stock_mensual] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:59:09] [INFO] [fact_movimiento_inventario] staging 'fact_movimiento_inventario_new' creada
+[2026-07-31 19:59:09] [INFO] [fact_movimiento_inventario] 13,287 filas insertadas
+[2026-07-31 19:59:10] [INFO] [fact_movimiento_inventario] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:59:10] [INFO] [fact_resena] staging 'fact_resena_new' creada
+[2026-07-31 19:59:10] [INFO] [fact_resena] 344 filas insertadas
+[2026-07-31 19:59:10] [INFO] [fact_resena] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:59:11] [INFO] [fact_stock_mensual] staging 'fact_stock_mensual_new' creada
+[2026-07-31 19:59:11] [INFO] [fact_stock_mensual] 21,122 filas derivadas dentro de retailmind_dwh
+[2026-07-31 19:59:11] [INFO] [fact_stock_mensual] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 19:59:35] [INFO] [fact_movimiento_inventario] staging 'fact_movimiento_inventario_new' creada
+[2026-07-31 19:59:36] [INFO] [fact_movimiento_inventario] 13,287 filas insertadas
+[2026-07-31 19:59:36] [WARNING] [fact_movimiento_inventario] intento 1/2 ABORTÓ: Conteo distinto: origen 13,288 vs destino 13,287 (diferencia -1).
+[2026-07-31 19:59:37] [INFO] [fact_movimiento_inventario] staging 'fact_movimiento_inventario_new' creada
+[2026-07-31 19:59:37] [INFO] [fact_movimiento_inventario] 13,287 filas insertadas
+[2026-07-31 19:59:38] [WARNING] [fact_movimiento_inventario] intento 2/2 ABORTÓ: Conteo distinto: origen 13,288 vs destino 13,287 (diferencia -1).
+[2026-07-31 19:59:38] [INFO] [fact_resena] staging 'fact_resena_new' creada
+[2026-07-31 19:59:38] [INFO] [fact_resena] 344 filas insertadas
+[2026-07-31 19:59:38] [INFO] [fact_resena] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:07:11] [INFO] [dim_fecha] staging 'dim_fecha_new' creada
+[2026-07-31 20:07:11] [INFO] [dim_fecha] 730 días generados (2025-01-01 → 2026-12-31)
+[2026-07-31 20:07:11] [INFO] [dim_fecha] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:07:12] [INFO] [dim_producto] staging 'dim_producto_new' creada
+[2026-07-31 20:07:12] [INFO] [dim_producto] 1,221 filas insertadas
+[2026-07-31 20:07:12] [INFO] [dim_producto] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:07:12] [INFO] [dim_cliente] staging 'dim_cliente_new' creada
+[2026-07-31 20:07:12] [INFO] [dim_cliente] 72 filas insertadas
+[2026-07-31 20:07:13] [INFO] [dim_cliente] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:07:13] [INFO] [dim_proveedor] staging 'dim_proveedor_new' creada
+[2026-07-31 20:07:13] [INFO] [dim_proveedor] 11 filas insertadas
+[2026-07-31 20:07:13] [INFO] [dim_proveedor] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:07:13] [INFO] [dim_promocion_producto] staging 'dim_promocion_producto_new' creada
+[2026-07-31 20:07:14] [INFO] [dim_promocion_producto] 232 filas insertadas
+[2026-07-31 20:07:14] [INFO] [dim_promocion_producto] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:07:14] [INFO] [fact_pedido] staging 'fact_pedido_new' creada
+[2026-07-31 20:07:14] [INFO] [fact_pedido] 4,083 filas insertadas
+[2026-07-31 20:07:15] [INFO] [fact_pedido] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:07:15] [INFO] [fact_venta_linea] staging 'fact_venta_linea_new' creada
+[2026-07-31 20:07:16] [INFO] [fact_venta_linea] 10,384 filas insertadas
+[2026-07-31 20:07:16] [INFO] [fact_venta_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:07:16] [INFO] [fact_flujo_caja] staging 'fact_flujo_caja_new' creada
+[2026-07-31 20:07:16] [INFO] [fact_flujo_caja] 4,981 filas insertadas
+[2026-07-31 20:07:17] [INFO] [fact_flujo_caja] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:07:17] [INFO] [fact_orden_compra] staging 'fact_orden_compra_new' creada
+[2026-07-31 20:07:17] [INFO] [fact_orden_compra] 865 filas insertadas
+[2026-07-31 20:07:17] [INFO] [fact_orden_compra] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:07:18] [INFO] [fact_compra_linea] staging 'fact_compra_linea_new' creada
+[2026-07-31 20:07:18] [INFO] [fact_compra_linea] 2,949 filas insertadas
+[2026-07-31 20:07:18] [INFO] [fact_compra_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:07:18] [INFO] [fact_movimiento_inventario] staging 'fact_movimiento_inventario_new' creada
+[2026-07-31 20:07:19] [INFO] [fact_movimiento_inventario] 13,287 filas insertadas
+[2026-07-31 20:07:19] [INFO] [fact_movimiento_inventario] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:07:19] [INFO] [fact_envio] staging 'fact_envio_new' creada
+[2026-07-31 20:07:20] [INFO] [fact_envio] 2,872 filas insertadas
+[2026-07-31 20:07:20] [INFO] [fact_envio] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:07:20] [INFO] [fact_novedad_envio] staging 'fact_novedad_envio_new' creada
+[2026-07-31 20:07:21] [INFO] [fact_novedad_envio] 176 filas insertadas
+[2026-07-31 20:07:21] [INFO] [fact_novedad_envio] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:07:21] [INFO] [fact_devolucion] staging 'fact_devolucion_new' creada
+[2026-07-31 20:07:21] [INFO] [fact_devolucion] 196 filas insertadas
+[2026-07-31 20:07:21] [INFO] [fact_devolucion] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:07:22] [INFO] [fact_devolucion_linea] staging 'fact_devolucion_linea_new' creada
+[2026-07-31 20:07:22] [INFO] [fact_devolucion_linea] 274 filas insertadas
+[2026-07-31 20:07:22] [INFO] [fact_devolucion_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:07:23] [INFO] [fact_ticket] staging 'fact_ticket_new' creada
+[2026-07-31 20:07:23] [INFO] [fact_ticket] 248 filas insertadas
+[2026-07-31 20:07:23] [INFO] [fact_ticket] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:07:23] [INFO] [fact_resena] staging 'fact_resena_new' creada
+[2026-07-31 20:07:23] [INFO] [fact_resena] 344 filas insertadas
+[2026-07-31 20:07:24] [INFO] [fact_resena] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:07:24] [INFO] [fact_devolucion_proveedor] staging 'fact_devolucion_proveedor_new' creada
+[2026-07-31 20:07:24] [INFO] [fact_devolucion_proveedor] 38 filas insertadas
+[2026-07-31 20:07:24] [INFO] [fact_devolucion_proveedor] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:07:25] [INFO] [fact_stock_mensual] staging 'fact_stock_mensual_new' creada
+[2026-07-31 20:07:25] [INFO] [fact_stock_mensual] 21,122 filas derivadas dentro de retailmind_dwh
+[2026-07-31 20:07:25] [INFO] [fact_stock_mensual] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:09:01] [INFO] [dim_fecha] staging 'dim_fecha_new' creada
+[2026-07-31 20:09:01] [INFO] [dim_fecha] 730 días generados (2025-01-01 → 2026-12-31)
+[2026-07-31 20:09:01] [INFO] [dim_fecha] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:09:01] [INFO] [dim_producto] staging 'dim_producto_new' creada
+[2026-07-31 20:09:02] [INFO] [dim_producto] 1,221 filas insertadas
+[2026-07-31 20:09:02] [INFO] [dim_producto] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:09:02] [INFO] [dim_cliente] staging 'dim_cliente_new' creada
+[2026-07-31 20:09:02] [INFO] [dim_cliente] 72 filas insertadas
+[2026-07-31 20:09:02] [INFO] [dim_cliente] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:09:03] [INFO] [dim_proveedor] staging 'dim_proveedor_new' creada
+[2026-07-31 20:09:03] [INFO] [dim_proveedor] 11 filas insertadas
+[2026-07-31 20:09:03] [INFO] [dim_proveedor] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:09:03] [INFO] [dim_promocion_producto] staging 'dim_promocion_producto_new' creada
+[2026-07-31 20:09:03] [INFO] [dim_promocion_producto] 232 filas insertadas
+[2026-07-31 20:09:04] [INFO] [dim_promocion_producto] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:09:04] [INFO] [fact_pedido] staging 'fact_pedido_new' creada
+[2026-07-31 20:09:04] [INFO] [fact_pedido] 4,083 filas insertadas
+[2026-07-31 20:09:05] [INFO] [fact_pedido] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:09:05] [INFO] [fact_venta_linea] staging 'fact_venta_linea_new' creada
+[2026-07-31 20:09:05] [INFO] [fact_venta_linea] 10,384 filas insertadas
+[2026-07-31 20:09:06] [INFO] [fact_venta_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:09:06] [INFO] [fact_flujo_caja] staging 'fact_flujo_caja_new' creada
+[2026-07-31 20:09:06] [INFO] [fact_flujo_caja] 4,981 filas insertadas
+[2026-07-31 20:09:06] [INFO] [fact_flujo_caja] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:09:07] [INFO] [fact_orden_compra] staging 'fact_orden_compra_new' creada
+[2026-07-31 20:09:07] [INFO] [fact_orden_compra] 865 filas insertadas
+[2026-07-31 20:09:07] [INFO] [fact_orden_compra] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:09:08] [INFO] [fact_compra_linea] staging 'fact_compra_linea_new' creada
+[2026-07-31 20:09:08] [INFO] [fact_compra_linea] 2,949 filas insertadas
+[2026-07-31 20:09:08] [INFO] [fact_compra_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:09:08] [INFO] [fact_movimiento_inventario] staging 'fact_movimiento_inventario_new' creada
+[2026-07-31 20:09:09] [INFO] [fact_movimiento_inventario] 13,287 filas insertadas
+[2026-07-31 20:09:09] [INFO] [fact_movimiento_inventario] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:09:09] [INFO] [fact_envio] staging 'fact_envio_new' creada
+[2026-07-31 20:09:10] [INFO] [fact_envio] 2,872 filas insertadas
+[2026-07-31 20:09:10] [INFO] [fact_envio] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:09:10] [INFO] [fact_novedad_envio] staging 'fact_novedad_envio_new' creada
+[2026-07-31 20:09:10] [INFO] [fact_novedad_envio] 176 filas insertadas
+[2026-07-31 20:09:11] [INFO] [fact_novedad_envio] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:09:11] [INFO] [fact_devolucion] staging 'fact_devolucion_new' creada
+[2026-07-31 20:09:11] [INFO] [fact_devolucion] 196 filas insertadas
+[2026-07-31 20:09:11] [INFO] [fact_devolucion] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:09:12] [INFO] [fact_devolucion_linea] staging 'fact_devolucion_linea_new' creada
+[2026-07-31 20:09:12] [INFO] [fact_devolucion_linea] 274 filas insertadas
+[2026-07-31 20:09:12] [INFO] [fact_devolucion_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:09:13] [INFO] [fact_ticket] staging 'fact_ticket_new' creada
+[2026-07-31 20:09:13] [INFO] [fact_ticket] 248 filas insertadas
+[2026-07-31 20:09:13] [INFO] [fact_ticket] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:09:13] [INFO] [fact_resena] staging 'fact_resena_new' creada
+[2026-07-31 20:09:14] [INFO] [fact_resena] 344 filas insertadas
+[2026-07-31 20:09:14] [INFO] [fact_resena] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:09:14] [INFO] [fact_devolucion_proveedor] staging 'fact_devolucion_proveedor_new' creada
+[2026-07-31 20:09:14] [INFO] [fact_devolucion_proveedor] 38 filas insertadas
+[2026-07-31 20:09:15] [INFO] [fact_devolucion_proveedor] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:09:15] [INFO] [fact_stock_mensual] staging 'fact_stock_mensual_new' creada
+[2026-07-31 20:09:15] [INFO] [fact_stock_mensual] 21,122 filas derivadas dentro de retailmind_dwh
+[2026-07-31 20:09:15] [INFO] [fact_stock_mensual] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:09:56] [INFO] [dim_fecha] staging 'dim_fecha_new' creada
+[2026-07-31 20:09:56] [INFO] [dim_fecha] 730 días generados (2025-01-01 → 2026-12-31)
+[2026-07-31 20:09:56] [INFO] [dim_fecha] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:09:56] [INFO] [dim_producto] staging 'dim_producto_new' creada
+[2026-07-31 20:09:57] [INFO] [dim_producto] 1,221 filas insertadas
+[2026-07-31 20:09:57] [INFO] [dim_producto] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:09:57] [INFO] [dim_cliente] staging 'dim_cliente_new' creada
+[2026-07-31 20:09:57] [INFO] [dim_cliente] 72 filas insertadas
+[2026-07-31 20:09:57] [INFO] [dim_cliente] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:09:58] [INFO] [dim_proveedor] staging 'dim_proveedor_new' creada
+[2026-07-31 20:09:58] [INFO] [dim_proveedor] 11 filas insertadas
+[2026-07-31 20:09:58] [INFO] [dim_proveedor] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:09:58] [INFO] [dim_promocion_producto] staging 'dim_promocion_producto_new' creada
+[2026-07-31 20:09:58] [INFO] [dim_promocion_producto] 232 filas insertadas
+[2026-07-31 20:09:59] [INFO] [dim_promocion_producto] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:09:59] [INFO] [fact_pedido] staging 'fact_pedido_new' creada
+[2026-07-31 20:09:59] [INFO] [fact_pedido] 4,083 filas insertadas
+[2026-07-31 20:09:59] [INFO] [fact_pedido] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:00] [INFO] [fact_venta_linea] staging 'fact_venta_linea_new' creada
+[2026-07-31 20:10:00] [INFO] [fact_venta_linea] 10,384 filas insertadas
+[2026-07-31 20:10:00] [INFO] [fact_venta_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:01] [INFO] [fact_flujo_caja] staging 'fact_flujo_caja_new' creada
+[2026-07-31 20:10:01] [INFO] [fact_flujo_caja] 4,981 filas insertadas
+[2026-07-31 20:10:01] [INFO] [fact_flujo_caja] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:02] [INFO] [fact_orden_compra] staging 'fact_orden_compra_new' creada
+[2026-07-31 20:10:02] [INFO] [fact_orden_compra] 865 filas insertadas
+[2026-07-31 20:10:02] [INFO] [fact_orden_compra] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:02] [INFO] [fact_compra_linea] staging 'fact_compra_linea_new' creada
+[2026-07-31 20:10:02] [INFO] [fact_compra_linea] 2,949 filas insertadas
+[2026-07-31 20:10:03] [INFO] [fact_compra_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:03] [INFO] [fact_movimiento_inventario] staging 'fact_movimiento_inventario_new' creada
+[2026-07-31 20:10:03] [INFO] [fact_movimiento_inventario] 13,287 filas insertadas
+[2026-07-31 20:10:04] [INFO] [fact_movimiento_inventario] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:04] [INFO] [fact_envio] staging 'fact_envio_new' creada
+[2026-07-31 20:10:04] [INFO] [fact_envio] 2,872 filas insertadas
+[2026-07-31 20:10:05] [INFO] [fact_envio] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:05] [INFO] [fact_novedad_envio] staging 'fact_novedad_envio_new' creada
+[2026-07-31 20:10:05] [INFO] [fact_novedad_envio] 176 filas insertadas
+[2026-07-31 20:10:05] [INFO] [fact_novedad_envio] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:06] [INFO] [fact_devolucion] staging 'fact_devolucion_new' creada
+[2026-07-31 20:10:06] [INFO] [fact_devolucion] 196 filas insertadas
+[2026-07-31 20:10:06] [INFO] [fact_devolucion] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:06] [INFO] [fact_devolucion_linea] staging 'fact_devolucion_linea_new' creada
+[2026-07-31 20:10:06] [INFO] [fact_devolucion_linea] 274 filas insertadas
+[2026-07-31 20:10:07] [INFO] [fact_devolucion_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:07] [INFO] [fact_ticket] staging 'fact_ticket_new' creada
+[2026-07-31 20:10:07] [INFO] [fact_ticket] 248 filas insertadas
+[2026-07-31 20:10:07] [INFO] [fact_ticket] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:08] [INFO] [fact_resena] staging 'fact_resena_new' creada
+[2026-07-31 20:10:08] [INFO] [fact_resena] 344 filas insertadas
+[2026-07-31 20:10:08] [INFO] [fact_resena] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:08] [INFO] [fact_devolucion_proveedor] staging 'fact_devolucion_proveedor_new' creada
+[2026-07-31 20:10:09] [INFO] [fact_devolucion_proveedor] 38 filas insertadas
+[2026-07-31 20:10:09] [INFO] [fact_devolucion_proveedor] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:09] [INFO] [fact_stock_mensual] staging 'fact_stock_mensual_new' creada
+[2026-07-31 20:10:09] [INFO] [fact_stock_mensual] 21,122 filas derivadas dentro de retailmind_dwh
+[2026-07-31 20:10:10] [INFO] [fact_stock_mensual] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:17] [INFO] [dim_fecha] staging 'dim_fecha_new' creada
+[2026-07-31 20:10:17] [INFO] [dim_fecha] 730 días generados (2025-01-01 → 2026-12-31)
+[2026-07-31 20:10:17] [INFO] [dim_fecha] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:18] [INFO] [dim_producto] staging 'dim_producto_new' creada
+[2026-07-31 20:10:18] [INFO] [dim_producto] 1,221 filas insertadas
+[2026-07-31 20:10:18] [INFO] [dim_producto] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:18] [INFO] [dim_cliente] staging 'dim_cliente_new' creada
+[2026-07-31 20:10:18] [INFO] [dim_cliente] 72 filas insertadas
+[2026-07-31 20:10:19] [INFO] [dim_cliente] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:19] [INFO] [dim_proveedor] staging 'dim_proveedor_new' creada
+[2026-07-31 20:10:19] [INFO] [dim_proveedor] 11 filas insertadas
+[2026-07-31 20:10:19] [INFO] [dim_proveedor] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:20] [INFO] [dim_promocion_producto] staging 'dim_promocion_producto_new' creada
+[2026-07-31 20:10:20] [INFO] [dim_promocion_producto] 232 filas insertadas
+[2026-07-31 20:10:20] [INFO] [dim_promocion_producto] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:20] [INFO] [fact_pedido] staging 'fact_pedido_new' creada
+[2026-07-31 20:10:20] [INFO] [fact_pedido] 4,083 filas insertadas
+[2026-07-31 20:10:21] [INFO] [fact_pedido] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:21] [INFO] [fact_venta_linea] staging 'fact_venta_linea_new' creada
+[2026-07-31 20:10:21] [INFO] [fact_venta_linea] 10,384 filas insertadas
+[2026-07-31 20:10:22] [INFO] [fact_venta_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:22] [INFO] [fact_flujo_caja] staging 'fact_flujo_caja_new' creada
+[2026-07-31 20:10:22] [INFO] [fact_flujo_caja] 4,981 filas insertadas
+[2026-07-31 20:10:22] [INFO] [fact_flujo_caja] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:23] [INFO] [fact_orden_compra] staging 'fact_orden_compra_new' creada
+[2026-07-31 20:10:23] [INFO] [fact_orden_compra] 865 filas insertadas
+[2026-07-31 20:10:23] [INFO] [fact_orden_compra] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:24] [INFO] [fact_compra_linea] staging 'fact_compra_linea_new' creada
+[2026-07-31 20:10:24] [INFO] [fact_compra_linea] 2,949 filas insertadas
+[2026-07-31 20:10:24] [INFO] [fact_compra_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:24] [INFO] [fact_movimiento_inventario] staging 'fact_movimiento_inventario_new' creada
+[2026-07-31 20:10:25] [INFO] [fact_movimiento_inventario] 13,287 filas insertadas
+[2026-07-31 20:10:25] [INFO] [fact_movimiento_inventario] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:25] [INFO] [fact_envio] staging 'fact_envio_new' creada
+[2026-07-31 20:10:26] [INFO] [fact_envio] 2,872 filas insertadas
+[2026-07-31 20:10:26] [INFO] [fact_envio] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:26] [INFO] [fact_novedad_envio] staging 'fact_novedad_envio_new' creada
+[2026-07-31 20:10:26] [INFO] [fact_novedad_envio] 176 filas insertadas
+[2026-07-31 20:10:27] [INFO] [fact_novedad_envio] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:27] [INFO] [fact_devolucion] staging 'fact_devolucion_new' creada
+[2026-07-31 20:10:27] [INFO] [fact_devolucion] 196 filas insertadas
+[2026-07-31 20:10:27] [INFO] [fact_devolucion] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:28] [INFO] [fact_devolucion_linea] staging 'fact_devolucion_linea_new' creada
+[2026-07-31 20:10:28] [INFO] [fact_devolucion_linea] 274 filas insertadas
+[2026-07-31 20:10:28] [INFO] [fact_devolucion_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:28] [INFO] [fact_ticket] staging 'fact_ticket_new' creada
+[2026-07-31 20:10:28] [INFO] [fact_ticket] 248 filas insertadas
+[2026-07-31 20:10:29] [INFO] [fact_ticket] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:29] [INFO] [fact_resena] staging 'fact_resena_new' creada
+[2026-07-31 20:10:29] [INFO] [fact_resena] 344 filas insertadas
+[2026-07-31 20:10:29] [INFO] [fact_resena] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:30] [INFO] [fact_devolucion_proveedor] staging 'fact_devolucion_proveedor_new' creada
+[2026-07-31 20:10:30] [INFO] [fact_devolucion_proveedor] 38 filas insertadas
+[2026-07-31 20:10:30] [INFO] [fact_devolucion_proveedor] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:30] [INFO] [fact_stock_mensual] staging 'fact_stock_mensual_new' creada
+[2026-07-31 20:10:31] [INFO] [fact_stock_mensual] 21,122 filas derivadas dentro de retailmind_dwh
+[2026-07-31 20:10:31] [INFO] [fact_stock_mensual] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:48] [INFO] [dim_fecha] staging 'dim_fecha_new' creada
+[2026-07-31 20:10:48] [INFO] [dim_fecha] 730 días generados (2025-01-01 → 2026-12-31)
+[2026-07-31 20:10:49] [INFO] [dim_fecha] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:49] [INFO] [dim_producto] staging 'dim_producto_new' creada
+[2026-07-31 20:10:49] [INFO] [dim_producto] 1,221 filas insertadas
+[2026-07-31 20:10:49] [INFO] [dim_producto] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:50] [INFO] [dim_cliente] staging 'dim_cliente_new' creada
+[2026-07-31 20:10:50] [INFO] [dim_cliente] 72 filas insertadas
+[2026-07-31 20:10:50] [INFO] [dim_cliente] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:50] [INFO] [dim_proveedor] staging 'dim_proveedor_new' creada
+[2026-07-31 20:10:50] [INFO] [dim_proveedor] 11 filas insertadas
+[2026-07-31 20:10:50] [INFO] [dim_proveedor] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:51] [INFO] [dim_promocion_producto] staging 'dim_promocion_producto_new' creada
+[2026-07-31 20:10:51] [INFO] [dim_promocion_producto] 232 filas insertadas
+[2026-07-31 20:10:51] [INFO] [dim_promocion_producto] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:51] [INFO] [fact_pedido] staging 'fact_pedido_new' creada
+[2026-07-31 20:10:52] [INFO] [fact_pedido] 4,083 filas insertadas
+[2026-07-31 20:10:52] [INFO] [fact_pedido] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:52] [INFO] [fact_venta_linea] staging 'fact_venta_linea_new' creada
+[2026-07-31 20:10:53] [INFO] [fact_venta_linea] 10,384 filas insertadas
+[2026-07-31 20:10:53] [INFO] [fact_venta_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:53] [INFO] [fact_flujo_caja] staging 'fact_flujo_caja_new' creada
+[2026-07-31 20:10:53] [INFO] [fact_flujo_caja] 4,981 filas insertadas
+[2026-07-31 20:10:54] [INFO] [fact_flujo_caja] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:54] [INFO] [fact_orden_compra] staging 'fact_orden_compra_new' creada
+[2026-07-31 20:10:54] [INFO] [fact_orden_compra] 865 filas insertadas
+[2026-07-31 20:10:54] [INFO] [fact_orden_compra] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:55] [INFO] [fact_compra_linea] staging 'fact_compra_linea_new' creada
+[2026-07-31 20:10:55] [INFO] [fact_compra_linea] 2,949 filas insertadas
+[2026-07-31 20:10:55] [INFO] [fact_compra_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:56] [INFO] [fact_movimiento_inventario] staging 'fact_movimiento_inventario_new' creada
+[2026-07-31 20:10:56] [INFO] [fact_movimiento_inventario] 13,287 filas insertadas
+[2026-07-31 20:10:56] [INFO] [fact_movimiento_inventario] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:57] [INFO] [fact_envio] staging 'fact_envio_new' creada
+[2026-07-31 20:10:57] [INFO] [fact_envio] 2,872 filas insertadas
+[2026-07-31 20:10:57] [INFO] [fact_envio] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:57] [INFO] [fact_novedad_envio] staging 'fact_novedad_envio_new' creada
+[2026-07-31 20:10:58] [INFO] [fact_novedad_envio] 176 filas insertadas
+[2026-07-31 20:10:58] [INFO] [fact_novedad_envio] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:58] [INFO] [fact_devolucion] staging 'fact_devolucion_new' creada
+[2026-07-31 20:10:58] [INFO] [fact_devolucion] 196 filas insertadas
+[2026-07-31 20:10:59] [INFO] [fact_devolucion] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:10:59] [INFO] [fact_devolucion_linea] staging 'fact_devolucion_linea_new' creada
+[2026-07-31 20:10:59] [INFO] [fact_devolucion_linea] 274 filas insertadas
+[2026-07-31 20:10:59] [INFO] [fact_devolucion_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:11:00] [INFO] [fact_ticket] staging 'fact_ticket_new' creada
+[2026-07-31 20:11:00] [INFO] [fact_ticket] 248 filas insertadas
+[2026-07-31 20:11:00] [INFO] [fact_ticket] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:11:00] [INFO] [fact_resena] staging 'fact_resena_new' creada
+[2026-07-31 20:11:01] [INFO] [fact_resena] 344 filas insertadas
+[2026-07-31 20:11:01] [INFO] [fact_resena] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:11:01] [INFO] [fact_devolucion_proveedor] staging 'fact_devolucion_proveedor_new' creada
+[2026-07-31 20:11:01] [INFO] [fact_devolucion_proveedor] 38 filas insertadas
+[2026-07-31 20:11:02] [INFO] [fact_devolucion_proveedor] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:11:02] [INFO] [fact_stock_mensual] staging 'fact_stock_mensual_new' creada
+[2026-07-31 20:11:02] [INFO] [fact_stock_mensual] 21,122 filas derivadas dentro de retailmind_dwh
+[2026-07-31 20:11:02] [INFO] [fact_stock_mensual] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:13:29] [INFO] [dim_fecha] staging 'dim_fecha_new' creada
+[2026-07-31 20:13:29] [INFO] [dim_fecha] 730 días generados (2025-01-01 → 2026-12-31)
+[2026-07-31 20:13:29] [INFO] [dim_fecha] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:13:30] [INFO] [dim_producto] staging 'dim_producto_new' creada
+[2026-07-31 20:13:30] [INFO] [dim_producto] 1,221 filas insertadas
+[2026-07-31 20:13:30] [INFO] [dim_producto] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:13:30] [INFO] [dim_cliente] staging 'dim_cliente_new' creada
+[2026-07-31 20:13:30] [INFO] [dim_cliente] 72 filas insertadas
+[2026-07-31 20:13:31] [INFO] [dim_cliente] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:13:31] [INFO] [dim_proveedor] staging 'dim_proveedor_new' creada
+[2026-07-31 20:13:31] [INFO] [dim_proveedor] 11 filas insertadas
+[2026-07-31 20:13:31] [INFO] [dim_proveedor] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:13:32] [INFO] [dim_promocion_producto] staging 'dim_promocion_producto_new' creada
+[2026-07-31 20:13:32] [INFO] [dim_promocion_producto] 232 filas insertadas
+[2026-07-31 20:13:32] [INFO] [dim_promocion_producto] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:13:32] [INFO] [fact_pedido] staging 'fact_pedido_new' creada
+[2026-07-31 20:13:32] [INFO] [fact_pedido] 4,083 filas insertadas
+[2026-07-31 20:13:33] [INFO] [fact_pedido] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:13:33] [INFO] [fact_venta_linea] staging 'fact_venta_linea_new' creada
+[2026-07-31 20:13:33] [INFO] [fact_venta_linea] 10,384 filas insertadas
+[2026-07-31 20:13:34] [INFO] [fact_venta_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:13:34] [INFO] [fact_flujo_caja] staging 'fact_flujo_caja_new' creada
+[2026-07-31 20:13:34] [INFO] [fact_flujo_caja] 4,981 filas insertadas
+[2026-07-31 20:13:34] [INFO] [fact_flujo_caja] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:13:35] [INFO] [fact_orden_compra] staging 'fact_orden_compra_new' creada
+[2026-07-31 20:13:35] [INFO] [fact_orden_compra] 865 filas insertadas
+[2026-07-31 20:13:35] [INFO] [fact_orden_compra] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:13:36] [INFO] [fact_compra_linea] staging 'fact_compra_linea_new' creada
+[2026-07-31 20:13:36] [INFO] [fact_compra_linea] 2,949 filas insertadas
+[2026-07-31 20:13:36] [INFO] [fact_compra_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:13:36] [INFO] [fact_movimiento_inventario] staging 'fact_movimiento_inventario_new' creada
+[2026-07-31 20:13:37] [INFO] [fact_movimiento_inventario] 13,287 filas insertadas
+[2026-07-31 20:13:37] [INFO] [fact_movimiento_inventario] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:13:37] [INFO] [fact_envio] staging 'fact_envio_new' creada
+[2026-07-31 20:13:38] [INFO] [fact_envio] 2,872 filas insertadas
+[2026-07-31 20:13:38] [INFO] [fact_envio] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:13:38] [INFO] [fact_novedad_envio] staging 'fact_novedad_envio_new' creada
+[2026-07-31 20:13:38] [INFO] [fact_novedad_envio] 176 filas insertadas
+[2026-07-31 20:13:39] [INFO] [fact_novedad_envio] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:13:39] [INFO] [fact_devolucion] staging 'fact_devolucion_new' creada
+[2026-07-31 20:13:39] [INFO] [fact_devolucion] 196 filas insertadas
+[2026-07-31 20:13:39] [INFO] [fact_devolucion] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:13:40] [INFO] [fact_devolucion_linea] staging 'fact_devolucion_linea_new' creada
+[2026-07-31 20:13:40] [INFO] [fact_devolucion_linea] 274 filas insertadas
+[2026-07-31 20:13:40] [INFO] [fact_devolucion_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:13:40] [INFO] [fact_ticket] staging 'fact_ticket_new' creada
+[2026-07-31 20:13:40] [INFO] [fact_ticket] 248 filas insertadas
+[2026-07-31 20:13:41] [INFO] [fact_ticket] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:13:41] [INFO] [fact_resena] staging 'fact_resena_new' creada
+[2026-07-31 20:13:41] [INFO] [fact_resena] 344 filas insertadas
+[2026-07-31 20:13:41] [INFO] [fact_resena] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:13:42] [INFO] [fact_devolucion_proveedor] staging 'fact_devolucion_proveedor_new' creada
+[2026-07-31 20:13:42] [INFO] [fact_devolucion_proveedor] 38 filas insertadas
+[2026-07-31 20:13:42] [INFO] [fact_devolucion_proveedor] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:13:42] [INFO] [fact_stock_mensual] staging 'fact_stock_mensual_new' creada
+[2026-07-31 20:13:43] [INFO] [fact_stock_mensual] 21,122 filas derivadas dentro de retailmind_dwh
+[2026-07-31 20:13:43] [INFO] [fact_stock_mensual] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:14:04] [ERROR] La corrida no pudo arrancar
+Traceback (most recent call last):
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\urllib3\connectionpool.py", line 788, in urlopen
+    response = self._make_request(
+        conn,
+    ...<10 lines>...
+        **response_kw,
+    )
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\urllib3\connectionpool.py", line 493, in _make_request
+    conn.request(
+    ~~~~~~~~~~~~^
+        method,
+        ^^^^^^^
+    ...<6 lines>...
+        enforce_content_length=enforce_content_length,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\urllib3\connection.py", line 514, in request
+    self.send(chunk)
+    ~~~~~~~~~^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\http\client.py", line 1077, in send
+    self.sock.sendall(data)
+    ~~~~~~~~~~~~~~~~~^^^^^^
+ConnectionAbortedError: [WinError 10053] Se ha anulado una conexión establecida por el software en su equipo host
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\clickhouse_connect\driver\httpclient.py", line 546, in _raw_request
+    response = self.http.request(method, url, **kwargs)
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\urllib3\_request_methods.py", line 143, in request
+    return self.request_encode_body(
+           ~~~~~~~~~~~~~~~~~~~~~~~~^
+        method, url, fields=fields, headers=headers, **urlopen_kw
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\urllib3\_request_methods.py", line 278, in request_encode_body
+    return self.urlopen(method, url, **extra_kw)
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\urllib3\poolmanager.py", line 457, in urlopen
+    response = conn.urlopen(method, u.request_uri, **kw)
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\urllib3\connectionpool.py", line 842, in urlopen
+    retries = retries.increment(
+        method, url, error=new_e, _pool=self, _stacktrace=sys.exc_info()[2]
+    )
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\urllib3\util\retry.py", line 498, in increment
+    raise reraise(type(error), error, _stacktrace)
+          ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\urllib3\util\util.py", line 38, in reraise
+    raise value.with_traceback(tb)
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\urllib3\connectionpool.py", line 788, in urlopen
+    response = self._make_request(
+        conn,
+    ...<10 lines>...
+        **response_kw,
+    )
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\urllib3\connectionpool.py", line 493, in _make_request
+    conn.request(
+    ~~~~~~~~~~~~^
+        method,
+        ^^^^^^^
+    ...<6 lines>...
+        enforce_content_length=enforce_content_length,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\urllib3\connection.py", line 514, in request
+    self.send(chunk)
+    ~~~~~~~~~^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\http\client.py", line 1077, in send
+    self.sock.sendall(data)
+    ~~~~~~~~~~~~~~~~~^^^^^^
+urllib3.exceptions.ProtocolError: ('Connection aborted.', ConnectionAbortedError(10053, 'Se ha anulado una conexión establecida por el software en su equipo host', None, 10053, None))
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\ASUS\Documents\UTEQ\6 SEMESTRE\Construccion de software\1M6DatosCS\retailmind\etl\dwh\run_etl.py", line 584, in main
+    resultado = ejecutar(
+        seleccion=seleccion, corrida_id=corrida, intentos=args.intentos,
+        espera=args.espera, con_validacion=not args.sin_validacion,
+    )
+  File "C:\Users\ASUS\Documents\UTEQ\6 SEMESTRE\Construccion de software\1M6DatosCS\retailmind\etl\dwh\run_etl.py", line 298, in ejecutar
+    client = get_ch_client()
+  File "C:\Users\ASUS\Documents\UTEQ\6 SEMESTRE\Construccion de software\1M6DatosCS\retailmind\etl\dwh\conexiones.py", line 128, in get_ch_client
+    return clickhouse_connect.get_client(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        host=CH_HOST,
+        ^^^^^^^^^^^^^
+    ...<5 lines>...
+        send_receive_timeout=300,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\clickhouse_connect\driver\__init__.py", line 138, in create_client
+    return HttpClient(interface, host, port, username, password, database, access_token,
+                      settings=settings, **kwargs)
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\clickhouse_connect\driver\httpclient.py", line 184, in __init__
+    super().__init__(database=database,
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+                     uri=self.url,
+                     ^^^^^^^^^^^^^
+    ...<6 lines>...
+                     apply_server_timezone=apply_server_timezone,
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                     show_clickhouse_errors=show_clickhouse_errors)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\clickhouse_connect\driver\client.py", line 229, in __init__
+    self._init_common_settings(resolved_tz_source)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\clickhouse_connect\driver\client.py", line 234, in _init_common_settings
+    tuple(self.command('SELECT version(), timezone()', use_database=False))
+          ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\clickhouse_connect\driver\httpclient.py", line 432, in command
+    response = self._raw_request(payload, params, headers, method, fields=fields, server_wait=False)
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\clickhouse_connect\driver\httpclient.py", line 558, in _raw_request
+    raise OperationalError(f'Error {ex} executing HTTP request attempt {attempts}{err_url}') from ex
+clickhouse_connect.driver.exceptions.OperationalError: Error ('Connection aborted.', ConnectionAbortedError(10053, 'Se ha anulado una conexión establecida por el software en su equipo host', None, 10053, None)) executing HTTP request attempt 1 (http://localhost:8123)
+[2026-07-31 20:14:34] [ERROR] La corrida no pudo arrancar
+Traceback (most recent call last):
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\urllib3\connection.py", line 204, in _new_conn
+    sock = connection.create_connection(
+        (self._dns_host, self.port),
+    ...<2 lines>...
+        socket_options=self.socket_options,
+    )
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\urllib3\util\connection.py", line 85, in create_connection
+    raise err
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\urllib3\util\connection.py", line 73, in create_connection
+    sock.connect(sa)
+    ~~~~~~~~~~~~^^^^
+ConnectionRefusedError: [WinError 10061] No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\urllib3\connectionpool.py", line 788, in urlopen
+    response = self._make_request(
+        conn,
+    ...<10 lines>...
+        **response_kw,
+    )
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\urllib3\connectionpool.py", line 493, in _make_request
+    conn.request(
+    ~~~~~~~~~~~~^
+        method,
+        ^^^^^^^
+    ...<6 lines>...
+        enforce_content_length=enforce_content_length,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\urllib3\connection.py", line 500, in request
+    self.endheaders()
+    ~~~~~~~~~~~~~~~^^
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\http\client.py", line 1353, in endheaders
+    self._send_output(message_body, encode_chunked=encode_chunked)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\http\client.py", line 1113, in _send_output
+    self.send(msg)
+    ~~~~~~~~~^^^^^
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\http\client.py", line 1057, in send
+    self.connect()
+    ~~~~~~~~~~~~^^
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\urllib3\connection.py", line 331, in connect
+    self.sock = self._new_conn()
+                ~~~~~~~~~~~~~~^^
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\urllib3\connection.py", line 219, in _new_conn
+    raise NewConnectionError(
+        self, f"Failed to establish a new connection: {e}"
+    ) from e
+urllib3.exceptions.NewConnectionError: HTTPConnection(host='localhost', port=8123): Failed to establish a new connection: [WinError 10061] No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\clickhouse_connect\driver\httpclient.py", line 546, in _raw_request
+    response = self.http.request(method, url, **kwargs)
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\urllib3\_request_methods.py", line 143, in request
+    return self.request_encode_body(
+           ~~~~~~~~~~~~~~~~~~~~~~~~^
+        method, url, fields=fields, headers=headers, **urlopen_kw
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\urllib3\_request_methods.py", line 278, in request_encode_body
+    return self.urlopen(method, url, **extra_kw)
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\urllib3\poolmanager.py", line 457, in urlopen
+    response = conn.urlopen(method, u.request_uri, **kw)
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\urllib3\connectionpool.py", line 872, in urlopen
+    return self.urlopen(
+           ~~~~~~~~~~~~^
+        method,
+        ^^^^^^^
+    ...<13 lines>...
+        **response_kw,
+        ^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\urllib3\connectionpool.py", line 842, in urlopen
+    retries = retries.increment(
+        method, url, error=new_e, _pool=self, _stacktrace=sys.exc_info()[2]
+    )
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\urllib3\util\retry.py", line 543, in increment
+    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+urllib3.exceptions.MaxRetryError: HTTPConnectionPool(host='localhost', port=8123): Max retries exceeded with url: /?query_id=32b5d75a-2133-4d22-b265-182306a651f3 (Caused by NewConnectionError("HTTPConnection(host='localhost', port=8123): Failed to establish a new connection: [WinError 10061] No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión"))
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\ASUS\Documents\UTEQ\6 SEMESTRE\Construccion de software\1M6DatosCS\retailmind\etl\dwh\run_etl.py", line 584, in main
+    resultado = ejecutar(
+        seleccion=seleccion, corrida_id=corrida, intentos=args.intentos,
+        espera=args.espera, con_validacion=not args.sin_validacion,
+    )
+  File "C:\Users\ASUS\Documents\UTEQ\6 SEMESTRE\Construccion de software\1M6DatosCS\retailmind\etl\dwh\run_etl.py", line 298, in ejecutar
+    client = get_ch_client()
+  File "C:\Users\ASUS\Documents\UTEQ\6 SEMESTRE\Construccion de software\1M6DatosCS\retailmind\etl\dwh\conexiones.py", line 128, in get_ch_client
+    return clickhouse_connect.get_client(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        host=CH_HOST,
+        ^^^^^^^^^^^^^
+    ...<5 lines>...
+        send_receive_timeout=300,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\clickhouse_connect\driver\__init__.py", line 138, in create_client
+    return HttpClient(interface, host, port, username, password, database, access_token,
+                      settings=settings, **kwargs)
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\clickhouse_connect\driver\httpclient.py", line 184, in __init__
+    super().__init__(database=database,
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+                     uri=self.url,
+                     ^^^^^^^^^^^^^
+    ...<6 lines>...
+                     apply_server_timezone=apply_server_timezone,
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                     show_clickhouse_errors=show_clickhouse_errors)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\clickhouse_connect\driver\client.py", line 229, in __init__
+    self._init_common_settings(resolved_tz_source)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\clickhouse_connect\driver\client.py", line 234, in _init_common_settings
+    tuple(self.command('SELECT version(), timezone()', use_database=False))
+          ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\clickhouse_connect\driver\httpclient.py", line 432, in command
+    response = self._raw_request(payload, params, headers, method, fields=fields, server_wait=False)
+  File "C:\Users\ASUS\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\clickhouse_connect\driver\httpclient.py", line 558, in _raw_request
+    raise OperationalError(f'Error {ex} executing HTTP request attempt {attempts}{err_url}') from ex
+clickhouse_connect.driver.exceptions.OperationalError: Error HTTPConnectionPool(host='localhost', port=8123): Max retries exceeded with url: /?query_id=32b5d75a-2133-4d22-b265-182306a651f3 (Caused by NewConnectionError("HTTPConnection(host='localhost', port=8123): Failed to establish a new connection: [WinError 10061] No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión")) executing HTTP request attempt 1 (http://localhost:8123)
+[2026-07-31 20:15:15] [INFO] [dim_fecha] staging 'dim_fecha_new' creada
+[2026-07-31 20:15:15] [INFO] [dim_fecha] 730 días generados (2025-01-01 → 2026-12-31)
+[2026-07-31 20:15:15] [INFO] [dim_fecha] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:15:15] [INFO] [dim_producto] staging 'dim_producto_new' creada
+[2026-07-31 20:15:15] [INFO] [dim_producto] 1,221 filas insertadas
+[2026-07-31 20:15:16] [INFO] [dim_producto] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:15:16] [INFO] [dim_cliente] staging 'dim_cliente_new' creada
+[2026-07-31 20:15:16] [INFO] [dim_cliente] 72 filas insertadas
+[2026-07-31 20:15:16] [INFO] [dim_cliente] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:15:17] [INFO] [dim_proveedor] staging 'dim_proveedor_new' creada
+[2026-07-31 20:15:17] [INFO] [dim_proveedor] 11 filas insertadas
+[2026-07-31 20:15:17] [INFO] [dim_proveedor] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:15:17] [INFO] [dim_promocion_producto] staging 'dim_promocion_producto_new' creada
+[2026-07-31 20:15:17] [INFO] [dim_promocion_producto] 232 filas insertadas
+[2026-07-31 20:15:18] [INFO] [dim_promocion_producto] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:15:18] [INFO] [fact_pedido] staging 'fact_pedido_new' creada
+[2026-07-31 20:15:18] [INFO] [fact_pedido] 4,083 filas insertadas
+[2026-07-31 20:15:18] [INFO] [fact_pedido] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:15:19] [INFO] [fact_venta_linea] staging 'fact_venta_linea_new' creada
+[2026-07-31 20:15:19] [INFO] [fact_venta_linea] 10,384 filas insertadas
+[2026-07-31 20:15:19] [INFO] [fact_venta_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:15:20] [INFO] [fact_flujo_caja] staging 'fact_flujo_caja_new' creada
+[2026-07-31 20:15:20] [INFO] [fact_flujo_caja] 4,981 filas insertadas
+[2026-07-31 20:15:20] [INFO] [fact_flujo_caja] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:15:21] [INFO] [fact_orden_compra] staging 'fact_orden_compra_new' creada
+[2026-07-31 20:15:21] [INFO] [fact_orden_compra] 865 filas insertadas
+[2026-07-31 20:15:21] [INFO] [fact_orden_compra] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:15:21] [INFO] [fact_compra_linea] staging 'fact_compra_linea_new' creada
+[2026-07-31 20:15:22] [INFO] [fact_compra_linea] 2,949 filas insertadas
+[2026-07-31 20:15:22] [INFO] [fact_compra_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:15:22] [INFO] [fact_movimiento_inventario] staging 'fact_movimiento_inventario_new' creada
+[2026-07-31 20:15:23] [INFO] [fact_movimiento_inventario] 13,287 filas insertadas
+[2026-07-31 20:15:23] [INFO] [fact_movimiento_inventario] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:15:23] [INFO] [fact_envio] staging 'fact_envio_new' creada
+[2026-07-31 20:15:23] [INFO] [fact_envio] 2,872 filas insertadas
+[2026-07-31 20:15:24] [INFO] [fact_envio] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:15:24] [INFO] [fact_novedad_envio] staging 'fact_novedad_envio_new' creada
+[2026-07-31 20:15:24] [INFO] [fact_novedad_envio] 176 filas insertadas
+[2026-07-31 20:15:24] [INFO] [fact_novedad_envio] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:15:25] [INFO] [fact_devolucion] staging 'fact_devolucion_new' creada
+[2026-07-31 20:15:25] [INFO] [fact_devolucion] 196 filas insertadas
+[2026-07-31 20:15:25] [INFO] [fact_devolucion] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:15:25] [INFO] [fact_devolucion_linea] staging 'fact_devolucion_linea_new' creada
+[2026-07-31 20:15:26] [INFO] [fact_devolucion_linea] 274 filas insertadas
+[2026-07-31 20:15:26] [INFO] [fact_devolucion_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:15:26] [INFO] [fact_ticket] staging 'fact_ticket_new' creada
+[2026-07-31 20:15:26] [INFO] [fact_ticket] 248 filas insertadas
+[2026-07-31 20:15:27] [INFO] [fact_ticket] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:15:27] [INFO] [fact_resena] staging 'fact_resena_new' creada
+[2026-07-31 20:15:27] [INFO] [fact_resena] 344 filas insertadas
+[2026-07-31 20:15:27] [INFO] [fact_resena] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:15:28] [INFO] [fact_devolucion_proveedor] staging 'fact_devolucion_proveedor_new' creada
+[2026-07-31 20:15:28] [INFO] [fact_devolucion_proveedor] 38 filas insertadas
+[2026-07-31 20:15:28] [INFO] [fact_devolucion_proveedor] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:15:28] [INFO] [fact_stock_mensual] staging 'fact_stock_mensual_new' creada
+[2026-07-31 20:15:28] [INFO] [fact_stock_mensual] 21,122 filas derivadas dentro de retailmind_dwh
+[2026-07-31 20:15:29] [INFO] [fact_stock_mensual] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:48:47] [INFO] [dim_fecha] staging 'dim_fecha_new' creada
+[2026-07-31 20:48:47] [INFO] [dim_fecha] 730 días generados (2025-01-01 → 2026-12-31)
+[2026-07-31 20:48:47] [INFO] [dim_fecha] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:50:54] [INFO] [dim_fecha] staging 'dim_fecha_new' creada
+[2026-07-31 20:50:54] [INFO] [dim_fecha] 730 días generados (2025-01-01 → 2026-12-31)
+[2026-07-31 20:50:54] [INFO] [dim_fecha] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:50:54] [INFO] [dim_producto] staging 'dim_producto_new' creada
+[2026-07-31 20:50:54] [INFO] [dim_producto] 1,221 filas insertadas
+[2026-07-31 20:50:54] [INFO] [dim_producto] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:50:55] [INFO] [dim_cliente] staging 'dim_cliente_new' creada
+[2026-07-31 20:50:55] [INFO] [dim_cliente] 72 filas insertadas
+[2026-07-31 20:50:55] [INFO] [dim_cliente] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:50:55] [INFO] [dim_proveedor] staging 'dim_proveedor_new' creada
+[2026-07-31 20:50:56] [INFO] [dim_proveedor] 11 filas insertadas
+[2026-07-31 20:50:56] [INFO] [dim_proveedor] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:50:56] [INFO] [dim_promocion_producto] staging 'dim_promocion_producto_new' creada
+[2026-07-31 20:50:56] [INFO] [dim_promocion_producto] 232 filas insertadas
+[2026-07-31 20:50:56] [INFO] [dim_promocion_producto] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:50:57] [INFO] [fact_pedido] staging 'fact_pedido_new' creada
+[2026-07-31 20:50:57] [INFO] [fact_pedido] 4,083 filas insertadas
+[2026-07-31 20:50:57] [INFO] [fact_pedido] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:50:58] [INFO] [fact_venta_linea] staging 'fact_venta_linea_new' creada
+[2026-07-31 20:50:58] [INFO] [fact_venta_linea] 10,384 filas insertadas
+[2026-07-31 20:50:58] [INFO] [fact_venta_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:50:59] [INFO] [fact_flujo_caja] staging 'fact_flujo_caja_new' creada
+[2026-07-31 20:50:59] [INFO] [fact_flujo_caja] 4,981 filas insertadas
+[2026-07-31 20:50:59] [INFO] [fact_flujo_caja] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:51:00] [INFO] [fact_orden_compra] staging 'fact_orden_compra_new' creada
+[2026-07-31 20:51:00] [INFO] [fact_orden_compra] 865 filas insertadas
+[2026-07-31 20:51:00] [INFO] [fact_orden_compra] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:51:00] [INFO] [fact_compra_linea] staging 'fact_compra_linea_new' creada
+[2026-07-31 20:51:01] [INFO] [fact_compra_linea] 2,949 filas insertadas
+[2026-07-31 20:51:01] [INFO] [fact_compra_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:51:01] [INFO] [fact_movimiento_inventario] staging 'fact_movimiento_inventario_new' creada
+[2026-07-31 20:51:02] [INFO] [fact_movimiento_inventario] 13,287 filas insertadas
+[2026-07-31 20:51:02] [INFO] [fact_movimiento_inventario] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:51:02] [INFO] [fact_envio] staging 'fact_envio_new' creada
+[2026-07-31 20:51:03] [INFO] [fact_envio] 2,872 filas insertadas
+[2026-07-31 20:51:03] [INFO] [fact_envio] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:51:03] [INFO] [fact_novedad_envio] staging 'fact_novedad_envio_new' creada
+[2026-07-31 20:51:03] [INFO] [fact_novedad_envio] 176 filas insertadas
+[2026-07-31 20:51:04] [INFO] [fact_novedad_envio] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:51:04] [INFO] [fact_devolucion] staging 'fact_devolucion_new' creada
+[2026-07-31 20:51:04] [INFO] [fact_devolucion] 196 filas insertadas
+[2026-07-31 20:51:04] [INFO] [fact_devolucion] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:51:05] [INFO] [fact_devolucion_linea] staging 'fact_devolucion_linea_new' creada
+[2026-07-31 20:51:05] [INFO] [fact_devolucion_linea] 274 filas insertadas
+[2026-07-31 20:51:05] [INFO] [fact_devolucion_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:51:05] [INFO] [fact_ticket] staging 'fact_ticket_new' creada
+[2026-07-31 20:51:06] [INFO] [fact_ticket] 248 filas insertadas
+[2026-07-31 20:51:06] [INFO] [fact_ticket] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:51:06] [INFO] [fact_resena] staging 'fact_resena_new' creada
+[2026-07-31 20:51:06] [INFO] [fact_resena] 344 filas insertadas
+[2026-07-31 20:51:06] [INFO] [fact_resena] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:51:07] [INFO] [fact_devolucion_proveedor] staging 'fact_devolucion_proveedor_new' creada
+[2026-07-31 20:51:07] [INFO] [fact_devolucion_proveedor] 38 filas insertadas
+[2026-07-31 20:51:07] [INFO] [fact_devolucion_proveedor] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-07-31 20:51:08] [INFO] [fact_stock_mensual] staging 'fact_stock_mensual_new' creada
+[2026-07-31 20:51:08] [INFO] [fact_stock_mensual] 21,122 filas derivadas dentro de retailmind_dwh
+[2026-07-31 20:51:08] [INFO] [fact_stock_mensual] EXCHANGE TABLES — publicada sin ventana de vacío

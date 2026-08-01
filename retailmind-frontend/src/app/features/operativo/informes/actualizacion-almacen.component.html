@@ -1,0 +1,102 @@
+<!--
+  Panel de actualización del almacén analítico. Solo dirección (ADMIN/GERENTE);
+  para el resto de roles el bloque entero no existe.
+-->
+<div class="op-card almacen-card" *ngIf="permitido">
+
+  <div class="almacen-cabecera">
+    <div class="almacen-titulo">
+      <mat-icon>storage</mat-icon>
+      <div>
+        <h3>Almacén analítico</h3>
+        <p class="almacen-sub" *ngIf="estado?.datosAl">
+          Datos al <strong>{{ estado?.datosAl }}</strong>
+          <span *ngIf="estado?.fin"> · última actualización {{ estado?.fin }}</span>
+        </p>
+        <p class="almacen-sub" *ngIf="!estado?.datosAl && estado?.analiticaDisponible === false">
+          El almacén no responde: no se puede consultar cuándo se actualizó.
+        </p>
+        <p class="almacen-sub" *ngIf="!estado?.datosAl && estado?.analiticaDisponible !== false">
+          Todavía no hay ninguna actualización registrada.
+        </p>
+      </div>
+    </div>
+
+    <div class="almacen-acciones">
+      <button mat-flat-button color="primary" class="btn-actualizar"
+              (click)="actualizar()"
+              [disabled]="disparando || estado?.enCurso"
+              matTooltip="Reconstruye las 19 tablas del almacén desde PostgreSQL y valida el resultado">
+        <mat-icon>{{ estado?.enCurso ? 'hourglass_top' : 'sync' }}</mat-icon>
+        {{ estado?.enCurso ? 'Actualizando…' : 'Actualizar ahora' }}
+      </button>
+      <button class="btn-limpiar" (click)="alternar()" *ngIf="estado?.hayCorridas">
+        <mat-icon>{{ abierto ? 'expand_less' : 'expand_more' }}</mat-icon>
+        {{ abierto ? 'Ocultar detalle' : 'Ver detalle' }}
+      </button>
+    </div>
+  </div>
+
+  <!-- EN CURSO: barra de avance real, tabla a tabla -->
+  <div class="almacen-progreso" *ngIf="estado?.enCurso">
+    <mat-progress-bar mode="determinate" [value]="avance"></mat-progress-bar>
+    <p class="almacen-sub">
+      {{ estado?.tareasCompletadas }} de {{ estado?.tareasTotales }} tablas publicadas.
+      La actualización sigue aunque cierres esta pantalla.
+    </p>
+  </div>
+
+  <!-- TERMINADA: veredicto de la última corrida -->
+  <div class="almacen-estado" *ngIf="!estado?.enCurso && estado?.hayCorridas"
+       [ngClass]="correcta ? 'ok' : 'aviso'">
+    <mat-icon>{{ correcta ? 'check_circle' : 'error_outline' }}</mat-icon>
+    <span>
+      <ng-container *ngIf="correcta">
+        Almacén al día: {{ estado?.tareasCompletadas }} tablas y
+        {{ estado?.filas | number }} filas publicadas
+        <ng-container *ngIf="estado?.duracionSeg"> en {{ estado?.duracionSeg | number:'1.0-1' }} s</ng-container>.
+        <ng-container *ngIf="estado?.validacion === 'exito'">
+          Los {{ estado?.controles }} controles cuadran con PostgreSQL.
+        </ng-container>
+      </ng-container>
+      <ng-container *ngIf="!correcta">{{ estado?.mensaje }}</ng-container>
+    </span>
+  </div>
+
+  <!-- La analítica está caída: aviso, no error -->
+  <div class="aviso-analitica" *ngIf="estado?.analiticaDisponible === false">
+    <mat-icon>cloud_off</mat-icon> {{ estado?.mensaje }}
+  </div>
+
+  <!-- Tablas que NO se publicaron. Se dice explícitamente que conservan su dato
+       anterior: es la diferencia entre un informe desactualizado y uno roto. -->
+  <div class="almacen-errores" *ngIf="hayErrores">
+    <p class="almacen-sub">
+      <strong>{{ estado?.errores?.length }}</strong> tabla(s) no se publicaron.
+      Conservan el dato de la corrida anterior, así que sus informes siguen
+      respondiendo — con cifras de antes.
+    </p>
+    <div class="almacen-error" *ngFor="let e of estado?.errores">
+      <span class="estado-chip error">{{ etiquetaResultado(e.resultado) }}</span>
+      <strong>{{ e.tarea }}</strong>
+      <span class="almacen-motivo">{{ e.mensaje }}</span>
+    </div>
+  </div>
+
+  <!-- Detalle tabla a tabla de la última corrida -->
+  <div class="almacen-detalle" *ngIf="abierto && estado?.tareas?.length">
+    <div class="almacen-fila" *ngFor="let t of estado?.tareas">
+      <span class="estado-chip" [ngClass]="claseResultado(t.resultado)">
+        {{ etiquetaResultado(t.resultado) }}
+      </span>
+      <span class="almacen-tabla">{{ t.tarea }}</span>
+      <span class="almacen-filas">{{ t.filas | number }} filas</span>
+      <span class="almacen-seg">{{ t.segundos | number:'1.0-2' }} s</span>
+    </div>
+    <p class="almacen-sub" *ngIf="estado?.validacionMensaje">
+      <mat-icon class="icono-inline">fact_check</mat-icon>
+      {{ estado?.validacionMensaje }}
+    </p>
+  </div>
+
+</div>

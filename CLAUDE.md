@@ -85,6 +85,9 @@ esquema usa el MCP `retailmind` (solo lectura) o psycopg2 (`postgres/1250143656@
   `analista@retailmind.com`): `Retail2026!` (script 27); `soporte@retailmind.com`:
   `Retail2026!` (script 37)
 - Clientes demo (`maria.lopez@demo.com`, `carlos.vera@demo.com`): `Cliente2026!` (script 26)
+- **Rol de motor del ETL** (no es un usuario de la app, no tiene login web):
+  `retailmind_etl` / `Etl2026!` (script 85). Sus parámetros de conexión viven en
+  `retailmind/.env` como `ETL_PG_*` / `ETL_CH_*`.
 
 ## Qué está hecho / qué falta
 
@@ -411,10 +414,280 @@ corrigió en la pantalla genérica la barra «avance sobre la meta», que aparec
 informe con un KPI de porcentaje (afectaba ya a INV-08): ahora es opt-in con `barraAvance: true`
 y solo OTD-VEN-15 la declara.
 
-**Pendiente**: contenerización completa (PostgreSQL sigue local, fuera de compose) y
-orquestación ETL con Airflow. Del NIVEL TÁCTICO (`docs/RetailMind_T11_Analisis_Tactico.pdf` +
-catálogo ampliado a 68 objetivos) quedan SOLO los objetivos COMPUESTOS, que se procesarán en
-ClickHouse vía el ETL orquestado por Airflow.
+**ETL AL DWH — FASE 0, PRERREQUISITOS (2026-07-30, script 85 + paquete `etl/dwh/`)**: arranca
+el pipeline PostgreSQL → ClickHouse que alimentará los 39 objetivos tácticos COMPUESTOS, según
+`docs/estrategico/DISENO_ETL_CLICKHOUSE.md` (§9.1). **No se carga ni una fila de datos**:
+`registro.TAREAS` está vacío a propósito y las 19 tablas de destino entran por fases. Tres piezas:
+(1) **script 85** = rol `retailmind_etl` (LOGIN + **BYPASSRLS** + SELECT sobre las 54 tablas de
+origen, `usuario` POR COLUMNA para no exponer `password_hash`). BYPASSRLS es el punto entero del
+script: `pol_horario` está declarada con `cmd = ALL`, y **ALL incluye SELECT**, así que un ETL
+nocturno con cualquier rol `grp_*` no recibe un 403 — RLS filtra **en silencio** y devuelve CERO
+FILAS, publicando 19 tablas vacías sin un error en ningún log (verificado: bajo `grp_cliente` el
+mismo `SELECT count(*) FROM pedido` da **0**; bajo `retailmind_etl`, **4.083**). (2) base
+**`retailmind_dwh`** (ENGINE `Atomic`, obligatorio para `EXCHANGE TABLES`) + bitácora
+`etl_ejecucion`; la base `retailmind` **legada de ClickHouse no se toca** y quedó verificada
+bit-idéntica (14 tablas, `fact_eventos` 2.823.245). (3) esqueleto `retailmind/etl/dwh/` con el
+patrón de carga atómica del §6.2 (staging `_new` → validar contra el origen → `EXCHANGE TABLES`;
+si la validación falla se ABORTA y la tabla publicada no se toca). Si vas a tocar esto: (1) el rol
+es de **SOLO LECTURA en cuatro capas** — sin atributos de escritura, solo GRANT SELECT, REVOKE
+explícito de escritura, y `default_transaction_read_only = on` a nivel de ROL; las capas 2 y 4 se
+probaron **por separado** (con la sesión en READ WRITE el motor sigue negando por privilegio);
+(2) el `default_transaction_read_only` implica que **una sesión de este rol no puede escribir ni
+temporales** — si alguna fase necesitara una tabla temporal, va en ClickHouse, no en PostgreSQL;
+(3) el CONNECT a otras bases del clúster lo concede el `PUBLIC` por defecto de PostgreSQL
+(`pg_database.datacl IS NULL` en las 14 bases): cerrarlo exigiría `REVOKE ... FROM PUBLIC`, que es
+modificar privilegios existentes y afectaría a las otras apps del clúster — queda declarado como
+limitación, y el riesgo residual es nulo porque el rol no tiene privilegio alguno sobre sus
+objetos; (4) `EXCHANGE TABLES` exige que AMBAS tablas existan: la primera carga de cada tabla usa
+`RENAME TABLE` (ya contemplado en `carga_atomica`); (5) `conexiones._validar_destino` lanza
+`BaseProhibida` si alguien apunta el pipeline a la base legada. Punto de entrada:
+`python -m etl.dwh.cargar --tabla X` (además de `--init`, `--verificar`, `--listar`, `--bitacora`),
+ejecutado desde `retailmind/`. Cada tabla es un comando autónomo: el DAG de Airflow de §7.1 sería
+un `BashOperator` de una línea por tarea, sin lógica de negocio dentro.
+
+**ETL AL DWH — FASE 1, EL PILOTO DE PUNTA A PUNTA (2026-07-30, solo código, sin script)**:
+`dim_fecha` (730 días, GENERADA con `numbers()` dentro de ClickHouse, no consulta PostgreSQL),
+`dim_producto` (1.221 variantes) y `fact_venta_linea` (10.384 líneas) cargadas y validadas contra
+PostgreSQL **al centavo**, más el primer informe COMPUESTO **OTD-VEN-06**
+(`GET /api/informes/ventas/evolucion-mensual`, ADMIN/GERENTE/ANALISTA). Las 7 cifras de control de
+§9.2 cuadran exactas (20.687 uds · venta neta de línea $4.991.078,85 · costo $3.844.509,33 · 0
+líneas sin costo · 19 meses) y también el control mes a mes en los 19 meses (3.924 pedidos no
+cancelados / $5.498.570,35). Entregable extra: `python -m etl.dwh.validar_dwh` (4 controles,
+`--fase`, `--control`, `--detalle`; exit 1 si algo difiere). Si vas a tocar esto:
+(1) **`factura_venta` NO es 1:1 con el pedido** — el pedido 2 tiene DOS facturas 'emitida'
+(duplicado legacy), así que filtrar solo por `estado <> 'anulada'` da 10.386 filas donde hay
+10.384; hay que tomar UNA **factura canónica** por pedido (`DISTINCT ON`, la no anulada más
+reciente por `fecha_emision, id`); (2) las **6 excepciones de descuento NO son las que el diseño
+suponía** (no son los pedidos 20/21/24662): son los pedidos **40, 4031, 4078, 4106, 4161 y 4176**,
+todos con descuento y en estado 'pagado' sin llegar a 'facturado', o sea SIN factura de la que
+prorratear el cupón — se cargan con `descuento_cupon_prorrateado = 0`, se MARCAN con la columna
+`excepcion_descuento` (consultables en el almacén, no solo contadas) y se registran en
+`etl_ejecucion.excepciones`; (3) el `mes` se calcula **en PostgreSQL**
+(`date_trunc('month', fecha_pedido AT TIME ZONE 'America/Guayaquil')`) y viaja resuelto: no se
+deriva en ClickHouse; (4) `fact_venta_linea.pedido_total` es un **atributo degenerado de cabecera**
+— solo se lee tras `GROUP BY pedido_id`; sumarlo a grano de línea lo contaría 2,5 veces; (5) OJO
+con ClickHouse: ningún alias de agregado puede llamarse como una columna (`ILLEGAL_AGGREGATION`),
+dividir dos `Decimal` trunca a la escala del operando izquierdo (los porcentajes van en
+`toFloat64`, el dinero NO), y el minuto de `formatDateTime` es `%i` — `%M` es el nombre del mes.
+La degradación se afinó: **solo un fallo de CONEXIÓN degrada**; una consulta mal formada se propaga
+como 500, porque capturar todo `DataAccessException` disfrazaba bugs de SQL de «analítica no
+disponible» y dejaba la prueba por API en verde. Detalle en `docs/tactico/PATRON_INFORMES.md` §13.
+
+**ETL AL DWH — FASE 2, EL NÚCLEO DE LA VENTA Y EL DINERO (2026-07-30, solo código, sin script)**:
+`dim_cliente` (72), `fact_pedido` (4.083) y `fact_flujo_caja` (4.981 = 4.079 cobros + 902 pagos)
+cargadas y validadas al centavo, más OCHO informes compuestos nuevos — OTD-VEN-05
+(`/clientes`), VEN-07 (`/ticket-promedio`), VEN-09 (`/formas-cobro`), VEN-12 (`/cobros-fallidos`),
+VEN-13 (`/evolucion-canal`), LOG-12 (`/logistica/tiempos-ciclo`), GER-02 (`/gerencia/balanza`) y
+GER-05 (`/gerencia/descuento-cupones`). Los 10 controles de `validar_dwh.py` (4 de Fase 1 + 6
+nuevos) cuadran EXACTOS: 3.924 pedidos no cancelados / $5.498.570,35, canal web 2.132 / tienda 990
+/ teléfono 802, $5.467.791,59 cobrados y $16.084.462,74 pagados a proveedor, y el control mes a mes
+en los 19 meses. `pedido_total` se RETIRÓ de `fact_venta_linea` (era un atributo degenerado de
+cabecera que solo existía para poder validar la Fase 1 sin `fact_pedido`); ningún informe lo leía y
+los controles de la Fase 1 siguen cuadrando. Si vas a tocar esto: (1) los **176 cobros fallidos no
+tienen `pedido_id` NI `fecha_pago`** —el intento se registra antes de que exista pedido y un cobro
+rechazado nunca se liquida—, así que la fecha es `COALESCE(fecha_pago, fecha_creacion)` marcada con
+`fecha_es_intento = 1`; tomar `fecha_pago` a secas habría dejado a OTD-VEN-12 sin período y el
+informe habría salido vacío sin un solo error; (2) `movimiento_id` **no es único**: `pago.id` y
+`pago_proveedor.id` son secuencias independientes que se solapan, la clave es el par
+`(sentido, movimiento_id)`; (3) `factura_venta` sigue sin ser 1:1 con el pedido (3.886 no anuladas
+→ **3.885** pedidos), así que la factura canónica se aplica también aquí o `fact_pedido` sale con
+4.084 filas; (4) `uso_cupon.monto_descontado` ($50.727,89 en 564 canjes) y `pedido.monto_descuento`
+($50.590,25 en 562) NO son la misma cifra —los pedidos legacy 20 y 21— y viajan en columnas
+separadas a propósito; (5) el pivote de hitos usa `min` y no `max` porque hay hitos repetidos (19
+'confirmado', 8 'pagado', 5 'despachado'), y las cuatro etapas de LOG-12 se miden sobre
+poblaciones DISTINTAS (2.868 / 2.856 / 2.727 / 3.696: hay 828 entregados sin registro de despacho),
+por lo que cada fila declara su `pedidos_medidos`; (6) los tramos van en `Decimal(12,2)` y no en el
+`Float32` del diseño, porque `validar_dwh.py` rechaza floats por construcción; (7) `motivo_fallo` se
+normaliza en `transformar()` (Python, no SQL) para poder aplicar la regla de escape: 6 valores
+crudos → **5** motivos, y cualquier valor no previsto cae en `'otro'` y se registra en la bitácora.
+La matriz rol × endpoint (8 × 8) está verificada por API: BODEGA fuera de los ocho y DESPACHO solo
+en LOG-12, cuyo corte financiero lo hace **la CONSULTA** (la tabla sí tiene `total`; ClickHouse no
+tiene GRANT por columna). Detalle en `docs/tactico/PATRON_INFORMES.md` §14.
+
+**ETL AL DWH — FASE 3A, EL CICLO DE COMPRAS + BITÁCORA DE CORRECCIONES (2026-07-30, solo código,
+sin script)**: `dim_proveedor` (11), `fact_orden_compra` (865) y `fact_compra_linea` (2.949)
+cargadas y validadas al centavo; **6 controles nuevos en `validar_dwh.py` (16 en total, todos en
+verde)**, entre ellos el CUADRE CONTABLE que cruza dos tablas de hechos de fases distintas —
+facturas de compra $22.467.387,27 − pagos a proveedor $16.084.462,74 = saldo CxP $6.382.924,53,
+**descuadre $0,00**. Entregable de la fase: `docs/estrategico/CORRECCIONES_DISENO_ETL.md`, la
+bitácora de los **17 supuestos del diseño que NO se sostuvieron** (2 de la Fase 1, 7 de la 2,
+7 de la 3A + apéndice de los que sí), con el formato «qué decía · qué dice la base · cómo se
+resolvió · qué informe habría roto». **A partir de aquí, cada supuesto que falle se registra ahí
+antes de cerrar la tarea.** Si vas a tocar esto: (1) **la cadena OC→recepción→factura→CxP NO es
+1:1 completa** aunque §5.4 lo afirme — 839 OC con recepción y 839 con factura, pero solo **838 con
+ambas** (la OC 8 tiene factura sin recepción, la 20 recepción sin factura): dos conteos idénticos
+sobre conjuntos distintos, así que se parte SIEMPRE de `orden_compra` con LEFT JOIN encadenado y se
+validan los tres por separado; (2) el gasto de compras es **`factura_total` y nunca el total de la
+orden** — difieren en 119 órdenes por $226.070,31 porque el proveedor factura lo que entregó
+(72 OC en `recibida_parcial`), y sumar la orden inventaría un +2,4 %; (3) `pct_rechazo` se calcula
+sobre **lo que LLEGÓ** (`recibida + rechazada`) y no sobre lo pedido, porque el rechazo no siempre
+se descuenta de lo recibido (49 líneas descontado, 37 aditivo, 6 mixto): sobre lo pedido, una línea
+real da 42,9 % donde la verdad es 30,0 %, y el sesgo cae solo en unos proveedores; (4)
+`fecha_recepcion` es `timestamptz` y `fecha_emision` es `date`: la resta exige `AT TIME ZONE`
+explícito o 5 de 839 órdenes ganan un día — invisible en el promedio de COM-06, pero COM-05
+clasifica con el corte en `desvio <= 0` y ahí un día cambia de lado; (5) `motivo_rechazo` es TEXTO
+LIBRE (6 valores crudos, 5 del negocio) y se normaliza en `transformar()` con regla de escape a
+`'Otro'`, pero a **frase canónica y no a slug** como en la Fase 2, porque aquí el origen ya guarda
+frases legibles; (6) `fact_compra_linea` es la ÚNICA tabla con el `ORDER BY` invertido
+(`producto_variante_id, proveedor_id, fecha_emision`) — respétalo: COM-12 es una serie por producto.
+
+**ETL AL DWH — FASE 3B, EL KARDEX Y LA RECONSTRUCCIÓN DEL INVENTARIO MENSUAL (2026-07-31, solo
+código, sin script)**: `fact_movimiento_inventario` (13.287) y `fact_stock_mensual` (21.122), la
+única `TareaDerivada` del modelo — se calcula DENTRO de ClickHouse y no vuelve a consultar
+PostgreSQL. **8 controles nuevos en `validar_dwh.py` (24 en total, todos en verde)**, entre ellos
+**LA PRUEBA DEFINITIVA**: el `stock_cierre` del último mes contra `inventario.stock_actual`
+**posición por posición — 1.406 de 1.406, 0 diferencias**; corre también DENTRO de la tarea y si una
+sola posición difiere la tabla NO se publica. Se conectaron los tres informes compuestos de
+Inventario: OTD-INV-04 (`/rotacion`, 10 categorías), OTD-INV-09 (`/capital-inmovilizado`, 19 meses,
+$22.024.063,50 al cierre) y OTD-INV-10 (`/mermas`, 11 motivos, 137 uds perdidas / 90 sobrantes).
+Si vas a tocar esto: (1) **INV-10 filtra por `es_ajuste_real` y JAMÁS por `naturaleza='ajuste'`** —
+la apertura del almacén se registró como `entrada_ajuste` (343 movs / 34.210 uds), así que el filtro
+«obvio» multiplica el sobrante real por **380×** sin que falle ninguna suma; el ETL precalcula la
+columna para que el error no esté al alcance de un descuido; (2) `ajuste_inventario.motivo` es TEXTO
+LIBRE con el SKU incrustado (`[SKU-P1340 x4] Merma…`): en crudo hay **53 valores distintos sobre 53
+ajustes** y tras limpiar prefijo y sufijo quedan **11** — aquí se LIMPIA pero NO se remapean
+sinónimos, al revés que en C3.3, porque quitar decoración de máquina es una limpieza y fusionar dos
+frases que escribió una persona es una opinión; (3) `fact_stock_mensual` son **21.122 filas y no las
+~26.700 del diseño**: la malla arranca en el PRIMER movimiento de cada par y no en el primer mes del
+período, o se fabrican 5.592 ceros que aplanan la curva de INV-09 al principio; (4) la
+reconstrucción LEE `argMax(stock_nuevo, (fecha, movimiento_id))` en vez de recalcular, y eso es
+lícito solo porque la cadena está íntegra (verificado: ecuación, enlaces, arranque en 0 y
+Σ(cantidad×factor) = stock_actual en los 1.406 pares); (5) **en ClickHouse «no hay dato» y «el dato
+es cero» se parecen demasiado** — un LEFT JOIN rellena con el DEFECTO del tipo y no con NULL (por eso
+el NULL del arrastre se fabrica desde `movimientos_mes`), y `any(x) OVER (… 1 PRECEDING)` hacía que
+el primer mes de INV-09 mostrara su capital entero como «variación»; (6) INV-09 valoriza a **costo
+VIGENTE** (no hay histórico) y lo DECLARA en pantalla con el campo nuevo `salvedad` del sobre — es
+volumen a moneda constante, no el valor histórico de la bodega; (7) los 56 movimientos de ajuste son
+justo los que NO traen `costo_unitario` (177 en total, con las transferencias), así que INV-10
+valoriza con `dim_producto.costo` y arrastra la misma salvedad. Matriz 8 roles × 3 endpoints
+verificada por API (BODEGA 200 en rotación y mermas, **403 en capital-inmovilizado**; INV-10 es
+MIXTO y a BODEGA no le llegan las columnas de valor: no se seleccionan). Detalle en
+`docs/tactico/PATRON_INFORMES.md` §15.
+
+**ETL AL DWH — FASE 3C, LA ÚLTIMA MILLA Y LAS INCIDENCIAS DE ENTREGA (2026-07-31, solo código,
+sin script)**: `fact_envio` (2.872) y `fact_novedad_envio` (176) cargadas y validadas, **7
+controles nuevos en `validar_dwh.py` (31 en total, todos en verde)**, y los CUATRO informes
+compuestos de Logística que las tablas dejan servidos: OTD-LOG-03 (`/cumplimiento-promesa`, 5
+transportistas), LOG-04 (`/dias-transito`, con filtro `agrupar` ∈ transportista|mes|zona),
+LOG-05 (`/novedades`, 14 filas tipo × desenlace) y la **SERIE mensual del costo de envío**
+(`/costo-envio-mensual`, 19 meses) — la evolución que OTD-LOG-11 dejó pendiente para ClickHouse
+al reclasificarse a SIMPLE; el simple da la FOTO por zona, éste la SERIE. Coste del patrón: **0
+clases Java nuevas** (entran en el servicio/controlador de Logística que ya existían por LOG-12)
++ 1 bloque por informe en las definiciones. LOG-09 NO se implementó: necesita `fact_devolucion`
+(Fase 4). Si vas a tocar esto: (1) **la zona NO es una columna de `envio`** — se resuelve por
+ciudad > provincia > país con precedencia por especificidad (181/596/2.078/17, exactos contra
+§5.8), y como las TRES zonas cuelgan del mismo país, agrupar por país manda **2.855 de 2.872 a
+UNA fila** sin dar error: por eso la tabla trae `zona_nivel` y los cuatro conteos quedan
+auditables con un `GROUP BY`; (2) **C3C.1 — la zona horaria decide el día y con él los tres
+plazos**: 569 de 2.727 envíos (20,9 %) cambian de `dias_transito` entre UTC y America/Guayaquil
+y el promedio se mueve de 3,98 a 3,77 días — el error es ASIMÉTRICO (el despacho es de tarde, la
+entrega de mañana) y acorta el tránsito sistemáticamente; la expresión del día vive en UNA
+constante porque aplicarla en dos restas y olvidarla en la tercera da un informe coherente
+consigo mismo y equivocado; (3) **C3C.3 — `accion` NO vale lo que dice §5.9**: `reprogramar`/
+`devolver_almacen` son los verbos del API y lo guardado es el participio (`reprogramada` 49 /
+`devuelto_almacen` 120 / NULL 7), así que el filtro del diseño casa con CERO filas y ocultaría
+el 68 % de las novedades — la lista blanca sale de los DATOS, no del documento; (4) **C3C.2 —
+los 24 envíos con `costo=0` y peso nulo NO son envíos gratis**, son envíos sin tarifar (ids 1-24,
+anteriores al script 54) y caen todos en julio de 2026: promediarlos deja ese mes en $7,59 en vez
+de $9,74 (**−22 %**), o sea el último punto de la serie parece una bajada de tarifas; se marcan
+con `sin_tarifa`, se excluyen del promedio y el informe DICE cuántos excluyó (campo `salvedad`);
+(5) cada informe declara su denominador porque hay TRES distintos (2.872 despachados / 2.727
+entregados / 2.723 con promesa medible: los 145 restantes no llegaron tarde, no llegaron) y
+`entregado_a_tiempo` viaja NULL —nunca 0— cuando falta una fecha; (6) **es la primera fase donde
+dos informes de la MISMA tabla se separan por dinero**: LOG-03/04 y la serie de costo salen los
+tres de `fact_envio`, y lo único que deja a DESPACHO fuera del tercero es que su consulta SÍ
+selecciona importes (más la línea de `SecurityConfig`) — el motor no los distingue, ClickHouse no
+tiene GRANT por columna; las dos rutas de dinero se enumeran POR NOMBRE y no con comodín para que
+un endpoint futuro no herede el permiso. Matriz 8 roles × 4 endpoints verificada por API (32
+celdas, 0 discrepancias): DESPACHO 200 en LOG-03/04/05 y **403 en `/costo-envio-mensual`**,
+SOPORTE solo en `/novedades`, ANALISTA en todos menos `/novedades` y el costo. Degradación
+probada con `docker stop`: los 4 informes dan 200 con `analiticaDisponible=false` en ~4,1 s, los
+informes SIMPLES de PostgreSQL siguen intactos, y al levantar el contenedor se recuperan sin
+reiniciar el backend. Detalle en `docs/tactico/PATRON_INFORMES.md` §16.
+
+**ETL AL DWH — FASE 4, LA POSVENTA Y EL CIERRE DEL MODELO (2026-07-31, solo código, sin
+script)**: última fase de carga. `dim_promocion_producto` (232), `fact_devolucion` (196),
+`fact_devolucion_linea` (274), `fact_ticket` (248), `fact_resena` (344) y
+`fact_devolucion_proveedor` (38) cargadas y validadas al centavo. **13 controles nuevos en
+`validar_dwh.py` (44 en total, todos en verde)**, tres de ellos CRUZADOS dentro del almacén
+(devoluciones ↔ `fact_pedido`, líneas/tickets/reseñas ↔ `dim_producto`, y la base mensual de
+LOG-09 cruzando `fact_envio` de la Fase 3C con `fact_devolucion`): **0 huérfanos en todas las
+direcciones**. Con esto el modelo está COMPLETO —19 de 19 tablas— y se conectaron los 16
+informes compuestos de POSVENTA: VEN-11, VEN-14, LOG-07/08/09/10, SOP-02/03/06/07/08,
+GER-03/07/10/11 y COM-09 — **32 endpoints compuestos en producción de los 39 del catálogo**;
+los 7 que faltan son de Compras (COM-03/04/05/06/07/11/12), con sus tablas cargadas desde la
+Fase 3A y pendientes solo de conectar. Coste: 2 clases Java nuevas (Soporte y Compras) + 1
+bloque por informe en las definiciones; GER-03/10/11 salen de `fact_venta_linea` sin tabla
+nueva. Si vas a tocar esto: (1) **el reembolso tiene DOS registros que no coinciden** —
+`devolucion.monto_reembolsado` (86 / $44.695,33) y la tabla `reembolso` (85 / $44.525,63), la
+devolución 8 no tiene asiento— y solo la cabecera guarda la VÍA, que es media pregunta de
+LOG-10: viajan sin reconciliar y el informe declara cuál usa; (2) **el ciclo completo del RMA
+solo existe en 35 de 196** (las cerradas), así que se carga además `dias_hasta_desenlace`, que
+suma las 18 rechazadas —terminales y las más rápidas— y mide 53; (3) `ticket_soporte`
+.`categoria_ticket_id` es NULLABLE y el JOIN interno de §5.12 tira 1 de 248 sin avisar; (4)
+**unir `fact_resena` a `dim_producto` por `producto_id` MULTIPLICA** (344 → 347): la dimensión
+es por variante y la reseña por producto padre, así que la tabla denormaliza y jamás une; (5)
+«resuelto» (44) NO escribe `fecha_cierre` — los tiempos miden sobre los 76 cerrados y no sobre
+los 120 «atendidos»; (6) `item_defectuoso.origen` vale `rma`/`recepcion` y NO
+`inspeccion_rma`/`recepcion_compra` como dice §5.14: el filtro del diseño vacía COM-09 entero
+sin dar error (segunda reincidencia exacta de C3C.3); (7) **19 de 28 ítems defectuosos se
+detectaron DESPUÉS de la devolución que los agrupa**, así que `dias_hasta_resolucion` mide el
+ciclo de la devolución (registro → resolución) y no la espera del ítem — la resta ingenua sale
+negativa en 18 y la carga abortó por ello; (8) los 4 informes con `now()` en su clasificación
+(SOP-02 y los vencidos de SOP-07/08) NO precalculan nada: el veredicto de un abierto depende de
+la hora en que se mira. **SOP-02 parte la base en cuatro** (12 a tiempo / 64 tarde / 0 abiertos
+en plazo / 172 abiertos y vencidos) porque una tasa sobre 248 daría 4,8 % y sería falsa; los
+DOS informes de muestra débil la declaran en pantalla (**COM-09**: 6 resoluciones,
+$5.220,94 recuperados sobre un pool de $9.349,93; **GER-07**: 184 líneas en ventana y 123 con
+descuento frente a 3.217 de base, ordenado por VOLUMEN y nunca por la variación). Matriz 16
+endpoints × 8 roles verificada por API (128 celdas, 0 discrepancias): los seis con dinero
+—VEN-14, LOG-10, GER-03, GER-10, GER-11, COM-09— dejan fuera a BODEGA y DESPACHO por RUTA;
+BODEGA solo entra en LOG-08 y DESPACHO solo en LOG-09. Degradación probada con `docker stop`:
+200 con `analiticaDisponible=false` en ~4,1 s y recuperación sin reiniciar. Detalle en
+`docs/tactico/PATRON_INFORMES.md` §17.
+
+**LOS SIETE DE COMPRAS — CATÁLOGO TÁCTICO COMPLETO (2026-07-31, solo código, sin script, NO
+carga ni una fila)**: se conectan los objetivos que quedaban, todos sobre tablas ya validadas
+en las Fases 2 y 3A. **Compuestos** (ClickHouse): OTD-COM-03 (`/puntualidad-pago`, 902 pagos /
+$16.084.462,74 / 564 a tiempo), COM-04 (`/gasto-mensual`, 839 facturas / $22.467.387,27),
+COM-05 (`/cumplimiento-plazo`, 825 pares / 449 cumplidas), COM-06 (`/ciclo-compra`, 839 órdenes
+/ 10,81 días de media) y COM-12 (`/evolucion-costo`, 1.041 pares producto-proveedor; 768 subieron,
+150 bajaron). **Mixtos** (BODEGA entra «en cantidades, sin montos»): COM-07 (`/rechazos`, 185 uds
+/ 5 motivos / $27.557,63) y **COM-11** (`/entregas-incompletas`, 165 líneas cortas / 1.514 uds),
+que es **SIMPLE y va contra PostgreSQL** —era el último objetivo simple del catálogo sin
+construir— porque agrega sobre la foto presente sin comparar períodos. Coste: **0 clases Java
+nuevas** + 1 bloque de definición por informe + 2 líneas de `SecurityConfig`. Si vas a tocar esto:
+(1) **el mes del GASTO es el de la FACTURA y no el de la orden** (corrección C5.1): 360 de las 839
+facturas caen en un mes distinto al de su OC, y agrupar por `fact_orden_compra.mes` desplaza
+**$4.628.932,62** entre meses —enero 2025 +52,6 %, julio 2026 −46,8 %— **sin que el total deje de
+cuadrar al centavo**; la columna `mes` sí es la correcta para COM-05/06, que hablan de la orden;
+(2) las «259 líneas incompletas» del catálogo son **tres cosas distintas** (C5.2): solo 165 son
+incumplimiento del proveedor, 41 vienen de camino y 53 son de órdenes canceladas — con las 259,
+Comercial El Costeno pasa de mejor proveedor (99,71 %) a PEOR (91,77 %) por 4 órdenes que canceló
+Compras, así que el filtro `alcance` arranca en `entregadas`; (3) **COM-05 y COM-06 miden sobre
+poblaciones distintas a propósito** (825 pares con promesa y llegada vs 839 con llegada) y cada
+fila declara su base; (4) en COM-12 **`lagInFrame` rellena la primera fila de cada partición con
+el DEFECTO del tipo y no con NULL**, así que la frontera de la serie se marca con
+`row_number() > 1` y jamás con `precio_previo != 0` —comparar contra ese 0,00 daría «subida del
+100 %» en los 1.041 primeros precios—, y el desempate del mismo día (16 pares) es
+`orden_compra_id`; (5) dos trampas NUEVAS y las dos de Java, no de ClickHouse: un bloque de texto
+**recorta el espacio final de cada línea** (`"""SELECT """ + col` → `SELECTpr.razon_social`) y
+`String.formatted()` **interpreta el bloque entero, comentarios incluidos** (el patrón de fecha
+va con el por-ciento duplicado… y el comentario que lo explicaba tumbó la consulta por llevar un
+especificador suelto dentro). Verificación: **41 controles contra PostgreSQL tomando la cifra de
+la RESPUESTA HTTP**, todos con Δ = 0; matriz 7 endpoints × 8 roles (56 celdas, 0 discrepancias):
+ANALISTA entra en COM-03/04/06/12 y queda fuera de COM-05 —que no lleva ni un importe, pero el
+catálogo lo reserva a Compras y Gerencia—, BODEGA solo en COM-07 y COM-11. Detalle en
+`docs/tactico/PATRON_INFORMES.md` §18.
+
+**Pendiente**: contenerización completa (PostgreSQL sigue local, fuera de compose) y la
+**orquestación del pipeline** (`run_etl.py` con orden topológico y, si se decide, el DAG de
+Airflow de §7). El MODELO DE DATOS está **COMPLETO**: las **19 tablas** del DWH cargadas y
+validadas (44 controles en verde), y el **CATÁLOGO TÁCTICO también**: 30 informes simples +
+**39 compuestos** en producción, ninguno pendiente. El diseño del
+pipeline vive en `docs/estrategico/DISENO_ETL_CLICKHOUSE.md` **y está corregido en
+`docs/estrategico/CORRECCIONES_DISENO_ETL.md` — 33 supuestos que no se sostuvieron; léelo antes
+de tocar cualquier tabla**.
 
 **Deuda técnica conocida** (tablas huérfanas, requieren bloque dedicado):
 

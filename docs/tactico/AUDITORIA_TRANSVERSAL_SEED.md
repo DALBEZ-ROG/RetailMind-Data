@@ -639,6 +639,13 @@ Los hallazgos no son 30 problemas independientes. Son **cuatro familias**:
    Corregir A8/A9 bien exige pasar por los triggers de total; M10 es trivial y se puede hacer ya.
 3. **Escala del universo de clientes y transportistas** (A7, M9): decidir si el negocio es
    minorista (⇒ más clientes) o mayorista (⇒ ajustar el relato del proyecto).
+   > **La mitad «minorista o mayorista» de esta decisión quedó RESUELTA el 2026-07-30**:
+   > `docs/estrategico/DIAGNOSTICO_SEGMENTO_CLIENTE.md` midió las siete dimensiones de compra y
+   > concluyó **(c) población homogénea — comercio MINORISTA multicanal de ticket alto**: el 99,94 %
+   > de las líneas pide 1–4 unidades y no hay ni un cliente con conducta mayorista. Se ajustó el
+   > relato del proyecto (base estratégica y catálogo táctico), **no los datos**. Lo que sigue
+   > abierto de A7 es solo la **escala del universo** (72 clientes ⇒ 59,2 pedidos por cliente), que
+   > es un problema de densidad del seed, no de tipo de negocio.
 4. **Realismo temporal fino** (M6, B1, B2, B3): cosmético, barato, se hace al final.
 
 Y los **7 objetivos que siguen sin datos** (§8) son un frente aparte, en su mayoría de esfuerzo

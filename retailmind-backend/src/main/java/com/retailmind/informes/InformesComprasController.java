@@ -99,4 +99,30 @@ public class InformesComprasController {
             @RequestParam(defaultValue = "25") int size) {
         return servicio.catalogoProveedor(proveedor, buscar, oferta, page, size);
     }
+
+    /**
+     * OTD-COM-11 — Quién entrega incompleto: pedido contra recibido.
+     * GET /api/informes/compras/entregas-incompletas?alcance=&agrupar=&proveedor=
+     *     &desde=&hasta=&page=&size=
+     *
+     * MIXTO: BODEGA entra «en cantidades, sin montos» (ver javadoc del servicio).
+     *
+     * {@code alcance} ∈ {@code entregadas | en_camino | canceladas | todas} y
+     * por defecto vale {@code entregadas}. No es un adorno: sin ese recorte, las
+     * 53 líneas de órdenes canceladas y las 41 que aún vienen de camino se
+     * contarían como incumplimientos del proveedor y lo hundirían en el ranking
+     * por una decisión de Compras.
+     */
+    @GetMapping("/entregas-incompletas")
+    public Map<String, Object> entregasIncompletas(
+            @RequestParam(required = false) String alcance,
+            @RequestParam(required = false) String agrupar,
+            @RequestParam(required = false) String proveedor,
+            @RequestParam(required = false) String desde,
+            @RequestParam(required = false) String hasta,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size) {
+        return servicio.entregasIncompletas(alcance, agrupar, proveedor, desde, hasta,
+                page, size);
+    }
 }

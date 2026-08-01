@@ -417,32 +417,43 @@ public class InformesVentasService extends InformeServiceBase {
 
     /**
      * Foto de la composición de la venta: cuántos pedidos, cuánto dinero, qué
-     * ticket promedio y qué porcentaje de participación pone cada canal en el
-     * período consultado. Sostiene el objetivo estratégico OE-06 (desarrollo
-     * omnicanal con foco en expansión mayorista) mostrando de dónde viene hoy
+     * ticket promedio y qué porcentaje de participación pone cada CANAL DE
+     * ENTRADA en el período consultado. Sostiene el objetivo estratégico OE-06
+     * (Consolidación de la Experiencia Omnicanal) mostrando de dónde viene hoy
      * el ingreso.
      *
      * <b>Alcance: SIMPLE.</b> Agrega sobre el presente sin comparar períodos,
      * como OTD-VEN-02 o OTD-SOP-04. La EVOLUCIÓN MENSUAL de esta misma
      * participación es OTD-VEN-13, COMPUESTO, y va a ClickHouse por el ETL.
      *
-     * <b>LIMITACIÓN DECLARADA — este informe NO separa B2B de B2C.</b>
-     * Verificado contra la base real el 2026-07-29: {@code pedido.canal} solo
-     * admite 'web', 'tienda' y 'telefono' (CHECK del motor), que son el MEDIO
-     * por el que entró el pedido, no el tipo de comprador. Y el segmento del
-     * comprador no está capturado en ninguna parte: {@code grupo_cliente},
-     * {@code segmento_cliente} y {@code cliente_segmento} tienen 0 filas, los
-     * 72 clientes tienen {@code grupo_cliente_id} NULL y
-     * {@code tipo_identificacion = 'cedula'} (persona natural; un negocio
-     * ecuatoriano llevaría RUC de 13 dígitos, y las 3.887 facturas de venta
-     * tienen identificación de 10). Por eso el informe agrupa por la dimensión
-     * que SÍ existe —el canal— y expone la columna {@code clientes_negocio}
-     * (clientes distintos con {@code grupo_cliente_id} asignado, la FK prevista
-     * para el segmento mayorista), que hoy vale 0 en los tres canales: así el
-     * informe MIDE la ausencia de B2B en vez de inventar una clasificación que
-     * el dato no soporta. Cerrar esa brecha es cambio de sistema en tres capas
-     * (poblar grupo_cliente, exponer el segmento en el alta de cliente,
-     * selector en la ficha), no un informe.
+     * <b>ESTE INFORME MIDE EL MEDIO DE ENTRADA, NO EL TIPO DE CLIENTE.</b>
+     * {@code pedido.canal} solo admite 'web', 'tienda' y 'telefono' (CHECK del
+     * motor): es la vía por la que entró el pedido. Agruparlo y rotularlo
+     * «B2B vs. B2C» sería una lectura falsa del dato (regla vinculante en
+     * {@code docs/tactico/PATRON_INFORMES.md} §12).
+     *
+     * <b>Y esa clasificación tampoco existe por otra vía.</b> El diagnóstico
+     * {@code docs/estrategico/DIAGNOSTICO_SEGMENTO_CLIENTE.md} (2026-07-30,
+     * solo lectura) la descartó con veredicto (c) POBLACIÓN HOMOGÉNEA: no está
+     * capturada —{@code grupo_cliente}, {@code segmento_cliente} y
+     * {@code cliente_segmento} con 0 filas, los 72 clientes con
+     * {@code grupo_cliente_id} NULL y {@code tipo_identificacion='cedula'}, y
+     * las 3.887 facturas de venta con identificación de 10 dígitos (sin RUC)—
+     * y tampoco es DERIVABLE del comportamiento: el 99,94 % de las 10.384
+     * líneas de pedido pide entre 1 y 4 unidades (techo histórico 12 por línea
+     * y 24 por pedido), de modo que no existe compra de volumen, y ninguna de
+     * las siete dimensiones analizadas (ticket, unidades, líneas, categorías,
+     * método de pago, canal, regularidad) separa dos poblaciones.
+     *
+     * <b>Por eso la columna {@code clientes_negocio} se conserva pero se rotula
+     * «Clientes con segmento registrado».</b> Es
+     * {@code count(DISTINCT cliente_id) FILTER (WHERE c.grupo_cliente_id IS NOT NULL)}
+     * y vale 0 en los tres canales: MIDE la ausencia de segmentación registrada
+     * en vez de disimularla. NO se rotula «B2B» porque ese nombre prometía un
+     * segmento pendiente de llenarse; poblar {@code grupo_cliente} hoy no
+     * capturaría un dato, pondría una etiqueta arbitraria sobre una población
+     * que se comporta como una sola. El propuesto OTD-VEN-17 quedó DESCARTADO,
+     * no pospuesto.
      *
      * Los pedidos cancelados NO cuentan como venta —igual que en OTD-VEN-02—
      * pero se muestran en columna propia para que no desaparezcan del análisis.
@@ -473,8 +484,8 @@ public class InformesVentasService extends InformeServiceBase {
                                    FILTER (WHERE ep.codigo <> 'cancelado'), 0)) OVER (), 0), 2)
                            AS participacion_monto_pct,
                        count(DISTINCT p.cliente_id) AS clientes,
-                       -- Medida honesta del B2B: clientes con el segmento
-                       -- mayorista asignado. Hoy 0 en los tres canales.
+                       -- Medida honesta de la ausencia: clientes con ALGÚN
+                       -- segmento registrado. Hoy 0 en los tres canales.
                        count(DISTINCT p.cliente_id) FILTER (WHERE c.grupo_cliente_id IS NOT NULL)
                            AS clientes_negocio,
                        count(*) FILTER (WHERE ep.codigo = 'cancelado') AS cancelados,
@@ -512,8 +523,9 @@ public class InformesVentasService extends InformeServiceBase {
                 kpi("Monto vendido", monto, "moneda"),
                 kpi("Ticket promedio", ticket, "moneda"),
                 kpi("Canal líder", lider, "texto"),
-                // KPI del hueco B2B: se informa el 0, no se esconde.
-                kpi("Clientes de tipo negocio (B2B)", negocio, "numero")));
+                // Medida de la ausencia de segmentación: se informa el 0, no se
+                // esconde. Sin etiqueta B2B: esa clasificación no existe.
+                kpi("Clientes con segmento registrado", negocio, "numero")));
     }
 
     /** Nombre de negocio de cada canal, para el KPI de canal líder. */

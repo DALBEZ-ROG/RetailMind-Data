@@ -294,12 +294,16 @@ export const routes: Routes = [
         .then(m => m.InformesDepartamentoComponent)
   },
   //    Compras: espeja SecurityConfig (/api/informes/compras/**). BODEGA entra a
-  //    la pantalla SOLO por OTD-COM-08 (pool de defectuosos, sin dinero); los
-  //    otros tres llevan monto y su ruta REST se los niega.
+  //    la pantalla por los TRES informes que el catálogo le da «en cantidades,
+  //    sin montos» —OTD-COM-08, COM-07 y COM-11—; el resto lleva monto y su ruta
+  //    REST se lo niega. ANALISTA entra por los cuatro compuestos en que el
+  //    catálogo lo incluye (COM-03, COM-04, COM-06 y COM-12) y la API le niega
+  //    los demás, COM-05 incluido.
   {
     path: 'operativo/informes/compras',
     data: { departamento: 'compras' },
-    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'COMPRAS', 'BODEGA'])],
+    canActivate: [authGuard,
+      roleGuard(['ADMIN', 'GERENTE', 'COMPRAS', 'BODEGA', 'ANALISTA'])],
     loadComponent: () =>
       import('./features/operativo/informes/informes-departamento.component')
         .then(m => m.InformesDepartamentoComponent)

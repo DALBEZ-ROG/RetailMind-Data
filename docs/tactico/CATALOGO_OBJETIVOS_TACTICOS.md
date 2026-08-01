@@ -1,19 +1,38 @@
 # Catálogo de objetivos tácticos por departamento — RetailMind
 
-**Versión 4 — sincronizada con el estado real del sistema el 2026-07-29.** Reemplaza por completo
+**Versión 5 — sincronizada con el estado real del sistema el 2026-07-30.** Reemplaza por completo
 la tabla de 25 objetivos del documento TA11 original y actualiza la versión ampliada del
 2026-07-21/22. Toda cita de tabla.columna y todo conteo de este catálogo fue **re-verificado vía
 MCP contra la base real `retailmind`** (PostgreSQL, **110 tablas** en el esquema `public`, conteo
 confirmado el 2026-07-26 — eran 109 antes de que el script 48 creara `meta_venta`).
 
+**Qué cambió en la versión 5 (2026-07-30) — solo redacción, ningún objetivo entra ni sale.** El
+diagnóstico `docs/estrategico/DIAGNOSTICO_SEGMENTO_CLIENTE.md` cerró con veredicto **(c) POBLACIÓN
+HOMOGÉNEA**: **no existe segmentación B2B/B2C en los datos ni forma honesta de derivarla**
+—10.378 de 10.384 líneas de pedido (**99,94 %**) piden entre 1 y 4 unidades, con techo histórico de
+12 por línea y 24 por pedido; ninguna de las siete dimensiones analizadas (ticket, unidades, líneas,
+categorías, método de pago, canal, regularidad) separa dos poblaciones; **0 RUC en 3.887 facturas**;
+`grupo_cliente`/`segmento_cliente`/`cliente_segmento` vacías—. En consecuencia:
+
+1. **Se corrige la caracterización del negocio** (§1.1): RetailMind es **comercio minorista
+   multicanal de ticket alto** ($1.400,06 por pedido sobre $276,36 por unidad), no una distribuidora
+   mayorista B2B. El **abastecimiento** sí se compra por volumen al proveedor —eso no cambia—; lo
+   que se corrige es el lado de la **venta**.
+2. **OTD-VEN-16 se re-rotula**: habla solo de **CANAL / MEDIO**, nunca de segmento de cliente. Su
+   columna «Clientes negocio (B2B)» pasa a llamarse **«Clientes con segmento registrado»** (sigue
+   valiendo 0: mide la ausencia de segmentación registrada, no un segmento pendiente de llenarse).
+3. **La segmentación de clientes pasa de decisión de alcance abierta a DESCARTADA** (§12), y con
+   ella el propuesto **OTD-VEN-17**, que queda retirado y **no se reasigna**.
+
 **Qué cambió en la versión 4 (2026-07-29)**: se incorporó **OTD-VEN-16** «Participación de la venta
 por canal» —SIMPLE, ya implementado en pantalla— a pedido de `docs/estrategico/BASE_ESTRATEGICA.md`
-§6.1, para sostener el objetivo estratégico **OE-06 «Desarrollo Omnicanal con foco en expansión
-mayorista»**, que hasta entonces no tenía ningún informe simple propio. El catálogo pasa de 68 a
-**69 objetivos** y de 29 a **30 simples**, con **29 implementados**. Se aclaró además que
-**OTD-VEN-13 es su par COMPUESTO** (la misma participación, pero mes a mes). Queda documentado en la
-ficha de OTD-VEN-16 que el informe **no separa B2B de B2C** y por qué: el dato del segmento no se
-captura en ninguna parte de la base.
+§6.1, para sostener el objetivo estratégico **OE-06** (hoy «Consolidación de la Experiencia
+Omnicanal»; entonces «Desarrollo Omnicanal con foco en expansión mayorista»), que hasta entonces no
+tenía ningún informe simple propio. El catálogo pasa de 68 a **69 objetivos** y de 29 a
+**30 simples**, con **29 implementados**. Se aclaró además que **OTD-VEN-13 es su par COMPUESTO**
+(la misma participación, pero mes a mes). Queda documentado en la ficha de OTD-VEN-16 que el informe
+**no separa B2B de B2C** y por qué — motivo que la versión 5 refuerza: no es que el dato no se
+capture, es que esa segmentación **no existe en el negocio**.
 
 Qué cambió en la versión 3 respecto de la anterior, y por qué:
 
@@ -27,10 +46,13 @@ Qué cambió en la versión 3 respecto de la anterior, y por qué:
 2. **OTD-LOG-11 se reclasificó de COMPUESTO a SIMPLE**, aplicando la regla de la sección 2 al
    informe que efectivamente se construyó (foto agregada por zona y transportista, sin serie
    temporal). Ver nota en la sección 6.
-3. **Reencuadre del negocio**: RetailMind se caracteriza como **distribuidora mayorista B2B**, no
-   como comercio minorista. La narrativa de cada jefatura se ajustó a ese marco (venta por
-   volumen a cliente corporativo recurrente, margen de distribución, abastecimiento como centro
-   de costo dominante). Los datos no cambian; cambia la lectura de negocio que los enmarca.
+3. **Reencuadre del negocio** *(corregido en la versión 5 — ver arriba)*: la versión 3 caracterizó
+   a RetailMind como «distribuidora mayorista B2B». El diagnóstico de segmento del 2026-07-30
+   **refutó esa lectura** con los datos de venta y la versión 5 la sustituye por **comercio
+   minorista multicanal de ticket alto**. Lo que sobrevive del reencuadre es la mitad que los datos
+   sí sostienen: el **abastecimiento** es el centro de costo dominante y se compra por volumen al
+   proveedor. Los datos nunca cambiaron; cambió dos veces la lectura de negocio que los enmarca, y
+   la segunda vez con evidencia medida.
 4. **Se marca qué objetivos ya tienen reporte en pantalla implementado** (columna «Reporte»):
    **29 de los 30 informes SIMPLES** están construidos y consultables en la aplicación, en los
    seis departamentos (28 de 29 al cerrar la versión 3; OTD-VEN-16 sumó uno a cada lado).
@@ -66,24 +88,34 @@ que aún esperan volumen de datos. Los informes tácticos se consultan **por pan
 filtros y registros visibles; no se entregan como PDF descargable (los documentos operativos —
 facturas, guías, comprobantes — siguen siendo PDF).
 
-### 1.1 El negocio que se dirige: distribuidora mayorista B2B
+### 1.1 El negocio que se dirige: comercio minorista multicanal de ticket alto
 
-RetailMind opera como **distribuidora mayorista ecuatoriana con sede en Quevedo**: compra
-volumen a proveedores, almacena en dos bodegas y revende a clientes corporativos y minoristas
-recurrentes por tres canales (mostrador, teléfono y tienda en línea). Esa caracterización no es
-decorativa — condiciona qué informe táctico tiene sentido:
+RetailMind opera como **comercio minorista ecuatoriano con sede en Quevedo**: compra volumen a
+proveedores, almacena en dos bodegas y vende **al consumidor final** por tres canales
+intercambiables (mostrador, teléfono y tienda en línea). Lo distintivo no es el tamaño del pedido
+sino su **valor**: $1.400,06 de ticket medio formado por un **precio unitario de $276,36**, no por
+cantidad. Esa caracterización no es decorativa — condiciona qué informe táctico tiene sentido:
+
+> **Verificado, no supuesto** (`docs/estrategico/DIAGNOSTICO_SEGMENTO_CLIENTE.md`, 2026-07-30, solo
+> lectura): **99,94 % de las 10.384 líneas de pedido piden entre 1 y 4 unidades** (techo histórico:
+> 12 por línea, 24 por pedido), los 72 clientes son personas naturales con cédula de 10 dígitos
+> —**0 RUC en 3.887 facturas**— y **64 de los 69 clientes con pedidos compran por web y por canal
+> interno**. La versión 3 de este catálogo llamaba al negocio «distribuidora mayorista B2B»; esa
+> lectura queda **corregida**, y el corte B2B/B2C **descartado** (§12).
 
 - **El abastecimiento pesa más que la venta.** El histórico verificado muestra $22,47 M
   facturados en compras contra $5,72 M vendidos, y $6,38 M de saldo abierto en cuentas por pagar
   sobre 276 cuentas vivas. Por eso Compras tiene 12 objetivos y la mitad de ellos miran deuda,
-  puntualidad y cumplimiento del proveedor: en una distribuidora, el margen se gana comprando.
-- **El margen es de distribución, no de detalle.** El costo por variante se sitúa en bandas
-  mayoristas por categoría (script 67), de modo que los objetivos de rentabilidad (OTD-GER-03,
-  OTD-GER-10) miden puntos de margen sobre volumen, no ticket unitario.
-- **El cliente es recurrente y de volumen**, no un comprador ocasional: 69 de 72 clientes tienen
-  pedidos y el ticket promedio se forma sobre 10.384 líneas en 4.083 pedidos. Eso vuelve
-  significativos los objetivos de comportamiento por cliente (OTD-VEN-05) y de descuento
-  negociado (OTD-GER-05, OTD-GER-11), que en un minorista de paso serían ruido.
+  puntualidad y cumplimiento del proveedor: **el margen se gana comprando**.
+- **El costo de entrada es de compra por volumen; el ingreso es de venta al detalle.** El costo por
+  variante se sitúa en bandas de **compra mayorista** por categoría (script 67) —eso describe la
+  relación con el **proveedor**, no con el cliente—, de modo que los objetivos de rentabilidad
+  (OTD-GER-03, OTD-GER-10) miden puntos de margen entre ese costo y el precio de venta al detalle.
+- **El cliente es recurrente y de ticket alto**, no de volumen: 69 de 72 clientes tienen pedidos,
+  59,17 pedidos por cliente de media, pero **1–4 unidades por línea** y máximo 5 líneas por pedido.
+  Esa recurrencia —y no el tamaño del pedido— es lo que vuelve significativos los objetivos de
+  comportamiento por cliente (OTD-VEN-05) y de descuento (OTD-GER-05, OTD-GER-11), que en un
+  comercio de paso serían ruido.
 - **El capital vive en la bodega.** El inventario valorizado asciende a $22,02 M — varias veces
   la venta anual —, lo que explica que Inventario concentre siete de sus diez objetivos en el
   control del presente (existencias, mínimos, máximos, kardex) y que el sobre-stock (OTD-INV-08,
@@ -146,10 +178,10 @@ aplicación bajo `/operativo/informes/{departamento}` y se consulta por pantalla
 
 ## 3. VENTAS (OTD-VEN)
 
-El jefe de ventas dirige la cartera de pedidos mayoristas de los tres canales (mostrador,
-teléfono y tienda en línea B2B), el desempeño de su equipo de vendedores, el comportamiento de
-compra de la cartera de clientes corporativos recurrentes y la voz del cliente sobre los
-productos (reseñas y preguntas). Es el área con más objetivos porque concentra el ingreso del
+El jefe de ventas dirige la cartera de pedidos de los tres canales (mostrador, teléfono y tienda
+en línea), el desempeño de su equipo de vendedores, el comportamiento de compra de una cartera de
+clientes **recurrentes y omnicanales** —64 de 69 compran por web y por canal interno— y la voz del
+cliente sobre los productos (reseñas y preguntas). Es el área con más objetivos porque concentra el ingreso del
 negocio: 4.083 pedidos por $5.716.436,55 en 19 meses (2.213 web, 1.030 mostrador, 840 teléfono).
 
 | ID | Objetivo táctico | ¿SIMPLE? | ¿COMPUESTO? | Fuente | Soporte de datos verificado (MCP 2026-07-26) | Factibilidad | Reporte | Dashboard y rol destinatario |
@@ -169,13 +201,13 @@ negocio: 4.083 pedidos por $5.716.436,55 en 19 meses (2.213 web, 1.030 mostrador
 | OTD-VEN-13 | Saber cómo **evoluciona** mes a mes lo que vende cada canal —mostrador, teléfono y tienda en línea— y cómo cambia en el tiempo la parte que pone cada uno. **Par COMPUESTO de OTD-VEN-16**: misma pregunta de negocio, pero como serie temporal en vez de foto del período. | — | X | BDColumnar | `pedido.canal/total/fecha_pedido` — poblados en los 4.083 pedidos: web $3.073.238,46 / tienda $1.438.538,94 / teléfono $1.204.659,15, repartidos en **19 meses** (es el recorrido del histórico lo que lo hace compuesto) | FACTIBLE HOY | — (ETL) | Evolución mensual de la participación por canal — Gerente, Vendedor, Analista, Administrador |
 | OTD-VEN-14 | Saber cuánto dinero devuelven los clientes al mes y qué porcentaje de la venta representa, para frenar a tiempo si se dispara. | — | X | BDColumnar | `devolucion.monto_total/fecha_creacion` (**196 devoluciones, $95.693,89**, mantenido por el trigger `fn_recalcular_total_devolucion`) contra `pedido.total/fecha_pedido` | FACTIBLE HOY | — (ETL) | Valor devuelto y porcentaje sobre la venta, mensual — Gerente, Administrador, Analista (Bodega y Despacho NO: es dinero) |
 | OTD-VEN-15 | Seguir la venta acumulada del período contra la meta que se fijó, para reaccionar a media quincena y no enterarse al cierre del mes. | X | — | BDR | Brecha CERRADA (script 48 + 84): tabla **`meta_venta` (anio, mes, departamento, monto_meta, fijada_por, activo)** con **133 filas = 7 departamentos × 19 meses**; la venta real se calcula desde `factura_venta` no anulada del mes | FACTIBLE HOY | ✔ implementado | Avance de venta contra la meta del período — Gerente, Vendedor, Administrador |
-| OTD-VEN-16 | Conocer de dónde viene el ingreso: qué participación pone cada canal —mostrador, teléfono y tienda en línea— en la venta del período, con pedidos, monto, ticket promedio y porcentaje, para dirigir el desarrollo omnicanal. | X | — | BDR | `pedido.canal` (CHECK del motor: solo `'web'`/`'tienda'`/`'telefono'`) + `pedido.total/fecha_pedido/cliente_id` + `estado_pedido.codigo` — **4.083 pedidos; neto de 159 cancelados: web 2.132 / $2.962.187,16 (53,87 %), mostrador 990 / $1.388.194,13 (25,25 %), teléfono 802 / $1.148.189,06 (20,88 %)**, suma $5.498.570,35 y 100,00 %. **NO separa B2B de B2C**: `canal` es el MEDIO de entrada, no el segmento del comprador — `grupo_cliente`/`segmento_cliente`/`cliente_segmento` tienen 0 filas, los 72 clientes tienen `grupo_cliente_id` NULL y `tipo_identificacion='cedula'`, y las 3.887 facturas llevan identificación de 10 dígitos (sin RUC). La columna `clientes_negocio` expone esa FK vacía (0 en los tres canales) para MEDIR la ausencia sin inventar la clasificación | FACTIBLE HOY | ✔ implementado | Participación de cada canal en la venta del período — Gerente, Administrador, Analista (**CON MONTO**: Bodega y Despacho NO; el Vendedor tampoco: no es su atribución) |
+| OTD-VEN-16 | Conocer de dónde viene el ingreso: qué participación pone cada **canal de entrada** —mostrador, teléfono y tienda en línea— en la venta del período, con pedidos, monto, ticket promedio y porcentaje, para dirigir la experiencia omnicanal. | X | — | BDR | `pedido.canal` (CHECK del motor: solo `'web'`/`'tienda'`/`'telefono'`) + `pedido.total/fecha_pedido/cliente_id` + `estado_pedido.codigo` — **4.083 pedidos; neto de 159 cancelados: web 2.132 / $2.962.187,16 (53,87 %), mostrador 990 / $1.388.194,13 (25,25 %), teléfono 802 / $1.148.189,06 (20,88 %)**, suma $5.498.570,35 y 100,00 %. **Mide MEDIO, no segmento de cliente**: `canal` es la vía por la que entró el pedido; agrupar por canal y rotularlo «B2B vs. B2C» sería falsear el dato (`PATRON_INFORMES.md` §12). Y esa clasificación **no es derivable por ninguna otra vía**: el diagnóstico del 2026-07-30 la descartó con veredicto (c) población homogénea — 99,94 % de las líneas piden 1–4 unidades, 0 RUC en 3.887 facturas, `grupo_cliente`/`segmento_cliente`/`cliente_segmento` con 0 filas. La columna **`clientes_negocio` («Clientes con segmento registrado»)** expone esa FK vacía (0 en los tres canales) para MEDIR la ausencia de segmentación registrada, sin inventar una clasificación | FACTIBLE HOY | ✔ implementado | Participación de cada canal en la venta del período — Gerente, Administrador, Analista (**CON MONTO**: Bodega y Despacho NO; el Vendedor tampoco: no es su atribución) |
 
 ## 4. COMPRAS (OTD-COM)
 
-El jefe de compras dirige el motor de costo de la distribuidora: órdenes y aprobaciones,
+El jefe de compras dirige el motor de costo del negocio: órdenes y aprobaciones,
 recepciones de mercancía por volumen, deuda con proveedores y devolución de mercancía
-defectuosa. En un mayorista el margen se gana comprando, y las cifras lo confirman: 865 órdenes,
+defectuosa. Aquí el margen se gana comprando, y las cifras lo confirman: 865 órdenes,
 839 facturas por **$22.467.387,27**, $16.084.462,74 pagados y **$6.382.924,53 de saldo abierto**
 en 276 cuentas por pagar vivas. Necesita saber a quién comprarle, cuánto debe, si paga a tiempo
 y si le entregan completo y a tiempo.
@@ -192,7 +224,7 @@ y si le entregan completo y a tiempo.
 | OTD-COM-08 | Ver los artículos defectuosos pendientes de devolver al proveedor y en qué paso va cada devolución. | X | — | BDR | `item_defectuoso.estado/origen/cantidad/proveedor_id` (**38 ítems, 10 pendientes**), `devolucion_proveedor.numero/estado` (8 devoluciones) | FACTIBLE HOY | ✔ implementado | Tablero del pool de defectuosos y devoluciones en curso — Compras, Gerente; Bodega en cantidades, sin montos |
 | OTD-COM-09 | Saber cuánto recuperamos de los proveedores por mercancía defectuosa: crédito a favor o reposición de producto. | — | X | BDColumnar | `devolucion_proveedor.tipo_resolucion/monto_credito/fecha_resolucion` + `item_defectuoso.costo_unitario` — **8 devoluciones, 6 resueltas** (3 reposición + 3 nota de crédito por $4.196,85), repartidas en apenas 6 meses distintos | REQUIERE VOLUMEN — el flujo escribe todo, pero 6 resoluciones sobre 11 proveedores y 19 meses no sostienen un agregado por proveedor y período | — (ETL) | Monto recuperado por proveedor y período — Compras, Gerente, Administrador |
 | OTD-COM-10 | Comparar a qué proveedor conviene comprarle cada producto: costo, plazo de entrega y proveedor preferido. | X | — | BDR | Brecha CERRADA (script 51) y **poblada**: `producto_proveedor` con **1.106 ofertas de 11 proveedores**, 1.093 con `tiempo_entrega_dias` y 1.040 marcadas `es_preferido` (antes: 0 filas) | FACTIBLE HOY | ✔ implementado | Ficha comparativa de proveedores por producto — Compras, Gerente |
-| OTD-COM-11 | Detectar qué proveedores entregan incompleto: comparar lo que se pidió contra lo que de verdad llegó, línea por línea y por proveedor. | X | — | BDR | `orden_compra_detalle.cantidad/cantidad_recibida` (**259 de 2.949 líneas con recepción menor a la pedida**) + `orden_compra.proveedor_id/fecha_emision` → `proveedor.razon_social` | FACTIBLE HOY | — (único simple pendiente) | Líneas incompletas y porcentaje de cumplimiento por proveedor — Compras, Gerente; Bodega en cantidades, sin montos |
+| OTD-COM-11 | Detectar qué proveedores entregan incompleto: comparar lo que se pidió contra lo que de verdad llegó, línea por línea y por proveedor. | X | — | BDR | `orden_compra_detalle.cantidad/cantidad_recibida` — 259 líneas con recepción menor a la pedida, pero **solo 165 son un incumplimiento del proveedor**: 41 vienen de camino y 53 son de órdenes canceladas (corrección C5.2). El informe recorta por defecto a las órdenes ya entregadas | FACTIBLE HOY | ✔ implementado | Líneas incompletas y porcentaje de cumplimiento por proveedor — Compras, Gerente; Bodega en cantidades, sin montos |
 | OTD-COM-12 | Saber si está subiendo el costo de lo que compramos: cómo cambia el precio que cobra el proveedor por cada producto entre una compra y la siguiente. | — | X | BDColumnar | `orden_compra_detalle.precio_unitario/producto_variante_id` (**2.949 líneas en 19 meses**) + `orden_compra.fecha_emision/proveedor_id`; cada línea de compra conserva su precio a esa fecha | FACTIBLE HOY | — (ETL) | Evolución del costo de compra por producto y proveedor — Compras, Gerente, Analista |
 
 ## 5. INVENTARIO / BODEGA (OTD-INV)
@@ -211,14 +243,14 @@ objetivos con dinero de este bloque se muestran a Gerencia y Administración.
 | OTD-INV-04 | Saber qué categorías de producto rotan más y cuáles se quedan paradas en bodega, por período. | — | X | BDColumnar | `movimiento_inventario.cantidad/fecha_creacion/tipo_movimiento_id` (13.287) + `producto_categoria.categoria_id` → `categoria.nombre` (1.214 asignaciones, 11 categorías) | FACTIBLE HOY | — (ETL) | Rotación por categoría y período — Gerente, Analista, Administrador; Bodega en cantidades |
 | OTD-INV-05 | Controlar la mercancía perdida o sobrante detectada en los ajustes de inventario y sus motivos. | X | — | BDR | `ajuste_inventario.tipo/motivo/estado/fecha_aplicacion` — **53 ajustes (50 aplicados, 3 anulados) repartidos en 19 meses** + movimientos `entrada_ajuste`/`salida_ajuste` del kardex, enlazados por `referencia_tipo` | FACTIBLE HOY | ✔ implementado | Lista de ajustes con motivo y cantidades — Bodega, Gerente, Administrador |
 | OTD-INV-06 | Seguir las transferencias de mercancía entre bodegas: cuáles van en camino y cuáles ya se recibieron. | X | — | BDR | `transferencia_bodega.estado/fecha_envio/fecha_recepcion/bodega_origen_id/bodega_destino_id` — **71 transferencias en los 4 estados** (57 recibidas, más en tránsito, pendientes y canceladas), en 19 meses | FACTIBLE HOY | ✔ implementado | Tabla de transferencias por estado — Bodega, Gerente, Administrador |
-| OTD-INV-07 | Saber cuánto dinero hay parado en mercancía almacenada, por categoría y por bodega. | X | — | BDR | `inventario.stock_actual` × `producto_variante.costo` (costo poblado en las 1.221 variantes, con bandas mayoristas del script 67) + `producto_categoria`/`categoria.nombre` — **$22.024.063,50 valorizados** | FACTIBLE HOY | ✔ implementado | Valor del inventario por categoría/bodega — Gerente, Administrador, Analista (Bodega NO: es dinero) |
+| OTD-INV-07 | Saber cuánto dinero hay parado en mercancía almacenada, por categoría y por bodega. | X | — | BDR | `inventario.stock_actual` × `producto_variante.costo` (costo poblado en las 1.221 variantes, con bandas de costo de COMPRA mayorista del script 67 — es el precio al proveedor, no un segmento de cliente) + `producto_categoria`/`categoria.nombre` — **$22.024.063,50 valorizados** | FACTIBLE HOY | ✔ implementado | Valor del inventario por categoría/bodega — Gerente, Administrador, Analista (Bodega NO: es dinero) |
 | OTD-INV-08 | Detectar productos con demasiada existencia — por encima del tope máximo deseado — para no enterrar dinero en mercancía de más. | X | — | BDR | Brecha CERRADA y **poblada** (PUT `/api/inventario/niveles` + script 54): `inventario.stock_maximo` en **1.227 de 1.406 posiciones, con 184 sobre-stock hoy** (antes: 0/1227, 100 % NULL) | FACTIBLE HOY | ✔ implementado | Lista de sobre-stock por bodega — Bodega, Compras, Gerente |
 | OTD-INV-09 | Ver cómo evoluciona mes a mes el dinero inmovilizado en la mercancía almacenada, para saber si la bodega se está llenando o vaciando de capital. | — | X | BDColumnar | Reconstrucción del stock al cierre de cada mes: `inventario.stock_actual` (1.406 filas) menos los movimientos posteriores del kardex — `movimiento_inventario.cantidad/fecha_creacion` (13.287, con `stock_anterior/stock_nuevo` como respaldo encadenado por `(fecha_creacion, id)`) y el signo de `tipo_movimiento.factor` — valorizado con `producto_variante.costo`. Usa el costo vigente: no existe histórico de costos (ver Decisiones de alcance) | FACTIBLE HOY | — (ETL) | Línea mensual del valor almacenado por bodega y categoría — Gerente, Administrador, Analista (Bodega NO: es dinero) |
 | OTD-INV-10 | Conocer las mermas (mercancía perdida) y los sobrantes acumulados por período y por motivo, para atacar las causas de la pérdida. | — | X | BDColumnar | `ajuste_inventario.tipo/motivo/fecha_aplicacion` (**53 ajustes sobre 7 motivos tipificados, en 19 meses**) + kardex `movimiento_inventario.cantidad` con `tipo_movimiento.codigo` 'salida_ajuste'/'entrada_ajuste', enlazados por `referencia_tipo='ajuste_inventario'` | FACTIBLE HOY | — (ETL) | Acumulado por motivo y mes — Bodega en cantidades; valorizado solo Gerente, Administrador |
 
 ## 6. LOGÍSTICA / DESPACHO (OTD-LOG)
 
-El jefe de despacho dirige la última milla mayorista y el camino de regreso: la cola de despacho,
+El jefe de despacho dirige la última milla y el camino de regreso: la cola de despacho,
 **2.872 envíos** con cinco transportistas, los problemas de entrega y todo el ciclo de
 devoluciones de clientes (solicitud → revisión → retorno → inspección → reembolso → cierre). Por
 la segregación financiera, Despacho ve estados, fechas y cantidades; el dinero (reembolsos, costo
@@ -251,7 +283,7 @@ queda para ClickHouse** como parte del bloque de objetivos compuestos de logíst
 
 ## 7. SOPORTE (OTD-SOP)
 
-El jefe de soporte dirige la atención de reclamos y consultas de la cartera corporativa: la
+El jefe de soporte dirige la atención de reclamos y consultas de la cartera de clientes: la
 bandeja de tickets, la urgencia, la carga de su equipo y los tiempos de respuesta. Es un área más
 pequeña que Ventas o Compras y su catálogo lo refleja: **248 tickets en 19 meses, 6 agentes, 8
 categorías, todas con casos**.
@@ -271,14 +303,14 @@ categorías, todas con casos**.
 
 La gerencia dirige la distribuidora completa: la foto consolidada del día, el equilibrio entre lo
 que entra por ventas ($5,72 M) y lo que sale hacia proveedores ($22,47 M facturados), la ganancia
-por línea de producto, las acciones de marketing mayorista (cupones de volumen, promociones,
+por línea de producto, las acciones de marketing (cupones, promociones,
 campañas) y el control interno (quién hizo qué en el sistema y quién intenta entrar a él).
 
 | ID | Objetivo táctico | ¿SIMPLE? | ¿COMPUESTO? | Fuente | Soporte de datos verificado (MCP 2026-07-26) | Factibilidad | Reporte | Dashboard y rol destinatario |
 |---|---|---|---|---|---|---|---|---|
 | OTD-GER-01 | Tener la foto del día del negocio: pedidos de hoy, dinero cobrado hoy y pendientes que necesitan decisión. | X | — | BDR | `pedido.fecha_pedido/total/estado_pedido_id` (4.083) + `pago.fecha_pago/monto` (4.079) + `factura_venta` (3.887) + `estado_pedido.nombre`. El bloque de pendientes es **al momento**, no del día consultado | FACTIBLE HOY | ✔ implementado | Tarjetas de resumen del día — Gerente, Administrador |
 | OTD-GER-02 | Comparar mes a mes el dinero que entra por ventas contra el dinero que sale hacia proveedores — la balanza comercial interna del negocio. | — | X | BDColumnar | Facturado: `factura_venta.total/fecha_emision` (**3.887 facturas, $5.417.807,65** sin anuladas) vs `factura_compra.total/fecha_emision` (**839, $22.467.387,27**). En caja: `pago.monto/fecha_pago` (**$5.467.791,59**) vs `pago_proveedor.monto/fecha_pago` (**$16.084.462,74**) | FACTIBLE HOY | — (ETL) | Barras enfrentadas entradas vs salidas, por mes — Gerente, Administrador, Analista |
-| OTD-GER-03 | Saber qué categorías de producto dejan más ganancia (venta menos costo), por período. | — | X | BDColumnar | `pedido_detalle.precio_unitario/cantidad/monto_descuento` (10.384 líneas) + `producto_variante.costo` (1.221 variantes, bandas mayoristas del script 67) + `producto_categoria`/`categoria.nombre` (11 categorías) | FACTIBLE HOY | — (ETL) | Ganancia por categoría y período — Gerente, Analista, Administrador |
+| OTD-GER-03 | Saber qué categorías de producto dejan más ganancia (venta menos costo), por período. | — | X | BDColumnar | `pedido_detalle.precio_unitario/cantidad/monto_descuento` (10.384 líneas) + `producto_variante.costo` (1.221 variantes, bandas de costo de COMPRA mayorista del script 67) + `producto_categoria`/`categoria.nombre` (11 categorías) | FACTIBLE HOY | — (ETL) | Ganancia por categoría y período — Gerente, Analista, Administrador |
 | OTD-GER-04 | Ver los cupones de descuento activos, cuántos usos les quedan y cuándo vencen. | X | — | BDR | `cupon.codigo/activo/usos_actuales/usos_maximos/fecha_inicio/fecha_fin` — **33 cupones, 7 vigentes**. La `situacion` replica las TRES condiciones de canje de `DescuentosService` (activo + ventana + usos disponibles), no solo `activo` | FACTIBLE HOY | ✔ implementado | Tabla de cupones con vigencia y usos restantes — Gerente, Administrador |
 | OTD-GER-05 | Saber qué cupones usaron efectivamente los clientes y cuánto descuento le costaron al negocio, por período. | — | X | BDColumnar | `uso_cupon.cupon_id/monto_descontado/fecha_creacion` — **564 usos de 25 cupones distintos, $50.727,89 otorgados, repartidos en 19 meses** (antes: 3 usos, $52,91) | FACTIBLE HOY | — (ETL) | Descuento otorgado por cupón y período — Gerente, Analista, Administrador |
 | OTD-GER-06 | Ver las acciones de marketing vigentes: promociones (y los productos que abarcan), campañas y anuncios de la tienda. | X | — | BDR | `promocion.fecha_inicio/fecha_fin/activo` (**24 promociones, 6 vigentes**) + `promocion_producto.producto_id` (**232 asignaciones, las 24 promos con productos**) + `campana.estado/fecha_inicio/fecha_fin` (**18, 6 activas**) + `banner.activo/fecha_inicio` (**23, 8 activos**) — 20 elementos vigentes en total | FACTIBLE HOY | ✔ implementado | Panel de vigencias de marketing — Gerente, Administrador |
@@ -314,8 +346,8 @@ Verificación aritmética: 16+12+10+12+8+11 = 69; simples 6+5+7+4+3+5 = 30; comp
 10+7+3+8+5+6 = 39; 30+39 = 69. Reportes 6+4+7+4+3+5 = 29.
 
 **Cambio respecto de la versión 3**: se incorporó **OTD-VEN-16** (participación de la venta por
-canal, SIMPLE, ya implementado), pedido por la base estratégica para sostener OE-06 «Desarrollo
-Omnicanal con foco en expansión mayorista». Ventas pasa de 15/5 a 16/6 y el total de simples de 29
+canal, SIMPLE, ya implementado), pedido por la base estratégica para sostener OE-06 (hoy
+«Consolidación de la Experiencia Omnicanal»). Ventas pasa de 15/5 a 16/6 y el total de simples de 29
 a 30. No se reclasificó ningún objetivo: OTD-VEN-13 sigue COMPUESTO y es el par temporal del nuevo
 (la foto es SIMPLE, la evolución mes a mes no).
 
@@ -348,8 +380,8 @@ volúmenes que faltaban (4.083 pedidos, 865 órdenes de compra, 2.872 envíos, 2
 reseñas, 13.287 movimientos de kardex, 7.073 registros de auditoría y 1.537 intentos de acceso).
 
 La asimetría entre departamentos es deliberada: Ventas y Logística (que carga todo el ciclo de
-devoluciones de cliente) pesan más que Soporte; Compras pesa porque en una distribuidora
-mayorista el abastecimiento es el centro de costo dominante; Inventario combina el control del
+devoluciones de cliente) pesan más que Soporte; Compras pesa porque el abastecimiento es el
+centro de costo dominante del negocio; Inventario combina el control del
 presente (existencias, kardex, ajustes) con la evolución del capital almacenado y de las mermas
 en el tiempo (OTD-INV-09 y OTD-INV-10), mientras que Ventas, Logística y Gerencia concentran
 compuestos porque sus decisiones son de evolución en el tiempo. De los 11 objetivos incorporados
@@ -476,11 +508,13 @@ PostgreSQL (GRANTs por columna + RLS) y, cuando el motor no alcanza, la propia c
 | OTD-GER-06 | `gerencia/marketing` | tipo, vigencia, buscar | 65 (20 vigentes) | Gerente, Admin |
 | OTD-GER-08 | `gerencia/auditoria` | usuario, tabla, acción, desde/hasta | 7.073 | **SENSIBLE**: Admin, Gerente |
 | OTD-GER-09 | `gerencia/accesos` | resultado, correo, desde/hasta | 1.537 | **SENSIBLE**: Admin, Gerente |
+| OTD-COM-11 | `compras/entregas-incompletas` | alcance, agrupar, proveedor, desde/hasta | 11 proveedores · 165 líneas cortas | Compras, Gerente, Admin; Bodega sin montos |
 
-**Pendiente: OTD-COM-11** (entregas incompletas por proveedor) — único informe simple del
-catálogo aún no construido; su dato está verificado y disponible (259 líneas incompletas de
-2.949). Los 39 objetivos COMPUESTOS no se implementan en este nivel: son trabajo del pipeline
-ETL hacia ClickHouse.
+**No queda ningún objetivo SIMPLE pendiente.** OTD-COM-11 se construyó el 2026-07-31 y era el
+último; sigue siendo SIMPLE y va contra PostgreSQL —agrega sobre la foto presente del
+abastecimiento y no compara períodos, por eso su filtro «Ver por» ofrece proveedor y producto y
+**no mes**—. Los 39 objetivos COMPUESTOS son trabajo del pipeline hacia ClickHouse y **están los
+39 conectados** desde esa misma fecha.
 
 **OTD-VEN-16 es la prueba de que el patrón sigue costando lo que promete**: se añadió a un
 departamento YA existente con **un método de servicio, un endpoint, una línea de `SecurityConfig` y
@@ -499,21 +533,40 @@ El detalle de CÓMO se construyen (patrón, contrato, seguridad y lecciones por 
   reclama a propósito.
 - **Ubicación física dentro de bodega (pasillo/estante)**: `ubicacion_bodega` sigue vacía. Es una
   necesidad operativa de picking, no de dirección táctica; se excluye del catálogo.
-- **Segmentación de clientes (grupos, edad, género) — y con ella el corte B2B / B2C**:
-  `grupo_cliente`, `segmento_cliente` y `cliente_segmento` siguen con 0 filas, aunque el universo de
-  clientes ya no es el limitante (72 clientes, 70 con fecha de nacimiento). La brecha es de captura,
-  no de volumen: ninguna pantalla asigna cliente a segmento. Se reevaluará junto con OTD-VEN-05
-  cuando el negocio defina su política de segmentación mayorista (por ejemplo, por escalón de
-  volumen anual). **Esta decisión de alcance es la razón por la que OTD-VEN-16 informa por CANAL y
-  no por segmento**: `pedido.canal` es el medio de entrada del pedido, no el tipo de comprador, y
-  agrupar por canal llamándolo «B2B vs. B2C» sería falsear el dato. Verificado el 2026-07-29 en modo
-  lectura: los 72 clientes con `grupo_cliente_id` NULL y `tipo_identificacion='cedula'`, las 3.887
-  facturas con identificación de 10 dígitos (el RUC ecuatoriano tiene 13), y ningún pedido con
-  conducta mayorista en ningún canal (mediana 4-5 unidades, máximo 24, **cero** pedidos de ≥50
-  unidades). El informe deja la ausencia a la vista en su columna `clientes_negocio` (0 en los tres
-  canales) en vez de disimularla. La versión segmentada está registrada como propuesta
-  **OTD-VEN-17** en `docs/estrategico/BASE_ESTRATEGICA.md` §6.1.b, en REQUIERE CAMBIO EN EL SISTEMA
-  hasta que las tres capas capturen el segmento.
+- **Corte B2B / B2C de cliente — ❌ DESCARTADO el 2026-07-30 (no «pendiente»)**. Hasta la versión 4
+  esto figuraba como brecha *de captura*: bastaría poblar `grupo_cliente` y llenar
+  `cliente.grupo_cliente_id` desde una pantalla nueva. El diagnóstico
+  `docs/estrategico/DIAGNOSTICO_SEGMENTO_CLIENTE.md` (2026-07-30, solo lectura) fue a comprobar
+  también si el segmento era **derivable del comportamiento** y concluyó que **no lo es**: veredicto
+  **(c) POBLACIÓN HOMOGÉNEA**. Las tres pruebas:
+  1. **No existe compra de volumen** — **10.378 de 10.384 líneas (99,94 %) piden entre 1 y 4
+     unidades**, máximo histórico 12 por línea y 24 por pedido, máximo 5 líneas por pedido. Sin
+     volumen no hay mayorista.
+  2. **Ninguna dimensión separa dos poblaciones** — ticket unimodal log-normal (una sola cresta),
+     mezcla de categorías con Δ máx. **0,62 pp**, método de pago Δ máx. **1,44 pp**, canal 3,3 %,
+     regularidad CV 1,34–1,82 en todos los grupos. El cliente de 673 pedidos compra igual que el de
+     1 ($1.415,96 vs. $1.258,97 de ticket): la concentración (top 10 % = 49,34 % del ingreso) es de
+     **frecuencia**, no de tipo de comprador.
+  3. **No existe soporte estructural** — 0 RUC en 3.887 facturas (todas con identificación de 10
+     dígitos; el RUC ecuatoriano tiene 13), 0 razones sociales empresariales, 0 listas de precios
+     por grupo, 0 crédito a cliente, y `grupo_cliente`/`segmento_cliente`/`cliente_segmento` con
+     **0, 0 y 0 filas**.
+
+  **Consecuencias para este catálogo**: (a) el propuesto **OTD-VEN-17** (venta por segmento
+  B2B/B2C), registrado en `BASE_ESTRATEGICA.md` §6.1.b, queda **retirado** — no pasa a REQUIERE
+  CAMBIO EN EL SISTEMA, porque poblar `grupo_cliente` hoy no sería capturar un dato sino inventar
+  una etiqueta; el ID no se reasigna; (b) **OTD-VEN-16 informa por CANAL y solo por canal**, que es
+  el medio de entrada del pedido — la regla vinculante está en `PATRON_INFORMES.md` §12; (c) la
+  columna `clientes_negocio` del informe se conserva, re-rotulada **«Clientes con segmento
+  registrado»**, midiendo la ausencia de segmentación registrada (0 en los tres canales) en vez de
+  prometer un segmento «negocio» que llegará. Si el negocio quisiera algún día un corte de cliente
+  **honesto** con estos datos, sería **RFM por valor** (top 20 % = 14 clientes = 68,76 % del
+  ingreso) rotulado «clientes de alto valor», nunca «B2B».
+- **Segmentación de clientes por atributos demográficos (edad, género)**: `cliente.genero` y
+  `fecha_nacimiento` están poblados en 70 de 72 clientes, pero ninguna jefatura pidió dirigir por
+  ellos y `segmento_cliente`/`cliente_segmento` siguen vacías. Se mantiene fuera del catálogo por
+  falta de pregunta de dirección, no por falta de dato. Es una decisión independiente del punto
+  anterior: descartar el corte B2B/B2C no descarta un futuro corte demográfico o RFM.
 - **Lista de deseos y comparador de productos**: `wishlist` (2 filas) y `comparacion` (0 filas)
   no sostienen hoy una decisión de dirección; la señal de demanda del cliente ya la aporta el
   módulo de recomendaciones (analítica, fuera de alcance de este catálogo).

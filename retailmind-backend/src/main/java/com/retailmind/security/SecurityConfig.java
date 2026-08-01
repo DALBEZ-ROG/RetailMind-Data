@@ -59,6 +59,16 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.DELETE, "/api/auth/usuarios/**").hasAuthority("ADMIN")
                 // ETL solo para ADMIN
                 .requestMatchers("/api/etl/**").hasAuthority("ADMIN")
+                // Actualizacion del data warehouse (orquestador run_etl.py):
+                // ADMIN y GERENTE. Es una ACCION, no una consulta, y por eso no
+                // cuelga de /api/informes —esa rama termina en denyAll() para
+                // todo lo que no sea GET—. Tampoco se mete en /api/etl, que es
+                // el ETL legado y solo ADMIN: ampliar aquella linea le abriria
+                // al gerente la carga de CSV. El ANALISTA queda fuera a
+                // proposito: LEE los informes compuestos, pero decidir cuando
+                // se reconstruye el almacen (19 tablas, con margenes, costos y
+                // flujo de caja) es de direccion.
+                .requestMatchers("/api/dwh/**").hasAnyAuthority("ADMIN", "GERENTE")
                 // Inicializacion solo para ADMIN
                 .requestMatchers("/api/init/**").hasAuthority("ADMIN")
                 // Gestion de datos solo para ADMIN
@@ -258,6 +268,60 @@ public class SecurityConfig {
                 // tampoco entran (el motor lo respalda: sin SELECT sobre pedido.total).
                 .requestMatchers(HttpMethod.GET, "/api/informes/ventas/participacion-canal")
                     .hasAnyAuthority("ADMIN", "GERENTE", "ANALISTA")
+                // OTD-VEN-06 (evolución de la venta mes a mes y por categoría) es
+                // el primer informe COMPUESTO: lo sirve ClickHouse
+                // (retailmind_dwh.fact_venta_linea), no PostgreSQL. Destinatarios
+                // del catálogo: Gerente, Analista y Administrador.
+                // Lleva DINERO (venta, costo y margen) y, a diferencia de los 29
+                // simples, el motor NO respalda aquí el corte: ClickHouse no tiene
+                // RLS por fila ni GRANT por columna, y el ETL escribe todas las
+                // columnas de monto en tablas planas (§8.2 del diseño del
+                // pipeline). El corte financiero lo hace ÍNTEGRAMENTE ESTA RUTA
+                // — mismo caso declarado que OTD-INV-07, OTD-LOG-11 y OTD-GER-08,
+                // y por eso va en su propia línea antes del comodín de Ventas.
+                .requestMatchers(HttpMethod.GET, "/api/informes/ventas/evolucion-mensual")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "ANALISTA")
+                // ── Fase 2 del pipeline: los cinco compuestos de Ventas que
+                // sirven fact_pedido y fact_flujo_caja. Mismo criterio que
+                // OTD-VEN-06: TODOS llevan dinero y en ninguno lo respalda el
+                // motor, así que Bodega y Despacho quedan fuera POR RUTA. Cada
+                // uno lleva su línea porque los destinatarios del catálogo NO
+                // coinciden entre sí ni con el comodín del departamento.
+                //
+                // OTD-VEN-05 (cartera de clientes) y OTD-VEN-13 (evolución de
+                // la participación por canal) suman VENDEDOR — es su cartera y
+                // su mercado— al trío de dirección.
+                .requestMatchers(HttpMethod.GET, "/api/informes/ventas/clientes",
+                        "/api/informes/ventas/evolucion-canal")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "VENDEDOR", "ANALISTA")
+                // OTD-VEN-07 (ticket promedio) y OTD-VEN-09 (mezcla de formas de
+                // cobro) son lecturas de DIRECCIÓN: entra el ANALISTA y no el
+                // vendedor, igual que en OTD-VEN-16.
+                .requestMatchers(HttpMethod.GET, "/api/informes/ventas/ticket-promedio",
+                        "/api/informes/ventas/formas-cobro")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "ANALISTA")
+                // OTD-VEN-12 (cobros fallidos) es el corte más estrecho de
+                // Ventas: el catálogo lo reserva a Gerente y Administrador. Sale
+                // de fact_flujo_caja, que lleva el monto de cada intento.
+                .requestMatchers(HttpMethod.GET, "/api/informes/ventas/cobros-fallidos")
+                    .hasAnyAuthority("ADMIN", "GERENTE")
+                // ── Fase 4 del pipeline: los dos compuestos de posventa que
+                // cierran Ventas.
+                //
+                // OTD-VEN-11 (calificación de cada producto) es el ÚNICO
+                // informe compuesto de Ventas SIN dinero: es una escala de 1 a
+                // 5. Aun así Bodega y Despacho quedan fuera — la opinión del
+                // cliente sobre el catálogo no es su atribución— y entra el
+                // VENDEDOR, que sí necesita saber qué se dice de lo que vende.
+                .requestMatchers(HttpMethod.GET, "/api/informes/ventas/resenas")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "VENDEDOR", "ANALISTA")
+                // OTD-VEN-14 (dinero devuelto y su peso sobre la venta) es
+                // DINERO: el catálogo lo reserva a Gerente, Administrador y
+                // Analista, y deja fuera a Bodega y Despacho explícitamente.
+                // También al VENDEDOR: la tasa de devolución del negocio es una
+                // lectura de dirección, no de cartera.
+                .requestMatchers(HttpMethod.GET, "/api/informes/ventas/devoluciones")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "ANALISTA")
                 // Resto de informes de Ventas (VEN-01/02/08/15): llevan MONTO, por
                 // lo que BODEGA y DESPACHO quedan fuera por segregación financiera
                 // (el motor lo respalda: sin SELECT sobre pedido.total, carrito ni
@@ -272,6 +336,26 @@ public class SecurityConfig {
                 // por la excepción declarada del script 41 (valoriza su kardex).
                 .requestMatchers(HttpMethod.GET, "/api/informes/inventario/valor-inventario")
                     .hasAnyAuthority("ADMIN", "GERENTE", "ANALISTA")
+                // COMPUESTOS de Inventario (fuente ClickHouse, Fase 3B del ETL).
+                // Van ANTES del comodín del departamento porque su reparto de
+                // roles NO coincide con el de los simples: suman al ANALISTA.
+                //
+                // OTD-INV-09 (capital inmovilizado) es DINERO de principio a fin
+                // y deja fuera a BODEGA — el segundo corte financiero del
+                // departamento, junto con OTD-INV-07, y por el mismo motivo:
+                // ClickHouse no tiene GRANT por columna (§8.2 del diseño), así
+                // que la barrera es esta ruta.
+                .requestMatchers(HttpMethod.GET,
+                        "/api/informes/inventario/capital-inmovilizado")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "ANALISTA")
+                // OTD-INV-04 (rotación) y OTD-INV-10 (mermas): BODEGA entra.
+                // INV-04 no selecciona ni un importe; INV-10 es MIXTO y el
+                // servicio decide sobre el rol del JWT — solo ADMIN y GERENTE
+                // reciben las columnas de valor, que ni siquiera se seleccionan
+                // para el resto.
+                .requestMatchers(HttpMethod.GET, "/api/informes/inventario/rotacion",
+                        "/api/informes/inventario/mermas")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "ANALISTA", "BODEGA")
                 // OTD-INV-02: existencias — COMPRAS y VENDEDOR también necesitan
                 // saber qué hay antes de comprar o de vender.
                 .requestMatchers(HttpMethod.GET, "/api/informes/inventario/stock-bodega")
@@ -291,13 +375,43 @@ public class SecurityConfig {
                 // ninguna columna de monto — el motor NO lo impediría, porque el
                 // script 45 dio a grp_bodega SELECT sobre item_defectuoso
                 // .costo_unitario para el flujo operativo; el control es la consulta.
-                .requestMatchers(HttpMethod.GET, "/api/informes/compras/defectuosos")
+                // Con ellos entran los otros dos SIN dinero para Bodega:
+                // OTD-COM-07 (rechazos en puerta) y OTD-COM-11 (entregas
+                // incompletas), que el catálogo le da «en cantidades, sin
+                // montos». Los tres son MIXTOS: la ruta deja pasar a Bodega y es
+                // la CONSULTA la que no le selecciona el importe. En COM-07 el
+                // motor tampoco alcanzaría —ClickHouse no tiene GRANT por
+                // columna— y en COM-11 grp_bodega conserva a propósito SELECT
+                // sobre orden_compra_detalle.precio_unitario (script 41, lo
+                // necesita para valorizar el kardex al recibir).
+                .requestMatchers(HttpMethod.GET, "/api/informes/compras/defectuosos",
+                        "/api/informes/compras/rechazos",
+                        "/api/informes/compras/entregas-incompletas")
                     .hasAnyAuthority("ADMIN", "GERENTE", "COMPRAS", "BODEGA")
+                // Los cuatro compuestos a los que el catálogo SÍ invita al
+                // ANALISTA: puntualidad de pago (COM-03), gasto de compras
+                // (COM-04), días de ciclo (COM-06) y evolución del costo
+                // (COM-12). Llevan dinero o precios, así que Bodega y Despacho
+                // siguen fuera; lo que cambia respecto del comodín de abajo es
+                // que se suma el analista, igual que ya ocurre en OTD-VEN-16.
+                // Se enumeran POR NOMBRE y no con un comodín para que un
+                // endpoint futuro no herede el permiso sin decidirlo.
+                .requestMatchers(HttpMethod.GET, "/api/informes/compras/puntualidad-pago",
+                        "/api/informes/compras/gasto-mensual",
+                        "/api/informes/compras/ciclo-compra",
+                        "/api/informes/compras/evolucion-costo")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "COMPRAS", "ANALISTA")
                 // Resto de informes de Compras (COM-01 órdenes, COM-02 cuentas por
-                // pagar, COM-10 catálogo proveedor-producto): llevan MONTO o COSTO,
-                // así que BODEGA y DESPACHO quedan fuera. Aquí el motor SÍ respalda
-                // el corte (sin SELECT sobre orden_compra.total, cuenta_por_pagar ni
-                // producto_proveedor).
+                // pagar, COM-10 catálogo proveedor-producto, COM-09 recuperación al
+                // proveedor): llevan MONTO o COSTO, así que BODEGA y DESPACHO quedan
+                // fuera. En los simples el motor SÍ respalda el corte (sin SELECT
+                // sobre orden_compra.total, cuenta_por_pagar ni producto_proveedor);
+                // en los compuestos lo hace solo esta ruta.
+                // OTD-COM-05 (cumplimiento del plazo prometido) cae aquí a
+                // propósito aunque NO seleccione ni un importe: el catálogo lo
+                // reserva a Compras y Gerencia porque es material de negociación
+                // con el proveedor. Es el único compuesto de Compras del que
+                // también sale el ANALISTA.
                 .requestMatchers(HttpMethod.GET, "/api/informes/compras/**")
                     .hasAnyAuthority("ADMIN", "GERENTE", "COMPRAS")
                 // LOGÍSTICA / DESPACHO — OTD-LOG-11 (costo del envío por zona) es
@@ -305,8 +419,72 @@ public class SecurityConfig {
                 // no el motor, porque grp_despacho conserva SELECT sobre envio.costo
                 // (lo escribe al despachar, script 47). Mismo caso declarado que
                 // OTD-INV-07.
-                .requestMatchers(HttpMethod.GET, "/api/informes/logistica/costo-envio")
+                // La SERIE mensual del mismo costo (compuesta, ClickHouse) va en
+                // la MISMA línea y por el mismo motivo: es dinero. Se nombra
+                // aparte y no con un comodín sobre `costo-envio*` para que el
+                // corte siga siendo una decisión escrita y no un efecto del
+                // prefijo — un endpoint futuro que empezara igual heredaría el
+                // permiso sin que nadie lo hubiera decidido.
+                // La FASE 4 añade a esta misma línea OTD-LOG-10 (reembolsos):
+                // es el tercer informe con dinero del departamento y el único
+                // de la posventa que lo lleva, así que DESPACHO queda fuera
+                // igual que en los dos de costo. SOPORTE sí entra —es quien
+                // gestiona el RMA y ve el reembolso en su bandeja—, y por eso
+                // no comparte línea con los otros dos sino que se enumera
+                // aparte, justo debajo.
+                .requestMatchers(HttpMethod.GET, "/api/informes/logistica/costo-envio",
+                        "/api/informes/logistica/costo-envio-mensual")
                     .hasAnyAuthority("ADMIN", "GERENTE")
+                .requestMatchers(HttpMethod.GET, "/api/informes/logistica/reembolsos")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "SOPORTE")
+                // OTD-LOG-12 (tiempo por etapa del ciclo) es COMPUESTO: lo sirve
+                // ClickHouse desde los hitos pivotados de fact_pedido. Suma al
+                // ANALISTA, que no participa en el resto del departamento, y por
+                // eso necesita línea propia. DESPACHO entra —es su operación— y
+                // aquí la ausencia de dinero NO la garantiza el motor: la tabla
+                // de origen sí tiene `total` y ClickHouse no tiene GRANT por
+                // columna. La barrera es la CONSULTA, que no selecciona ningún
+                // importe; mismo mecanismo declarado en OTD-COM-08.
+                .requestMatchers(HttpMethod.GET, "/api/informes/logistica/tiempos-ciclo")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "DESPACHO", "ANALISTA")
+                // OTD-LOG-03 y OTD-LOG-04 (cumplimiento de la fecha prometida y
+                // días reales de tránsito) son COMPUESTOS sobre fact_envio, y
+                // comparten destinatarios con LOG-12: suman al ANALISTA. DESPACHO
+                // entra porque son SU operación medida en fechas y veredictos —
+                // la tabla de origen sí tiene `costo`, así que aquí la ausencia
+                // de dinero tampoco la garantiza el motor: la garantizan estas
+                // dos consultas, que no seleccionan ningún importe.
+                .requestMatchers(HttpMethod.GET,
+                        "/api/informes/logistica/cumplimiento-promesa",
+                        "/api/informes/logistica/dias-transito")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "DESPACHO", "ANALISTA")
+                // OTD-LOG-05 (problemas de entrega) cambia de reparto: entra
+                // SOPORTE —la incidencia de entrega acaba en su bandeja— y NO el
+                // analista, que no participa en la posventa. Sin columnas de
+                // monto: fact_novedad_envio no lleva ninguna, así que aquí el
+                // corte no depende de la consulta.
+                .requestMatchers(HttpMethod.GET, "/api/informes/logistica/novedades")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "DESPACHO", "SOPORTE")
+                // ── Fase 4: los tres compuestos de posventa SIN dinero ────
+                // OTD-LOG-07 (días de ciclo de la devolución) y OTD-LOG-08
+                // (motivos y destino de la mercancía). El catálogo pone en los
+                // dos a Gerente, Soporte y Analista; LOG-08 suma además a
+                // BODEGA «en cantidades», porque es quien inspecciona. En los
+                // dos la ausencia de dinero la garantiza la CONSULTA y no el
+                // motor: fact_devolucion lleva `monto_total` y ClickHouse no
+                // tiene GRANT por columna. Mismo mecanismo que OTD-COM-08.
+                .requestMatchers(HttpMethod.GET,
+                        "/api/informes/logistica/ciclo-devolucion")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "SOPORTE", "ANALISTA")
+                .requestMatchers(HttpMethod.GET,
+                        "/api/informes/logistica/motivos-devolucion")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "SOPORTE", "ANALISTA", "BODEGA")
+                // OTD-LOG-09 (de cada 100 envíos, cuántos vuelven) cambia de
+                // reparto otra vez: Gerente, Analista y DESPACHO «en conteos»
+                // —es su operación—, y NO Soporte. Solo cuenta envíos y
+                // devoluciones; ni un importe.
+                .requestMatchers(HttpMethod.GET, "/api/informes/logistica/tasa-devolucion")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "DESPACHO", "ANALISTA")
                 // OTD-LOG-06: el ciclo RMA lo comparten DESPACHO (tránsito y
                 // recepción), SOPORTE (valida y cierra) y BODEGA (inspección, en
                 // cantidades). Sin columnas de monto: el motor lo respalda.
@@ -316,9 +494,28 @@ public class SecurityConfig {
                 // y cantidades.
                 .requestMatchers(HttpMethod.GET, "/api/informes/logistica/**")
                     .hasAnyAuthority("ADMIN", "GERENTE", "DESPACHO")
-                // SOPORTE — los tres informes de la mesa de ayuda (OTD-SOP-01/04/05).
-                // Ninguno lleva dinero, así que no hay corte financiero: los
-                // destinatarios del catálogo son el propio SOPORTE y la jefatura.
+                // SOPORTE — los tres simples de la mesa de ayuda
+                // (OTD-SOP-01/04/05) más los cinco COMPUESTOS de la Fase 4
+                // (SOP-02/03/06/07/08). Ninguno de los ocho lleva dinero, así
+                // que no hay corte financiero que hacer y comparten el comodín
+                // del departamento. DOS excepciones, ambas de la Fase 4 y las
+                // dos por AMPLIACIÓN, nunca por restricción:
+                //
+                //   · OTD-SOP-03 (tiempo de resolución por categoría) suma al
+                //     ANALISTA, que el catálogo nombra destinatario.
+                //   · OTD-SOP-08 (productos que más reclamos y devoluciones
+                //     generan) suma a COMPRAS: el ranking existe precisamente
+                //     para que Compras vaya a revisar el producto con su
+                //     proveedor. Son conteos de reclamos y unidades — la
+                //     consulta no selecciona ni un importe.
+                //
+                // Van ANTES del comodín porque ampliarlo arrastraría a los
+                // otros seis.
+                .requestMatchers(HttpMethod.GET, "/api/informes/soporte/tiempo-resolucion")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "SOPORTE", "ANALISTA")
+                .requestMatchers(HttpMethod.GET,
+                        "/api/informes/soporte/productos-reclamados")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "SOPORTE", "COMPRAS")
                 .requestMatchers(HttpMethod.GET, "/api/informes/soporte/**")
                     .hasAnyAuthority("ADMIN", "GERENTE", "SOPORTE")
                 // GERENCIA / DIRECCIÓN — OTD-GER-08 (auditoría del sistema) y
@@ -333,6 +530,31 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/informes/gerencia/auditoria",
                         "/api/informes/gerencia/accesos")
                     .hasAnyAuthority("ADMIN", "GERENTE")
+                // OTD-GER-02 (balanza mensual de caja) y OTD-GER-05 (descuento
+                // por cupón y período) son COMPUESTOS: los sirve ClickHouse
+                // desde fact_flujo_caja y fact_pedido. El catálogo suma el
+                // ANALISTA a los dos, y por eso van en su PROPIA línea y no
+                // ampliando el comodín del departamento: ese comodín también
+                // cubriría —si se ampliara— los dos informes de seguridad de
+                // arriba, que deben seguir en ADMIN+GERENTE. Separarlos es lo
+                // que impide que un permiso de análisis abra un dato sensible.
+                //
+                // La FASE 4 añade cuatro más con el MISMO reparto y a la misma
+                // línea: OTD-GER-03 (ganancia por categoría), GER-10 (margen
+                // producto a producto), GER-11 (descuento total entregado) y
+                // GER-07 (efecto de las promociones). El catálogo pone el
+                // ANALISTA en los cuatro; los cuatro llevan dinero y ninguno lo
+                // respalda el motor. Se enumeran POR NOMBRE y no con un comodín
+                // sobre `margen-*` o `descuento-*` para que un endpoint futuro
+                // que empiece igual no herede el permiso sin que nadie lo haya
+                // decidido — el mismo criterio de `costo-envio-mensual`.
+                .requestMatchers(HttpMethod.GET, "/api/informes/gerencia/balanza",
+                        "/api/informes/gerencia/descuento-cupones",
+                        "/api/informes/gerencia/margen-categoria",
+                        "/api/informes/gerencia/margen-producto",
+                        "/api/informes/gerencia/descuento-total",
+                        "/api/informes/gerencia/efecto-promociones")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "ANALISTA")
                 // Resto de informes de Gerencia (GER-01 foto del día, GER-04
                 // cupones, GER-06 marketing vigente): dirección del negocio, con
                 // montos y presupuesto — ADMIN y GERENTE.

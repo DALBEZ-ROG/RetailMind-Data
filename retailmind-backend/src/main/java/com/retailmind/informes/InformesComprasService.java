@@ -22,13 +22,20 @@ import org.springframework.transaction.annotation.Transactional;
  *       devoluciones al proveedor en curso (SOLO CANTIDADES).</li>
  *   <li><b>OTD-COM-10</b> {@link #catalogoProveedor} — qué proveedor ofrece cada
  *       producto, a qué costo y en cuántos días (CON COSTO).</li>
+ *   <li><b>OTD-COM-11</b> {@link #entregasIncompletas} — quién entrega de menos:
+ *       pedido contra recibido, línea a línea (MIXTO: Bodega sin montos).</li>
  * </ul>
  *
  * Los COMPUESTOS de Compras (puntualidad de pago — COM-03, gasto mensual —
  * COM-04, cumplimiento de plazo — COM-05, días de ciclo — COM-06, rechazos en
- * puerta — COM-07, monto recuperado — COM-09, entregas incompletas por período —
- * COM-11, evolución del costo — COM-12) NO viven aquí: pertenecen a la fase
- * ETL → ClickHouse.
+ * puerta — COM-07, monto recuperado — COM-09, evolución del costo — COM-12) NO
+ * viven aquí: los sirve {@link InformesComprasCompuestosService} desde
+ * ClickHouse.
+ *
+ * OTD-COM-11 sí está aquí, y es deliberado: el catálogo lo clasifica SIMPLE
+ * porque agrega sobre la foto presente del abastecimiento sin comparar un
+ * período con otro (§3 del catálogo, la regla que separa simple de compuesto).
+ * Era el último objetivo SIMPLE del catálogo pendiente de construir.
  *
  * TODO método va en {@code @Transactional(readOnly = true)} para que
  * PgSessionRoleAspect asuma el grp_* del usuario: sin transacción la consulta
@@ -80,6 +87,24 @@ public class InformesComprasService extends InformeServiceBase {
 
     /** Filtro de OTD-COM-10 sobre la marca de proveedor preferido. */
     private static final Set<String> MARCAS_OFERTA = Set.of("preferida", "mas_barata");
+
+    /**
+     * OTD-COM-11 — qué órdenes entran en «entregas incompletas».
+     *
+     * NO es {@code orden_compra.estado} disfrazado: son tres LECTURAS distintas
+     * de la misma columna, y la diferencia es el sentido del informe. Sin este
+     * filtro, una orden cancelada (0 recibido de 25 pedidos) contaría como el
+     * peor incumplimiento del proveedor cuando la canceló Compras.
+     */
+    private static final Set<String> ALCANCES_ENTREGA =
+            Set.of("entregadas", "en_camino", "canceladas", "todas");
+
+    /**
+     * OTD-COM-11 — ejes del agregado. Deliberadamente SIN «mes»: el catálogo lo
+     * clasifica SIMPLE porque agrega sobre la foto presente, y un eje temporal
+     * lo convertiría en una serie, es decir en un compuesto de ClickHouse.
+     */
+    private static final Set<String> EJES_ENTREGA = Set.of("proveedor", "producto");
 
     public InformesComprasService(@Qualifier("pgJdbcTemplate") JdbcTemplate pg) {
         super(pg);
@@ -432,5 +457,152 @@ public class InformesComprasService extends InformeServiceBase {
                 kpi("Proveedores", tot.get("proveedores"), "numero"),
                 kpi("Plazo medio de entrega", tot.get("plazo_medio"), "dias"),
                 kpi("Marcadas como preferidas", tot.get("preferidas"), "numero")));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // OTD-COM-11 — Quién entrega incompleto (MIXTO: Bodega sin montos)
+    // ─────────────────────────────────────────────────────────────────────
+
+    /**
+     * Lo que se pidió contra lo que de verdad llegó, por proveedor.
+     *
+     * <h3>Por qué está aquí y no entre los compuestos</h3>
+     * El catálogo lo clasifica <b>SIMPLE</b> y es uno de los nueve simples que
+     * agregan: totaliza la foto presente del abastecimiento sin comparar un
+     * período contra otro. Por eso NO tiene eje de mes — añadirlo lo convertiría
+     * en una serie temporal y lo mandaría a ClickHouse, que es justo la frontera
+     * que el catálogo §3 define. Era el ÚNICO simple del catálogo que quedaba sin
+     * construir.
+     *
+     * <h3>«Incompleto» no es lo mismo que «todavía no ha llegado»</h3>
+     * Contar como entrega incompleta toda línea con
+     * {@code cantidad_recibida < cantidad} da <b>259 líneas</b>, y esa cifra
+     * mezcla tres situaciones que no significan lo mismo:
+     *
+     * <pre>
+     *   recibida / recibida_parcial ... 165 líneas   el proveedor sirvió de menos
+     *   confirmada / enviada .......... 41 líneas    aún viene de camino
+     *   cancelada ..................... 53 líneas    se anuló: nunca hubo que servirla
+     * </pre>
+     *
+     * Las 94 últimas suman 2.372 unidades que <b>nunca llegaron a deberse</b>
+     * (corrección C3.7), y achacárselas al proveedor lo hunde en el ranking por
+     * una decisión de Compras. Por eso el alcance por defecto es
+     * {@code entregadas} —las órdenes que YA llegaron— y las otras dos
+     * situaciones son valores explícitos del filtro, no una omisión silenciosa.
+     *
+     * <h3>MIXTO: Bodega entra, y sin importes</h3>
+     * El catálogo se lo da a Bodega «en cantidades, sin montos». Aquí el motor NO
+     * puede ser la última línea: grp_bodega conserva SELECT sobre
+     * {@code orden_compra_detalle.precio_unitario} (excepción declarada del
+     * script 41 — lo necesita para valorizar el kardex al recibir), de modo que
+     * la BD le dejaría calcular el valor faltante. El control es la CONSULTA: con
+     * Bodega, {@code valor_faltante} no se selecciona. Lo que sí respalda el
+     * motor es que la consulta jamás toca {@code orden_compra.total} ni
+     * {@code cuenta_por_pagar}, sobre los que Bodega no tiene privilegio.
+     *
+     * Verificado contra la base: 165 líneas incompletas sobre 2.855 entregadas,
+     * 1.514 unidades no servidas y 11 proveedores.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> entregasIncompletas(String alcance, String agrupar,
+                                                   String proveedor, String desde,
+                                                   String hasta, int page, int size) {
+        String alc = opcion(alcance, ALCANCES_ENTREGA, "alcance");
+        String eje = agrupar == null || agrupar.isBlank()
+                ? "proveedor" : opcion(agrupar, EJES_ENTREGA, "agrupar");
+        String prov = texto(proveedor);
+        String d = fecha(desde, "desde");
+        String h = fecha(hasta, "hasta");
+        exigirRangoValido(d, h);
+        boolean conDinero = !"BODEGA".equals(rolActual());
+
+        // Sin filtro explícito, solo lo que YA llegó: ver el javadoc.
+        String estados = switch (alc == null ? "entregadas" : alc) {
+            case "en_camino" -> "('confirmada', 'enviada')";
+            case "canceladas" -> "('cancelada')";
+            case "todas" -> null;
+            default -> "('recibida', 'recibida_parcial')";
+        };
+
+        final String from = """
+                FROM orden_compra_detalle d
+                JOIN orden_compra oc     ON oc.id = d.orden_compra_id
+                JOIN proveedor pr        ON pr.id = oc.proveedor_id
+                JOIN producto_variante v ON v.id = d.producto_variante_id
+                JOIN producto p          ON p.id = v.producto_id
+                WHERE (?::varchar IS NULL OR pr.razon_social ILIKE '%' || ?::varchar || '%'
+                       OR pr.ruc ILIKE '%' || ?::varchar || '%')
+                  AND (?::date IS NULL OR oc.fecha_emision >= ?::date)
+                  AND (?::date IS NULL OR oc.fecha_emision <= ?::date)
+                """ + (estados == null ? "" : "  AND oc.estado IN " + estados + "\n");
+        Object[] args = { prov, prov, prov, d, d, h, h };
+
+        String clave = "producto".equals(eje) ? "v.sku, p.nombre" : "pr.razon_social";
+        // OJO: va SIN bloque de texto a propósito. Un text block de Java recorta
+        // el espacio final de cada línea, así que `"""SELECT """ + etiqueta`
+        // produce `SELECTpr.razon_social` — sintaxis inválida, y solo revienta en
+        // tiempo de ejecución.
+        String etiqueta = "producto".equals(eje)
+                ? "SELECT v.sku AS etiqueta, p.nombre AS detalle"
+                : "SELECT pr.razon_social AS etiqueta, '' AS detalle";
+
+        // La ÚNICA columna de dinero del informe. Bodega no la recibe.
+        String columnaValor = conDinero ? """
+                ,      ROUND(SUM((d.cantidad - d.cantidad_recibida) * d.precio_unitario), 2)
+                           AS valor_faltante
+                """ : "";
+
+        Map<String, Object> res = paginar(etiqueta + """
+                ,      count(DISTINCT oc.id)                              AS ordenes,
+                       count(*)                                           AS lineas,
+                       count(*) FILTER (WHERE d.cantidad_recibida < d.cantidad)
+                                                                          AS lineas_incompletas,
+                       SUM(d.cantidad)                                    AS uds_pedidas,
+                       SUM(d.cantidad_recibida)                           AS uds_recibidas,
+                       SUM(d.cantidad - d.cantidad_recibida)              AS uds_faltantes,
+                       ROUND(SUM(d.cantidad_recibida) * 100.0
+                             / NULLIF(SUM(d.cantidad), 0), 2)             AS pct_cumplimiento,
+                       ROUND(count(*) FILTER (WHERE d.cantidad_recibida < d.cantidad) * 100.0
+                             / NULLIF(count(*), 0), 2)                    AS pct_lineas_incompletas
+                """ + columnaValor + from
+                + " GROUP BY " + clave
+                + " ORDER BY pct_cumplimiento ASC, uds_faltantes DESC",
+                "SELECT count(*) FROM (SELECT 1 " + from + " GROUP BY " + clave + ") x",
+                args, page, size);
+
+        Map<String, Object> tot = pg.queryForMap("""
+                SELECT count(*)                                           AS lineas,
+                       count(*) FILTER (WHERE d.cantidad_recibida < d.cantidad)
+                                                                          AS incompletas,
+                       count(DISTINCT oc.id)                              AS ordenes,
+                       count(DISTINCT oc.id) FILTER (WHERE d.cantidad_recibida < d.cantidad)
+                                                                          AS ordenes_afectadas,
+                       count(DISTINCT oc.proveedor_id)                    AS proveedores,
+                       COALESCE(SUM(d.cantidad), 0)                       AS pedidas,
+                       COALESCE(SUM(d.cantidad_recibida), 0)              AS recibidas,
+                       COALESCE(SUM(d.cantidad - d.cantidad_recibida), 0) AS faltantes,
+                       COALESCE(ROUND(SUM(d.cantidad_recibida) * 100.0
+                             / NULLIF(SUM(d.cantidad), 0), 2), 0)         AS pct,
+                       COALESCE(ROUND(SUM((d.cantidad - d.cantidad_recibida)
+                             * d.precio_unitario), 2), 0)                 AS valor
+                """ + from, args);
+
+        List<Map<String, Object>> kpis = new java.util.ArrayList<>(List.of(
+                kpi("Líneas incompletas", tot.get("incompletas"), "numero"),
+                kpi("Líneas en el alcance", tot.get("lineas"), "numero"),
+                kpi("Unidades no servidas", tot.get("faltantes"), "numero"),
+                kpi("Cumplimiento en unidades", tot.get("pct"), "porcentaje"),
+                kpi("Unidades pedidas", tot.get("pedidas"), "numero"),
+                kpi("Unidades recibidas", tot.get("recibidas"), "numero"),
+                kpi("Órdenes con alguna falta", tot.get("ordenes_afectadas"), "numero"),
+                kpi("Órdenes en el alcance", tot.get("ordenes"), "numero"),
+                kpi("Proveedores", tot.get("proveedores"), "numero")));
+        if (conDinero) {
+            kpis.add(kpi("Valor no servido", tot.get("valor"), "moneda"));
+        }
+        conResumen(res, kpis);
+        res.put("conValorizacion", conDinero);
+        return res;
     }
 }
