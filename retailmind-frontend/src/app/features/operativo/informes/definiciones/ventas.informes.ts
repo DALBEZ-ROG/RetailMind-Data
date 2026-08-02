@@ -30,6 +30,45 @@ import { ColorChip, DefinicionDepartamento } from '../../../../core/models/infor
 const CATEGORIAS = ['Abarrotes', 'Accesorios', 'Belleza', 'Calzado', 'Deportes',
   'Electrónica', 'Hogar', 'Ropa', 'Ropa Hombre', 'Ropa Mujer'];
 
+// ── OTD-VEN-19 · alerta de abandono (fase E3 del nivel estratégico) ────────
+
+/**
+ * Color del nivel de alerta. `sin_muestra` NO es «normal» y no puede pintarse
+ * como tal: es «el modelo no puede opinar», y son precisamente los clientes con
+ * más silencio los que caen ahí —su silencio es lo que los dejó sin pedidos en
+ * la ventana—. Va en gris y con su etiqueta explícita.
+ */
+function colorNivelAlerta(fila: Record<string, any>): ColorChip {
+  switch (fila['nivel_alerta']) {
+    case 'critica':     return 'error';
+    case 'atencion':    return 'warn';
+    case 'normal':      return 'ok';
+    default:            return 'neutral';
+  }
+}
+
+function etiquetaNivelAlerta(valor: any): string {
+  switch (valor) {
+    case 'critica':     return 'crítica';
+    case 'atencion':    return 'atención';
+    case 'normal':      return 'normal';
+    case 'sin_muestra': return 'sin muestra';
+    default:            return String(valor);
+  }
+}
+
+/**
+ * El silencio se lee EN INTERVALOS PROPIOS y no en días: 3 veces el ritmo
+ * habitual es el umbral de α = 0,05 (e⁻³ ≈ 5 %), sea el ritmo semanal o
+ * trimestral.
+ */
+function colorSilencio(fila: Record<string, any>): ColorChip {
+  if (Number(fila['pedidos_ventana']) < 3) { return 'neutral'; }
+  const veces = Number(fila['silencio_en_intervalos']);
+  if (veces >= 3) { return 'error'; }
+  return veces >= 2.3 ? 'warn' : 'ok';
+}
+
 /** Color de la píldora de estado del pedido, por etapa del ciclo. */
 function colorEstadoPedido(fila: Record<string, any>): ColorChip {
   switch (fila['estado_codigo']) {
@@ -659,6 +698,89 @@ export const INFORMES_VENTAS: DefinicionDepartamento = {
         { campo: 'pct_sobre_venta',    titulo: '% sobre la venta', tipo: 'porcentaje' },
         { campo: 'pct_reembolsado',    titulo: '% reembolsado',   tipo: 'porcentaje' },
         { campo: 'pct_pedidos',        titulo: '% de los pedidos', tipo: 'porcentaje' }
+      ]
+    },
+
+    // ── OTD-VEN-19 ── MODELO: fact_alerta_cliente (fase E3, §5.2) ─────
+    // El único informe del departamento servido por un MODELO y no por un
+    // hecho. Lleva monto: sin Bodega ni Despacho. El VENDEDOR entra y se
+    // recorta a SU cartera.
+    {
+      id: 'OTD-VEN-19',
+      endpoint: 'clientes-en-riesgo',
+      titulo: 'Clientes en riesgo',
+      descripcion: 'Clientes cuyo silencio es inusual PARA SU PROPIO RITMO de compra, '
+                 + 'ordenados por valor en riesgo. Lee primero las tres tarjetas del '
+                 + 'encabezado: son el lift medido del modelo, la muestra sobre la que '
+                 + 'se midió y si supera al azar. En esta base NO lo supera de forma '
+                 + 'significativa, y eso cambia cómo hay que usar la lista: sirve para '
+                 + 'priorizar una llamada, no para dar por perdido a un cliente.',
+      icono: 'person_alert',
+      roles: ['ADMIN', 'GERENTE', 'VENDEDOR'],
+      vacio: 'Ningún cliente cruza el umbral de alerta con los filtros elegidos. '
+           + 'Prueba con «Todos» para ver la cartera completa y su nivel.',
+      filtros: [
+        // Arranca en «alerta» a propósito: un informe de alerta que abre con los
+        // 69 clientes obliga a buscar la alerta dentro de la lista.
+        { param: 'nivel', etiqueta: 'Nivel', tipo: 'select', valorInicial: 'alerta',
+          ancho: 'ancho', opciones: [
+            { valor: 'alerta',      etiqueta: 'En alerta (crítica + atención)' },
+            { valor: 'critica',     etiqueta: 'Solo críticas (P < 5 %)' },
+            { valor: 'atencion',    etiqueta: 'Solo atención (5 % ≤ P < 10 %)' },
+            { valor: 'normal',      etiqueta: 'Solo normales' },
+            { valor: 'sin_muestra', etiqueta: 'Sin muestra para opinar (< 3 pedidos)' },
+            { valor: 'todos',       etiqueta: 'Todos los clientes' }
+          ] },
+        { param: 'buscar', etiqueta: 'Cliente o correo', tipo: 'texto',
+          debounce: true, ancho: 'ancho' }
+      ],
+      columnas: [
+        { campo: 'cliente',      titulo: 'Cliente',   tipo: 'texto', recortar: 26 },
+        { campo: 'facturacion_12m', titulo: 'Fact. 12m', tipo: 'moneda', monto: true },
+        // Regla 3: la lista se ordena por ESTO, no por probabilidad.
+        { campo: 'valor_en_riesgo', titulo: 'Valor en riesgo', tipo: 'moneda',
+          monto: true },
+        // Regla 1: la medida principal es «veces su intervalo propio». Va
+        // inmediatamente después del ritmo y de los días, que son lo que la
+        // hacen legible — «67 días» no dice nada sin el «cada 9».
+        { campo: 'intervalo_medio_dias', titulo: 'Su ritmo', tipo: 'texto',
+          etiqueta: (v, f) => Number(f['pedidos_ventana']) < 3
+            ? '—' : 'cada ' + Number(v).toLocaleString('es-EC',
+                { maximumFractionDigits: 1 }) + ' d' },
+        { campo: 'dias_silencio', titulo: 'Silencio', tipo: 'dias' },
+        { campo: 'silencio_en_intervalos', titulo: '= veces su ritmo', tipo: 'chip',
+          color: colorSilencio,
+          etiqueta: (v, f) => Number(f['pedidos_ventana']) < 3
+            ? 'sin ritmo' : Number(v).toLocaleString('es-EC',
+                { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '×' },
+        { campo: 'prob_pct', titulo: 'Probabilidad', tipo: 'texto',
+          etiqueta: (v, f) => Number(f['pedidos_ventana']) < 3
+            ? '—' : Number(v).toLocaleString('es-EC',
+                { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' %' },
+        { campo: 'nivel_alerta', titulo: 'Nivel', tipo: 'chip',
+          color: colorNivelAlerta, etiqueta: etiquetaNivelAlerta },
+        // Regla 2: el sparkline EN LA FILA.
+        { campo: 'compras_por_mes', titulo: 'Compras por mes', tipo: 'sparkline' },
+        // La MUESTRA que sostiene el ritmo de esta fila (limitación 5 de
+        // §5.2.10). Con menos de 5 pedidos el ritmo es una conjetura, y el
+        // color lo dice.
+        { campo: 'pedidos_ventana', titulo: 'Pedidos', tipo: 'chip',
+          color: f => Number(f['pedidos_ventana']) < 3 ? 'error'
+                    : Number(f['pedidos_ventana']) < 5 ? 'warn' : 'ok' },
+        { campo: 'ultima_compra', titulo: 'Última compra', tipo: 'texto' },
+        { campo: 'percentil_valor', titulo: 'Percentil de valor', tipo: 'porcentaje' },
+        // CONTEXTO, no entradas del modelo (§5.2.4). Se muestran para informar
+        // el gesto comercial: no es lo mismo llamar a quien se fue en silencio
+        // que a quien se fue con un reclamo abierto.
+        { campo: 'reclamos_abiertos', titulo: 'Reclamos abiertos', tipo: 'chip',
+          color: f => Number(f['reclamos_abiertos']) > 0 ? 'warn' : 'neutral' },
+        { campo: 'devoluciones_12m', titulo: 'Devoluciones 12m', tipo: 'chip',
+          color: f => Number(f['devoluciones_12m']) > 0 ? 'info' : 'neutral' },
+        { campo: 'ciudad',  titulo: 'Ciudad', tipo: 'texto' },
+        { campo: 'email',   titulo: 'Correo', tipo: 'texto', recortar: 24 },
+        { campo: 'activo',  titulo: 'Activo', tipo: 'chip',
+          color: f => Number(f['activo']) ? 'ok' : 'error',
+          etiqueta: v => Number(v) ? 'sí' : 'DADO DE BAJA' }
       ]
     }
   ]

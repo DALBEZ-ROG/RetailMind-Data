@@ -1,8 +1,9 @@
 # Correcciones al diseño del ETL — bitácora de supuestos que no se sostuvieron
 
-> Documento vivo. Acompaña a `DISENO_ETL_CLICKHOUSE.md` y lo **corrige**; no lo sustituye.
-> Última actualización: **2026-07-31** (Fase 5 — conexión de los informes de Compras. **Catálogo
-> táctico completo**).
+> Documento vivo. Acompaña a `DISENO_ETL_CLICKHOUSE.md` **y a
+> `DISENO_NIVEL_ESTRATEGICO.md`**, y los **corrige**; no los sustituye.
+> Última actualización: **2026-08-01** (Fase E3 — la **alerta de abandono de cliente**, el segundo
+> y último modelo del nivel estratégico y la tabla 21 del almacén).
 
 ---
 
@@ -22,7 +23,7 @@ como si fuera verdad. Esta bitácora cierra ese hueco.
 
 ### El patrón que se repite
 
-De los **33 supuestos fallidos** registrados, la mayoría comparte una forma:
+De los **57 supuestos fallidos** registrados, la mayoría comparte una forma:
 
 > El diseño afirma que una relación es **1:1** o que una columna **siempre está poblada**, y los
 > datos reales tienen un puñado de excepciones —dos, seis, ciento setenta y seis— que no rompen
@@ -84,6 +85,30 @@ están aquí rompían algo.
 | [C4.8](#c48-la-detección-del-ítem-defectuoso-no-precede-a-su-devolución) | 4 | `dias_hasta_resolucion` desde la detección (§5.14) | 🔴 **18 de 28 tramos NEGATIVOS** |
 | [C5.1](#c51-el-mes-del-gasto-de-compras-no-es-el-mes-de-la-orden) | 5 | `mes` sirve para agrupar COM-04 (§5.4) | 🔴 **$4,6 M cambian de mes, el total no** |
 | [C5.2](#c52-las-259-líneas-incompletas-son-tres-cosas-distintas) | 5 | 259 líneas con recepción menor a la pedida (catálogo §4) | 🔴 **el proveedor carga con lo que canceló Compras** |
+| [CE1.1](#ce11-el-embudo-del-recorrido-no-es-monótono-si-se-cuenta-el-hito-a-secas) | E1-A | El embudo se cuenta con `countIf(fecha_X IS NOT NULL)` (estratégico §4, T-1) | 🔴 **fuga del 26 % en la etapa equivocada** |
+| [CE1.2](#ce12-la-tasa-de-rechazo-del-cobro-en-línea-no-es-computable-el-intento-fallido-no-tiene-canal) | E1-A | «Tasa de rechazo del cobro **en línea**» (estratégico §4, T-1) | 🔴 **0 % de rechazo en los tres canales** |
+| [CE1.3](#ce13-las-dos-cifras-del-pareto-del-diseño-están-calculadas-sobre-los-pedidos-cancelados) | E1-A | 49,34 % / 68,76 % del top de clientes (estratégico §3.3) | 🟡 dos denominadores con el mismo nombre |
+| [CE1.4](#ce14-el-fan-out-de-c44-son-4-filas-no-3) | E1-A | El fan-out de C4.4 es 344 → 347 (estratégico §4, T-3) | 🟡 corrección de una corrección |
+| [CE1.5](#ce15-factura_venta_detallemonto_descuento-no-es-el-cupón-incluye-la-promoción) | E1-A | El campo de la factura ES la capa de cupón (estratégico §4, T-2) | 🟠 **la promoción contada dos veces** |
+| [CE1.6](#ce16-la-categoría-de-producto-no-se-puede-filtrar-a-grano-de-pedido) | E1-A | T-1 se filtra por categoría (estratégico §4, T-1) | 🟠 filtro mudo o importe mezclado |
+| [CE2.1](#ce21-dim_fecha-no-tiene-fecha_carga-y-todo-el-sistema-da-por-hecho-que-sí) | E1-B | Las 19 tablas llevan `fecha_carga` (ETL §6.2) | 🔴 **el tablero que vigila el dato no abre** |
+| [CE2.2](#ce22-preparación-en-los-tramos-del-ciclo-es-el-hito-preparado-no-en_preparacion) | E1-B | «preparación» = el estado `en_preparacion` | 🟡 nombre con dos lecturas, 15 pedidos |
+| [CE2.3](#ce23-el-embudo-del-retorno-al-almacén-termina-en-cero-y-no-es-un-fallo-del-dato) | E1-B | El retorno al almacén acaba en `fact_devolucion` (estratégico §4, T-4) | 🟠 **120 pedidos sin rastro posterior** |
+| [CE2.4](#ce24-sumar-filas_escritas-de-una-corrida-duplica-el-total) | E1-B | `etl_ejecucion` solo guarda tareas de tabla (estratégico §4, T-7) | 🔴 **el doble de filas y una alarma falsa** |
+| [CE3.1](#ce31-los-métodos-de-previsión-son-cuatro-y-no-tres) | E2 | `metodo` tiene tres valores (estratégico §5.1.7) | 🟡 dos categorías con una previsión inventada |
+| [CE3.2](#ce32-k--2-encoge-demasiado-y-suspende-el-criterio-de-aceptación-del-propio-diseño) | E2 | El encogimiento estacional es `k ≈ 2` (§5.1.3) | 🔴 **banda al 100 %: el modelo se rechaza a sí mismo** |
+| [CE3.3](#ce33-la-cobertura-medida-sobre-6-puntos-no-distingue-nada) | E2 | La cobertura se juzga sobre el backtest del total (§5.1.6) | 🔴 **criterio de rechazo sin poder de decisión** |
+| [CE3.4](#ce34-el-mes-truncado-no-sobrevive-a-la-publicación) | E2 | La tabla de §5.1.7 basta para la pantalla | 🟠 **un artefacto del corte leído como caída del negocio** |
+| [CE3.5](#ce35-la-banda-no-se-ensancha-siempre-y-exigirlo-aborta-la-carga) | E2 | «La banda se ensancha con el horizonte» (§5.1.9, regla 5) | 🟠 15 series abortan la publicación con razón |
+| [CE3.6](#ce36-el-informe-de-previsión-no-cabe-en-0-clases-java) | E2 | 0 clases Java nuevas (§5.1.8) | 🟡 dos copias del mismo modelo divergiendo |
+| [CE4.1](#ce41-la-ventana-estable-escrita-como-fecha-caduca-en-la-corrida-siguiente) | E3 | «la ventana desde enero de 2026» (§5.2.10) | 🔴 **la alerta se INVIERTE: el 2.º cliente sale como el más perdido** |
+| [CE4.2](#ce42-el-lift-no-se-divide-por-una-tasa-base-constante-y-un-origen-no-tiene-ninguna) | E3 | Lift = precisión@10 ÷ **9,4 %** (§5.2.6) | 🔴 **lift falso en dos de los tres orígenes** |
+| [CE4.3](#ce43-la-ventana-de-entrenamiento-del-backtest-tiene-que-rodar-con-el-origen) | E3 | «3 orígenes dentro de la ventana estable» (§5.2.6) | 🟠 se mide un estimador que nunca se publica |
+| [CE4.4](#ce44-el-lift-no-sale-10-sale-199--y-sin-su-valor-p-es-un-titular-falso) | E3 | «la expectativa razonable es lift ≈ 1,0» (§5.2.6) | 🔴 **un resultado del azar publicado como éxito** |
+| [CE4.5](#ce45-los-clientes-sin-muestra-son-los-candidatos-más-fuertes-y-el-modelo-los-expulsa) | E3 | λ se calcula sobre los clientes con historia (§5.2.3) | 🔴 **el que se fue de verdad no aparece jamás** |
+| [CE4.6](#ce46-el-recorte-del-vendedor-no-puede-hacerse-con-el-mismo-mecanismo-de-otd-ven-02) | E3 | «el mismo mecanismo de OTD-VEN-02» (§5.2.8) | 🟠 el almacén no tiene `vendedor_id` |
+| [CE4.7](#ce47-la-foto-fechada-no-acumula-historia--y-el-backtest-no-la-necesita) | E3 | Sin `fecha_calculo` el backtest no tiene contra qué medirse (§5.2.7) | 🟡 justificación falsa de una columna correcta |
+| [CE4.8](#ce48-las-dependencias-declaradas-no-producen-dos-columnas-que-la-propia-tabla-exige) | E3 | `depende_de = {fact_pedido, dim_cliente}` (§5.2.5) | 🟠 **dos columnas de contexto a cero, en silencio** |
 
 ---
 
@@ -1399,6 +1424,1004 @@ resultaron correctos:
                         saldo     $ 6.382.924,53
 Σ cuenta_por_pagar.saldo_pendiente $ 6.382.924,53      ← diferencia $0,00
 ```
+
+---
+
+# Fase E1-A — los tres primeros tableros de dirección
+
+> Primera fase del **nivel estratégico**. **No carga ni una fila**: monta T-1 (Omnicanal), T-2
+> (Rentabilidad y Rotación) y T-3 (Cliente y Posventa) sobre las 19 tablas ya validadas.
+>
+> A partir de aquí la bitácora corrige **dos** documentos: `DISENO_ETL_CLICKHOUSE.md` y
+> `DISENO_NIVEL_ESTRATEGICO.md`. Cada entrada dice cuál.
+>
+> El patrón cambia de forma en este nivel y conviene decirlo. En las fases de carga el supuesto
+> fallido era casi siempre **una columna que responde otra pregunta**. Aquí aparece uno nuevo:
+> **una cifra correcta calculada sobre una población distinta de la que el lector supone**. No hay
+> JOIN que multiplique ni suma que no cuadre — hay un denominador que nadie escribió.
+
+## CE1.1 · El embudo del recorrido NO es monótono si se cuenta el hito a secas
+
+| | |
+|---|---|
+| **Fase** | E1-A (T-1, elemento «Embudo del recorrido») |
+| **El diseño decía** | `DISENO_NIVEL_ESTRATEGICO.md` §4, T-1: «Embudo de 5 pasos · `fact_pedido` · `countIf(fecha_pagado IS NOT NULL)`, **etc.**». El «etc.» es la trampa: invita a repetir el mismo patrón con `fecha_facturado`, `fecha_despachado` y `fecha_entregado`. |
+
+**La realidad.** Contando la marca de tiempo de cada hito, los pasos NO decrecen:
+
+```
+creados ............................................ 4.083
+con fecha_pagado ................................... 3.906
+con fecha_facturado ................................ 3.872
+con fecha_despachado ............................... 2.868   ← se hunde
+con fecha_entregado ................................ 3.696   ← y se recupera
+   pedidos ENTREGADOS sin marca de despacho ..........  969
+```
+
+**969 pedidos llegaron a entregarse sin que nadie registrara la hora del despacho.** No es un dato
+nuevo —la Fase 2 ya lo midió para OTD-LOG-12, que declara `pedidos_medidos` distinto en cada
+etapa— pero allí producía un promedio sobre menos casos, y aquí produce **una fuga que no existe**.
+
+Dibujado tal cual, el embudo enseña una caída del **26 %** en el despacho (2.868 sobre 3.872) que
+se «recupera» sola en la entrega. Un embudo cuyo cuarto escalón es más estrecho que el quinto no
+es un embudo: es una figura imposible que un ojo entrenado leería como el cuello de botella.
+
+**Cómo se resolvió.** Cada paso cuenta a los pedidos que alcanzaron **ese hito o cualquiera
+posterior**: un pedido entregado pasó por el despacho aunque nadie apuntara la hora. La serie sí
+decrece, y el bloque lo DECLARA en su salvedad con el número de registros incompletos:
+
+```
+Pedido creado 4.083 → Cobrado 3.907 → Facturado 3.884 → Despachado 3.837 → Entregado 3.696
+```
+
+Lo que el registro incompleto sí impide es medir el **tiempo** de esa etapa, y eso se sigue
+haciendo aparte con su propio denominador. `validar_tableros.py` comprueba la monotonía como un
+control más: si un paso sube respecto del anterior, la verificación falla.
+
+**Qué habría roto.** D-06.2 es literalmente «cuál de los tres puntos de caída se ataca este
+trimestre». Con el embudo de hitos, la respuesta sería «el despacho», que es la etapa donde el
+problema no está: no se pierden 1.004 pedidos ahí, se pierden **47**. La inversión iría a reforzar
+una operación que funciona mientras la fuga real —los 176 del primer escalón, de los que 159 son
+cancelaciones— sigue intacta. Es la misma clase de error que C2.7, un nivel más arriba: allí
+falseaba un promedio, aquí falsea la forma del embudo.
+
+---
+
+## CE1.2 · La «tasa de rechazo del cobro EN LÍNEA» no es computable: el intento fallido no tiene canal
+
+| | |
+|---|---|
+| **Fase** | E1-A (T-1, KPI de cabecera) |
+| **El diseño decía** | `DISENO_NIVEL_ESTRATEGICO.md` §4, T-1, KPI: «venta del período · ticket medio · % de la venta por web · **tasa de rechazo del cobro en línea** · clientes omnicanales». Y §3.1, D-06.3, da por sentado que `fact_flujo_caja` «ya trae los 176 intentos fallidos con su motivo normalizado» — lo cual es cierto, pero no dice nada del canal. |
+
+**La realidad.** El canal de un cobro **no es una columna de `pago`**: sale del PEDIDO
+(`COALESCE(p.canal, '')` en el extractor). Y un intento rechazado no tiene pedido:
+
+```
+intentos de cobro fallidos ......................... 176
+  sin pedido_id .................................... 176   (el 100 %)
+  y por tanto sin canal ........................... 176   (el 100 %)
+```
+
+Es la **misma causa** que C2.1 ya registró para la fecha —el intento se anota antes de que el
+pedido exista— aplicada a otra columna. La consecuencia, en cambio, es peor: una fecha ausente
+vacía un informe y se nota; un canal ausente produce **una tasa de rechazo del 0,00 % en los tres
+canales**, que es una cifra perfectamente plausible y perfectamente falsa.
+
+**Cómo se resolvió.** El KPI publica la tasa **global** —176 sobre 4.079 intentos, **4,31 %**— y
+su nota dice por qué no está partida por canal. Además, el **filtro de canal del tablero no se
+aplica al bloque de cobros rechazados**, y el bloque lo declara: aplicándolo, los 176 se irían al
+suelo y la lectura sería «en este canal no hay rechazos».
+
+**Qué habría roto.** D-06.3 decide «qué medios de cobro se ofrecen, se retiran o se renegocian».
+Con la tasa por canal, la tienda en línea —el canal que concentra el 53,87 % de la venta y **el
+100 % de los rechazos reales**, porque los tres canales internos cobran contra un pedido ya
+creado— aparecería con cero rechazos. La conclusión sería que la pasarela funciona perfectamente y
+que no hay nada que renegociar.
+
+---
+
+## CE1.3 · Las dos cifras del Pareto del diseño están calculadas sobre los pedidos CANCELADOS
+
+| | |
+|---|---|
+| **Fase** | E1-A (T-3, curva de valor del cliente) |
+| **El diseño decía** | `DISENO_NIVEL_ESTRATEGICO.md` §3.3: «el top 10 % de clientes (7 de 69) pone el **49,34 %** del ingreso y el top 20 % (14) el **68,76 %**». La misma sección §1 usa como cifra de venta $5.716.436,55 en unos sitios y $5.498.570,35 en otros. |
+
+**La realidad.** Las dos cifras salen de sumar **todos** los pedidos, cancelados incluidos. Sobre
+la base que el propio tablero usa —y que el diseño declara correcta en todas partes: los
+cancelados miden intención, no venta— dan otra cosa:
+
+```
+base                        clientes   ingreso        top 7      top 14
+todos los pedidos              69     $5.716.436,55   49,34 %    68,76 %   ← las cifras del diseño
+solo los NO cancelados         69     $5.498.570,35   49,05 %    68,69 %   ← lo que publica T-3
+```
+
+La diferencia es de **0,29 y 0,07 puntos**: irrelevante para la conclusión de negocio, y
+exactamente por eso peligrosa. Nadie la habría notado, y el documento habría quedado con dos
+denominadores conviviendo bajo el mismo nombre —«el ingreso»— a tres párrafos de distancia.
+
+**Cómo se resolvió.** T-3 excluye los cancelados en TODO el tablero, el KPI publica **68,69 %** y
+su nota escribe el numerador, el denominador y el número de clientes que entran en el corte.
+`validar_tableros.py` recalcula el corte igual que el tablero (`ceil(0,2 × n)`) y compara.
+
+**Qué habría roto.** Nada por sí sola: la decisión D-08.2 —dónde se pone el corte de cliente
+preferente— no cambia por siete centésimas. Lo que rompe es **la confianza en el propio
+documento**: si dos cifras del mismo párrafo usan bases distintas sin decirlo, ninguna otra cifra
+del documento se puede usar sin volver a medirla. Se registra por eso, y no por su magnitud.
+
+---
+
+## CE1.4 · El fan-out de C4.4 son 4 filas, no 3
+
+| | |
+|---|---|
+| **Fase** | E1-A (T-3, calificación por producto) |
+| **El diseño decía** | `DISENO_NIVEL_ESTRATEGICO.md` §4, T-3: «⚠️ **JAMÁS unir a `dim_producto`** (C4.4): la dimensión es por variante y multiplicaría **344 → 347** sin error». |
+
+**La realidad.** La advertencia es correcta; la cifra no. Medido hoy:
+
+```
+reseñas en la tabla ............................ 344
+tras unir a la dimensión por producto_id ....... 348   (+4)
+productos con más de una variante ...............  7   (5 con dos, 2 con tres)
+```
+
+`5 × 1 + 2 × 2 = 9` variantes sobrantes; caen 4 reseñas sobre productos de ese grupo, de ahí el +4.
+
+**Cómo se resolvió.** El bloque se sirve **solo** de `fact_resena`, que ya denormaliza nombre,
+categoría y marca precisamente para que este JOIN no haga falta. `validar_tableros.py` mide las
+dos cifras y publica la distancia en la salida, para que la próxima vez no haya que redescubrirla.
+
+**Qué habría roto.** Lo mismo que C4.4 anunció —el ranking de calificación y su nota media—, y por
+eso no es una corrección nueva sino una **corrección de la corrección**. Se registra porque una
+bitácora cuyo cometido es evitar que se repita un error no puede llevar dentro un número
+equivocado: el que compare 344 con 347 dará por buena una diferencia de una fila.
+
+---
+
+## CE1.5 · `factura_venta_detalle.monto_descuento` NO es el cupón: incluye la promoción
+
+| | |
+|---|---|
+| **Fase** | E1-A (T-2, descuento entregado) |
+| **El diseño decía** | `DISENO_NIVEL_ESTRATEGICO.md` §4, T-2: «Descuento entregado por mes y categoría · `fact_venta_linea` · `descuento_promocion` + `descuento_cupon_prorrateado`», presentándolas como «dos capas» independientes. Y §5.1 del diseño del ETL habla del cupón «prorrateado en `factura_venta_detalle.monto_descuento`». |
+
+**La realidad.** El descuento de la línea de FACTURA es el descuento **total** de esa línea —la
+promoción ya está dentro—, y el cupón prorrateado se obtiene **despejándolo**:
+
+```
+cupon = GREATEST(factura_venta_detalle.monto_descuento − pedido_detalle.monto_descuento, 0)
+```
+
+Tomando el campo de la factura tal cual como «capa de cupón», la promoción se cuenta **dos veces**:
+
+```
+capa de promoción ..................................  $5.384,09
+capa de cupón, despejada ........................... $50.332,99   ← correcto
+capa de cupón, leyendo el campo a secas ............ $55.717,08   ← +$5.384,09
+descuento entregado total .......................... $55.720,57  vs  $61.104,66  (+9,66 %)
+```
+
+Y la venta neta cae en la misma cantidad, porque se resta un descuento que no existe.
+
+**Cómo se resolvió.** El tablero **no toca la factura**: lee `fact_venta_linea`, donde el ETL ya
+hizo el despeje. La entrada se registra porque **el error lo cometió la verificación**: la primera
+versión de `validar_tableros.py` reprodujo la fórmula «obvia» y acusó al tablero de una diferencia
+de $5.384,09 que era del propio control. Un verificador equivocado es peor que no tenerlo —habría
+llevado a «corregir» un tablero correcto—, y por eso su fórmula lleva ahora el despeje comentado.
+
+**Qué habría roto.** D-07.3 fija el techo de descuento del trimestre. Con las dos capas mal
+separadas, el cupón parecería un **9,7 %** más caro de lo que es y la promoción, invisible dentro
+de él: se recortaría la palanca equivocada. Y como el descuento arrastra su IVA —el total cae
+1,15× lo descontado—, el efecto de recortar la palanca que no era tarda un trimestre en verse.
+
+---
+
+## CE1.6 · La categoría de producto no se puede filtrar a grano de pedido
+
+| | |
+|---|---|
+| **Fase** | E1-A (T-1, filtros) |
+| **El diseño decía** | `DISENO_NIVEL_ESTRATEGICO.md` §4, T-1: «**Filtros**: rango de meses · canal · **categoría**», sobre un tablero cuyos seis elementos salen de `fact_pedido` y `fact_flujo_caja`. |
+
+**La realidad.** Ninguna de las dos tablas tiene categoría, y no puede tenerla: la categoría es un
+atributo de la **línea**, y un pedido mezcla varias. Las dos salidas ingenuas fallan de formas
+distintas:
+
+- **Ignorar el filtro**: la pantalla ofrece un campo que no hace nada. Al escribir «Belleza» las
+  cifras no cambian y se leen como «Belleza es todo el negocio».
+- **Aplicarlo con un semi-join y sumar el pedido entero**: el pedido entra completo, con las demás
+  categorías dentro, y la «venta de Belleza» incluye lo que no es Belleza.
+
+**Cómo se resolvió.** Se aplica el semi-join —un pedido entra si contiene **al menos una línea** de
+esa categoría— y el tablero **declara la consecuencia en una salvedad que solo aparece cuando el
+filtro está puesto**: «el pedido entra ENTERO y sus importes incluyen las demás categorías; para el
+reparto exacto por categoría, T-2 mide a grano de línea». Un embudo no admite medias unidades: un
+pedido está en el paso o no está, y por eso la alternativa de repartir proporcionalmente ni siquiera
+existe aquí.
+
+**Qué habría roto.** D-06.1 reparte capacidad —personal de mostrador, líneas de teléfono— entre
+canales. Filtrado por una categoría pequeña, el importe arrastrado de las demás categorías del
+mismo pedido infla su peso, y un canal que vende esa categoría junto a otras parece
+desproporcionadamente fuerte en ella. La salvedad convierte un dato engañoso en un dato acotado.
+
+---
+
+### Reincidencias declaradas, sin número propio
+
+**C3B.5 (`lagInFrame` rellena con el DEFECTO del tipo, no con NULL) vuelve en T-2.** La serie de
+capital inmovilizado necesita la variación mes a mes, y con la comprobación «hay valor anterior si
+`anterior != 0`» el primer mes publicaría su capital entero como una subida del +100 %. La frontera
+se marca con `row_number() > 1`, igual que en COM-12, y `validar_tableros.py` comprueba
+explícitamente que el primer mes llega con la variación **NULA**.
+
+**El alias de agregado con el nombre de su columna (Fase 1) reincidió SEIS veces en una sola
+tarde.** `sum(monto) AS monto`, `sum(venta_neta) AS venta_neta`, `sum(descuento_total) AS
+descuento_total`, `sum(unidades_reingresadas) AS unidades_reingresadas` y `any(corte) AS corte`
+producen todos `ILLEGAL_AGGREGATION` en cuanto una ventana o un porcentaje vuelven a nombrar la
+columna: ClickHouse sustituye el alias por su definición y anida el agregado. La regla operativa,
+ya sin excepciones, es **prefijar `t_` todo alias de agregado y reponer el nombre del contrato en
+el SELECT exterior**. No llega a corrección porque revienta con un error explícito y en la primera
+petición: es ruidoso, que es justo lo contrario de lo que esta bitácora persigue.
+
+**`devolucion_detalle` no guarda la variante.** Se llega a ella por `pedido_detalle`. Es una nota
+de implementación y no una corrección —el JOIN inexistente da un error de columna, no una cifra
+equivocada—, pero se apunta porque el cruce «producto que reclama y devuelve» de T-3 y cualquier
+verificación de devoluciones por producto tienen que pasar por ahí.
+
+**`24:00:00` es una hora válida en PostgreSQL y psycopg2 la convierte a `00:00` en silencio.**
+No afecta a ningún tablero —no toca el almacén—, pero mordió a la prueba de la matriz rol ×
+tablero y merece quedar escrito. La cobertura 24/7 del rol SOPORTE está declarada así:
+
+```
+grupo_horario id 64 · grp_soporte · sábado · 00:00:00 → 24:00:00
+```
+
+`datetime.time` de Python no puede representar las 24:00, así que el driver la entrega como
+`00:00`. El script ensanchaba la ventana horaria para poder probar a GERENTE y ANALISTA un sábado
+por la tarde y la restauraba en un `finally`; al devolver el valor leído, `00:00 → 00:00` violó el
+`CHECK (hora_inicio < hora_fin)` y **la restauración reventó A MITAD**, con seis filas ya devueltas
+y la séptima abierta. El fallo fue ruidoso, se detectó y se corrigió a mano en el momento — pero el
+patrón es el de siempre: *leer un valor y volver a escribirlo* parece una operación neutra y no lo
+es cuando el driver no puede representar el valor. Las horas se leen y se escriben con `::text` en
+los dos sentidos, y la restauración se **verifica releyendo** antes de darla por buena.
+
+---
+
+# Fase E1-B — los cuatro tableros de dirección restantes
+
+> Cierra el nivel estratégico de tablero: **T-4 Operación y Última Milla**, **T-5 Costo de la
+> Operación**, **T-6 Abastecimiento** y **T-7 Gobierno del Dato**. Con los tres de E1-A son
+> **7 tableros y las 19 decisiones de dashboard**. **No carga ni una fila** y **no crea ninguna
+> tabla**: las 19 del almacén bastaron, como el diseño anticipó.
+>
+> Aparecen cuatro supuestos fallidos y los cuatro son del mismo tipo nuevo que estrenó E1-A: **una
+> cifra correcta calculada sobre una población distinta de la que el lector supone**, o **un
+> nombre que significa otra cosa**. Ninguno rompe un JOIN. Dos de ellos —CE2.2 y CE2.4— los cazó
+> la verificación y no el código, que es exactamente para lo que existe.
+
+## CE2.1 · `dim_fecha` no tiene `fecha_carga`, y todo el sistema da por hecho que sí
+
+| | |
+|---|---|
+| **Fase** | E1-B (T-7, antigüedad del dato) |
+| **El diseño decía** | `DISENO_ETL_CLICKHOUSE.md` §6.2 establece `fecha_carga` como columna de control de TODAS las tablas del modelo, y el nivel estratégico se apoya en ello sin excepción: la marca de agua «Datos al …» de los siete tableros sale de un `max(fecha_carga)`, y `DISENO_NIVEL_ESTRATEGICO.md` §4 pide para T-7 «antigüedad del dato · `etl_ejecucion` + **`fecha_carga` de cada tabla**». |
+
+**La realidad.** De las 19 tablas del modelo, **18 llevan el sello y una no**:
+
+```
+tablas del modelo ....................................... 19
+  con fecha_carga ....................................... 18
+  SIN fecha_carga ....................................... 1   ← dim_fecha
+```
+
+`dim_fecha` es el calendario y se **GENERA dentro de ClickHouse** con `numbers()`: nunca consulta
+PostgreSQL, así que no hay carga que sellar. La consecuencia no es un nulo — es un error duro:
+
+```
+Code: 47. DB::Exception: Unknown expression or function identifier `fecha_carga`
+in scope SELECT 'dim_fecha' AS tabla, max(fecha_carga) ... (UNKNOWN_IDENTIFIER)
+```
+
+**Cómo se resolvió.** El cálculo de frescura corre sobre las **18 con sello** y el calendario se
+publica igualmente en la lista, con su casilla de antigüedad **vacía** y marcado como generado en
+el almacén. No se omite: una lista de 18 tablas en el tablero que existe para vigilar las 19
+invitaría a preguntarse cuál falta y por qué. Y la marca de agua conjunta —el `min` de los `max`—
+también excluye el calendario, que no puede quedarse rezagado.
+
+**Qué habría roto.** T-7 entero, y de la peor manera para lo que ese tablero es: la consulta
+revienta, el servicio la propaga como 500 —correctamente, porque no es una caída de la analítica—
+y el **tablero cuyo trabajo es avisar de que el dato no es confiable se queda sin responder**. La
+única pantalla que puede detectar una carga fallida no se abre. Los otros seis tableros no lo
+notaron porque su marca de agua nombra solo las tablas que ellos leen, y ninguno lee el
+calendario.
+
+---
+
+## CE2.2 · «Preparación» en los tramos del ciclo es el hito `preparado`, no `en_preparacion`
+
+| | |
+|---|---|
+| **El diseño decía** | `DISENO_NIVEL_ESTRATEGICO.md` §4, T-4: «Tiempo por etapa del ciclo · `fact_pedido` · **Los 4 tramos** · cada fila declara `pedidos_medidos` (2.868 / 2.856 / 2.727 / 3.696)». Las columnas se llaman `horas_pago_a_preparacion` y `horas_preparacion_a_despacho`, y el ciclo del pedido tiene un estado llamado literalmente `en_preparacion`. |
+
+**La realidad.** «Preparación» en esos dos nombres significa el hito **`'preparado'`** —picking
+TERMINADO— y no `'en_preparacion'` —picking EMPEZADO—. Son dos hitos distintos y no coinciden:
+
+```
+pedidos con hito 'en_preparacion' y cobro .............. 2.883
+pedidos con hito 'preparado'     y cobro .............. 2.868   ← el del tramo
+                                                          −15
+```
+
+La elección es correcta y está razonada en el ETL: con `preparado`, cada tramo empieza exactamente
+donde acaba el anterior y los tres cubren el ciclo sin huecos ni solapes. Lo que falla es el
+NOMBRE, que admite las dos lecturas.
+
+**Cómo se resolvió.** Las etiquetas del tablero dejan de decir «preparación»: ahora son **«Del
+cobro al picking terminado»** y **«Del picking terminado al despacho»**, y la salvedad del bloque
+lo escribe con las dos cifras. El nombre de la columna del almacén no se toca —está cargado y
+validado— pero la pantalla ya no hereda su ambigüedad.
+
+**Qué habría roto.** Nada visible, y por eso está aquí: 15 pedidos sobre 2.868 mueven el promedio
+del tramo en la tercera cifra decimal. Lo que sí rompió fue **la verificación**: el control de
+`validar_tableros.py` replicó el tramo con `en_preparacion` —la lectura natural del nombre— y
+acusó al tablero de una diferencia de 15 pedidos que era del propio control. Es la segunda vez que
+pasa (CE1.5 fue la primera): cuando un verificador independiente y el código difieren, lo primero
+que hay que preguntarse es cuál de los dos entendió mal el nombre.
+
+---
+
+## CE2.3 · El embudo del retorno al almacén termina en CERO, y no es un fallo del dato
+
+| | |
+|---|---|
+| **El diseño decía** | `DISENO_NIVEL_ESTRATEGICO.md` §4, T-4: «Devoluciones al almacén por incidencia · **Embudo** · `fact_novedad_envio` **+ `fact_devolucion`** · Directa». Nombrar las dos tablas da por hecho que la mercancía devuelta al almacén acaba en una devolución registrada. |
+
+**La realidad.** No hay ni una:
+
+```
+envíos despachados ................................... 2.872
+con alguna incidencia de entrega ......................  173
+devueltos al almacén ..................................  120
+pedidos que quedaron sin entregar .....................  120
+   con una devolución registrada después ..............    0   ← el JOIN da cero
+```
+
+Y es coherente con cómo está construido el sistema: devolver al almacén **no reingresa stock** —el
+kardex solo se mueve tras la inspección de bodega, criterio heredado del RMA— y el reembolso queda
+pendiente de soporte. O sea que **la mercancía de 120 pedidos volvió físicamente y no existe en
+ningún registro posterior**: ni está disponible para vender, ni consta que se haya devuelto el
+dinero al cliente.
+
+**Cómo se resolvió.** El paso se publica **con su cero** y con una nota que explica qué significa,
+en vez de omitirse por estar vacío. La salvedad del bloque lo dice entero. El embudo se verifica
+además como monótono, igual que el de T-1 (CE1.1).
+
+**Qué habría roto.** Las dos salidas alternativas eran peores que el cero. Omitir el paso —lo
+natural cuando un JOIN no devuelve nada— habría dejado un embudo de cuatro escalones que termina
+en «120 pedidos sin entregar» y se lee como un final ordenado. Publicarlo sin nota habría dado un
+cero mudo, que en un tablero se lee como «aquí no pasa nada». **La brecha ES el hallazgo**: es
+exactamente lo que D-09.4 —dónde se ataca la pérdida física— tiene que ver, y el diseño la había
+supuesto cubierta.
+
+---
+
+## CE2.4 · Sumar `filas_escritas` de una corrida DUPLICA el total
+
+| | |
+|---|---|
+| **El diseño decía** | `DISENO_NIVEL_ESTRATEGICO.md` §4, T-7: «Salud de la última corrida del ETL · **Semáforo por tabla + histórico** · `etl_ejecucion` · **Estado, filas, excepciones y duración por tarea**» y el KPI «**tablas publicadas en la última corrida**». La lectura obvia es agrupar por tarea y sumar. |
+
+**La realidad.** `etl_ejecucion` no guarda solo tablas. Tiene **dos pseudo-tareas**:
+
+- **`corrida`** es el sobre de la ejecución entera, escribe **DOS filas** —una `en_curso` al
+  empezar y otra `exito` al acabar— y su `filas_escritas` es **la suma de todas las tablas**;
+- **`validar_dwh`** es la puerta de control, y sus «filas» son los 44 controles, no datos.
+
+De ahí que la suma ingenua salga **exactamente al doble**:
+
+```
+suma de las 19 tablas del modelo ................. 64.085
++ fila «corrida», que repite ese mismo total ..... 64.085
++ fila «validar_dwh» (44 controles) ..............     44
+                                                   ───────
+suma ingenua ..................................... 128.214
+```
+
+**Cómo se resolvió.** Todos los agregados excluyen `corrida` y `validar_dwh`, y el estado de cada
+tarea se colapsa con `argMax(…, inicio)` para quedarse con el ÚLTIMO. El bloque marca cada fila con
+su tipo —tabla, control o corrida— para que las tres se vean sin mezclarse en ningún conteo.
+`validar_tableros.py` comprueba que el KPI de filas coincide con la suma de las TABLAS y que la
+fila `corrida` no se quedó en `en_curso`.
+
+**Qué habría roto.** Dos cosas, y las dos en el tablero cuyo único trabajo es decir si el dato es
+fiable. **La primera**: el KPI «filas publicadas» habría dicho 128.214 donde hay 64.085 — una
+cifra perfectamente plausible que nadie mira dos veces, y que además es el DOBLE. **La segunda es
+peor**: listadas en crudo, la tarea `corrida` aparece dos veces, una de ellas eternamente
+`en_curso` junto a la misma tarea ya terminada. Una alarma falsa permanente en el semáforo entrena
+a la dirección a ignorarlo, y a partir de ahí la alarma verdadera tampoco se ve.
+
+---
+
+### Reincidencias declaradas, sin número propio
+
+**El alias de agregado con el nombre de su columna volvió a aparecer OCHO veces**, en los cuatro
+tableros: `sum(costo) AS costo`, `countIf(sin_tarifa = 1) AS sin_tarifa`,
+`countIf(a_tiempo = 1) AS a_tiempo`, `min(inicio) AS inicio`,
+`sumIf(excepciones, …) AS excepciones` y `sumIf(filas, …) AS filas`. Con E1-A van **catorce**. La
+regla ya no admite excepciones: **todo alias de agregado lleva prefijo `t_` y el nombre del
+contrato se repone en el SELECT exterior**. Y hay una variante nueva que conviene nombrar aparte,
+porque el arreglo intuitivo es justo el equivocado: en `argMax(resultado, inicio)` el segundo
+argumento tiene que ser la **columna cruda**, no el alias del `min(inicio)` del mismo nivel —
+renombrar el alias no basta, hay que dejar de usarlo ahí dentro. No llega a corrección porque
+revienta con un error explícito en la primera petición: es ruidoso, que es lo contrario de lo que
+esta bitácora persigue.
+
+**C3C.3 (la lista blanca sale de los DATOS) se aplicó por adelantado y se comprobó.** Los
+desenlaces de la incidencia de entrega son `reprogramada`, `devuelto_almacen` y `sin_resolver` —los
+participios, no los verbos del API que declara el diseño— y los orígenes del ítem defectuoso son
+`rma` y `recepcion`, no `inspeccion_rma`/`recepcion_compra`. Ninguno de los dos bloques enumera
+nada: agrupan y dejan que los valores aparezcan. La verificación compara además el conjunto
+publicado contra el `SELECT DISTINCT` de la base, de modo que un valor nuevo se ve en vez de
+desaparecer.
+
+---
+
+# Fase E2 — la previsión de demanda
+
+> El primer modelo del nivel estratégico: `fact_prevision_demanda`, la tabla **20** del almacén y
+> la primera que contiene filas con **fecha futura**. Descomposición estacional con factores
+> encogidos, ajustada a nivel de total y de categoría, y desagregada a la variante por cuota.
+>
+> Los seis supuestos fallidos de esta fase son de un tipo que no había aparecido antes. Hasta
+> ahora el diseño se equivocaba sobre **los datos** —una relación 1:1 que no lo era, un enum cuyos
+> valores eran otros—. Aquí se equivoca sobre **su propio método**: dos de sus decisiones
+> metodológicas (el encogimiento y el criterio de cobertura) se contradicen entre sí, y aplicarlas
+> juntas hace que el modelo suspenda su propio examen. Eso solo se ve ejecutándolo.
+>
+> Los seis se detectaron **durante la implementación**, cuatro de ellos por una validación que
+> abortó la publicación. Ninguno llegó a la pantalla.
+
+## CE3.1 · Los métodos de previsión son CUATRO y no tres
+
+| | |
+|---|---|
+| **Fase** | E2 (`fact_prevision_demanda`, columna `metodo`) |
+| **El diseño decía** | §5.1.7: «`metodo` · `LowCardinality(String)` · `descomposicion` / `linea_base_estacional` / `top_down_categoria`». Tres valores, cerrados. |
+
+**La realidad.** El propio §5.1.1 clasifica dos categorías como **ruido** y dice que «se excluyen o
+se agrupan»: Ropa Mujer (**9 meses con venta / 28 uds** / CV 1,358) y Ropa Hombre (**1 mes / 5
+uds**). Pero las dos **existen como categoría** y aparecen en el filtro de la pantalla, así que la
+tabla tiene que decir algo sobre ellas. Con los tres métodos del diseño, las únicas salidas eran
+publicar una `descomposicion` sobre 9 puntos —o sobre 1— con su banda, o hacerlas desaparecer.
+
+Y el mockup del propio §5.1.9 ya dibujaba la respuesta correcta sin darle nombre:
+
+```
+│ Ropa Mujer          2     [ — ]                 9        —    sin prev. │
+```
+
+**Cómo se resolvió.** Cuarto valor, `sin_prevision`: previsión y banda a cero, `mape` a cero,
+`meses_historia` con su cifra real (9 y 1) y la pantalla escribiendo «sin previsión individual».
+La lista blanca de la validación enumera los cuatro y aborta si aparece un quinto.
+
+**Qué habría roto.** D-11.1 es el plan de compra. Una categoría con **28 unidades en 19 meses** y
+una previsión con banda al lado de Abarrotes —**4.665 uds**— se lee como una serie más, con la
+misma autoridad visual. Hacerla desaparecer es igual de malo por el motivo simétrico: quien filtra
+por Ropa Mujer y no ve nada concluye que el filtro está roto, no que la categoría no es
+previsible.
+
+---
+
+## CE3.2 · `k = 2` encoge demasiado, y suspende el criterio de aceptación del propio diseño
+
+| | |
+|---|---|
+| **Fase** | E2 (`modelos/prevision_demanda.py`, factores estacionales) |
+| **El diseño decía** | §5.1.3: «factor_mes · ratio a la media móvil centrada, ENCOGIDO: `f̂ = (n·f + k)/(n + k)` con n = observaciones de ese mes (1 o 2) y **k ≈ 2**». |
+
+**La realidad.** Es la corrección más importante de la fase, porque con `k = 2` **el modelo no se
+puede publicar**, y no por poco.
+
+Con n(m) = 1 —los cinco meses de agosto a diciembre—, `k = 2` deja al dato **un tercio** del peso.
+Medido contra el generador del seed (`60_seed_bloque_b_ventas.sql` línea 63, normalizado a media 1):
+
+| Mes | Generador | `k = 2` | `k` estimado |
+|---|---|---|---|
+| Enero | 0,717 | 0,864 | **0,634** |
+| Mayo | 1,195 | 1,152 | **1,325** |
+| Diciembre | **1,482** | 1,075 | **1,482** |
+
+Con `k = 2` el diciembre del modelo es **1,075 donde la verdad es 1,482**: la estacionalidad
+prácticamente ha desaparecido. Y esto no se queda en el factor. Un modelo sesgado deja residuos
+grandes, y la banda se calcula desde ellos:
+
+```
+                        k = 2 fijo        k estimado
+σ relativo                 0,214             0,118
+banda del primer mes       ±41 %             ±23 %
+COBERTURA medida          100,0 %            87,6 %
+MAPE total (crudo)         11,48 %            8,78 %
+```
+
+**La cobertura del 100 % SUSPENDE el criterio de rechazo n.º 3 de §5.1.6**, que exige entre 65 % y
+90 % y dice, con razón, que «un intervalo que acierta el 100 % es tan malo como uno que acierta el
+40 %: el primero es inútilmente ancho». Es decir: **aplicando §5.1.3 al pie de la letra, §5.1.6
+rechaza el resultado.** Las dos secciones del diseño se contradicen y solo ejecutándolas se ve.
+
+**Cómo se resolvió.** La fuerza del encogimiento **se estima de los datos** en vez de fijarla. El
+peso óptimo de un encogimiento hacia la media es conocido (Stein / Bayes empírico) y equivale
+exactamente a la fórmula del diseño con `k = σ²/τ²`:
+
+- **σ²** — varianza del RUIDO de una razón, estimada DENTRO de cada mes del calendario con los seis
+  meses que se repiten;
+- **τ²** — varianza REAL entre los doce factores, descontando la parte que ya explica el ruido.
+
+Sobre esta serie sale **k = 0,175**, recortado al suelo declarado de **0,25**. O sea: los datos
+piden **menos** encogimiento del que el suelo permite, y el suelo se conserva a propósito como la
+cautela que §5.1.3 pretendía — un mes visto una sola vez nunca entra crudo. El error medio absoluto
+de los doce factores contra el generador queda en **0,048**.
+
+Cuando no hay estacionalidad por encima del ruido, τ² tiende a cero, k se dispara al techo y todos
+los factores acaban en 1 — que es la respuesta correcta. Ocurre de hecho con Ropa Mujer (k = 20).
+
+> **Y hay un segundo hallazgo dentro de éste, que fue el que hizo falsa la primera estimación.**
+> §5.1.3 dice «nivel: suavizado exponencial simple sobre la serie desestacionalizada», y calcular
+> las razones dividiendo por ese nivel **filtrado** es lo natural. Es un error: un nivel local tiene
+> que ser **estacionalmente neutro**, que es la propiedad por la que el método clásico usa una media
+> móvil CENTRADA de doce meses. El nivel exponencial persigue la subida de mayo y la bajada de
+> junio, de modo que al dividir por él la estacionalidad ya se ha comido a sí misma. Medido: la
+> varianza DENTRO de cada mes sale mayor que la varianza ENTRE meses, el `k` empírico se dispara a
+> su techo y los doce factores acaban **entre 0,98 y 1,02** — un modelo sin ninguna estacionalidad
+> sobre una serie que la tiene escrita en el generador. La media móvil centrada tampoco sirve aquí
+> (con 18 puntos solo produce razón para los 6 meses centrales, y enero a junio —donde vive la
+> mayor amplitud— se quedarían sin factor). Se usa el nivel GLOBAL de la serie ya normalizada al
+> año base, que sí es neutro.
+
+**Qué habría roto.** Los tres consumidores del modelo. D-10.1 fija metas: una previsión de
+diciembre un **28 % por debajo** de la estacionalidad real fija una meta que se supera sola. D-11.1
+es el plan de compra y D-07.5 el nivel objetivo de stock: comprar diciembre con el factor 1,075 en
+vez de 1,482 es planificar un desabastecimiento en el mes más alto del año. Y la banda del ±41 %
+que lo acompañaba no habría avisado de nada, porque es tan ancha que **contiene cualquier cosa** —
+justo el fallo que el criterio de cobertura existe para detectar.
+
+---
+
+## CE3.3 · La cobertura medida sobre 6 puntos no distingue nada
+
+| | |
+|---|---|
+| **Fase** | E2 (criterio de rechazo n.º 3) |
+| **El diseño decía** | §5.1.6: «Cobertura del intervalo: aproximadamente el 80 % de los valores reales debe caer dentro de la banda del 80 %», y el rechazo si sale del rango 65 %–90 %. Va escrito junto al backtest del **nivel total**. |
+
+**La realidad.** El backtest del nivel total produce, por construcción, **6 puntos**: tres orígenes
+(2026-04, 2026-05, 2026-06) prediciendo hasta el final de la serie. Sobre 6 puntos, una banda
+**perfectamente calibrada al 80 %** da los 6 aciertos con probabilidad 0,8⁶ = **26 %**, y da 5 o 6
+aciertos —o sea, ≥83 %, fuera o al borde del rango— más de la mitad de las veces.
+
+Dicho de otro modo: **el criterio aplicado a esa muestra rechaza una banda correcta una de cada
+cuatro veces y no detecta una mala**. No mide lo que dice medir.
+
+**Cómo se resolvió.** La cobertura se evalúa sobre el conjunto **AGRUPADO** de puntos del backtest
+—el total, las 8 categorías previsibles y las 159 variantes con historia larga—, que son **881
+puntos**. Medido: **772 dentro, 87,6 %**. El parte de la corrida publica los tres niveles por
+separado para que se pueda ver de dónde sale:
+
+```
+total + categorías      40 / 54    74,1 %
+variantes              730 / 827   88,3 %
+AGRUPADO               772 / 881   87,6 %   ← el que decide
+```
+
+**Qué habría roto.** Nada en la pantalla: habría roto la **publicación**. Con el criterio sobre 6
+puntos, la carga aborta con `100,0 % fuera de rango` en un modelo cuya banda está bien calibrada, y
+la tabla se queda con la previsión de la corrida anterior — indefinidamente, y sin que el mensaje
+de error apunte a la causa real. Es el modo de fallo más caro de esta fase: un criterio de calidad
+que impide publicar lo que es correcto enseña a saltárselo.
+
+---
+
+## CE3.4 · El mes truncado no sobrevive a la publicación
+
+| | |
+|---|---|
+| **Fase** | E2 (`fact_prevision_demanda`, columnas) |
+| **El diseño decía** | §5.1.7 enumera las columnas de la tabla, y §5.1.2 decide que el último mes, por estar incompleto, **se excluye del entrenamiento y se muestra aparte en el gráfico**. |
+
+**La realidad.** Las columnas de §5.1.7 **no permiten saber si eso ocurrió**. La tabla publica
+siempre los tres meses siguientes al último mes observado, se haya excluido o no: por fuera, los
+dos casos son **idénticos**. La pantalla, que es la que tiene que «mostrarlo aparte», no tiene con
+qué distinguirlos.
+
+Y no se puede deducir del calendario. El primer intento fue precisamente ése —«si la previsión
+arranca a dos meses del último dato observado, es que ese mes se excluyó»— y es falso: el desfase
+se aplica al elegir **qué puntos se publican**, no a dónde empieza la tabla.
+
+Se añaden cuatro columnas, y ésta es la que importa:
+
+| Columna | Por qué |
+|---|---|
+| **`horizonte_efectivo`** | los meses que separan la previsión del último mes **entrenado**, que son uno más que los del último mes **observado** cuando ése se excluyó. Es el único rastro de la decisión de §5.1.2, y además explica por qué la banda del primer mes es más ancha de lo que su horizonte 1 haría esperar: se calculó para una distancia de 2 |
+| `horizonte` | §5.1.8 declara un filtro «horizonte (1-3 meses)» y con solo `mes` no se puede resolver |
+| `mae_backtest` | §5.1.6 pide DOS métricas —«MAPE y MAE en unidades, interpretable para compras»— y la tabla guardaba una. Un MAPE del 45 % no le dice a Compras cuántas unidades puede equivocarse |
+| `mape_linea_base` | sin la vara al lado, el error por fila (regla 4) es un número sin referencia: 24 % es bueno o malo según lo que sacara el ingenuo en ESA serie, que aquí va de 10 % a 72 % |
+
+**Cómo se resolvió.** Además de la columna, **el mes truncado se DETECTA y no se escribe**: se
+compara el día del mes más alto con pedidos del último mes contra la mediana de los anteriores.
+Escribir «julio de 2026» en el código funcionaría exactamente una vez. Medido: julio de 2026 cubre
+**1/1,227** del mes (22 de 27 días comparables), y el control `prevision_ancla` de `validar_dwh.py`
+verifica esa decisión **desde PostgreSQL, por su cuenta**, comparando el desfase que la base implica
+contra el que la tabla publicó.
+
+**Qué habría roto.** El gráfico de §5.1.9 —regla 1, la serie histórica y la previsión juntas—
+pintaría julio de 2026 como un punto normal de la línea continua. Julio cae de **1.567 uds en mayo
+a 996**, y una parte de esa caída es que faltan cinco días de ventas. Un director que mira esa
+curva ve el negocio desplomándose justo antes de la previsión, y la previsión —que sí sabe que el
+mes está corto— parece optimista sin motivo. Es un artefacto del corte de los datos leído como una
+caída del negocio.
+
+---
+
+## CE3.5 · La banda no se ensancha siempre, y exigirlo aborta la carga
+
+| | |
+|---|---|
+| **Fase** | E2 (validación de la tabla) |
+| **El diseño decía** | §5.1.9, regla 5: «La banda se ensancha con el horizonte y con la escasez de observaciones del mes previsto. Que agosto tenga la banda más ancha que mayo **es la información**, no un defecto del gráfico». |
+
+**La realidad.** Es cierto como afirmación sobre la incertidumbre y **falso como invariante fila a
+fila**. Las dos formas obvias de escribirlo abortan la publicación de un resultado correcto:
+
+| Cómo se escribe el invariante | Series que lo violan | Por qué lo violan, con razón |
+|---|---|---|
+| en **UNIDADES** (`superior − inferior` crece) | **15** | su previsión BAJA a lo largo del horizonte. Si octubre espera la mitad de unidades que agosto, su banda es más estrecha en unidades y más ancha en incertidumbre **a la vez** |
+| en **RELATIVO**, fila a fila | **16** | el ruido de conteo aporta `1/valor` a la varianza relativa: una variante que pasa de 2 a 10 unidades previstas estrecha su banda relativa aunque el horizonte crezca |
+
+Las 15 y las 16 son, en su práctica totalidad, series publicadas con la **línea base estacional**,
+cuyo nivel es el del mismo mes del año pasado: un salto arbitrario entre un mes y el siguiente.
+Ninguna afirmación monótona sobre su anchura es cierta.
+
+**Cómo se resolvió.** El invariante se exige **donde la regla habla**: serie a serie sobre las
+`descomposicion` —el total y las 8 categorías, que son las que se pintan en el gráfico—, cuyo nivel
+se mueve suavemente y cuyo ruido de conteo es despreciable. Ahí se cumple en **9 de 9**. Sobre el
+resto se comprueba lo que sí es cierto: la banda relativa **MEDIA** crece con el horizonte, medido
+en los dos métodos que tienen escalado propio:
+
+```
+descomposicion       0,862 → 1,044 → 1,200
+top_down_categoria   1,734 → 1,800 → 1,835
+```
+
+Es un control débil por fila y fuerte por tabla: si alguien quitara el `√h` del modelo, esta media
+se quedaría plana y saltaría aquí.
+
+> **Dentro de esta corrección apareció un defecto real**, y por eso la validación merecía la pena:
+> dos series publicaban `0 uds [0 – 0]` —una previsión de cero con **banda de anchura cero**, que
+> es la afirmación de certeza más fuerte de toda la tabla, y precisamente sobre la serie de la que
+> menos se sabe—. Ocurría en la línea base estacional de una variante que no vendió nada ese mes
+> del año anterior. El semiancho lleva ahora un suelo de ruido de conteo (`max(valor, 1)`), de modo
+> que esa fila dice «0, y podría llegar a 1 ó 2».
+
+**Qué habría roto.** La publicación entera: 15 series bastan para que la carga aborte y la pantalla
+se quede con la previsión del mes pasado. Y la banda `[0 – 0]` habría llegado a D-11.1 como una
+instrucción de no comprar nada, con la autoridad de un intervalo que no admite discusión.
+
+---
+
+## CE3.6 · El informe de previsión no cabe en «0 clases Java»
+
+| | |
+|---|---|
+| **Fase** | E2 (capa de aplicación) |
+| **El diseño decía** | §5.1.8: «**Coste: 0 clases Java nuevas** —los dos servicios de departamento ya existen—, 1 bloque de definición por pantalla, 2 líneas en `SecurityConfig`». |
+
+**La realidad.** Los dos servicios existen, sí, pero el informe es **el mismo** para Gerencia y para
+Compras: el mismo SQL, los mismos KPI, la misma serie del gráfico, la misma salvedad. Lo único que
+cambia es **quién puede verlo**, y los dos repartos no son uno subconjunto del otro:
+
+```
+/api/informes/gerencia/prevision-demanda   ADMIN · GERENTE · ANALISTA
+/api/informes/compras/prevision-demanda    ADMIN · GERENTE · COMPRAS
+```
+
+Repartirlo entre `InformesGerenciaCompuestosService` e `InformesComprasCompuestosService` obliga a
+duplicarlo. Dos copias de una consulta de previsión divergen en la primera corrección, y el síntoma
+es peculiarmente malo: **las dos pantallas enseñan una banda distinta para el mismo mes**, y ninguna
+de las dos parece rota.
+
+**Cómo se resolvió.** UNA clase, `InformesPrevisionService`, que los dos controladores **ya
+existentes** inyectan. Coste real: 1 clase Java, 0 controladores, 1 archivo de definición
+compartido por los dos departamentos y **2 líneas de `SecurityConfig`** — enumeradas por nombre y
+no apoyadas en el comodín de su departamento, porque cada comodín deja fuera al rol que la otra
+ruta necesita. La matriz por API (16 celdas) verifica las dos.
+
+**Qué habría roto.** No un dato: la coherencia entre dos pantallas que la dirección compara. D-10.1
+fija la meta con la de Gerencia y D-11.1 compra con la de Compras; si divergen, la compra no cubre
+la meta y nadie sabe cuál de las dos cifras creer.
+
+---
+
+### Reincidencias declaradas, sin número propio
+
+**`String.formatted()` interpreta el bloque de texto ENTERO, comentarios y SQL incluidos** —ya
+registrado en §18 del patrón de informes— y volvió a morder a la primera petición. La consulta de
+la previsión lleva `formatDateTime(mes, '%Y-%m')` dentro, y el formateador lee ese `%Y` como un
+especificador suyo: el endpoint devolvía **HTTP 400 con «Conversion = 'Y'»**, un error del usuario
+por un fallo que no tiene nada que ver con la petición. La consulta se arma por **concatenación**.
+El fallo es ruidoso y por eso no llega a corrección, pero la regla operativa queda: **un bloque de
+texto con un patrón de fecha dentro no se pasa por `formatted()`**.
+
+**El universo se valida contra PostgreSQL aunque la previsión no se pueda validar.** No es una
+corrección sino la respuesta a una pregunta que la fase tuvo que resolver: una fila con fecha futura
+no tiene contra qué compararse al centavo, que es el criterio de todo el resto del almacén. Lo que
+sí se compara —y es lo único que de verdad falla aquí— es el **universo** (10 categorías, 159
+variantes con ≥12 meses, 510 filas) y el **ancla** (la previsión arranca donde acaba la venta real).
+El segundo detecta el modo de fallo propio de una predicción: una tabla **rancia**. Si entra un mes
+de ventas y el modelo no vuelve a correr, la pantalla sigue enseñando con toda naturalidad la
+previsión de un mes que **ya ocurrió**, con su banda intacta y sin dar ningún error.
+
+---
+
+# Fase E3 — la alerta de abandono de cliente
+
+> El modelo entra sabiendo que su veredicto de viabilidad es **negativo** (§5.2.2): no hay etiqueta
+> de abandono, el generador del seed no permite que nadie abandone, y la correlación medida entre
+> el mejor predictor disponible y el resultado real es **0,039**. Lo que se implementa es un modelo
+> del **proceso**, no uno aprendido. Las ocho correcciones de abajo no cambian ese veredicto:
+> cambian **cómo se mide y cómo se publica**, que en un modelo que ya se sabe débil es lo único
+> que separa una herramienta honesta de una que finge.
+
+## CE4.1 · La ventana estable escrita como fecha caduca en la corrida siguiente
+
+| | |
+|---|---|
+| **Fase** | E3 (`modelos/alerta_abandono.py`, `inicio_ventana`) |
+| **El diseño decía** | §5.2.10, limitación 2: «**Se calcula solo sobre la ventana desde enero de 2026**». Y §5.2.3: «Para cada cliente i, sobre la ventana ESTABLE (desde 2026-01)». |
+
+**La realidad.** La ventana no es un dato del negocio: es una consecuencia del **ancla**, que es
+`max(fecha_pedido)` del almacén. Escribir «2026-01» funciona exactamente una vez. En la corrida
+siguiente —el ETL es **semanal** por §5.2.5— el ancla se mueve y la ventana no, así que λ se
+estimaría sobre un período cada vez más largo hasta volver a tragarse la rampa de cartera. Es el
+mismo error que CE3.4 documentó al revés con el mes truncado: **lo que se declara tiene que ser el
+criterio, no el mes**.
+
+Y la rampa es real, medida: en la ventana completa (19 meses) el mayor comprador de un mes llega al
+**100,0 %** de los pedidos —enero y febrero de 2025, cuando era el único registrado—; en la ventana
+de 7 meses no pasa del **10,9 %**.
+
+**Cómo se resolvió.** La ventana son los últimos `MESES_VENTANA = 7` meses **contados desde el mes
+del ancla**, nunca una fecha. Con los datos de hoy da 2026-01-01 → 2026-07-22, que es exactamente
+la ventana que el diseño declara; mañana se desplaza sola. Y como el parámetro sigue siendo un
+número que alguien puede cambiar, la carga lleva un **guardia que ABORTA**: si algún mes de la
+ventana elegida tiene un cliente por encima de `CONCENTRACION_MAXIMA = 25 %`, la tabla no se
+publica. Probado: 7 meses → 10,9 % **publica**; 12 meses → 18,0 % publica; 19 meses → 100,0 %
+**aborta**.
+
+**Qué habría roto.** D-08.1 entera, y del peor modo posible: **al revés**. Con la ventana completa,
+el cliente **54 (Milton Moreira Vera, $399.425 facturados, el segundo de la cartera)** acumula 283
+pedidos, un intervalo medio de **1,96 días** y 74 de silencio — o sea **37,7 veces su propio
+ritmo**, con probabilidad **4,4·10⁻¹⁷**. Sale como la alerta más fuerte del sistema. Con la ventana
+estable son 4 pedidos, 1/λ = 31,5 días y **2,35 intervalos**: normal. Ninguna suma falla en el
+primer caso; la lista se pinta perfectamente y señala como perdido al cliente que más compra.
+
+*(Nota sobre la cifra del propio diseño: §5.2.1 dice «74 días de silencio, que son 43 de sus
+propios intervalos» con probabilidad e⁻⁴³ ≈ 2·10⁻¹⁹. Medido con λ estimada desde su primera compra
+de la ventana salen 37,7 intervalos y 4,4·10⁻¹⁷. La diferencia es de método de estimación, no de
+fondo: la conclusión y el orden de magnitud del disparate son los mismos.)*
+
+---
+
+## CE4.2 · El lift no se divide por una tasa base constante, y un origen no tiene ninguna
+
+| | |
+|---|---|
+| **Fase** | E3 (`modelos/alerta_abandono.py`, `Origen.lift`) |
+| **El diseño decía** | §5.2.6: «**Lift sobre la tasa base**: precisión@10 ÷ **9,4 %**. Es la métrica que decide». |
+
+**La realidad.** El 9,4 % es la tasa base **de un solo origen** —el que §5.2.1 usó para la prueba
+C— y los otros dos no valen eso. Medidas sobre los tres orígenes: **5,8 % · 7,0 % · 12,1 %**
+(3, 4 y 7 casos positivos sobre 52, 57 y 58 clientes evaluados). Dividir siempre por 9,4 % publica
+un lift equivocado en dos de los tres.
+
+Y hay un caso peor, que aparece en cuanto la ventana se fija en 2026-01 tal como el diseño la
+escribe: el origen más antiguo (corte 2026-03-24, 40 clientes evaluados) tiene **CERO positivos**.
+Ahí el lift no vale 0: **no existe**. Con la fórmula del diseño ese origen habría reportado
+`0 ÷ 9,4 % = 0,00`, que se lee como «la alerta fue peor que el azar» cuando lo cierto es que **no
+hubo azar que batir** — nadie dejó de comprar en esos 60 días.
+
+**Cómo se resolvió.** Cada origen se divide por **su propia** tasa base; `Origen.lift` devuelve
+`None` —y la consola imprime «n/d (0 positivos: no hay azar que batir)»— cuando no hay positivos. El
+veredicto que viaja en la fila y en la cabecera de la pantalla es el **AGRUPADO** sobre los tres
+orígenes (30 intentos, 167 evaluaciones, 14 positivos), que es la única cifra con muestra
+suficiente para significar algo.
+
+**Qué habría roto.** La cabecera de OTD-VEN-19, que es el entregable entero de esta fase. La regla 4
+de §5.2.9 pone el lift **antes que la lista** precisamente para que el gerente lo use al decidir; un
+lift calculado contra el denominador de otro origen es peor que no publicarlo, porque llega con la
+autoridad de una medición.
+
+---
+
+## CE4.3 · La ventana de entrenamiento del backtest tiene que rodar con el origen
+
+| | |
+|---|---|
+| **Fase** | E3 (`modelos/alerta_abandono.py`, `backtest`) |
+| **El diseño decía** | §5.2.6: «backtest de origen móvil con **3 orígenes dentro de la ventana estable**, ventanas de prueba de 60 días». |
+
+**La realidad.** «Dentro de la ventana estable» se lee como que la ventana es fija y lo que se mueve
+es el corte. Hecho así, el origen más antiguo estima λ sobre **83 días** de historia frente a los
+**203** de la corrida de producción: se está midiendo el error de un estimador **que nunca se
+publica**. El efecto no es teórico — el lift agrupado pasa de **1,34** (ventana fija) a **1,99**
+(ventana rodante), y ninguno de los dos números es «el error del modelo» si no se dice cuál de los
+dos estimadores describe.
+
+**Cómo se resolvió.** Cada origen entrena con `MESES_VENTANA` meses **acabados en su propio corte**,
+igual que la corrida de producción acaba en el ancla. El modelo evaluado es el modelo publicado.
+
+**Qué habría roto.** No una cifra de negocio: la credibilidad de la única métrica que esta fase
+publica sobre sí misma. Un backtest que mide otro estimador es exactamente el patrón que esta
+bitácora documenta cincuenta veces — todo coherente, todo plausible, y describiendo otra cosa.
+
+---
+
+## CE4.4 · El lift no sale 1,0: sale 1,99 — y sin su valor p es un titular falso
+
+| | |
+|---|---|
+| **Fase** | E3 (`modelos/alerta_abandono.py`, `Backtest.p_valor`) |
+| **El diseño decía** | §5.2.6: «dado que la correlación medida entre la señal y el resultado es 0,039, **la expectativa razonable es que el lift salga ≈ 1,0 sobre estos datos**». |
+
+**La realidad.** Sale **1,99**: precisión@10 del **16,7 %** (5 aciertos de 30 intentos) contra una
+tasa base del **8,4 %** (14 positivos de 167 evaluaciones). Leído solo, ese número dice que la
+alerta acierta el **doble** que elegir al azar, y sería el titular de la pantalla.
+
+Pero la muestra es la que es. Bajo la hipótesis de que la alerta no discrimina, la probabilidad de
+obtener **5 o más** aciertos en 30 intentos con una tasa base del 8,4 % es **0,102**. El resultado
+**no es distinguible del azar**, exactamente como el diseño anticipaba — solo que el lift, por sí
+solo, dice lo contrario.
+
+**Cómo se resolvió.** El backtest calcula la cola superior binomial exacta (`math.comb`, sin
+dependencias nuevas), la tabla la publica en `p_valor_backtest` y la **tercera tarjeta de la
+cabecera** responde literalmente «¿Supera al azar? **NO · p = 0,1019**». La salvedad lo repite con
+palabras. El criterio declarado del código es `lift > 1 Y p < 0,05`, y hoy no se cumple.
+
+**Qué habría roto.** D-08.1 en la dirección contraria a la temida. El diseño se preparó para que un
+lift de 1,0 no se ocultara; lo que estuvo a punto de pasar es lo simétrico — **un 1,99 publicado
+como si fuera un logro**, sobre 14 casos. La decisión de negocio («se publica con su lift a la
+vista») se cumple igual: lo que se añade es que el lift no viaje solo.
+
+---
+
+## CE4.5 · Los clientes sin muestra son los candidatos más fuertes, y el modelo los expulsa
+
+| | |
+|---|---|
+| **Fase** | E3 (`tablas/fact_alerta_cliente.py`, nivel `sin_muestra`) |
+| **El diseño decía** | §5.2.3 calcula λ «para cada cliente i» y §5.2.9 dibuja la cabecera como «9 en alerta **de 69 clientes**». No hay ningún nivel para el cliente sin muestra, y §5.2.10 solo advierte que «con menos de 5 pedidos el ritmo es una conjetura». |
+
+**La realidad.** λ exige un mínimo de pedidos **dentro de la ventana** (3, para que no sea el
+inverso de un único intervalo observado), y **8 de los 69 clientes no llegan**. El problema no es
+que sean 8: es **quiénes son**. Un cliente lleva 179 días sin comprar y por eso mismo solo tiene 1
+pedido en la ventana ($10.955 facturados); otro lleva 94 días con 2 pedidos ($21.554). **Son los dos
+silencios más largos de toda la cartera** y el modelo no puede opinar sobre ninguno, precisamente
+porque su silencio es lo que los dejó sin muestra.
+
+**Cómo se resolvió.** Se publican los **69**, no los 61 evaluables. Los 8 salen con
+`nivel_alerta = 'sin_muestra'`, `tasa_diaria = 0`, `prob_silencio = 1,0` —«no hay evidencia de
+silencio inusual» es lo que corresponde cuando no hay con qué medirlo; un 0 los pondría en cabeza
+con la certeza más alta del sistema— y su **silencio REAL**, que es un hecho medible sin λ. La
+cabecera lleva una tarjeta propia («Sin muestra para opinar: 8 clientes · el mayor silencio entre
+ellos, 179 días») y la quinta limitación de la salvedad los nombra con su cifra.
+
+**Qué habría roto.** D-08.1, de la forma más difícil de detectar de todas: **por omisión**. Una lista
+de clientes en riesgo que nunca muestra al cliente que se fue de verdad se lee como una lista
+completa. No falla ninguna suma, no falta ninguna columna, y el caso de uso entero desaparece.
+
+---
+
+## CE4.6 · El recorte del VENDEDOR no puede hacerse «con el mismo mecanismo de OTD-VEN-02»
+
+| | |
+|---|---|
+| **Fase** | E3 (`fact_alerta_cliente.vendedores`, `InformesVentasCompuestosService`) |
+| **El diseño decía** | §5.2.8: «El VENDEDOR entra porque es quien ejecuta el gesto comercial — y **se recorta a su cartera con el mismo mecanismo de OTD-VEN-02** (`alcance: "propio"` desde el JWT)». |
+
+**La realidad.** El mecanismo de OTD-VEN-02 es `pedido.vendedor_id = <id del JWT>` **en
+PostgreSQL**. En el almacén **no existe `vendedor_id`**: `fact_pedido` guarda `vendedor` como el
+NOMBRE del usuario (o el centinela `(canal en línea)` para el checkout). El mecanismo citado no está
+disponible, y añadir la columna a `fact_pedido` está fuera del alcance de la fase.
+
+Hay además un hallazgo de fondo sobre lo que significa «su cartera»: **no es una partición**. No
+existe asignación de cliente a vendedor en el sistema; la cartera solo puede derivarse de a quién ha
+atendido cada uno, y en la ventana estable **54 de los 69 clientes fueron atendidos por 3 o más
+vendedores distintos**. Verificado por API: el recorte deja al vendedor **50 de los 69 clientes**
+—el 72 %—. Recorta de verdad, pero está lejos de ser una segmentación.
+
+**Cómo se resolvió.** La tabla publica `vendedores Array(String)`, el conjunto de nombres que
+atendieron al cliente **dentro de la ventana** (excluido el centinela del canal en línea, que no
+forma cartera de nadie), y el informe filtra con `has(vendedores, ?)` usando el nombre del principal
+—compuesto exactamente igual que en el ETL—. Como casar por nombre es frágil, `sql_controles`
+comprueba contra PostgreSQL que **los nombres de los usuarios que venden son únicos** y ABORTA la
+carga si dos coinciden. El aviso de la pantalla dice qué significa el recorte, en vez del texto de
+VEN-02 («tus propias ventas»), que aquí describiría mal el filtro aplicado.
+
+**Qué habría roto.** Un recorte que falla **abierto**: sin la columna, la salida obvia era no
+recortar y dejar que el vendedor viera la cartera entera con su facturación. Y con dos homónimos,
+seguiría fallando abierto sin dar error — de ahí el control.
+
+---
+
+## CE4.7 · La foto fechada no acumula historia — y el backtest no la necesita
+
+| | |
+|---|---|
+| **Fase** | E3 (`tablas/fact_alerta_cliente.py`, patrón de carga) |
+| **El diseño decía** | §5.2.7: «tiene que ser una **foto fechada**: sin `fecha_calculo`, la alerta de la semana pasada se pierde **y el backtest del mes que viene no tiene contra qué medirse**». |
+
+**La realidad.** Las dos mitades de la frase son falsas por motivos distintos. La primera: el patrón
+de carga del §6.2 es **reemplazo total** —staging `_new`, validar, `EXCHANGE TABLES`—, así que la
+foto de la semana pasada se pierde **igualmente**, tenga la columna o no. Conservar historia
+exigiría leer la tabla publicada antes de reemplazarla, y con ello el control de conteo dejaría de
+ser `clientes` para pasar a ser `clientes × fotos`.
+
+La segunda: **el backtest no necesita fotos pasadas**. Reconstruye cada origen desde `fact_pedido`,
+que tiene todas las compras de la historia; por eso puede evaluar tres cortes en una corrida recién
+instalada. La columna es correcta y se mantiene —la pantalla muestra cuándo se calculó, que no es lo
+mismo que el ancla—, pero su justificación no lo era.
+
+**Cómo se resolvió.** Se publica **la foto vigente** y se declara. `fecha_calculo` y `fecha_ancla`
+son columnas distintas a propósito: la primera dice cuándo corrió el modelo, la segunda contra qué
+día se midió el silencio, y son la misma cosa solo si el pipeline está al día.
+
+**Qué habría roto.** Nada del dato; sí una decisión de arquitectura tomada sobre una premisa falsa.
+Quien leyera §5.2.7 y quisiera «arreglar» la pérdida de historia acabaría convirtiendo la única
+tabla del almacén con reemplazo total en una tabla acumulativa, y con ella el control de conteo que
+protege a las otras veinte.
+
+---
+
+## CE4.8 · Las dependencias declaradas no producen dos columnas que la propia tabla exige
+
+| | |
+|---|---|
+| **Fase** | E3 (`FactAlertaCliente.depende_de`) |
+| **El diseño decía** | §5.2.5: «`TareaDerivada` en `etl/dwh/tablas/`, **`depende_de = {fact_pedido, dim_cliente}`**». |
+
+**La realidad.** Con esas dos tablas no se pueden producir dos columnas que **la propia §5.2.7
+declara**: `reclamos_abiertos` y `devoluciones_12m`. Salen de `fact_ticket` (248 filas) y
+`fact_devolucion` (196), que no están en la lista. Y la §5.2.4 insiste —con razón— en que **no son
+variables del modelo** sino contexto para el gesto comercial: precisamente por eso nadie las echaría
+de menos si publicaran ceros.
+
+**Cómo se resolvió.** `depende_de = (fact_pedido, dim_cliente, fact_ticket, fact_devolucion)`. El
+orden topológico de `run_etl.py` lo deriva de ahí y coloca la tarea en la posición **21**, después
+de las cuatro.
+
+**Qué habría roto.** El gesto comercial, que es la decisión que D-08.1 toma. La pantalla habría
+mostrado «0 reclamos abiertos» para un cliente con dos abiertos, y quien llamara lo haría sin saber
+por qué se fue — que es la diferencia entre una llamada de recuperación y una que empeora las cosas.
+Sin dependencia declarada el fallo además es **intermitente**: si `fact_ticket` corre después, la
+alerta lee la tabla de ayer y a veces acierta.
+
+---
+
+### Reincidencias declaradas, sin número propio
+
+**`String.formatted()` y los patrones de fecha, otra vez.** Ya registrado en §18 del patrón de
+informes y de nuevo en la Fase E2. La consulta de OTD-VEN-19 lleva `formatDateTime(fecha_ancla,
+'%d/%m/%Y')`, así que se arma por **concatenación** desde el principio. La regla operativa está
+consolidada: **un bloque de texto con un patrón de fecha dentro no se pasa por `formatted()`**.
+
+**El rol `retailmind_etl` no llega a `usuario_rol`.** El script 85 concede SELECT sobre 54 tablas y
+la tabla puente del rol no está entre ellas, así que el control de unicidad de nombres no podía
+partir de «los usuarios con rol VENDEDOR». Se parte de los usuarios que **realmente figuran** como
+autor de un pedido (`pedido JOIN usuario ON u.id = p.vendedor_id`), que además es la población
+correcta: un vendedor dado de alta que nunca vendió no puede colisionar en una cartera que no
+existe. No es un supuesto fallido del diseño —el diseño no habla de esto— pero sí una restricción
+que la fase siguiente encontrará igual.
 
 ---
 

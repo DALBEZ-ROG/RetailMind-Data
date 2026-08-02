@@ -343,6 +343,83 @@ export const routes: Routes = [
       import('./features/operativo/informes/informes-departamento.component')
         .then(m => m.InformesDepartamentoComponent)
   },
+  // ── Tableros de DIRECCIÓN (nivel estratégico, fase E1-A:
+  //    docs/estrategico/DISENO_NIVEL_ESTRATEGICO.md §4).
+  //    UNA sola pantalla genérica parametrizada por `data.tablero`; los bloques
+  //    y su presentación salen del archivo de definiciones.
+  //
+  //    Los TRES llevan dinero, así que BODEGA y DESPACHO quedan fuera —igual
+  //    que en SecurityConfig, que es quien realmente decide—. En ClickHouse la
+  //    segregación no la respalda el motor: no hay GRANT por columna, y la
+  //    única barrera es la ruta.
+  {
+    path: 'operativo/tableros/omnicanal',
+    data: { tablero: 'omnicanal' },
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'ANALISTA'])],
+    loadComponent: () =>
+      import('./features/operativo/tableros/tablero.component')
+        .then(m => m.TableroComponent)
+  },
+  {
+    path: 'operativo/tableros/rentabilidad',
+    data: { tablero: 'rentabilidad' },
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'ANALISTA'])],
+    loadComponent: () =>
+      import('./features/operativo/tableros/tablero.component')
+        .then(m => m.TableroComponent)
+  },
+  //    T-3 suma SOPORTE, y solo él: entra por el bloque de tickets y
+  //    devoluciones. El recorte de los demás bloques no lo hace el guard —es
+  //    DENTRO del mismo tablero— sino la consulta del backend, que no los
+  //    ejecuta y declara en el sobre cuáles omitió.
+  {
+    path: 'operativo/tableros/cliente-posventa',
+    data: { tablero: 'cliente-posventa' },
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'ANALISTA', 'SOPORTE'])],
+    loadComponent: () =>
+      import('./features/operativo/tableros/tablero.component')
+        .then(m => m.TableroComponent)
+  },
+  //    Fase E1-B. T-4 es el UNICO tablero SIN dinero y el unico al que Despacho
+  //    y Bodega pueden entrar: su consulta no selecciona un solo importe. T-5 es
+  //    su gemelo CON dinero y existe separado precisamente por eso.
+  {
+    path: 'operativo/tableros/operacion',
+    data: { tablero: 'operacion' },
+    canActivate: [authGuard,
+      roleGuard(['ADMIN', 'GERENTE', 'ANALISTA', 'DESPACHO', 'BODEGA'])],
+    loadComponent: () =>
+      import('./features/operativo/tableros/tablero.component')
+        .then(m => m.TableroComponent)
+  },
+  {
+    path: 'operativo/tableros/costo-operacion',
+    data: { tablero: 'costo-operacion' },
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'ANALISTA'])],
+    loadComponent: () =>
+      import('./features/operativo/tableros/tablero.component')
+        .then(m => m.TableroComponent)
+  },
+  //    T-6 suma COMPRAS: es su objetivo (OE-11) y su centro de costo.
+  {
+    path: 'operativo/tableros/abastecimiento',
+    data: { tablero: 'abastecimiento' },
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'COMPRAS', 'ANALISTA'])],
+    loadComponent: () =>
+      import('./features/operativo/tableros/tablero.component')
+        .then(m => m.TableroComponent)
+  },
+  //    T-7 es DATO SENSIBLE: el corte mas estricto del sistema. El ANALISTA
+  //    queda fuera aunque entre en los otros seis, y en la auditoria la barrera
+  //    real es la RUTA y no el motor (grp_analista SI lee log_auditoria).
+  {
+    path: 'operativo/tableros/gobierno-dato',
+    data: { tablero: 'gobierno-dato' },
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE'])],
+    loadComponent: () =>
+      import('./features/operativo/tableros/tablero.component')
+        .then(m => m.TableroComponent)
+  },
   // ── Seguridad: intentos de acceso al sistema (OTD-GER-09, script 53) —
   //    informe solo ADMIN/GERENTE (espeja SecurityConfig y los GRANTs)
   {

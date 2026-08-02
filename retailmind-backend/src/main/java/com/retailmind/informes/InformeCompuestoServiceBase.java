@@ -128,6 +128,18 @@ public abstract class InformeCompuestoServiceBase extends InformeServiceBase {
         private final StringBuilder where = new StringBuilder();
         private final List<Object> args = new ArrayList<>();
 
+        /**
+         * Constructor explícito y PÚBLICO. El implícito de una clase anidada
+         * {@code protected} también es {@code protected}, y el acceso protegido
+         * entre paquetes distintos solo alcanza a los miembros de instancias
+         * del propio subtipo: una subclase de otro paquete —los tableros del
+         * nivel estratégico, {@code com.retailmind.tableros}— no puede hacer
+         * {@code new Filtros()}. La clase sigue siendo {@code protected}: quien
+         * no herede de este molde no la ve siquiera.
+         */
+        public Filtros() {
+        }
+
         /** Añade {@code AND <fragmento>} solo si el valor llegó. */
         public Filtros y(String fragmentoConstante, Object valor) {
             if (valor != null) {
@@ -237,6 +249,14 @@ public abstract class InformeCompuestoServiceBase extends InformeServiceBase {
     /**
      * ¿El fallo es de red/pool y no de la consulta?
      *
+     * Es {@code protected} y no {@code private} porque el nivel ESTRATÉGICO
+     * ({@code com.retailmind.tableros}) necesita exactamente esta clasificación
+     * para degradar un TABLERO, cuyo sobre tiene otra forma que el de un
+     * informe. Duplicar la lista de excepciones de red en la otra jerarquía
+     * garantizaría que las dos divergieran en la primera excepción nueva del
+     * driver: el criterio de «qué es una caída y qué es un bug» tiene que vivir
+     * en un solo sitio.
+     *
      * Se mira la causa raíz y no solo el tipo de Spring, porque el driver de
      * ClickHouse envuelve un {@code ConnectException} dentro de excepciones
      * genéricas de acceso a datos: quedarse en la capa de Spring clasificaría
@@ -244,7 +264,7 @@ public abstract class InformeCompuestoServiceBase extends InformeServiceBase {
      * simétrico y dejaría la aplicación devolviendo 500 con Docker apagado —
      * justo lo que el invariante del sistema prohíbe.
      */
-    private static boolean esFalloDeConexion(DataAccessException e) {
+    protected static boolean esFalloDeConexion(DataAccessException e) {
         if (e instanceof org.springframework.dao.DataAccessResourceFailureException
                 || e instanceof org.springframework.dao.QueryTimeoutException
                 || e instanceof org.springframework.jdbc.CannotGetJdbcConnectionException) {

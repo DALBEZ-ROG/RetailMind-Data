@@ -1,4 +1,5 @@
 import { ColorChip, DefinicionDepartamento, FiltroInforme } from '../../../../core/models/informe.model';
+import { informePrevisionDemanda } from './prevision.informe';
 
 /**
  * INFORMES TÁCTICOS DE COMPRAS — los CINCO objetivos SIMPLES y los SIETE
@@ -747,6 +748,14 @@ export const INFORMES_COMPRAS: DefinicionDepartamento = {
         { campo: 'categoria',       titulo: 'Categoría',  tipo: 'texto', recortar: 16 },
         { campo: 'uds_compradas',   titulo: 'Unidades',   tipo: 'numero' }
       ]
-    }
+    },
+
+    // ── OTD-GER-13 ── PREDICTIVO: fact_prevision_demanda (fase E2, §5.1) ──
+    // El mismo informe que sirve Gerencia, con OTRO reparto: aquí entra
+    // COMPRAS y sale el ANALISTA. Sirve a D-11.1 (el plan de compra del
+    // próximo trimestre) y a D-07.5 (el nivel objetivo de stock).
+    // Para dimensionar una compra la columna que decide es «Máximo 80 %»:
+    // pedir por la previsión central deja fuera la mitad de los escenarios.
+    informePrevisionDemanda(['ADMIN', 'GERENTE', 'COMPRAS'])
   ]
 };

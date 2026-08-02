@@ -34,9 +34,42 @@ import org.springframework.web.bind.annotation.RestController;
 public class InformesComprasCompuestosController {
 
     private final InformesComprasCompuestosService servicio;
+    private final InformesPrevisionService prevision;
 
-    public InformesComprasCompuestosController(InformesComprasCompuestosService servicio) {
+    public InformesComprasCompuestosController(InformesComprasCompuestosService servicio,
+                                               InformesPrevisionService prevision) {
         this.servicio = servicio;
+        this.prevision = prevision;
+    }
+
+    /**
+     * OTD-GER-13 — PREVISIÓN DE DEMANDA a tres meses (fase E2, §5.1).
+     * GET /api/informes/compras/prevision-demanda?nivel=&categoria=&horizonte=
+     *     &buscar=&page=&size=
+     *
+     * Destinatarios (§5.1.8): Administrador, Gerente y COMPRAS. Sirve a D-11.1
+     * (el plan de compra del próximo trimestre) y a D-07.5 (el nivel objetivo
+     * de stock).
+     *
+     * Es literalmente el mismo informe que
+     * {@code /api/informes/gerencia/prevision-demanda} —mismo servicio, mismo
+     * SQL, misma banda— y lo único que cambia es quién puede pedirlo. Cada ruta
+     * lleva su propia línea en {@code SecurityConfig}, enumerada por NOMBRE:
+     * ninguna de las dos hereda del comodín de su departamento, porque los dos
+     * comodines dejan fuera al rol que la otra necesita.
+     *
+     * Para Compras la columna que decide es {@code limite_superior}: dimensionar
+     * una compra con la previsión central deja fuera la mitad de los escenarios.
+     */
+    @GetMapping("/prevision-demanda")
+    public Map<String, Object> previsionDemanda(
+            @RequestParam(required = false) String nivel,
+            @RequestParam(required = false) String categoria,
+            @RequestParam(required = false) Integer horizonte,
+            @RequestParam(required = false) String buscar,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size) {
+        return prevision.previsionDemanda(nivel, categoria, horizonte, buscar, page, size);
     }
 
     /**

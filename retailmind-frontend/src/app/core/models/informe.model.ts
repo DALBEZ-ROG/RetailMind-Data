@@ -21,7 +21,22 @@ export type TipoValor =
   | 'dias'        // "n días"
   | 'estrellas'   // calificación 1-5
   | 'booleano'    // Sí / No
-  | 'chip';       // píldora de estado (usa `chip` para el color)
+  | 'chip'        // píldora de estado (usa `chip` para el color)
+  /**
+   * Micro-gráfico de barras dibujado EN LA CELDA a partir de un array de
+   * números que envía el backend.
+   *
+   * Lo estrena OTD-VEN-19, y ahí no es adorno: la regla 2 de §5.2.9 del diseño
+   * estratégico exige el *sparkline* de compras por mes EN LA FILA porque es lo
+   * que permite distinguir de un golpe un hueco de una pendiente — y es la
+   * defensa contra el artefacto de la rampa de cartera, que fue el único modo
+   * de fallo capaz de invertir por completo esta lista.
+   *
+   * Se dibuja como SVG inline con `<title>` NATIVO y no con `matTooltip`: la
+   * lección de la fase E1-A es que con centenares de directivas de tooltip
+   * vivas el navegador deja de responder.
+   */
+  | 'sparkline';
 
 /** Color de la píldora cuando `tipo: 'chip'`. */
 export type ColorChip = 'ok' | 'warn' | 'error' | 'neutral' | 'info';
@@ -77,6 +92,18 @@ export interface DefinicionInforme {
    * un avance, y presentarlo como tal miente.
    */
   barraAvance?: boolean;
+  /**
+   * Pinta el gráfico de serie histórica + previsión con su banda, a partir del
+   * campo `serie` del sobre.
+   *
+   * Es opt-in por la misma razón que `barraAvance`: solo la previsión de
+   * demanda (fase E2) envía una serie con puntos observados Y previstos, y la
+   * regla 1 de §5.1.9 la exige precisamente ahí — «un número solo, sin la serie
+   * que lo produjo, no es interpretable». Un informe cualquiera con una columna
+   * mensual NO es una previsión y no debe heredar el trazo discontinuo, que
+   * afirma que esos puntos no han ocurrido.
+   */
+  graficoPrevision?: boolean;
 }
 
 /** Departamento con sus informes. Un archivo de definiciones por departamento. */
@@ -105,6 +132,21 @@ export interface SobreInforme {
   resumen?: KpiInforme[];
   /** VEN-02: 'propio' cuando el backend recortó el informe al vendedor. */
   alcance?: string;
+  /**
+   * Texto del recorte, cuando el informe quiere decirlo con sus palabras. Sin
+   * él, la pantalla usa el de VEN-02 («tus propias ventas»), que en OTD-VEN-19
+   * sería falso: allí el recorte es por CARTERA, no por autoría de la venta.
+   */
+  avisoAlcance?: string;
+  /**
+   * Coletilla que se pinta junto al título del informe.
+   *
+   * La estrena OTD-VEN-19 para cumplir la regla 5 de §5.2.9: la fecha ancla va
+   * EN EL TÍTULO. La recencia de la alerta se mide contra la última compra
+   * registrada en el almacén y no contra el reloj, así que una pantalla sin esa
+   * fecha se lee como si fuera de hoy — y si el pipeline se detuvo, no lo es.
+   */
+  sufijoTitulo?: string;
 
   // ── Solo en los informes COMPUESTOS (fuente ClickHouse) ────────────────
   /**

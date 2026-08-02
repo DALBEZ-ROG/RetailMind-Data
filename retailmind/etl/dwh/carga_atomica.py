@@ -1,6 +1,6 @@
 """
 etl/dwh/carga_atomica.py
-El patrón de carga del §6.2 del diseño, idéntico para las 19 tablas:
+El patrón de carga del §6.2 del diseño, idéntico para las 21 tablas:
 
     1. CREATE TABLE retailmind_dwh.fact_x_new   (misma definición, vacía)
     2. INSERT INTO fact_x_new  ← lotes desde PostgreSQL (o desde el propio DWH

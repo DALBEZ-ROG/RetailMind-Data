@@ -1,6 +1,6 @@
 """
 etl/dwh/tarea.py
-Contrato que cumple CADA una de las 19 tablas del DWH.
+Contrato que cumple CADA una de las 21 tablas del DWH.
 
 El molde es deliberadamente parecido al de `InformeServiceBase` del backend: la
 mecánica común (lotes, validación, publicación atómica, bitácora) vive UNA vez
@@ -9,10 +9,14 @@ de extracción y sus cifras de control.
 
 Una tabla nueva = una subclase + una línea en `registro.py`. Nada más.
 
-Dos sabores:
-  * `TareaCarga`    — lee de PostgreSQL. Son 18 de las 19.
+Tres sabores:
+  * `TareaCarga`    — lee de PostgreSQL. Son 18 de las 21.
   * `TareaDerivada` — se calcula DENTRO de ClickHouse con un INSERT … SELECT y
     no vuelve a consultar PostgreSQL. Hoy solo `fact_stock_mensual` (§5.7).
+  * `TareaModelo`   — también se calcula desde el almacén y tampoco vuelve a
+    PostgreSQL, pero su transformación es un MODELO en Python y no cabe en un
+    SELECT. Son dos, las dos del nivel ESTRATÉGICO:
+    `fact_prevision_demanda` (§5.1) y `fact_alerta_cliente` (§5.2).
 """
 
 from abc import ABC, abstractmethod
@@ -184,3 +188,48 @@ class TareaDerivada(TareaCarga):
     def columnas(self) -> list[str]:
         """El INSERT … SELECT nombra sus propias columnas."""
         return []
+
+
+class TareaModelo(TareaDerivada):
+    """
+    Tabla cuyo contenido produce un MODELO en Python a partir del almacén.
+
+    Es una `TareaDerivada` en todo lo que importa —no consulta PostgreSQL para
+    extraer, se calcula desde otras tablas del DWH y hereda el patrón atómico—
+    con una única diferencia: su transformación no cabe en un `INSERT … SELECT`.
+    Una descomposición estacional con encogimiento empírico, un backtest de
+    origen móvil y una banda de predicción no son SQL, y forzarlos a serlo daría
+    una consulta que nadie puede revisar. La segunda es `fact_alerta_cliente`
+    (§5.2), cuya cola binomial tampoco cabe en un SELECT.
+
+    Lo que compra al heredar aquí, y es el motivo entero de que el modelo viva
+    en el ETL y no en el backend (§6.1 del diseño estratégico): **un modelo que
+    no supera su backtest no llega a la pantalla**, porque `validar()` aborta,
+    `EXCHANGE TABLES` no se ejecuta y la tabla publicada sigue siendo la de la
+    corrida anterior. La red de seguridad de la carga se convierte, sin escribir
+    una línea más, en la red de seguridad del modelo.
+
+    Una subclase implementa `filas()` y `columnas()`; el resto es el molde.
+    """
+
+    def sql_insert(self, tabla_destino: str) -> str:  # pragma: no cover
+        raise NotImplementedError(
+            "Una tarea de modelo no deriva con SQL: implementa `filas()`."
+        )
+
+    @abstractmethod
+    def filas(self, client) -> list[tuple]:
+        """
+        Calcula el contenido de la tabla y lo devuelve como tuplas en el orden
+        de `columnas()`.
+
+        Recibe el cliente de ClickHouse porque el modelo LEE del almacén (las
+        series de las que aprende). No escribe: de eso se encarga `cargar_en`.
+        """
+
+    def cargar_en(self, client, tabla_staging: str) -> int:
+        filas = self.filas(client)
+        if filas:
+            client.insert(tabla_staging, filas, column_names=self.columnas())
+        logger.info(f"[{self.nombre}] {len(filas):,} filas calculadas por el modelo")
+        return len(filas)

@@ -1,0 +1,151 @@
+<!-- Geometría pura: el denominador, la salvedad y el conteo los pinta la
+     tarjeta que envuelve a este gráfico, no el gráfico.
+
+     Los rótulos al pasar el ratón son <title> NATIVO de SVG y no matTooltip.
+     No es una preferencia de estilo: una dispersión de 834 puntos crearía 834
+     directivas de Angular, y en la primera versión de esta pantalla el
+     navegador se quedaba sin responder con 1.933 tooltips vivos entre las
+     marcas y las celdas. El <title> lo dibuja el navegador y no cuesta nada. -->
+<div class="grafico-wrap" *ngIf="!vacio">
+
+  <div class="grafico-leyenda" *ngIf="leyenda.length">
+    <span class="leyenda-item" *ngFor="let l of leyenda">
+      <i class="leyenda-punto" [style.background]="l.color"></i>{{ l.nombre }}
+    </span>
+  </div>
+
+  <!-- La ALTURA del viewBox es variable: un ranking de 25 filas necesita más
+       caja que un embudo de 5, y comprimirlo dejaría cada barra en cuatro
+       píxeles con los nombres pisándose. -->
+  <svg [attr.viewBox]="'0 0 ' + ancho + ' ' + altoVista" preserveAspectRatio="xMidYMid meet"
+       class="grafico-svg" role="img">
+
+    <!-- Rejilla y eje vertical izquierdo. Arranca SIEMPRE en cero salvo en el
+         doble eje: recortar el eje inferior convierte una variación del 2 % en
+         un acantilado. -->
+    <g class="grafico-rejilla"
+       *ngIf="tipo !== 'embudo' && tipo !== 'ranking' && tipo !== 'matriz'
+              && tipo !== 'caja_bigotes'">
+      <g *ngFor="let m of ejeY">
+        <line [attr.x1]="margen.izquierda" [attr.y1]="m.y"
+              [attr.x2]="ancho - margen.derecha" [attr.y2]="m.y"></line>
+        <text [attr.x]="margen.izquierda - 8" [attr.y]="m.y + 4"
+              text-anchor="end">{{ m.etiqueta }}</text>
+      </g>
+      <g *ngFor="let m of ejeY2">
+        <text [attr.x]="ancho - margen.derecha + 8" [attr.y]="m.y + 4"
+              text-anchor="start" class="eje-derecho">{{ m.etiqueta }}</text>
+      </g>
+    </g>
+
+    <!-- Barras (apiladas, simples o Pareto) -->
+    <g class="grafico-barras">
+      <rect *ngFor="let b of barras" [attr.x]="b.x" [attr.y]="b.y"
+            [attr.width]="b.w" [attr.height]="b.h" [attr.fill]="b.color">
+        <title>{{ b.titulo }}</title>
+      </rect>
+    </g>
+
+    <!-- Cruz de corte de la dispersión: solo si el backend la mandó -->
+    <g class="grafico-cruz">
+      <line *ngIf="cruz.x !== null" [attr.x1]="cruz.x" [attr.y1]="margen.arriba"
+            [attr.x2]="cruz.x" [attr.y2]="base"></line>
+      <line *ngIf="cruz.y !== null" [attr.x1]="margen.izquierda" [attr.y1]="cruz.y"
+            [attr.x2]="ancho - margen.derecha" [attr.y2]="cruz.y"></line>
+    </g>
+
+    <!-- Nube de puntos -->
+    <g class="grafico-puntos">
+      <circle *ngFor="let p of puntos" [attr.cx]="p.cx" [attr.cy]="p.cy" [attr.r]="p.r"
+              [attr.fill]="p.color">
+        <title>{{ p.titulo }}</title>
+      </circle>
+    </g>
+
+    <!-- Líneas -->
+    <g class="grafico-lineas">
+      <g *ngFor="let l of lineas">
+        <path [attr.d]="l.d" [attr.stroke]="l.color" fill="none"></path>
+        <circle *ngFor="let p of l.puntos" [attr.cx]="p.cx" [attr.cy]="p.cy" r="3.5"
+                [attr.fill]="l.color">
+          <title>{{ p.titulo }}</title>
+        </circle>
+      </g>
+    </g>
+
+    <!-- Embudo y ranking: barras horizontales con su etiqueta al lado -->
+    <g class="grafico-pasos">
+      <g *ngFor="let p of pasos">
+        <rect [attr.x]="p.x" [attr.y]="p.y" [attr.width]="p.w" [attr.height]="p.h"
+              [attr.fill]="p.color">
+          <title>{{ p.titulo }}</title>
+        </rect>
+        <text [attr.x]="p.x - 8" [attr.y]="p.y + p.h / 2 + 4"
+              text-anchor="end" class="paso-etiqueta">{{ p.etiqueta }}</text>
+        <text [attr.x]="p.x + p.w + 8" [attr.y]="p.y + p.h / 2 + 4"
+              text-anchor="start" class="paso-valor">
+          {{ p.valor }}<tspan class="paso-tasa" *ngIf="p.tasa"> · {{ p.tasa }}</tspan>
+        </text>
+      </g>
+    </g>
+
+    <!-- Caja y bigotes: la distribución, no el promedio -->
+    <g class="grafico-cajas">
+      <g *ngFor="let c of cajas">
+        <line [attr.x1]="c.bigoteIzq" [attr.y1]="c.y + c.alto / 2"
+              [attr.x2]="c.bigoteDer" [attr.y2]="c.y + c.alto / 2" class="bigote"></line>
+        <line [attr.x1]="c.bigoteIzq" [attr.y1]="c.y + 3"
+              [attr.x2]="c.bigoteIzq" [attr.y2]="c.y + c.alto - 3" class="tope"></line>
+        <line [attr.x1]="c.bigoteDer" [attr.y1]="c.y + 3"
+              [attr.x2]="c.bigoteDer" [attr.y2]="c.y + c.alto - 3" class="tope"></line>
+        <rect [attr.x]="c.x" [attr.y]="c.y" [attr.width]="c.ancho" [attr.height]="c.alto"
+              [attr.fill]="c.color" class="caja">
+          <title>{{ c.titulo }}</title>
+        </rect>
+        <line [attr.x1]="c.mediana" [attr.y1]="c.y" [attr.x2]="c.mediana"
+              [attr.y2]="c.y + c.alto" class="mediana"></line>
+        <circle *ngIf="c.media !== null" [attr.cx]="c.media" [attr.cy]="c.y + c.alto / 2"
+                r="3" class="media"></circle>
+        <text [attr.x]="margenCajas - 10" [attr.y]="c.y + c.alto / 2 + 4"
+              text-anchor="end" class="paso-etiqueta">{{ c.etiqueta }}</text>
+      </g>
+    </g>
+
+    <!-- Mapa de calor -->
+    <g class="grafico-matriz">
+      <rect *ngFor="let c of celdas" [attr.x]="c.x" [attr.y]="c.y"
+            [attr.width]="c.w" [attr.height]="c.h" [attr.fill]="c.color">
+        <title>{{ c.titulo }}</title>
+      </rect>
+      <text *ngFor="let c of celdas" [attr.x]="c.x + c.w / 2" [attr.y]="c.y + c.h / 2 + 4"
+            text-anchor="middle" [attr.fill]="c.textoColor" class="celda-valor">
+        {{ c.texto }}
+      </text>
+      <text *ngFor="let r of rotulosFila" [attr.x]="200" [attr.y]="r.y"
+            text-anchor="end" class="paso-etiqueta">{{ r.etiqueta }}</text>
+      <text *ngFor="let c of rotulosColumna" [attr.x]="c.x" [attr.y]="c.y"
+            text-anchor="middle" class="rotulo-columna">{{ c.etiqueta }}</text>
+    </g>
+
+    <!-- Eje horizontal -->
+    <g class="grafico-eje-x"
+       *ngIf="tipo !== 'embudo' && tipo !== 'ranking' && tipo !== 'matriz'">
+      <line [attr.x1]="margen.izquierda" [attr.y1]="base"
+            [attr.x2]="ancho - margen.derecha" [attr.y2]="base"></line>
+      <text *ngFor="let m of ejeX" [attr.x]="m.x" [attr.y]="base + 20"
+            text-anchor="middle">{{ m.etiqueta }}</text>
+    </g>
+
+    <!-- Rótulos de los ejes de la dispersión -->
+    <g class="grafico-rotulos" *ngIf="tipo === 'dispersion'">
+      <text [attr.x]="ancho / 2" [attr.y]="alto - 6" text-anchor="middle">
+        {{ pres.xEtiqueta }}
+      </text>
+      <text [attr.x]="14" [attr.y]="alto / 2" text-anchor="middle"
+            [attr.transform]="'rotate(-90 14 ' + alto / 2 + ')'">
+        {{ pres.yEtiqueta }}
+      </text>
+    </g>
+
+  </svg>
+</div>

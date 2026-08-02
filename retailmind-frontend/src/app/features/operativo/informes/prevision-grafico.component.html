@@ -1,0 +1,71 @@
+<div class="prevision-grafico" *ngIf="!vacio">
+
+  <div class="prevision-leyenda">
+    <span class="leyenda-item">
+      <svg width="26" height="10" aria-hidden="true">
+        <line x1="0" y1="5" x2="26" y2="5" class="trazo-historico"></line>
+      </svg>
+      Histórico observado
+    </span>
+    <span class="leyenda-item">
+      <svg width="26" height="10" aria-hidden="true">
+        <line x1="0" y1="5" x2="26" y2="5" class="trazo-prevision"></line>
+      </svg>
+      Previsión
+    </span>
+    <span class="leyenda-item">
+      <svg width="26" height="10" aria-hidden="true">
+        <rect x="0" y="1" width="26" height="8" class="area-banda"></rect>
+      </svg>
+      Banda 80 %
+    </span>
+    <span class="leyenda-serie" *ngIf="serie">{{ serie }}</span>
+  </div>
+
+  <svg [attr.viewBox]="'0 0 ' + ancho + ' ' + alto" preserveAspectRatio="xMidYMid meet"
+       class="grafico-svg" role="img"
+       [attr.aria-label]="'Serie histórica y previsión de demanda de ' + serie">
+
+    <!-- Rejilla y eje vertical (arranca en cero, siempre) -->
+    <g class="eje">
+      <line *ngFor="let m of ejeY" [attr.x1]="margen.izquierda" [attr.y1]="m.y"
+            [attr.x2]="ancho - margen.derecha" [attr.y2]="m.y" class="rejilla"></line>
+      <text *ngFor="let m of ejeY" [attr.x]="margen.izquierda - 10" [attr.y]="m.y + 4"
+            text-anchor="end" class="rotulo">{{ m.etiqueta }}</text>
+    </g>
+
+    <!-- Banda del 80 %: va DEBAJO de los trazos para no taparlos -->
+    <path *ngIf="banda" [attr.d]="banda" class="area-banda"></path>
+
+    <path *ngIf="historico" [attr.d]="historico" class="trazo-historico" fill="none"></path>
+    <path *ngIf="prevision" [attr.d]="prevision" class="trazo-prevision" fill="none"></path>
+
+    <!-- Separador visual entre lo que pasó y lo que se prevé -->
+    <line *ngIf="marcaTruncado" [attr.x1]="marcaTruncado.x" [attr.y1]="margen.arriba"
+          [attr.x2]="marcaTruncado.x" [attr.y2]="base" class="corte-serie"></line>
+
+    <circle *ngFor="let p of puntosHistoricos" [attr.cx]="p.cx" [attr.cy]="p.cy"
+            [attr.r]="p.truncado ? 5 : 3"
+            [class.punto-truncado]="p.truncado" class="punto-historico">
+      <title>{{ p.titulo }}</title>
+    </circle>
+
+    <circle *ngFor="let p of puntosPrevistos" [attr.cx]="p.cx" [attr.cy]="p.cy" r="4"
+            class="punto-prevision">
+      <title>{{ p.titulo }}</title>
+    </circle>
+
+    <text *ngIf="marcaTruncado" [attr.x]="marcaTruncado.x - 8"
+          [attr.y]="margen.arriba + 12" text-anchor="end" class="rotulo-truncado">
+      mes incompleto ▸ excluido del ajuste
+    </text>
+
+    <g class="eje">
+      <text *ngFor="let m of ejeX" [attr.x]="m.x" [attr.y]="base + 20"
+            text-anchor="middle" class="rotulo"
+            [attr.transform]="'rotate(-35 ' + m.x + ' ' + (base + 20) + ')'">
+        {{ m.etiqueta }}
+      </text>
+    </g>
+  </svg>
+</div>

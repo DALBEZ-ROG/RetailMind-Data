@@ -4,7 +4,7 @@ Punto de entrada del pipeline DWH. Carga UNA tabla por invocación.
 
     python -m etl.dwh.cargar --verificar          # ¿responden PostgreSQL y ClickHouse?
     python -m etl.dwh.cargar --init               # crea retailmind_dwh + etl_ejecucion
-    python -m etl.dwh.cargar --listar             # estado de las 19 tablas
+    python -m etl.dwh.cargar --listar             # estado de las 21 tablas
     python -m etl.dwh.cargar --bitacora           # últimas corridas
     python -m etl.dwh.cargar --tabla fact_pedido  # carga esa tabla
 
@@ -88,6 +88,12 @@ def cargar_tabla(nombre: str) -> int:
             duracion_seg=segundos,
         )
         print(f"[OK] {nombre}: {resultado.mensaje} · {segundos:.2f} s")
+        # Gancho para las tareas que producen un PARTE además de filas. Hoy solo
+        # el modelo de previsión: su backtest es el entregable de la fase y
+        # dejarlo únicamente en el log de un archivo sería esconderlo.
+        parte = getattr(tarea, "resumen", None)
+        if callable(parte):
+            print(parte())
         return 0
 
     except ValidacionFallida as e:
@@ -128,7 +134,7 @@ def main(argv=None) -> int:
     grupo.add_argument("--init", action="store_true",
                        help=f"crea la base {CH_DATABASE} y la bitácora")
     grupo.add_argument("--listar", action="store_true",
-                       help="estado de las 19 tablas del modelo")
+                       help="estado de las 21 tablas del modelo")
     grupo.add_argument("--verificar", action="store_true",
                        help="comprueba que PostgreSQL y ClickHouse responden")
     grupo.add_argument("--bitacora", action="store_true",

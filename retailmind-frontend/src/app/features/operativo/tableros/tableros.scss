@@ -1,0 +1,232 @@
+// Estilos propios de los TABLEROS DE DIRECCIÓN (nivel estratégico).
+// Complementa operativo-shared.scss e informes.scss, de donde ya salen
+// .kpi-card, .marca-agua, .aviso-analitica, .salvedad y .aviso-alcance.
+//
+// Criterio visual: el tablero se lee de arriba abajo y cada bloque es una
+// unidad cerrada — salvedad, denominador, gráfico y tabla. Nada de tarjetas
+// flotantes ni de gráficos sin sus cifras al lado.
+
+.tablero-page {
+  .tablero-objetivo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+
+    .objetivo-tag { margin-left: 0; }
+  }
+
+  .tablero-decisiones { opacity: 0.8; }
+}
+
+// ── Tarjetas de cabecera con su NOTA ─────────────────────────────────────
+// La nota es el denominador de la tarjeta y por eso viaja DENTRO de ella y no
+// en un tooltip: un dato de dirección sin su base es la cifra plausible que
+// este nivel persigue.
+.tablero-kpis {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+
+  .kpi-card { align-items: flex-start; }
+
+  .kpi-nota {
+    font-size: 10.5px;
+    line-height: 1.5;
+    opacity: 0.85;
+    font-weight: 500;
+  }
+}
+
+// ── Bloque ───────────────────────────────────────────────────────────────
+.bloque-card {
+  margin-bottom: 22px;
+
+  h3 { display: flex; align-items: center; gap: 8px; }
+}
+
+// El denominador NO es una nota al pie: es la condición de lectura del bloque
+// y va antes de la primera cifra.
+.denominador {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  border-left: 4px solid #64748b;
+  border-radius: var(--border-radius-sm);
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 12px;
+  line-height: 1.55;
+
+  mat-icon {
+    font-size: 18px; width: 18px; height: 18px;
+    flex-shrink: 0; margin-top: 1px;
+  }
+
+  // Un bloque servido desde PostgreSQL se distingue a simple vista: es el que
+  // sigue vivo cuando el almacén analítico está apagado.
+  &.fuente-pg {
+    border-left-color: #7e57c2;
+    background: #f3e5f5;
+    color: #4527a0;
+  }
+}
+
+.muestra-debil {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  border-left: 4px solid #ef6c00;
+  border-radius: var(--border-radius-sm);
+  background: #fff3e0;
+  color: #e65100;
+  font-size: 12.5px;
+
+  mat-icon { font-size: 18px; width: 18px; height: 18px; }
+}
+
+.ayuda-bloque {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0 0 12px;
+
+  mat-icon { font-size: 16px; width: 16px; height: 16px; color: #f9a825; }
+}
+
+.pie-recorte {
+  font-size: 11.5px;
+  color: var(--text-light);
+  margin: 10px 0 0;
+  text-align: right;
+}
+
+// ── Semáforo ─────────────────────────────────────────────────────────────
+.semaforo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.semaforo-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 18px 20px;
+  border-radius: var(--border-radius);
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: var(--shadow-soft);
+
+  .semaforo-valor {
+    font-size: 30px; font-weight: 800; letter-spacing: -1px;
+    color: var(--text-primary);
+  }
+  .semaforo-pct { font-size: 14px; font-weight: 700; color: var(--primary-light); }
+  .semaforo-etiqueta { font-size: 12.5px; font-weight: 600; color: var(--text-primary); }
+  .semaforo-pie { font-size: 11px; color: var(--text-secondary); }
+}
+
+// ── Gráfico SVG ──────────────────────────────────────────────────────────
+.grafico-wrap { margin-bottom: 16px; }
+
+.grafico-leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-bottom: 8px;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+
+  .leyenda-item { display: inline-flex; align-items: center; gap: 6px; }
+
+  .leyenda-punto {
+    width: 10px; height: 10px; border-radius: 3px; display: inline-block;
+  }
+}
+
+.grafico-svg {
+  display: block;
+  width: 100%;
+  // Sin `max-height`: con la altura recortada, el SVG se ajusta a la ALTURA y
+  // deja franjas vacias a izquierda y derecha. La altura sale de la proporcion
+  // del viewBox, que ya esta elegida para el ancho de la tarjeta.
+  height: auto;
+  font-family: 'Inter', sans-serif;
+
+  .grafico-rejilla {
+    line { stroke: rgba(100, 116, 139, 0.18); stroke-width: 1; }
+    text { font-size: 10px; fill: var(--text-light, #94a3b8); }
+    .eje-derecho { fill: #8e24aa; }
+  }
+
+  .grafico-eje-x {
+    line { stroke: rgba(100, 116, 139, 0.45); stroke-width: 1; }
+    text { font-size: 10px; fill: var(--text-secondary, #64748b); }
+  }
+
+  .grafico-barras rect { opacity: 0.9; }
+  .grafico-barras rect:hover { opacity: 1; }
+
+  .grafico-lineas path { stroke-width: 2; stroke-linejoin: round; fill: none; }
+
+  // La cruz de los cuadrantes es discontinua a propósito: es un corte
+  // calculado (la mediana del conjunto filtrado), no un umbral del negocio.
+  .grafico-cruz line {
+    stroke: #ef5350;
+    stroke-width: 1.4;
+    stroke-dasharray: 5 4;
+  }
+
+  .grafico-puntos circle { opacity: 0.78; }
+  .grafico-puntos circle:hover { opacity: 1; }
+
+  .grafico-pasos {
+    .paso-etiqueta { font-size: 10.5px; fill: var(--text-primary, #1f2937); font-weight: 600; }
+    .paso-valor { font-size: 10.5px; fill: var(--text-secondary, #64748b); }
+    .paso-tasa { fill: var(--text-light, #94a3b8); }
+  }
+
+  // Caja y bigotes: la caja es el 50 % central, la línea gruesa la mediana y
+  // el punto hueco la media. Se distinguen a propósito — cuando el punto cae
+  // fuera de la caja, la distribución está sesgada y eso es información.
+  .grafico-cajas {
+    .bigote { stroke: rgba(100, 116, 139, 0.75); stroke-width: 1.2; }
+    .tope   { stroke: rgba(100, 116, 139, 0.75); stroke-width: 1.2; }
+    .caja   { opacity: 0.72; rx: 2; }
+    .mediana { stroke: #1f2937; stroke-width: 2.4; }
+    .media  { fill: #ffffff; stroke: #1f2937; stroke-width: 1.4; }
+    .paso-etiqueta { font-size: 10.5px; fill: var(--text-primary, #1f2937); font-weight: 600; }
+  }
+
+  // Mapa de calor. La escala es de un solo tono: dos colores distintos
+  // sugerirían dos magnitudes distintas donde solo hay más y menos.
+  .grafico-matriz {
+    rect { rx: 2; }
+    .celda-valor { font-size: 10px; font-weight: 600; }
+    .rotulo-columna {
+      font-size: 10px;
+      fill: var(--text-secondary, #64748b);
+      font-weight: 600;
+    }
+    .paso-etiqueta { font-size: 10.5px; fill: var(--text-primary, #1f2937); font-weight: 600; }
+  }
+
+  .grafico-rotulos text {
+    font-size: 10.5px;
+    fill: var(--text-secondary, #64748b);
+    font-weight: 600;
+  }
+}
+
+// El bloque servido desde PostgreSQL, marcado también en el borde de la
+// tarjeta: es la señal de que no depende del almacén analítico.
+.bloque-externo { border-left: 3px solid #7e57c2; }

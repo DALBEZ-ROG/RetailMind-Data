@@ -7,7 +7,7 @@ y `--tabla` con un nombre desconocido falla con la lista de opciones válidas en
 vez de intentar construir un nombre de tabla a partir de texto libre. Es el
 mismo criterio de lista blanca que rige las consultas del proyecto.
 
-ESTADO: **MODELO COMPLETO — las 19 tablas implementadas.**
+ESTADO: **MODELO COMPLETO — las 19 tablas de HECHOS, más las DOS de MODELO.**
 
     Fase 1 (piloto)  dim_fecha · dim_producto · fact_venta_linea   ← HECHA
     Fase 2           dim_cliente · fact_pedido · fact_flujo_caja   ← HECHA
@@ -19,6 +19,8 @@ ESTADO: **MODELO COMPLETO — las 19 tablas implementadas.**
     Fase 4           dim_promocion_producto · fact_devolucion ·
                      fact_devolucion_linea · fact_ticket ·
                      fact_resena · fact_devolucion_proveedor       ← HECHA
+    Fase E2          fact_prevision_demanda  (nivel ESTRATÉGICO)   ← HECHA
+    Fase E3          fact_alerta_cliente     (nivel ESTRATÉGICO)   ← HECHA
 
 OJO con el ORDEN: `fact_stock_mensual` es la ÚNICA `TareaDerivada` del modelo y
 la única con dependencias de datos reales (`fact_movimiento_inventario` +
@@ -31,7 +33,7 @@ no comparte datos ni CTE, pero su Σ de líneas tiene que cuadrar con la Σ de
 cabeceras, y publicar el detalle cuando el total abortó dejaría a OTD-LOG-08 y
 OTD-VEN-14 contando dinero distinto del mismo hecho.
 
-Las correcciones al diseño que cada fase ha ido encontrando —30 supuestos que no
+Las correcciones al diseño que cada fase ha ido encontrando —57 supuestos que no
 se sostuvieron contra la base— viven en
 `docs/estrategico/CORRECCIONES_DISENO_ETL.md`. Léelo ANTES de implementar una
 tabla nueva: el diseño en papel se escribió sin ejecutar nada y varias de sus
@@ -46,7 +48,7 @@ CÓMO SE AÑADE UNA TABLA (el molde completo, en tres pasos):
 
 No hace falta tocar `carga_atomica.py`, `bitacora.py` ni `cargar.py`: la
 mecánica de lotes, validación, publicación atómica y bitácora ya está escrita
-una sola vez y sirve a las 19.
+una sola vez y sirve a las 21.
 """
 
 from etl.dwh.tablas.dim_cliente import DimCliente
@@ -54,6 +56,7 @@ from etl.dwh.tablas.dim_fecha import DimFecha
 from etl.dwh.tablas.dim_producto import DimProducto
 from etl.dwh.tablas.dim_promocion_producto import DimPromocionProducto
 from etl.dwh.tablas.dim_proveedor import DimProveedor
+from etl.dwh.tablas.fact_alerta_cliente import FactAlertaCliente
 from etl.dwh.tablas.fact_compra_linea import FactCompraLinea
 from etl.dwh.tablas.fact_devolucion import FactDevolucion
 from etl.dwh.tablas.fact_devolucion_linea import FactDevolucionLinea
@@ -64,6 +67,7 @@ from etl.dwh.tablas.fact_movimiento_inventario import FactMovimientoInventario
 from etl.dwh.tablas.fact_novedad_envio import FactNovedadEnvio
 from etl.dwh.tablas.fact_orden_compra import FactOrdenCompra
 from etl.dwh.tablas.fact_pedido import FactPedido
+from etl.dwh.tablas.fact_prevision_demanda import FactPrevisionDemanda
 from etl.dwh.tablas.fact_resena import FactResena
 from etl.dwh.tablas.fact_stock_mensual import FactStockMensual
 from etl.dwh.tablas.fact_ticket import FactTicket
@@ -91,11 +95,14 @@ TAREAS: dict[str, type[TareaCarga]] = {
     FactTicket.nombre: FactTicket,
     FactResena.nombre: FactResena,
     FactDevolucionProveedor.nombre: FactDevolucionProveedor,
+    FactPrevisionDemanda.nombre: FactPrevisionDemanda,
+    FactAlertaCliente.nombre: FactAlertaCliente,
 }
 
-#: Orden en que `run_etl.py` recorrería el grafo. La ÚNICA dependencia real del
-#: modelo es fact_movimiento_inventario → fact_stock_mensual (§7.1); las
-#: dimensiones van antes que los hechos por claridad, no por obligación técnica.
+#: Orden en que `run_etl.py` recorrería el grafo — que lo DERIVA de `depende_de`
+#: y no de esta tupla. Las dimensiones van antes que los hechos por claridad, no
+#: por obligación técnica; las dependencias reales son las de las tres tareas
+#: calculadas dentro del almacén (`fact_stock_mensual` y los dos modelos).
 ORDEN_SUGERIDO: tuple[str, ...] = (
     "dim_fecha",
     "dim_producto",
@@ -116,6 +123,8 @@ ORDEN_SUGERIDO: tuple[str, ...] = (
     "fact_resena",
     "fact_devolucion_proveedor",
     "fact_stock_mensual",          # derivada: DESPUÉS de fact_movimiento_inventario
+    "fact_prevision_demanda",      # modelo: DESPUÉS de fact_venta_linea
+    "fact_alerta_cliente",         # modelo: DESPUÉS de fact_pedido y fact_ticket
 )
 
 
@@ -133,7 +142,7 @@ def obtener(nombre: str) -> TareaCarga:
 
 
 def listar() -> None:
-    """Imprime el estado de las 19 tablas del modelo."""
+    """Imprime el estado de las 21 tablas del modelo."""
     print(f"\nTareas del DWH ({len(TAREAS)} de {len(ORDEN_SUGERIDO)} implementadas)\n")
     for nombre in ORDEN_SUGERIDO:
         estado = "implementada" if nombre in TAREAS else "pendiente"

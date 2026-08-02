@@ -96,6 +96,10 @@
       <h3>
         <mat-icon>{{ informe.icono }}</mat-icon>
         {{ informe.titulo }}
+        <!-- REGLA 5 de §5.2.9: la fecha ancla va EN EL TÍTULO. Solo la envían
+             los informes cuya recencia se mide contra el almacén y no contra
+             el reloj (OTD-VEN-19). -->
+        <span class="titulo-ancla" *ngIf="sufijoTitulo">· {{ sufijoTitulo }}</span>
         <span class="conteo" *ngIf="!loading">({{ total | number }})</span>
       </h3>
       <p class="informe-desc">{{ informe.descripcion }}</p>
@@ -131,6 +135,13 @@
         <mat-icon>hourglass_top</mat-icon> Consultando…
       </div>
 
+      <!-- REGLA 1 de §5.1.9: la serie histórica y la previsión, en el MISMO
+           gráfico. Va ANTES de la tabla porque es lo que hace interpretable
+           cada número de abajo. Solo lo declara OTD-GER-13. -->
+      <app-prevision-grafico *ngIf="!loading && informe.graficoPrevision && serie.length"
+                             [puntos]="serie" [serie]="previsionDe">
+      </app-prevision-grafico>
+
       <div class="table-wrapper" *ngIf="!loading && filas.length">
         <table mat-table [dataSource]="filas">
           <ng-container *ngFor="let col of informe.columnas" [matColumnDef]="col.campo">
@@ -138,11 +149,23 @@
             <td mat-cell *matCellDef="let fila"
                 [matTooltip]="valorCompleto(col, fila)"
                 [class.celda-monto]="col.monto">
-              <span *ngIf="col.tipo === 'chip'; else plano"
-                    class="estado-chip" [ngClass]="claseChip(col, fila)">
+              <span *ngIf="col.tipo === 'chip'" class="estado-chip"
+                    [ngClass]="claseChip(col, fila)">
                 {{ valor(col, fila) }}
               </span>
-              <ng-template #plano>{{ valor(col, fila) }}</ng-template>
+              <!-- REGLA 2 de §5.2.9: el sparkline va EN LA FILA. El rótulo es
+                   un <title> NATIVO del SVG: con centenares de matTooltip vivos
+                   el navegador deja de responder. -->
+              <svg *ngIf="col.tipo === 'sparkline'" class="sparkline" height="18"
+                   [attr.width]="anchoSparkline(fila, col.campo)"
+                   [attr.viewBox]="'0 0 ' + anchoSparkline(fila, col.campo) + ' 18'">
+                <title>{{ rotuloSparkline(fila, col.campo) }}</title>
+                <rect *ngFor="let b of barras(fila, col.campo)"
+                      [attr.x]="b.x" [attr.y]="b.y" width="4" [attr.height]="b.alto"></rect>
+              </svg>
+              <ng-container *ngIf="col.tipo !== 'chip' && col.tipo !== 'sparkline'">
+                {{ valor(col, fila) }}
+              </ng-container>
             </td>
           </ng-container>
           <tr mat-header-row *matHeaderRowDef="columnas"></tr>

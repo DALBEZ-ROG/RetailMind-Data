@@ -1677,6 +1677,311 @@ CONTROLES += [
             ) GROUP BY mes ORDER BY periodo
         """,
     ),
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # FASE E2 — la previsión de demanda (nivel ESTRATÉGICO, §5.1)
+    # ═══════════════════════════════════════════════════════════════════════
+    #
+    # Aquí la validación cruzada cambia de naturaleza y conviene decirlo. Las 44
+    # anteriores comparan HECHOS al centavo: PostgreSQL tiene la misma fila y el
+    # criterio es la igualdad exacta. Una previsión es una fila con fecha
+    # FUTURA: PostgreSQL no la tiene y no puede tenerla, así que no hay ninguna
+    # cifra prevista que contrastar.
+    #
+    # Lo que sí se puede contrastar —y es lo único que de verdad falla aquí— es
+    # el UNIVERSO y el ANCLA:
+    #
+    #   * el universo: se previsiona exactamente el catálogo que existe. Si el
+    #     almacén perdiera una categoría o un puñado de variantes, el modelo
+    #     publicaría tan tranquilo una previsión de un catálogo más pequeño, con
+    #     todas sus cifras coherentes entre sí y equivocadas — el patrón
+    #     dominante del sistema.
+    #   * el ancla: el primer mes previsto tiene que estar donde acaba la venta
+    #     REAL de PostgreSQL. Es el control que detecta una tabla RANCIA, que es
+    #     el modo de fallo propio de una predicción: si entra un mes de ventas y
+    #     el modelo no vuelve a correr, la pantalla sigue enseñando la previsión
+    #     de un mes que YA ocurrió, sin dar ningún error y con su banda intacta.
+
+    Control(
+        nombre="fact_prevision_demanda",
+        fase=5,
+        tabla="fact_prevision_demanda",
+        descripcion="Universo previsionado: el catálogo que PostgreSQL tiene, sin "
+                    "perder ni inventar series",
+        columnas=("filas", "categorias", "variantes_largas", "meses_previstos",
+                  "series_sin_prevision"),
+        sql_pg="""
+            WITH linea AS (
+                SELECT (date_trunc('month',
+                            p.fecha_pedido AT TIME ZONE 'America/Guayaquil'))::date AS mes,
+                       COALESCE(c.nombre, 'sin_categoria')                     AS categoria,
+                       pd.producto_variante_id                                 AS variante
+                FROM pedido_detalle pd
+                JOIN pedido p             ON p.id  = pd.pedido_id
+                JOIN estado_pedido ep     ON ep.id = p.estado_pedido_id
+                JOIN producto_variante pv ON pv.id = pd.producto_variante_id
+                LEFT JOIN producto_categoria pc
+                                          ON pc.producto_id = pv.producto_id
+                                         AND pc.es_principal
+                LEFT JOIN categoria c     ON c.id  = pc.categoria_id
+                WHERE ep.codigo <> 'cancelado'
+            ),
+            cat AS (SELECT categoria, count(DISTINCT mes) AS meses
+                      FROM linea GROUP BY categoria),
+            var AS (SELECT variante, count(DISTINCT mes) AS meses
+                      FROM linea GROUP BY variante)
+            SELECT ((SELECT count(*) FROM cat)
+                    + (SELECT count(*) FROM var WHERE meses >= 12) + 1) * 3,
+                   (SELECT count(*) FROM cat),
+                   (SELECT count(*) FROM var WHERE meses >= 12),
+                   3,
+                   (SELECT count(*) FROM cat WHERE meses < 12)
+        """,
+        sql_ch=f"""
+            SELECT count(),
+                   countDistinctIf(categoria, nivel = 'categoria'),
+                   countDistinctIf(producto_variante_id, nivel = 'variante'),
+                   countDistinct(mes),
+                   countDistinctIf(categoria, metodo = 'sin_prevision')
+            FROM {CH_DATABASE}.fact_prevision_demanda
+        """,
+    ),
+
+    Control(
+        nombre="prevision_ancla",
+        fase=5,
+        tabla="fact_prevision_demanda",
+        descripcion="La previsión arranca donde acaba la venta real: detecta una "
+                    "tabla rancia, el modo de fallo propio de una predicción",
+        columnas=("ultimo_mes_vendido", "primer_mes_previsto", "ultimo_previsto",
+                  "desfase_entrenamiento"),
+        # Tres meses a partir del último mes vendido, ni uno más ni uno menos.
+        # Ningún desplazamiento se escribe a mano en el lado de ClickHouse:
+        # PostgreSQL los deriva de su propio `max(mes)` y ClickHouse los lee de
+        # la tabla publicada.
+        #
+        # La cuarta columna es la que vigila la decisión de §5.1.2: PostgreSQL
+        # determina POR SU CUENTA si el último mes está truncado —comparando el
+        # día más alto con pedidos contra la mediana de los meses anteriores— y
+        # de ahí sale el desfase que el entrenamiento debería tener (2 si el mes
+        # se excluyó, 1 si entró). ClickHouse lo responde con
+        # `horizonte_efectivo - horizonte`. Si el ETL dejara de excluir el mes
+        # incompleto, las dos cifras dejarían de coincidir aquí — y ninguna suma
+        # de la tabla habría fallado.
+        sql_pg="""
+            WITH linea AS (
+                SELECT (p.fecha_pedido AT TIME ZONE 'America/Guayaquil') AS f
+                FROM pedido p
+                JOIN estado_pedido ep ON ep.id = p.estado_pedido_id
+                WHERE ep.codigo <> 'cancelado'
+            ),
+            por_mes AS (
+                SELECT date_trunc('month', f)::date AS mes,
+                       max(extract(day FROM f))     AS dia_max
+                FROM linea GROUP BY 1
+            ),
+            ultimo AS (SELECT max(mes) AS mes FROM por_mes),
+            corte AS (
+                SELECT (SELECT dia_max FROM por_mes
+                         WHERE mes = (SELECT mes FROM ultimo))       AS propio,
+                       (SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY dia_max)
+                          FROM por_mes
+                         WHERE mes <> (SELECT mes FROM ultimo))      AS referencia
+            )
+            SELECT to_char(u.mes, 'YYYY-MM'),
+                   to_char(u.mes + interval '1 month', 'YYYY-MM'),
+                   to_char(u.mes + interval '3 month', 'YYYY-MM'),
+                   CASE WHEN c.propio < c.referencia THEN 2 ELSE 1 END
+            FROM ultimo u CROSS JOIN corte c
+        """,
+        sql_ch=f"""
+            SELECT
+                (SELECT formatDateTime(max(mes), '%Y-%m')
+                   FROM {CH_DATABASE}.fact_venta_linea WHERE es_cancelado = 0),
+                (SELECT formatDateTime(min(mes), '%Y-%m')
+                   FROM {CH_DATABASE}.fact_prevision_demanda),
+                (SELECT formatDateTime(max(mes), '%Y-%m')
+                   FROM {CH_DATABASE}.fact_prevision_demanda),
+                (SELECT max(toInt16(horizonte_efectivo) - toInt16(horizonte))
+                   FROM {CH_DATABASE}.fact_prevision_demanda) + 1
+        """,
+    ),
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # FASE E3 — la alerta de abandono de cliente (nivel ESTRATÉGICO, §5.2)
+    # ═══════════════════════════════════════════════════════════════════════
+    #
+    # Aquí la validación cruzada vuelve a ser posible al detalle, y es una
+    # suerte: la alerta es una PREDICCIÓN, pero se calcula con una fórmula
+    # cerrada sobre tres cantidades que PostgreSQL sí tiene —cuántas veces
+    # compró el cliente en la ventana, desde cuándo, y cuánto lleva callado—.
+    # Así que PostgreSQL puede recalcular el modelo ENTERO, incluida la
+    # exponencial, y contradecir al almacén cliente por cliente.
+    #
+    # Los tres controles atacan los tres modos de fallo de esta fase, y ninguno
+    # de ellos rompe una suma:
+    #
+    #   * `alerta_ancla` — el ANCLA y la VENTANA. §5.2.5: la recencia se mide
+    #     contra `max(fecha_pedido)` del almacén y jamás contra el reloj. Si el
+    #     almacén se quedara atrás, todos los silencios saldrían cortos y la
+    #     pantalla quedaría tranquilizadora. Vigila además la CONCENTRACIÓN
+    #     máxima mensual, que es el guardia del artefacto de la rampa.
+    #   * `alerta_lambda` — los INSUMOS de λ, cliente por cliente. Es el control
+    #     fuerte: 69 filas × 3 cantidades reconstruidas desde `pedido`.
+    #   * `alerta_niveles` — el VEREDICTO por cliente. PostgreSQL calcula
+    #     e^(−λt) por su cuenta y cuenta cuántos caen en cada nivel. Si el
+    #     almacén cambiara α o el orden de los umbrales, aquí se vería; una lista
+    #     con los semáforos corridos no da ningún error por sí sola.
+
+    Control(
+        nombre="alerta_ancla",
+        fase=6,
+        tabla="fact_alerta_cliente",
+        descripcion="Ancla, ventana estable y concentración máxima: el marco "
+                    "temporal del que depende toda la alerta",
+        columnas=("filas", "ancla", "ventana_inicio", "concentracion_maxima",
+                  "meses_ventana"),
+        # La ventana se deriva del ancla también en PostgreSQL: 7 meses contados
+        # desde el mes del ancla incluido, o sea 6 meses de resta. Se escribe
+        # aquí a propósito en vez de importarla del modelo — este script debe
+        # poder contradecir al ETL, y compartir la constante sería una
+        # tautología.
+        sql_pg="""
+            WITH venta AS (
+                SELECT p.cliente_id AS cid,
+                       (p.fecha_pedido AT TIME ZONE 'America/Guayaquil')::date AS dia
+                FROM pedido p
+                JOIN estado_pedido ep ON ep.id = p.estado_pedido_id
+                WHERE ep.codigo <> 'cancelado' AND p.cliente_id IS NOT NULL
+            ),
+            ancla AS (SELECT max(dia) AS d FROM venta),
+            ventana AS (
+                SELECT (date_trunc('month', (SELECT d FROM ancla))
+                        - interval '6 months')::date AS ini
+            ),
+            por_mes AS (
+                SELECT date_trunc('month', dia)::date AS mes, cid, count(*) AS n
+                FROM venta WHERE dia >= (SELECT ini FROM ventana)
+                GROUP BY 1, 2
+            ),
+            conc AS (
+                SELECT mes, sum(n) AS tot, max(n) AS mx FROM por_mes GROUP BY mes
+            )
+            SELECT (SELECT count(DISTINCT cid) FROM venta),
+                   (SELECT d FROM ancla),
+                   (SELECT ini FROM ventana),
+                   (SELECT round(max(100.0 * mx / tot), 2) FROM conc),
+                   7
+        """,
+        sql_ch=f"""
+            SELECT count(), max(fecha_ancla), max(ventana_inicio),
+                   max(concentracion_maxima), max(meses_ventana)
+            FROM {CH_DATABASE}.fact_alerta_cliente
+        """,
+    ),
+
+    Control(
+        nombre="alerta_lambda",
+        fase=6,
+        tabla="fact_alerta_cliente",
+        descripcion="Los insumos de λ cliente por cliente: pedidos en la ventana, "
+                    "días observados y días de silencio",
+        clave=("cliente_id",),
+        columnas=("cliente_id", "pedidos_ventana", "dias_observados", "dias_silencio"),
+        # `dias_observados` arranca en la PRIMERA compra del cliente DENTRO de la
+        # ventana, no en el inicio de la ventana: contarle a un cliente de mayo
+        # los cuatro meses en que todavía no era cliente le divide λ por tres.
+        # Los clientes sin muestra (menos de 3 pedidos) llevan 0 días observados
+        # porque no tienen λ — y aun así están en la tabla con su silencio real.
+        sql_pg="""
+            WITH venta AS (
+                SELECT p.cliente_id AS cid,
+                       (p.fecha_pedido AT TIME ZONE 'America/Guayaquil')::date AS dia
+                FROM pedido p
+                JOIN estado_pedido ep ON ep.id = p.estado_pedido_id
+                WHERE ep.codigo <> 'cancelado' AND p.cliente_id IS NOT NULL
+            ),
+            ancla AS (SELECT max(dia) AS d FROM venta),
+            ventana AS (
+                SELECT (date_trunc('month', (SELECT d FROM ancla))
+                        - interval '6 months')::date AS ini
+            ),
+            agg AS (
+                SELECT cid,
+                       count(*) FILTER (WHERE dia >= (SELECT ini FROM ventana)) AS en_ventana,
+                       min(dia) FILTER (WHERE dia >= (SELECT ini FROM ventana)) AS primera,
+                       max(dia) AS ultima
+                FROM venta GROUP BY cid
+            )
+            SELECT cid,
+                   en_ventana,
+                   CASE WHEN en_ventana >= 3
+                        THEN ((SELECT d FROM ancla) - primera) + 1 ELSE 0 END,
+                   (SELECT d FROM ancla) - ultima
+            FROM agg ORDER BY cid
+        """,
+        sql_ch=f"""
+            SELECT cliente_id, pedidos_ventana, dias_observados, dias_silencio
+            FROM {CH_DATABASE}.fact_alerta_cliente ORDER BY cliente_id
+        """,
+    ),
+
+    Control(
+        nombre="alerta_niveles",
+        fase=6,
+        tabla="fact_alerta_cliente",
+        descripcion="El veredicto: PostgreSQL recalcula e^(−λt) y reparte los "
+                    "clientes por nivel de alerta",
+        columnas=("criticas", "atencion", "normal", "sin_muestra", "en_alerta"),
+        # α = 0,05 y la frontera de `atencion` en 0,10 se escriben aquí, otra vez
+        # a propósito. Si alguien moviera el umbral en el modelo sin decirlo, la
+        # lista seguiría saliendo perfectamente formada con los semáforos
+        # corridos, y este control es lo único que lo notaría.
+        sql_pg="""
+            WITH venta AS (
+                SELECT p.cliente_id AS cid,
+                       (p.fecha_pedido AT TIME ZONE 'America/Guayaquil')::date AS dia
+                FROM pedido p
+                JOIN estado_pedido ep ON ep.id = p.estado_pedido_id
+                WHERE ep.codigo <> 'cancelado' AND p.cliente_id IS NOT NULL
+            ),
+            ancla AS (SELECT max(dia) AS d FROM venta),
+            ventana AS (
+                SELECT (date_trunc('month', (SELECT d FROM ancla))
+                        - interval '6 months')::date AS ini
+            ),
+            agg AS (
+                SELECT cid,
+                       count(*) FILTER (WHERE dia >= (SELECT ini FROM ventana)) AS en_ventana,
+                       min(dia) FILTER (WHERE dia >= (SELECT ini FROM ventana)) AS primera,
+                       max(dia) AS ultima
+                FROM venta GROUP BY cid
+            ),
+            prob AS (
+                SELECT cid, en_ventana,
+                       CASE WHEN en_ventana >= 3 THEN
+                           exp(- (en_ventana::float8
+                                  / (((SELECT d FROM ancla) - primera) + 1))
+                               * ((SELECT d FROM ancla) - ultima))
+                       END AS p
+                FROM agg
+            )
+            SELECT count(*) FILTER (WHERE p IS NOT NULL AND p <  0.05),
+                   count(*) FILTER (WHERE p IS NOT NULL AND p >= 0.05 AND p < 0.10),
+                   count(*) FILTER (WHERE p IS NOT NULL AND p >= 0.10),
+                   count(*) FILTER (WHERE p IS NULL),
+                   count(*) FILTER (WHERE p IS NOT NULL AND p < 0.10)
+            FROM prob
+        """,
+        sql_ch=f"""
+            SELECT countIf(nivel_alerta = 'critica'),
+                   countIf(nivel_alerta = 'atencion'),
+                   countIf(nivel_alerta = 'normal'),
+                   countIf(nivel_alerta = 'sin_muestra'),
+                   countIf(nivel_alerta IN ('critica', 'atencion'))
+            FROM {CH_DATABASE}.fact_alerta_cliente
+        """,
+    ),
 ]
 
 

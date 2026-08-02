@@ -680,13 +680,178 @@ ANALISTA entra en COM-03/04/06/12 y queda fuera de COM-05 —que no lleva ni un 
 catálogo lo reserva a Compras y Gerencia—, BODEGA solo en COM-07 y COM-11. Detalle en
 `docs/tactico/PATRON_INFORMES.md` §18.
 
-**Pendiente**: contenerización completa (PostgreSQL sigue local, fuera de compose) y la
-**orquestación del pipeline** (`run_etl.py` con orden topológico y, si se decide, el DAG de
-Airflow de §7). El MODELO DE DATOS está **COMPLETO**: las **19 tablas** del DWH cargadas y
-validadas (44 controles en verde), y el **CATÁLOGO TÁCTICO también**: 30 informes simples +
-**39 compuestos** en producción, ninguno pendiente. El diseño del
-pipeline vive en `docs/estrategico/DISENO_ETL_CLICKHOUSE.md` **y está corregido en
-`docs/estrategico/CORRECCIONES_DISENO_ETL.md` — 33 supuestos que no se sostuvieron; léelo antes
+**TABLEROS DE DIRECCIÓN — FASE E1-A (2026-08-01, solo código, sin script, NO carga ni una
+fila)**: arranca el nivel ESTRATÉGICO con los tres primeros tableros de
+`docs/estrategico/DISENO_NIVEL_ESTRATEGICO.md` §4 — **T-1 Omnicanal** (OE-06), **T-2 Rentabilidad
+y Rotación** (OE-07) y **T-3 Cliente y Posventa** (OE-08) — que cubren 10 de las 19 decisiones de
+dashboard. **0 tablas nuevas**: las 19 del almacén bastan. Paquete nuevo `tableros/`
+(`TableroServiceBase` + 3 servicios + 1 controlador) y pantalla genérica
+`features/operativo/tableros/` parametrizada por `definiciones/tableros.ts`; un tablero nuevo =
+1 clase Java + 1 bloque de definición.
+**ENFOQUE: una respuesta por tablero, no una por elemento** (`GET /api/tableros/{tablero}` →
+`{tablero, kpis[], bloques[], salvedades[], datosAl, analiticaDisponible}`). Los seis elementos
+comparten filtros, llevan la MISMA marca de agua y degradan a la vez; con seis peticiones,
+ClickHouse cayéndose a mitad de carga dejaría medio tablero pintado. **Excepción declarada**: los
+dos elementos que NO salen del almacén —carrito abandonado (T-1) y sobre-stock del presente
+(T-2)— los pide la PANTALLA con una segunda llamada a los informes simples OTD-VEN-08 y
+OTD-INV-08, y por eso **siguen vivos con ClickHouse apagado**.
+Si vas a tocar esto: (1) **el embudo de T-1 cuenta «alcanzó este hito O uno posterior», jamás la
+marca a secas**: hay **969 pedidos entregados sin registro de despacho**, y con
+`countIf(fecha_despachado IS NOT NULL)` el embudo NO es monótono (2.868 despachados contra 3.696
+entregados) y pinta una fuga del 26 % en la etapa que no la tiene — justo la decisión que D-06.2
+toma; (2) la **tasa de rechazo del cobro NO es separable por canal**: los 176 intentos fallidos no
+tienen `pedido_id` y el canal sale del pedido, así que partirla daría **0 % en los tres canales**
+sin un solo error (misma causa que C2.1); (3) **T-3 recorta a SOPORTE por la CONSULTA y no por la
+ruta** —entra al endpoint y el servicio NO ejecuta los bloques de valor del cliente ni de
+reseñas—, y el sobre declara cuáles omitió en `bloquesOmitidos`; (4) la salvedad de **costo
+vigente** (margen) y **moneda constante** (capital) es obligatoria y se pinta ENCIMA de la cifra;
+(5) `bloque()` **exige** el campo `denominador` y revienta sin él: en este nivel una cifra sin su
+base no produce una pantalla rara, produce una decisión; (6) el alias de agregado con el nombre de
+su columna reincidió **seis veces** en una tarde (`sum(monto) AS monto` → `ILLEGAL_AGGREGATION`):
+prefija `t_` SIEMPRE y repón el nombre del contrato en el SELECT exterior; (7) la **dispersión se
+pinta entera** (834 puntos) aunque su tabla se recorte — la cruz son las MEDIANAS del conjunto y
+con las 40 primeras por venta los cuadrantes dejan de corresponder con lo que se ve; (8) los
+rótulos del SVG son `<title>` NATIVO y no `matTooltip`: con 1.933 directivas vivas el navegador
+dejaba de responder.
+Verificación: **71 controles contra PostgreSQL tomando la cifra de la RESPUESTA HTTP**
+(`retailmind/validar_tableros.py`, rol `retailmind_etl`), todos con Δ = 0 — venta $5.498.570,35 ·
+3.924 pedidos · 64 clientes omnicanales · margen $1.049.320,91 · capital $22.024.063,50 · 387
+productos hueso · 834 variantes con venta · 76 tickets cerrados · 344 reseñas sin multiplicar.
+Matriz **24 celdas × 0 discrepancias** (`retailmind/matriz_tableros.py`, que ensancha la ventana
+horaria y la **restaura verificándola**). Degradación probada con `docker stop`: 200 con
+`analiticaDisponible=false` en ~4,1 s, los bloques de PostgreSQL intactos, y recuperación sin
+reiniciar. Los 6 supuestos del diseño que no se sostuvieron están en
+`docs/estrategico/CORRECCIONES_DISENO_ETL.md` (CE1.1 a CE1.6).
+
+**TABLEROS DE DIRECCIÓN — FASE E1-B: NIVEL ESTRATÉGICO DE TABLERO COMPLETO (2026-08-01, solo
+código, sin script, NO carga ni una fila)**: los cuatro que faltaban — **T-4 Operación y Última
+Milla** (OE-09), **T-5 Costo de la Operación** (OE-09), **T-6 Abastecimiento** (OE-11) y **T-7
+Gobierno del Dato** (OE-10) —. Con E1-A son **7 tableros y las 19 decisiones de dashboard, todas
+servidas**; **0 tablas nuevas** en el almacén, como el diseño anticipó. Coste: 4 clases Java + 1
+bloque de definición por tablero + 4 líneas de `SecurityConfig` (la pantalla genérica no se tocó,
+solo ganó dos trazados: caja-y-bigotes y mapa de calor).
+Si vas a tocar esto: (1) **T-4 es el ÚNICO tablero SIN dinero y el único que DESPACHO y BODEGA
+abren**; lo sostienen DOS cosas a la vez —su línea de `SecurityConfig` y que su consulta no
+seleccione un importe—, y como ClickHouse no tiene GRANT por columna la segunda se comprueba
+automáticamente: `validar_tableros.py` recorre la respuesta entera buscando nombres con aspecto
+monetario y falla si aparece uno, **en los cinco roles**; (2) **`dim_fecha` NO tiene
+`fecha_carga`** —es el calendario, generado con `numbers()` dentro de ClickHouse— y pedírsela no
+devuelve nulo, revienta con `UNKNOWN_IDENTIFIER`: la frescura se calcula sobre las **18** tablas
+con sello y el calendario se publica aparte, marcado; (3) en `etl_ejecucion` **`corrida` y
+`validar_dwh` NO son tablas**: la primera escribe DOS filas (`en_curso` al empezar, `exito` al
+acabar) y su `filas_escritas` repite el total de todas las tablas, así que sumar sin excluirlas da
+**128.214 donde hay 64.085** —el doble exacto— y lista una tarea eternamente «en curso»; se colapsa
+con `argMax(…, inicio)` y se excluyen de todo conteo; (4) **«preparación» en `horas_pago_a_
+preparacion` es el hito `preparado` (picking TERMINADO), no `en_preparacion`** —2.868 pedidos
+frente a 2.883—, y las etiquetas del tablero ya no usan esa palabra; (5) el embudo del retorno al
+almacén **termina en CERO y se publica igual**: los 120 pedidos devueltos no tienen ninguna
+devolución registrada después, la mercancía volvió y no consta en ningún sitio — es la brecha que
+D-09.4 tiene que ver, no un fallo del dato; (6) en `argMax(resultado, inicio)` el segundo argumento
+es la **columna cruda**, jamás el alias del `min(inicio)` del mismo nivel: renombrar el alias no
+basta, hay que dejar de usarlo ahí dentro; (7) T-6 arranca en `alcance=entregadas` porque con
+«todas» el mejor proveedor (99,71 %) pasa a ser el peor (91,77 %), y su GASTO se agrupa por el mes
+de la **FACTURA**, no por el de la orden.
+Verificación: **132 controles contra PostgreSQL tomando la cifra de la RESPUESTA HTTP**
+(`retailmind/validar_tableros.py`, rol `retailmind_etl`), todos con Δ = 0 — 2.872 envíos · 2.723
+con promesa medible · 1.704 a tiempo · tramos 2.868/2.856/2.727/3.696 · 176 incidencias con 169
+resueltas · merma 137 perdidas/90 sobrantes (con el filtro por naturaleza serían 34.300: **381×**) ·
+$32.723,25 de flete con 24 envíos sin tarifar excluidos · 86 reembolsos con 1 sin asiento y $169,70
+de diferencia · $22.467.387,27 facturado · $6.382.924,53 de saldo · 902 pagos por $16.084.462,74 ·
+38 ítems defectuosos en 9 devoluciones. Matriz **56 celdas × 0 discrepancias**
+(`retailmind/matriz_tableros.py`, que ensancha la ventana horaria y la **restaura verificándola**):
+ANALISTA entra en SEIS tableros y queda fuera de T-7; COMPRAS solo en T-6; BODEGA y DESPACHO solo
+en T-4. Degradación probada con `docker stop`: 200 con `analiticaDisponible=false` en ~4,08 s, los
+bloques servidos desde PostgreSQL intactos (auditoría 7.073, accesos 219), y recuperación sin
+reiniciar. Los 4 supuestos que no se sostuvieron están en
+`docs/estrategico/CORRECCIONES_DISENO_ETL.md` (CE2.1 a CE2.4). **Pendiente del nivel estratégico**:
+solo el modelo E3 (alerta de abandono); E2 está hecho — ver el bloque siguiente.
+
+**PREVISIÓN DE DEMANDA — FASE E2, EL PRIMER MODELO (2026-08-01, solo código, sin script)**:
+`fact_prevision_demanda`, la **tabla 20** del almacén y la primera con filas de **fecha futura**
+(510 = 3 meses × [1 total + 10 categorías + 159 variantes]). Descomposición multiplicativa con
+factores estacionales ENCOGIDOS, ajustada a total y categoría, desagregada a la variante por
+cuota; entra como `TareaModelo` (sabor nuevo de `TareaDerivada`: se calcula desde el DWH pero su
+transformación es Python y no un `INSERT … SELECT`). El modelo vive en
+`retailmind/etl/dwh/modelos/prevision_demanda.py` y **no abre ninguna conexión**: entran dos
+vectores, sale una previsión con banda. **Veredicto: se publica el MODELO** — MAPE total
+**8,78 %** contra **12,22 %** del ingenuo estacional y 33,00 % del ingenuo (con el mes truncado
+anualizado, 17,39 % contra 20,07 %), cobertura de la banda del 80 % en **87,6 % (772/881 puntos)**,
+y 41 de 168 series publican su línea base por no superarla (`es_linea_base = 1`). Dos endpoints
+—`/api/informes/{gerencia|compras}/prevision-demanda`— sobre UNA sola clase
+(`InformesPrevisionService`) que los dos controladores existentes inyectan. Si vas a tocar esto:
+(1) **el `k ≈ 2` del diseño encoge DEMASIADO y hace que el modelo se rechace a sí mismo**: deja
+diciembre en 1,075 donde el generador del seed lo escribió en 1,48, infla σ al 0,214 y la banda al
+±41 %, con lo que la cobertura sale **100 %** y suspende el criterio de §5.1.6; k se ESTIMA de los
+datos (Stein / Bayes empírico, `k = σ²/τ²` → 0,175, recortado al suelo declarado de 0,25);
+(2) **el nivel con el que se calculan las razones tiene que ser ESTACIONALMENTE NEUTRO** — el nivel
+filtrado por suavizado exponencial persigue la subida de mayo, la varianza dentro del mes sale mayor
+que la de entre meses y los doce factores acaban entre 0,98 y 1,02; se usa el nivel GLOBAL de la
+serie ya normalizada al año base; (3) **la cobertura NO se juzga sobre los 6 puntos del total** —
+una banda perfecta al 80 % da 6/6 el 26 % de las veces—: se mide sobre los 881 puntos agrupados;
+(4) **el mes truncado se DETECTA** (día máximo del último mes contra la mediana de los anteriores;
+julio 2026 cubre 1/1,227) y su exclusión se publica en `horizonte_efectivo`, porque la tabla sale
+IDÉNTICA se haya excluido o no y la pantalla no tendría cómo marcarlo; (5) **la regla «la banda se
+ensancha con el horizonte» NO es exigible fila a fila** —en unidades falla en 15 series y en
+relativo en 16, todas con razón—: se exige serie a serie sobre `descomposicion` y en media sobre el
+resto; (6) `String.formatted()` interpreta el bloque entero y `formatDateTime(mes,'%Y-%m')` lo
+revienta con un 400 «Conversion = 'Y'» (reincidencia de §18). Verificación: **46 controles** de
+`validar_dwh.py` en verde (44 + universo + ancla, este último comprobando desde PostgreSQL que el
+mes truncado se excluyó) y **16 celdas × 0 discrepancias** en `retailmind/matriz_prevision.py`, que
+además contrasta contra PostgreSQL **la serie del gráfico mes a mes** y exige las cinco
+limitaciones de §5.1.10 en la salvedad. Degradación probada con `docker stop`: 200 con
+`analiticaDisponible=false` en ~4,1 s y recuperación sin reiniciar. Detalle en
+`docs/tactico/PATRON_INFORMES.md` §20; los 6 supuestos que no se sostuvieron, en
+`docs/estrategico/CORRECCIONES_DISENO_ETL.md` (CE3.1 a CE3.6).
+
+**ALERTA DE ABANDONO — FASE E3, EL ÚLTIMO MODELO (2026-08-02, solo código, sin script)**:
+`fact_alerta_cliente`, la **tabla 21** del almacén, y con ella el nivel estratégico COMPLETO.
+Es un modelo del **PROCESO** y no uno aprendido, y entra sabiendo que §5.2.2 lo declaró **NO
+VIABLE como modelo entrenado**: no hay etiqueta de abandono, el generador del seed sortea al
+cliente con peso constante —**nadie abandona nunca**— y la correlación entre el mejor predictor
+y el resultado real es **0,039**. Se implementa supervivencia exponencial con la tasa propia de
+cada cliente (λᵢ = pedidos/días observados; P = e^(−λᵢ·t); alerta si P < α = 0,05), sin
+etiquetas y con la tasa de falsa alarma conocida de antemano. **Se publica CON SU LIFT A LA
+VISTA**: las tres primeras tarjetas de la cabecera son el lift medido (**1,99×**), su muestra
+(**14 casos positivos de 167 evaluaciones**) y el dictamen **«¿Supera al azar? NO · p = 0,1019»**
+—el valor p es la pieza que el diseño no pidió y sin la cual un 1,99 sobre 14 positivos se lee
+como un éxito—. Endpoint `GET /api/informes/ventas/clientes-en-riesgo` (ADMIN/GERENTE/VENDEDOR,
+lleva monto: Bodega y Despacho fuera por RUTA), **0 clases Java nuevas** y **0 componentes
+Angular nuevos**. Si vas a tocar esto: (1) **la ventana estable NO es una fecha** — son los
+últimos `MESES_VENTANA = 7` meses contados desde el ancla, y un mes escrito en el código
+funcionaría exactamente una vez; el guardia de **concentración ABORTA la publicación** si algún
+mes de la ventana tiene un cliente por encima del 25 % (hoy 10,9 %; con los 19 meses, **100 %**,
+y ahí el 2.º cliente de la cartera —$399.425— sale como la alerta más fuerte del sistema con
+P = 4·10⁻¹⁷: la inversión exacta de la verdad); (2) **la recencia se ancla a `max(fecha_pedido)`
+del almacén y JAMÁS al reloj** —si el ETL se para, los 69 clientes cruzarían el umbral a la vez—
+y la fecha ancla va EN EL TÍTULO; (3) **los clientes sin muestra son los candidatos más fuertes
+y el modelo los expulsa**: los dos silencios más largos de la cartera (179 y 94 días) tienen por
+eso mismo menos de 3 pedidos en la ventana, así que se publican los **69** con nivel
+`sin_muestra` y su silencio REAL en vez de los 61 evaluables; (4) el lift se divide por la tasa
+base **de su propio origen** (5,8 % · 7,0 % · 12,1 %, no el 9,4 % del diseño) y un origen sin
+positivos da lift **inexistente**, no cero; (5) **la ventana de entrenamiento del backtest RUEDA
+con el origen**, o se mide un estimador que nunca se publica (1,34 fija vs 1,99 rodante); (6) el
+recorte del VENDEDOR **no puede usar `vendedor_id`** —el almacén guarda el NOMBRE—: casa contra
+`vendedores Array(String)` y el ETL valida que los nombres sean únicos; medido, deja **50 de 69**
+clientes, porque 54 fueron atendidos por 3 o más vendedores. Verificación: **49 controles** de
+`validar_dwh.py` en verde (46 + 3 nuevos, donde PostgreSQL **recalcula el modelo entero**,
+exponencial incluida, y contrasta λ **cliente por cliente**) y **8 celdas × 0 discrepancias** en
+`retailmind/matriz_alerta_cliente.py`, que además verifica el reparto por nivel contra
+PostgreSQL (69/3/6/8, Δ = 0), el recorte del vendedor cliente por cliente y que el **lift esté en
+las tres primeras tarjetas**. Degradación probada con `docker stop`: 200 con
+`analiticaDisponible=false` en ~4,1 s y recuperación sin reiniciar. Detalle en
+`docs/tactico/PATRON_INFORMES.md` §21; los 8 supuestos que no se sostuvieron, en
+`docs/estrategico/CORRECCIONES_DISENO_ETL.md` (CE4.1 a CE4.8).
+
+**Pendiente**: contenerización completa (PostgreSQL sigue local, fuera de compose) y, si se
+decide, el DAG de Airflow de §7 (`run_etl.py` ya orquesta con orden topológico). El MODELO DE
+DATOS está **COMPLETO**: las **19 tablas de hechos** del DWH más `fact_prevision_demanda` y
+`fact_alerta_cliente` — **21 tablas, 64.664 filas**, cargadas y validadas (**49 controles en
+verde**). El **CATÁLOGO TÁCTICO también**: 30 informes simples + **39 compuestos**. Y el **NIVEL
+ESTRATÉGICO está CERRADO**: 7 tableros, las 19 decisiones de dashboard y **los 2 modelos**
+(previsión de demanda y alerta de abandono). El diseño del pipeline vive en
+`docs/estrategico/DISENO_ETL_CLICKHOUSE.md` y el del nivel estratégico en
+`docs/estrategico/DISENO_NIVEL_ESTRATEGICO.md`; **los dos están corregidos en
+`docs/estrategico/CORRECCIONES_DISENO_ETL.md` — 57 supuestos que no se sostuvieron; léelo antes
 de tocar cualquier tabla**.
 
 **Deuda técnica conocida** (tablas huérfanas, requieren bloque dedicado):

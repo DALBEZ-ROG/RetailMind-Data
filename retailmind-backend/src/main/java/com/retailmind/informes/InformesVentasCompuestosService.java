@@ -1417,4 +1417,326 @@ public class InformesVentasCompuestosService extends InformeCompuestoServiceBase
     private static String contarSobre(String sql) {
         return "SELECT count() FROM (" + sql + ")";
     }
+
+    // ═════════════════════════════════════════════════════════════════════
+    // OTD-VEN-19 — Clientes en riesgo (fase E3 del nivel estratégico, §5.2)
+    // ═════════════════════════════════════════════════════════════════════
+
+    private static final String TABLA_ALERTA = "fact_alerta_cliente";
+
+    /** Niveles publicados por el modelo. Lista blanca. */
+    private static final java.util.Set<String> NIVELES_ALERTA =
+            java.util.Set.of("critica", "atencion", "normal", "sin_muestra");
+
+    /**
+     * Estado sintético: los dos niveles que piden una llamada. Se traduce aquí y
+     * NUNCA se concatena texto del usuario — mismo criterio que el
+     * {@code pendientes} de OTD-SOP-01.
+     */
+    private static final String NIVEL_EN_ALERTA = "alerta";
+
+    /**
+     * Alerta de abandono: qué clientes llevan un silencio inusual **según su
+     * propio ritmo de compra**, ordenados por valor en riesgo.
+     *
+     * <h3>Esto NO es una predicción de abandono, y la pantalla lo dice</h3>
+     * §5.2.1 verificó contra los datos que no hay modelo entrenable aquí: no
+     * existe etiqueta de abandono, el generador del seed sortea al cliente con
+     * peso constante —**nadie abandona nunca**— y la correlación entre el mejor
+     * predictor disponible y el resultado real es <b>0,039</b> sobre 5 casos
+     * positivos. Lo que se publica es un modelo del PROCESO: supervivencia
+     * exponencial con la tasa propia de cada cliente, que no necesita etiquetas
+     * y cuya tasa de falsa alarma se conoce de antemano (≈ α = 0,05).
+     *
+     * <h3>Las cinco reglas de presentación de §5.2.9, y quién cumple cada una</h3>
+     * <ol>
+     *   <li><b>La medida principal es «veces su intervalo propio»</b> — viaja en
+     *       {@code silencio_en_intervalos} y la definición la pone junto al
+     *       ritmo. «67 días» no dice nada sin saber si el cliente compra cada
+     *       semana o cada trimestre.</li>
+     *   <li><b>El <i>sparkline</i> de compras por mes va EN LA FILA</b> —
+     *       {@code compras_por_mes} es un array de 12 enteros que la pantalla
+     *       dibuja en la celda. Es la defensa contra el artefacto de la rampa:
+     *       deja ver de un golpe si la caída es un hueco o una pendiente.</li>
+     *   <li><b>La lista se ordena por VALOR EN RIESGO</b>, no por probabilidad.
+     *       Un cliente de $500 con probabilidad 0,1 % no es la primera
+     *       llamada.</li>
+     *   <li><b>El lift y su muestra van en la CABECERA</b> — son los TRES
+     *       primeros KPI del resumen, antes que ninguna cifra de negocio. Si el
+     *       lift no discrimina, el usuario tiene que verlo antes que la lista.
+     *       Ver {@link #kpisRiesgo}.</li>
+     *   <li><b>La fecha ancla va en el título</b> — {@code sufijoTitulo}. La
+     *       recencia se mide contra {@code max(fecha_pedido)} del almacén y no
+     *       contra el reloj; sin la fecha, la pantalla se lee como si fuera de
+     *       hoy.</li>
+     * </ol>
+     *
+     * <h3>El recorte del VENDEDOR</h3>
+     * §5.2.8 lo pide «con el mismo mecanismo de OTD-VEN-02», que en PostgreSQL
+     * es {@code pedido.vendedor_id = <id del JWT>}. En el almacén <b>no existe
+     * {@code vendedor_id}</b>: {@code fact_pedido} guarda el NOMBRE. El recorte
+     * casa por tanto contra {@code vendedores}, el conjunto de nombres que
+     * atendieron al cliente en la ventana, usando el nombre del principal — que
+     * se compone igual que en el ETL ({@code nombre + ' ' + apellido}). El ETL
+     * valida que esos nombres son únicos, o dos homónimos compartirían cartera.
+     */
+    public Map<String, Object> clientesEnRiesgo(String nivel, String buscar,
+                                                int page, int size) {
+        String fNivel = opcionAlerta(nivel);
+        String fBuscar = texto(buscar);
+        boolean soloPropio = "VENDEDOR".equals(rolActual());
+        String cartera = soloPropio ? nombreActual() : null;
+
+        return ejecutar("OTD-VEN-19", () -> {
+            Filtros f = new Filtros();
+            if (NIVEL_EN_ALERTA.equals(fNivel)) {
+                f.y("nivel_alerta IN ('critica', 'atencion')");
+            } else if (fNivel != null) {
+                f.y("nivel_alerta = ?", fNivel);
+            }
+            f.y("positionCaseInsensitive(concat(cliente_nombre, ' ', email), ?) > 0",
+                    fBuscar);
+            // El recorte del vendedor va DESPUÉS de los filtros del usuario y
+            // antes de la paginación: es una restricción de visibilidad, no un
+            // filtro, y tiene que aplicarse pase lo que pase.
+            f.y("has(vendedores, ?)", cartera);
+
+            String sql = sqlRiesgo(f.where());
+            Map<String, Object> sobre = paginarCh(
+                    sql, contarSobre(sql), f.args(), page, size);
+
+            Map<String, Object> cabecera = ch.queryForMap(
+                    "SELECT formatDateTime(max(fecha_ancla), '%d/%m/%Y')   AS ancla, "
+                    + "     formatDateTime(max(ventana_inicio), '%d/%m/%Y') AS ventana, "
+                    + "     max(meses_ventana) AS meses "
+                    + "FROM " + DWH + "." + TABLA_ALERTA);
+
+            conResumen(sobre, kpisRiesgo(f, soloPropio, cartera));
+            sobre.put("alcance", soloPropio ? "propio" : "equipo");
+            if (soloPropio) {
+                sobre.put("avisoAlcance",
+                        "Estás viendo únicamente los clientes de TU cartera —aquellos a "
+                        + "los que has atendido en la ventana del cálculo—. El resto es "
+                        + "atribución de Gerencia. Ojo: el pedido del canal en línea no "
+                        + "tiene vendedor y no forma cartera de nadie.");
+            }
+            sobre.put("sufijoTitulo", "datos al " + cabecera.get("ancla")
+                    + " (última compra registrada)");
+            sobre.put("salvedad", salvedadRiesgo(cabecera));
+            return conMarcaDeAgua(sobre, TABLA_ALERTA);
+        });
+    }
+
+    /**
+     * Lista blanca del filtro, con el estado sintético {@code alerta}.
+     *
+     * El valor por DEFECTO es diseño y no comodidad: la pantalla arranca en los
+     * clientes que piden una llamada, no en los 69. Un informe de alerta que
+     * abre mostrando a todo el mundo obliga a buscar la alerta dentro de la
+     * lista, que es exactamente lo que la alerta venía a evitar.
+     */
+    private static String opcionAlerta(String nivel) {
+        if (nivel == null || nivel.isBlank()) {
+            return NIVEL_EN_ALERTA;
+        }
+        if ("todos".equals(nivel)) {
+            return null;
+        }
+        if (NIVEL_EN_ALERTA.equals(nivel)) {
+            return NIVEL_EN_ALERTA;
+        }
+        return opcion(nivel, NIVELES_ALERTA, "nivel");
+    }
+
+    /**
+     * Nombre del usuario autenticado, compuesto EXACTAMENTE como lo compone el
+     * ETL al etiquetar {@code fact_pedido.vendedor}
+     * ({@code trim(nombre || ' ' || apellido)}). {@code AppUserPrincipal} ya lo
+     * trae resuelto desde el login, así que no hace falta tocar PostgreSQL —
+     * que además obligaría a abrir una transacción en un servicio que por
+     * contrato no la tiene.
+     */
+    private static String nombreActual() {
+        org.springframework.security.core.Authentication auth =
+                org.springframework.security.core.context.SecurityContextHolder
+                        .getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal()
+                instanceof com.retailmind.auth.AppUserPrincipal p
+                && p.getNombre() != null) {
+            return p.getNombre().trim();
+        }
+        // Sin nombre no se puede recortar, y un recorte que falla ABIERTO
+        // enseñaría la cartera entera a un vendedor. Se recorta a nada.
+        return " sin-cartera";
+    }
+
+    private static String sqlRiesgo(String where) {
+        // Concatenación y no `String.formatted()`: el SQL lleva patrones de
+        // fecha con por-ciento ('%d/%m/%Y') y el formateador los interpretaría
+        // como especificadores suyos, reventando con «Conversion = 'd'». Misma
+        // trampa que ya documentó §18 del patrón de informes.
+        return "SELECT\n"
+            + """
+                cliente_nombre                                 AS cliente,
+                email,
+                ciudad,
+                nivel_alerta,
+                facturacion_12m,
+                valor_en_riesgo,
+                percentil_valor,
+                intervalo_medio_dias,
+                dias_silencio,
+                silencio_en_intervalos,
+                round(toFloat64(prob_silencio) * 100, 2)       AS prob_pct,
+                pedidos_ventana,
+                dias_observados,
+                compras_por_mes,
+                reclamos_abiertos,
+                devoluciones_12m,
+                activo,
+                vendedores
+            """
+            + ", formatDateTime(fecha_ultima_compra, '%d/%m/%Y') AS ultima_compra"
+            + " FROM " + DWH + "." + TABLA_ALERTA
+            + " WHERE 1 = 1 " + where
+            // Regla 3 de §5.2.9. El desempate por probabilidad es lo que ordena
+            // a los `sin_muestra`, cuyo valor en riesgo es 0 por construcción:
+            // el modelo no emite juicio sobre ellos y no puede fingir uno.
+            + " ORDER BY valor_en_riesgo DESC, prob_silencio ASC, cliente_nombre";
+    }
+
+    /**
+     * Las tarjetas del encabezado. <b>El veredicto del modelo va primero.</b>
+     *
+     * Regla 4 de §5.2.9: «el lift y su muestra van en la cabecera, no en una
+     * nota. Si el lift es 1,0 el usuario tiene que verlo antes que la lista».
+     * Por eso las tres primeras tarjetas son el lift, su muestra y el dictamen
+     * de si supera al azar — y solo después vienen las cifras de negocio.
+     *
+     * La tercera tarjeta es la que el diseño no pidió y sin la cual el lift
+     * engaña igual: un lift de 1,99 medido sobre 14 casos positivos tiene un
+     * valor p de 0,10, o sea que **no es distinguible del azar**. Publicar el
+     * 1,99 solo lo convertiría en un titular.
+     */
+    private List<Map<String, Object>> kpisRiesgo(Filtros f, boolean soloPropio,
+                                                 String cartera) {
+        Map<String, Object> v = ch.queryForMap(
+                "SELECT max(lift_backtest) AS lift, "
+                + "     max(casos_positivos_backtest) AS positivos, "
+                + "     max(evaluados_backtest) AS evaluados, "
+                + "     max(precision_backtest) AS precision_top, "
+                + "     max(tasa_base_backtest) AS tasa_base, "
+                + "     max(p_valor_backtest) AS p_valor, "
+                + "     max(alerta_alpha) AS alfa "
+                + "FROM " + DWH + "." + TABLA_ALERTA);
+
+        // El universo de la cabecera respeta el recorte del vendedor, pero NO el
+        // filtro de nivel: «9 en alerta de 69» es la cifra que da sentido al 9, y
+        // con el filtro aplicado diría «9 de 9».
+        Filtros u = new Filtros();
+        u.y("has(vendedores, ?)", cartera);
+        Map<String, Object> t = ch.queryForMap(
+                "SELECT count() AS clientes, "
+                + "     countIf(nivel_alerta IN ('critica', 'atencion')) AS en_alerta, "
+                + "     countIf(nivel_alerta = 'critica')      AS criticas, "
+                + "     countIf(nivel_alerta = 'sin_muestra')  AS sin_muestra, "
+                + "     sumIf(facturacion_12m, nivel_alerta IN ('critica','atencion')) "
+                + "                                            AS facturacion_alerta, "
+                + "     sumIf(valor_en_riesgo, nivel_alerta IN ('critica','atencion')) "
+                + "                                            AS riesgo, "
+                + "     maxIf(dias_silencio, nivel_alerta = 'sin_muestra') AS silencio_ciego "
+                + "FROM " + DWH + "." + TABLA_ALERTA + " WHERE 1 = 1 " + u.where(),
+                u.args());
+
+        BigDecimal lift = decimalDe(v.get("lift"));
+        BigDecimal pValor = decimalDe(v.get("p_valor"));
+        boolean supera = lift.compareTo(BigDecimal.ONE) > 0
+                && pValor.compareTo(new BigDecimal("0.05")) < 0;
+
+        List<Map<String, Object>> k = new ArrayList<>();
+        // ── El veredicto, primero ────────────────────────────────────────
+        k.add(kpi("Lift sobre el azar",
+                lift.toPlainString().replace('.', ',') + "×", "texto"));
+        k.add(kpi("Medido sobre",
+                v.get("positivos") + " casos positivos de " + v.get("evaluados")
+                + " evaluaciones", "texto"));
+        k.add(kpi("¿Supera al azar?", (supera ? "Sí" : "NO")
+                + " · p = " + pValor.toPlainString().replace('.', ','), "texto"));
+        k.add(kpi("Aciertos en el top 10", v.get("precision_top"), "porcentaje"));
+        k.add(kpi("Tasa base (dejaron de comprar)", v.get("tasa_base"), "porcentaje"));
+        // ── Y después, el negocio ────────────────────────────────────────
+        k.add(kpi(soloPropio ? "En alerta en mi cartera" : "Clientes en alerta",
+                t.get("en_alerta") + " de " + t.get("clientes"), "texto"));
+        k.add(kpi("De ellos, críticos", t.get("criticas"), "numero"));
+        k.add(kpi("Facturación 12m en alerta", valorOCero(t.get("facturacion_alerta")),
+                "moneda"));
+        k.add(kpi("Valor en riesgo", valorOCero(t.get("riesgo")), "moneda"));
+        k.add(kpi("Sin muestra para opinar",
+                t.get("sin_muestra") + " clientes · el mayor silencio entre ellos, "
+                + t.get("silencio_ciego") + " días", "texto"));
+        k.add(kpi("Umbral de alerta (α)", decimalDe(v.get("alfa")).toPlainString()
+                .replace('.', ','), "texto"));
+        return k;
+    }
+
+    private static BigDecimal decimalDe(Object valor) {
+        if (valor instanceof BigDecimal b) {
+            return b;
+        }
+        return valor == null ? BigDecimal.ZERO : new BigDecimal(valor.toString());
+    }
+
+    /**
+     * Las CINCO limitaciones de §5.2.10, en pantalla y encima de la tabla.
+     *
+     * No es documentación trasladada: quien mira esta lista va a llamar a un
+     * cliente por lo que ponga aquí. La tercera es la que impide leerla mal —
+     * en la validación, la alerta no superó al azar— y la quinta nombra el hueco
+     * que el propio método abre: los clientes con más silencio son, por eso
+     * mismo, los que se quedan sin muestra.
+     */
+    private String salvedadRiesgo(Map<String, Object> cabecera) {
+        Map<String, Object> v = ch.queryForMap(
+                "SELECT max(lift_backtest) AS lift, "
+                + "     max(casos_positivos_backtest) AS positivos, "
+                + "     max(p_valor_backtest) AS p_valor, "
+                + "     countIf(nivel_alerta = 'sin_muestra') AS sin_muestra, "
+                + "     count() AS clientes, "
+                + "     max(concentracion_maxima) AS concentracion "
+                + "FROM " + DWH + "." + TABLA_ALERTA);
+
+        return "1) Esto es una ALERTA DE SILENCIO ESTADÍSTICAMENTE INUSUAL, no una "
+            + "predicción de abandono. El sistema no tiene ningún registro de un "
+            + "cliente que se despide: no hay baja, no hay contrato, no hay campo. Un "
+            + "silencio largo puede ser un viaje. "
+            + "2) Se calcula solo sobre los últimos " + cabecera.get("meses")
+            + " meses (desde el " + cabecera.get("ventana") + "). Antes, la cartera "
+            + "estaba creciendo desde UN SOLO comprador —en enero y febrero de 2025 un "
+            + "cliente hizo el 100 % de los pedidos—, y un ritmo calculado con esa "
+            + "historia señalaría a los clientes más grandes como los más perdidos. En "
+            + "la ventana usada, el mayor comprador de un mes no pasa del "
+            + decimalDe(v.get("concentracion")).toPlainString().replace('.', ',')
+            + " % de los pedidos. "
+            + "3) EN LA VALIDACIÓN, la alerta no supera al azar de forma "
+            + "significativa: lift "
+            + decimalDe(v.get("lift")).toPlainString().replace('.', ',')
+            + " sobre " + v.get("positivos") + " casos positivos, con un valor p de "
+            + decimalDe(v.get("p_valor")).toPlainString().replace('.', ',')
+            + ". Es una propiedad de LOS DATOS y no del método: en el histórico "
+            + "disponible las compras de cada cliente ocurren a ritmo constante y "
+            + "nadie abandona nunca (la correlación medida entre la señal y el "
+            + "resultado es 0,039). Úsela para priorizar una llamada, no para dar por "
+            + "perdido a un cliente. "
+            + "4) La recencia se mide contra la ÚLTIMA COMPRA REGISTRADA EN EL ALMACÉN "
+            + "(" + cabecera.get("ancla") + "), no contra la fecha de hoy. Si el "
+            + "pipeline se detiene, la pantalla no se llena de falsas alarmas — pero "
+            + "tampoco se actualiza, y la fecha del título lo dice. "
+            + "5) La muestra por cliente es pequeña: la columna «pedidos» sostiene el "
+            + "ritmo de cada fila, y con menos de 3 pedidos en la ventana no hay ritmo "
+            + "que calcular. " + v.get("sin_muestra") + " de " + v.get("clientes")
+            + " clientes están en ese caso y salen con nivel «sin muestra» y su "
+            + "silencio real: son precisamente los candidatos más fuertes al abandono "
+            + "—su silencio es lo que los dejó sin pedidos— y el modelo NO puede "
+            + "ordenarlos.";
+    }
 }

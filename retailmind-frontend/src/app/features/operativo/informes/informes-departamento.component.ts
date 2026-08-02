@@ -24,6 +24,7 @@ import {
 } from '../../../core/models/informe.model';
 import { definicionDepartamento } from './definiciones/catalogo-informes';
 import { ActualizacionAlmacenComponent } from './actualizacion-almacen.component';
+import { PrevisionGraficoComponent, PuntoPrevision } from './prevision-grafico.component';
 
 /**
  * PANTALLA GENÉRICA de informes tácticos — sirve a los seis departamentos.
@@ -48,7 +49,7 @@ import { ActualizacionAlmacenComponent } from './actualizacion-almacen.component
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule,
     MatTooltipModule, MatPaginatorModule, MatProgressBarModule,
-    ActualizacionAlmacenComponent],
+    ActualizacionAlmacenComponent, PrevisionGraficoComponent],
   templateUrl: './informes-departamento.component.html',
   styleUrls: ['../operativo-shared.scss', './informes.scss']
 })
@@ -83,6 +84,21 @@ export class InformesDepartamentoComponent implements OnInit {
    * costo VIGENTE porque no existe costo histórico en el sistema.
    */
   salvedad = '';
+
+  /**
+   * Serie del gráfico de previsión: meses observados y meses previstos en una
+   * sola lista (regla 1 de §5.1.9). Solo la envía OTD-GER-13.
+   */
+  serie: PuntoPrevision[] = [];
+  /** Nombre de la serie que el gráfico está mostrando (total o categoría). */
+  previsionDe = '';
+
+  /**
+   * Coletilla del título (regla 5 de §5.2.9, la estrena OTD-VEN-19): la fecha
+   * ancla contra la que se midió el informe. Sin ella, una pantalla servida por
+   * un pipeline detenido se lee como si fuera de hoy.
+   */
+  sufijoTitulo = '';
 
   /** Valores actuales de los filtros del informe seleccionado. */
   valores: Record<string, string> = {};
@@ -140,6 +156,9 @@ export class InformesDepartamentoComponent implements OnInit {
     this.datosAl = '';
     this.fuente = '';
     this.salvedad = '';
+    this.serie = [];
+    this.previsionDe = '';
+    this.sufijoTitulo = '';
 
     const filtros: Record<string, string | number> = { ...this.valores };
     // El filtro de período se envía descompuesto en año y mes.
@@ -160,9 +179,15 @@ export class InformesDepartamentoComponent implements OnInit {
         this.total = sobre.total ?? this.filas.length;
         this.resumen = sobre.resumen ?? [];
         if (sobre.alcance === 'propio') {
-          this.avisoAlcance = 'Estás viendo únicamente tus propias ventas: '
-                            + 'el detalle del resto del equipo es atribución de Gerencia.';
+          // El informe puede traer su propio texto: en OTD-VEN-19 el recorte es
+          // por CARTERA (a quién ha atendido) y no por autoría de la venta, y
+          // decir «tus propias ventas» ahí sería describir mal el filtro que se
+          // acaba de aplicar.
+          this.avisoAlcance = sobre.avisoAlcance
+            ?? 'Estás viendo únicamente tus propias ventas: '
+             + 'el detalle del resto del equipo es atribución de Gerencia.';
         }
+        this.sufijoTitulo = sobre.sufijoTitulo ?? '';
         // Informes compuestos: marca de agua y degradación. Los simples no
         // envían estos campos y todo queda vacío, así que no se pinta nada.
         this.datosAl = sobre.datosAl ?? '';
@@ -171,6 +196,10 @@ export class InformesDepartamentoComponent implements OnInit {
         // se pinta ENCIMA de la tabla, no debajo, porque es una advertencia
         // sobre cómo leer las cifras y llega tarde después de haberlas leído.
         this.salvedad = sobre.salvedad ?? '';
+        // Serie del gráfico de previsión (regla 1 de §5.1.9). Los demás
+        // informes no envían `serie` y el gráfico no llega a pintarse.
+        this.serie = (sobre['serie'] as PuntoPrevision[]) ?? [];
+        this.previsionDe = (sobre['previsionDe'] as string) ?? '';
         if (sobre.analiticaDisponible === false) {
           this.avisoAnalitica = sobre.avisoAnalitica
             ?? 'La analítica no está disponible en este momento.';
@@ -225,6 +254,10 @@ export class InformesDepartamentoComponent implements OnInit {
   /** Texto completo para el tooltip de las celdas recortadas. */
   valorCompleto(col: ColumnaInforme, fila: Record<string, any>): string {
     const crudo = fila[col.campo];
+    // El sparkline lleva su rótulo dentro del SVG (<title> nativo); devolver
+    // aquí un texto añadiría un matTooltip por fila y por celda, que es
+    // justamente lo que dejó el navegador colgado en la fase E1-A.
+    if (col.tipo === 'sparkline') { return ''; }
     if (crudo === null || crudo === undefined || crudo === '') { return ''; }
     const texto = col.etiqueta ? col.etiqueta(crudo, fila) : this.formatear(crudo, col.tipo);
     return col.recortar && texto.length > col.recortar ? texto : '';
@@ -262,6 +295,46 @@ export class InformesDepartamentoComponent implements OnInit {
 
   claseChip(col: ColumnaInforme, fila: Record<string, any>): string {
     return col.color ? col.color(fila) : 'neutral';
+  }
+
+  // ── Sparkline (regla 2 de §5.2.9, lo estrena OTD-VEN-19) ─────────────
+
+  /**
+   * Barras del micro-gráfico de una celda, ya escaladas a la altura del SVG.
+   *
+   * Se escala contra el MÁXIMO DE LA PROPIA FILA y no contra el de la tabla: la
+   * pregunta que responde el trazo es «¿este cliente está bajando?», que es
+   * sobre su propia serie. Escalar contra el máximo global dejaría plana la
+   * serie de los 60 clientes pequeños y solo se vería la del mayor — que es
+   * justo la lectura que el artefacto de la rampa produce.
+   */
+  barras(fila: Record<string, any>, campo: string): { x: number; y: number; alto: number }[] {
+    const serie = (fila[campo] as number[]) ?? [];
+    if (!serie.length) { return []; }
+    const tope = Math.max(...serie.map(Number), 1);
+    const ancho = 4, hueco = 1, alto = 18;
+    return serie.map((v, i) => {
+      const h = Math.max(Math.round((Number(v) / tope) * alto), Number(v) > 0 ? 1 : 0);
+      return { x: i * (ancho + hueco), y: alto - h, alto: h };
+    });
+  }
+
+  /** Ancho del SVG para que las barras quepan justas. */
+  anchoSparkline(fila: Record<string, any>, campo: string): number {
+    const serie = (fila[campo] as number[]) ?? [];
+    return Math.max(serie.length * 5, 5);
+  }
+
+  /**
+   * Rótulo del sparkline. Va como `<title>` NATIVO del SVG y no como
+   * `matTooltip`: con centenares de directivas de tooltip vivas el navegador
+   * deja de responder (lección de la fase E1-A del nivel estratégico).
+   */
+  rotuloSparkline(fila: Record<string, any>, campo: string): string {
+    const serie = (fila[campo] as number[]) ?? [];
+    return serie.length
+      ? `Compras por mes (últimos ${serie.length} meses): ${serie.join(' · ')}`
+      : '';
   }
 
   /**

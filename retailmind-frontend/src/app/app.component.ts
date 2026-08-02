@@ -84,6 +84,13 @@ export class AppComponent {
     '/operativo/informes/logistica': 'Informes de Logística',
     '/operativo/informes/soporte': 'Informes de Soporte',
     '/operativo/informes/gerencia': 'Informes de Gerencia',
+    '/operativo/tableros/omnicanal': 'Tablero Omnicanal',
+    '/operativo/tableros/rentabilidad': 'Tablero de Rentabilidad y Rotación',
+    '/operativo/tableros/cliente-posventa': 'Tablero de Cliente y Posventa',
+    '/operativo/tableros/operacion': 'Tablero de Operación y Última Milla',
+    '/operativo/tableros/costo-operacion': 'Tablero de Costo de la Operación',
+    '/operativo/tableros/abastecimiento': 'Tablero de Abastecimiento',
+    '/operativo/tableros/gobierno-dato': 'Tablero de Gobierno del Dato',
     '/operativo/marketing/cupones': 'Cupones de Descuento',
     '/operativo/marketing/promociones': 'Promociones',
     '/operativo/marketing/campanas': 'Campañas de Marketing',
@@ -156,6 +163,14 @@ export class AppComponent {
   get canInformesLogistica(): boolean { return this.nav.can('informesLogistica'); }
   get canInformesSoporte(): boolean { return this.nav.can('informesSoporte'); }
   get canInformesGerencia(): boolean { return this.nav.can('informesGerencia'); }
+  // Tableros de dirección (nivel estratégico, fase E1-A)
+  get canTableroOmnicanal(): boolean { return this.nav.can('tableroOmnicanal'); }
+  get canTableroRentabilidad(): boolean { return this.nav.can('tableroRentabilidad'); }
+  get canTableroPosventa(): boolean { return this.nav.can('tableroPosventa'); }
+  get canTableroOperacion(): boolean { return this.nav.can('tableroOperacion'); }
+  get canTableroCosto(): boolean { return this.nav.can('tableroCosto'); }
+  get canTableroAbastecimiento(): boolean { return this.nav.can('tableroAbastecimiento'); }
+  get canTableroGobierno(): boolean { return this.nav.can('tableroGobierno'); }
   get canAccesos(): boolean    { return this.nav.can('accesos'); }
   get canTickets(): boolean    { return this.nav.can('tickets'); }
   get canCategoriasTicket(): boolean { return this.nav.can('categoriasTicket'); }

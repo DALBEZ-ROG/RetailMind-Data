@@ -1109,3 +1109,296 @@ OTD-COM-11 (PostgreSQL) ........ 200 en 0,15 s · 11 filas   ← intacto, como d
 Al volver a levantar el contenedor se recuperan **solos**, sin reiniciar nada. Y `validar_dwh.py`
 sigue en **44 de 44**: esta fase no tocó ninguna tabla, y el control lo demuestra en vez de
 suponerlo.
+
+---
+
+# 19. El nivel ESTRATÉGICO no usa este patrón — y por qué
+
+**Fase E1-A, 2026-08-01.** Los tres primeros tableros de dirección (T-1 Omnicanal, T-2
+Rentabilidad y Rotación, T-3 Cliente y Posventa) NO extienden `InformeServiceBase` ni reutilizan
+`InformesDepartamentoComponent`. Viven en `com.retailmind.tableros` y en
+`features/operativo/tableros/`, con su propio molde (`TableroServiceBase`), su propio sobre y su
+propia pantalla. Esta sección existe para que nadie intente unificarlos: la separación es una
+decisión, no una omisión.
+
+## 19.1 Qué cambia, exactamente
+
+| | Informe táctico | Tablero de dirección |
+|---|---|---|
+| **Unidad** | una tabla con filtros | varios elementos de naturaleza distinta que se leen JUNTOS |
+| **Sobre** | `{items, total, page, size, resumen[]}` | `{kpis[], bloques[], salvedades[], datosAl, …}` |
+| **Grano** | uno | uno POR BLOQUE (mes×canal, cliente, producto, paso del embudo…) |
+| **Paginación** | server-side, obligatoria | ninguna: un tablero no se pagina, se lee entero |
+| **Denominador** | recomendable | **obligatorio**: `bloque()` lanza excepción sin él |
+| **Salida** | una tabla Material | serie, embudo, dispersión, Pareto, semáforo, ranking |
+
+Meter seis elementos de grano distinto dentro de un sobre pensado para uno solo obliga a una de
+dos cosas —seis peticiones o un `items` heterogéneo con columnas nulas— y las dos empobrecen el
+tablero. Y al revés: darle a un informe táctico el sobre del tablero le quitaría la paginación,
+que es lo que impide que OTD-VEN-01 descargue 4.083 filas.
+
+## 19.2 Lo que SÍ se reutiliza, y no se duplica
+
+`TableroServiceBase` **extiende** `InformeCompuestoServiceBase`. De ahí salen, sin una línea
+repetida: la validación por lista blanca (`opcion`, `fecha`, `exigirRangoValido`), el acumulador
+`Filtros` (fragmentos constantes + parámetros, jamás texto del usuario en el SQL), la lectura
+`FINAL` de las dimensiones, la marca de agua y —lo más importante— `esFalloDeConexion`, que decide
+qué degrada y qué no. Duplicar esa clasificación en dos jerarquías garantizaría que divergieran en
+la primera excepción nueva del driver.
+
+Dos cambios menores en el molde compartido, ambos sin efecto sobre los 69 informes: `Filtros`
+ganó un constructor público explícito (el implícito de una clase anidada `protected` no alcanza
+desde otro paquete) y `esFalloDeConexion` pasó de `private` a `protected`.
+
+## 19.3 Un endpoint por tablero, no uno por elemento
+
+`GET /api/tableros/{tablero}` devuelve el tablero entero. Cuatro razones, en orden de peso:
+coherencia de la foto (los seis elementos comparten filtros y se leen juntos), una sola marca de
+agua, **una sola decisión de degradación** —con seis llamadas, ClickHouse cayéndose a mitad de
+carga dejaría medio tablero pintado y medio vacío— y coste (sobre ~64.000 filas, seis agregados en
+una petición cuestan menos que seis peticiones).
+
+**La excepción declarada**: los elementos que no tienen grano en el almacén —carrito abandonado
+(T-1) y sobre-stock del presente (T-2)— los pide la PANTALLA con una segunda llamada a los
+informes SIMPLES que ya existen, OTD-VEN-08 y OTD-INV-08. Efecto colateral bueno y verificado:
+**esos dos bloques siguen vivos con ClickHouse apagado**.
+
+## 19.4 El corte de rol, un escalón más fino
+
+Hasta ahora el corte financiero era por ENDPOINT. T-3 estrena el corte **por bloque dentro del
+mismo endpoint**: SOPORTE entra a `/cliente-posventa` y el servicio **no ejecuta** los bloques de
+valor del cliente ni de reseñas. No es que se oculten en la pantalla —se declara cuáles se
+omitieron y por qué, en `bloquesOmitidos`— y no lo puede hacer `SecurityConfig`, que solo alcanza
+a la ruta. Verificado: 3 bloques con alcance `posventa` frente a 6 con alcance `completo`.
+
+## 19.5 Verificación
+
+Dos scripts nuevos en `retailmind/`, los dos tomando la cifra de la **respuesta HTTP** y no de una
+consulta a ClickHouse escrita a mano —entre la tabla y la pantalla hay un agregado, un filtro y un
+formateo, y es justo ahí donde se pierde una fila—:
+
+- `validar_tableros.py` — **71 controles contra PostgreSQL, todos con Δ = 0**. Además de las
+  sumas, comprueba invariantes de forma: que el embudo sea monótono, que el acumulado del Pareto
+  cierre en 100 %, que el primer mes de la serie de capital llegue con la variación NULA y que las
+  reseñas no se hayan multiplicado por variante.
+- `matriz_tableros.py` — **24 celdas (8 roles × 3 tableros), 0 discrepancias**. Ensancha la
+  ventana horaria del día en curso para poder probar a GERENTE y ANALISTA fuera de su franja, la
+  restaura en un `finally` y **verifica la restauración releyéndola**.
+
+## 19.6 Fase E1-B: los siete tableros, y lo que el patrón aguantó
+
+**2026-08-01.** T-4 (Operación y Última Milla), T-5 (Costo de la Operación), T-6 (Abastecimiento)
+y T-7 (Gobierno del Dato) completan los **siete tableros y las 19 decisiones de dashboard**, sin
+crear una sola tabla en el almacén.
+
+**Coste real del patrón**: 4 clases Java (una por tablero), 1 bloque de definición por tablero y
+4 líneas de `SecurityConfig`. La pantalla genérica **no se tocó**; solo ganó dos trazados nuevos
+—caja y bigotes, y mapa de calor— que sirven a cualquier tablero futuro. T-6 tiene ocho elementos
+y T-7 tres: el sobre aguanta las dos formas sin cambiar.
+
+### Lo que esta fase añadió al patrón
+
+**Un corte que el motor no puede dar, comprobado por prueba automática.** T-4 es el único tablero
+que Despacho y Bodega abren, y lo que lo permite es que su consulta no seleccione un importe.
+ClickHouse no tiene GRANT por columna, así que esa regla no la respalda nada… salvo un control
+que recorre la respuesta entera —KPI y todas las filas de todos los bloques— buscando nombres con
+aspecto monetario, **y que se repite en los cinco roles**. Una regla que solo vive en un comentario
+se rompe en el primer bloque nuevo; ésta falla la verificación.
+
+**El tablero que vigila al resto.** T-7 no mide datos: mide la BITÁCORA del pipeline. Es el único
+riesgo del sistema que no se detecta mirando una pantalla —una carga fallida a medias produce
+cifras perfectas de ayer— y por eso sus dos elementos sensibles (auditoría y accesos) se sirven de
+los informes SIMPLES de PostgreSQL que ya existían: **siguen respondiendo con el almacén apagado**,
+que es justo lo que hace falta cuando lo que se sospecha es que el almacén falló.
+
+**Los bloques externos ganaron su propio resumen.** El sobre de un informe simple trae `resumen[]`,
+y ahora la pantalla lo pinta DENTRO de la tarjeta del bloque externo, nunca arriba con los KPI del
+tablero: son de otra fuente y de otra base de datos, y juntarlos invitaría a sumarlos.
+
+### Verificación
+
+- `validar_tableros.py` — **132 controles contra PostgreSQL, todos con Δ = 0** (los 71 de E1-A más
+  61 nuevos). Además de las sumas comprueba invariantes de forma: que los dos embudos sean
+  monótonos, que la lista de desenlaces publicada sea EXACTAMENTE la del `SELECT DISTINCT` de la
+  base, que el KPI de filas del ETL no incluya la pseudo-tarea que duplica el total, y que T-4 no
+  devuelva una sola columna de dinero.
+- `matriz_tableros.py` — **56 celdas (8 roles × 7 tableros), 0 discrepancias**, con la ventana
+  horaria ensanchada, restaurada y **verificada releyéndola**.
+
+---
+
+## 20. Fase E2: la previsión de demanda — el patrón sirve a un informe PREDICTIVO
+
+> Primer modelo del nivel estratégico. **OTD-GER-13** entra por el patrón de siempre —el mismo
+> sobre, la misma pantalla genérica, el mismo archivo declarativo— y es el primer informe del
+> sistema cuyas filas describen meses que **no han ocurrido**.
+>
+> Aporta la respuesta a una pregunta que el patrón todavía no había tenido que contestar: qué se
+> valida cuando **no hay nada contra qué validar al centavo**.
+
+### 20.1 Lo que NO cambió
+
+Nada de la mecánica. `InformesPrevisionService` extiende `InformeCompuestoServiceBase` como los
+otros 39 compuestos: sin `@Transactional` porque no toca PostgreSQL, con `ejecutar()` para degradar
+solo ante un fallo de CONEXIÓN, con `paginarCh`, con la marca de agua obligatoria y con la misma
+disciplina de parámetros. La pantalla es
+`features/operativo/informes/informes-departamento.component`, sin tocar. El informe se declara en
+un archivo y se engancha con una línea por departamento.
+
+### 20.2 Las tres cosas que sí son nuevas
+
+**1. El mismo informe en DOS departamentos.** Es el primero. Gerencia lo usa para fijar metas
+(D-10.1) y Compras para el plan de compra (D-11.1) y el nivel objetivo de stock (D-07.5). El dato
+es idéntico y lo único que cambia es el reparto de roles, que **no es uno subconjunto del otro**:
+
+```
+/api/informes/gerencia/prevision-demanda   ADMIN · GERENTE · ANALISTA
+/api/informes/compras/prevision-demanda    ADMIN · GERENTE · COMPRAS
+```
+
+De ahí las dos consecuencias de diseño: **una sola clase de servicio** que los dos controladores ya
+existentes inyectan (repartirlo entre los dos servicios de departamento obligaría a duplicar la
+consulta, y dos copias divergen dando **bandas distintas para el mismo mes** sin que ninguna
+pantalla parezca rota), y **una definición compartida** —`definiciones/prevision.informe.ts`
+exporta una función que recibe los roles— que los dos archivos de departamento importan. Corrección
+CE3.6.
+
+**2. Un gráfico en la pantalla genérica, y es opt-in.** La regla 1 de §5.1.9 exige que la serie
+histórica y la previsión vayan en el MISMO gráfico. El sobre trae un campo `serie` con los 19 meses
+observados y los 3 previstos en una sola lista —cada punto con lo suyo, y el mes truncado
+marcado—, y el informe lo pide con `graficoPrevision: true`. Es opt-in por el mismo motivo que
+`barraAvance`: un informe cualquiera con una columna mensual **no es una previsión**, y el trazo
+discontinuo afirma que esos puntos no han ocurrido.
+
+**3. La validación cambia de naturaleza.** Los 44 controles anteriores comparan hechos al centavo.
+Una fila con fecha futura no tiene con qué compararse, así que se validan las dos cosas que sí
+puede responder PostgreSQL y que son justo las que fallan:
+
+| Control | Qué detecta |
+|---|---|
+| **universo** — 10 categorías, 159 variantes con ≥12 meses, 510 filas | que el almacén haya perdido una categoría o un puñado de variantes, y el modelo publique tan tranquilo la previsión de un catálogo más pequeño, coherente consigo mismo y equivocado |
+| **ancla** — la previsión arranca donde acaba la venta real | una tabla **RANCIA**, que es el modo de fallo propio de una predicción: si entra un mes de ventas y el modelo no vuelve a correr, la pantalla enseña con toda naturalidad la previsión de un mes que **ya ocurrió**, con su banda intacta y sin dar ningún error |
+
+El segundo control comprueba además, **desde PostgreSQL y por su cuenta**, que el mes truncado se
+excluyó del entrenamiento: deriva de la base si el último mes está corto y compara ese veredicto
+contra el que la tabla publicó en `horizonte_efectivo`.
+
+### 20.3 Si vas a tocar esto
+
+1. **`String.formatted()` interpreta el bloque ENTERO** y la consulta lleva
+   `formatDateTime(mes, '%Y-%m')` dentro: el formateador lee ese `%Y` como suyo y el endpoint
+   responde **400 «Conversion = 'Y'»**, un error del usuario por un fallo que no tiene nada que ver
+   con la petición. La consulta se arma por concatenación. Ya estaba escrito en §18 y volvió a
+   morder.
+2. **Las columnas de banda van PEGADAS a la cifra**, no al final de la tabla. La regla 2 es «ningún
+   número sin banda», y una previsión que aparece sola en la columna 5 mientras su intervalo vive
+   en la 12 se lee como exacta.
+3. **El MAPE por fila necesita su vara al lado.** Un 24 % no significa nada: es excelente en
+   Abarrotes (el ingenuo saca 24,2 %) y malo en Ropa (el ingenuo saca 10,7 %). Por eso viajan
+   `mape_backtest` y `mape_linea_base` juntas y el semáforo de la primera se calcula **contra la
+   segunda**, nunca contra un umbral fijo.
+4. **`sin_prevision` no es un cero.** Ropa Mujer (9 meses con venta) y Ropa Hombre (1 mes) publican
+   fila con banda vacía y la pantalla escribe «sin previsión». Publicar un 0 con banda las pondría
+   al lado de Abarrotes con la misma autoridad visual.
+5. **La salvedad se calcula en cada petición, no se escribe.** El mes truncado, el número de
+   variantes sin previsión propia y el desajuste entre la suma de las categorías y el total salen
+   de la base en el momento. Una salvedad con una cifra escrita a mano caduca sin avisar, y es
+   exactamente el tipo de mentira que la salvedad existe para evitar.
+
+### 20.4 Verificación
+
+- `matriz_prevision.py` — **16 celdas (8 roles × 2 rutas), 0 discrepancias**, con la ventana
+  horaria ensanchada, restaurada y **verificada releyéndola**. Además del código HTTP comprueba
+  **sobre la respuesta**: el universo en los tres niveles, el ancla, los 19 meses del gráfico
+  contra PostgreSQL **mes a mes**, que ninguna banda tenga anchura cero ni deje fuera a su propia
+  cifra, que `meses_historia` y el par de MAPE viajen en la fila, y que las **cinco limitaciones**
+  de §5.1.10 estén en la salvedad.
+- `validar_dwh.py` — **46 controles** (44 + 2 de la fase), todos con Δ = 0.
+- Degradación con `docker stop`: los dos endpoints responden **200 con
+  `analiticaDisponible=false` en ~4,1 s**, los informes simples de PostgreSQL siguen en 0,03 s, y
+  se recuperan **sin reiniciar el backend**.
+
+---
+
+## 21. Fase E3: la alerta de abandono — el patrón sirve a un modelo que NO funciona
+
+> Segundo y último modelo del nivel estratégico. **OTD-VEN-19** entra por el patrón de siempre y es
+> el primer informe del sistema que **publica su propio veredicto negativo en la cabecera**.
+>
+> La pregunta nueva que contesta: qué forma tiene una pantalla cuando el modelo que la alimenta
+> **no supera al azar**, y el negocio ha decidido publicarla igual.
+
+### 21.1 Coste, otra vez el del patrón
+
+**0 clases Java nuevas** y **0 componentes Angular nuevos**. El informe entra en
+`InformesVentasCompuestosService` —el departamento ya existía— con un bloque de definición en
+`ventas.informes.ts` y **una línea de `SecurityConfig`**. La pantalla genérica ganó dos capacidades
+declarativas y ningún caso particular:
+
+- `tipo: 'sparkline'` — micro-gráfico de barras dibujado en la celda desde un array del sobre;
+- `sufijoTitulo` — coletilla que se pinta junto al título del informe.
+
+Las dos son **opt-in**, como `barraAvance` y `graficoPrevision`, y por la misma razón: un array
+cualquiera no es una serie temporal y un informe cualquiera no tiene ancla que declarar.
+
+### 21.2 Lo que sí es nuevo: el veredicto va ARRIBA
+
+La regla 4 de §5.2.9 del diseño estratégico dice que **el lift y su muestra van en la cabecera, no
+en una nota**. En este patrón la cabecera son los KPI del sobre, así que la regla se traduce en algo
+comprobable: **las tres primeras tarjetas del resumen son el veredicto del modelo**, y ninguna de
+ellas es dinero.
+
+```
+Lift sobre el azar              1,99×
+Medido sobre                    14 casos positivos de 167 evaluaciones
+¿Supera al azar?                NO · p = 0,1019
+─────────────────────────────────────────────────────────────
+Aciertos en el top 10           16.67 %
+Tasa base (dejaron de comprar)  8.38 %
+Clientes en alerta              9 de 69
+…y después, el dinero
+```
+
+`matriz_alerta_cliente.py` lo **exige**: falla si la primera tarjeta no es el lift, si la segunda no
+declara los casos positivos, si la tercera no dice si supera al azar, o si hay una cifra de tipo
+`moneda` entre las tres. Si alguien las reordena «para que se vea mejor el dinero», la verificación
+se pone en rojo. Es el único informe del sistema con esa restricción, y es deliberado: un modelo
+que oculta su lift es indistinguible de uno que funciona.
+
+**La tercera tarjeta no la pidió el diseño.** El lift salió **1,99** y no ≈ 1,0 como §5.2.6
+anticipaba; publicado solo, se lee como un éxito. Su valor p es **0,102**: no es distinguible del
+azar. Corrección CE4.4.
+
+### 21.3 Cinco cosas que aprendió el patrón, y que se repetirán
+
+1. **El recorte de rol puede no tener el mecanismo que el diseño cita.** §5.2.8 pedía el de
+   OTD-VEN-02 (`pedido.vendedor_id = <JWT>`); en el almacén **no hay `vendedor_id`**, solo el
+   NOMBRE. Se casa por nombre contra `vendedores Array(String)` y el **ETL valida que los nombres
+   sean únicos**, porque dos homónimos compartirían cartera y el recorte fallaría **abierto**.
+   Medido: el vendedor ve **50 de los 69** clientes, porque 54 de ellos fueron atendidos por 3 o
+   más vendedores — la cartera no es una partición. Corrección CE4.6.
+2. **El aviso de alcance tiene que poder ser del informe.** El texto de VEN-02 («tus propias
+   ventas») describiría mal este filtro, que es por cartera y no por autoría. El sobre puede
+   enviar `avisoAlcance` y la pantalla lo prefiere al genérico.
+3. **El valor por defecto de un filtro sigue siendo diseño.** Igual que SOP-01 arranca en
+   `pendientes` y GER-04 en `vigente`, éste arranca en `alerta`: un informe de alerta que abre
+   mostrando los 69 clientes obliga a buscar la alerta dentro de la lista.
+4. **Un nivel que significa «no puedo opinar» no es un nivel más.** `sin_muestra` se pinta en gris
+   y con su etiqueta explícita, nunca como `normal`, porque los clientes con más silencio de toda
+   la cartera están ahí — su silencio es lo que los dejó sin muestra. Corrección CE4.5.
+5. **El rótulo de un SVG en tabla es `<title>` nativo, no `matTooltip`.** Ya se pagó en la fase
+   E1-A con la dispersión de T-2; con 69 filas × 12 barras la lección se aplica de entrada.
+
+### 21.4 Verificación
+
+- `matriz_alerta_cliente.py` — **8 celdas (8 roles × 1 ruta), 0 discrepancias**, con la ventana
+  horaria ensanchada, restaurada y **verificada releyéndola**. Además del código HTTP comprueba
+  **sobre la respuesta**: el reparto por nivel contra PostgreSQL (69 / 3 / 6 / 8, Δ = 0), que el
+  filtro por defecto devuelva los 9 en alerta, las cinco reglas de presentación, las cinco
+  limitaciones en la salvedad, y el **recorte del vendedor cliente por cliente** —ni uno ajeno, ni
+  uno de menos—.
+- `validar_dwh.py` — **49 controles** (46 + 3 de la fase), todos con Δ = 0. Los tres nuevos son
+  inusualmente fuertes para una predicción: PostgreSQL **recalcula el modelo entero**, exponencial
+  incluida, y contrasta λ **cliente por cliente**.
+- Degradación con `docker stop`: **200 con `analiticaDisponible=false` en ~4,1 s**, los informes
+  simples de PostgreSQL en 0,13 s, y recuperación **sin reiniciar el backend**.

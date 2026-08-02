@@ -1,6 +1,6 @@
 """
 etl/dwh/run_etl.py
-ORQUESTADOR del pipeline DWH: las 19 cargas en orden topológico, una corrida.
+ORQUESTADOR del pipeline DWH: las 21 cargas en orden topológico, una corrida.
 
     python -m etl.dwh.run_etl                     # corrida completa + validación
     python -m etl.dwh.run_etl --orden             # solo imprime el orden resuelto
@@ -80,7 +80,7 @@ RESULTADO_FALLO_PARCIAL = "fallo_parcial"
 SALIDA_OK = 0
 SALIDA_ERROR_ARRANQUE = 1    # ni siquiera se pudo empezar (ClickHouse, grafo…)
 SALIDA_FALLO_PARCIAL = 2     # alguna tabla falló, abortó o quedó omitida
-SALIDA_VALIDACION = 3        # las 19 cargaron, pero los controles no cuadran
+SALIDA_VALIDACION = 3        # las 21 cargaron, pero los controles no cuadran
 
 
 def _ascii(texto: str) -> str:
@@ -530,11 +530,11 @@ def main(argv=None) -> int:
 
     parser = argparse.ArgumentParser(
         prog="python -m etl.dwh.run_etl",
-        description="Orquesta las 19 cargas del DWH en orden topológico y valida "
+        description="Orquesta las 21 cargas del DWH en orden topológico y valida "
                     "el resultado contra PostgreSQL.",
     )
     parser.add_argument("--tablas", metavar="A,B,C",
-                        help="subconjunto de tareas (por defecto, las 19)")
+                        help="subconjunto de tareas (por defecto, las 21)")
     parser.add_argument("--corrida-id", metavar="UUID",
                         help="id de corrida impuesto (lo usa la aplicación para "
                              "poder consultar el progreso desde el primer instante)")

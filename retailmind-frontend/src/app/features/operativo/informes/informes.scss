@@ -336,3 +336,125 @@
     vertical-align: -2px;
   }
 }
+
+/* ── Gráfico de la previsión de demanda (fase E2, regla 1 de §5.1.9) ──────
+   El histórico y la previsión comparten gráfico: lo continuo es lo que pasó,
+   lo discontinuo lo que se espera, y el área es la banda del 80 %. Los tres
+   trazos se distinguen por FORMA además de por color, para que la lectura no
+   dependa de percibir la diferencia entre dos azules.                       */
+.prevision-grafico {
+  margin: 4px 0 18px;
+
+  .prevision-leyenda {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 18px;
+    margin-bottom: 6px;
+    font-size: 12.5px;
+    color: var(--text-secondary);
+  }
+
+  .leyenda-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .leyenda-serie {
+    margin-left: auto;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .grafico-svg {
+    width: 100%;
+    height: auto;
+    display: block;
+    overflow: visible;
+  }
+
+  .rejilla {
+    stroke: rgba(0, 0, 0, 0.08);
+    stroke-width: 1;
+  }
+
+  .rotulo {
+    font-size: 11px;
+    fill: var(--text-secondary);
+  }
+
+  .trazo-historico {
+    stroke: #1e88e5;
+    stroke-width: 2.2;
+    stroke-linejoin: round;
+  }
+
+  .trazo-prevision {
+    stroke: #8e24aa;
+    stroke-width: 2.4;
+    stroke-dasharray: 7 5;
+    stroke-linejoin: round;
+  }
+
+  .area-banda {
+    fill: rgba(142, 36, 170, 0.16);
+    stroke: none;
+  }
+
+  .punto-historico {
+    fill: #1e88e5;
+    cursor: help;
+  }
+
+  /* El mes incompleto va HUECO: se ve que es un punto distinto del resto sin
+     tener que leer el rótulo. */
+  .punto-truncado {
+    fill: #fff;
+    stroke: #fb8c00;
+    stroke-width: 2.4;
+  }
+
+  .punto-prevision {
+    fill: #8e24aa;
+    cursor: help;
+  }
+
+  .corte-serie {
+    stroke: #fb8c00;
+    stroke-width: 1.4;
+    stroke-dasharray: 3 4;
+  }
+
+  .rotulo-truncado {
+    font-size: 11px;
+    fill: #ef6c00;
+    font-weight: 600;
+  }
+}
+
+/* ── SPARKLINE en la celda (regla 2 de §5.2.9, OTD-VEN-19) ────────────────
+   El micro-gráfico de compras por mes que va EN LA FILA. No es adorno: es lo
+   que deja distinguir un hueco de una pendiente, y la defensa contra el
+   artefacto de la rampa de cartera. Su rótulo es un <title> NATIVO del SVG y
+   no un matTooltip, por la lección de rendimiento de la fase E1-A. */
+.sparkline {
+  display: block;
+  overflow: visible;
+  cursor: help;
+
+  rect {
+    fill: #5c6bc0;
+  }
+}
+
+/* La fecha ancla junto al título del informe (regla 5 de §5.2.9). Va en tono
+   menor que el título pero dentro de él: es una precisión sobre de cuándo es
+   lo que se está mirando, no un pie de página. */
+.titulo-ancla {
+  margin-left: .4rem;
+  font-size: .82rem;
+  font-weight: 500;
+  color: #5f6368;
+  letter-spacing: .01em;
+}

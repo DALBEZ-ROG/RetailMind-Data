@@ -322,6 +322,21 @@ public class SecurityConfig {
                 // lectura de dirección, no de cartera.
                 .requestMatchers(HttpMethod.GET, "/api/informes/ventas/devoluciones")
                     .hasAnyAuthority("ADMIN", "GERENTE", "ANALISTA")
+                // ── Fase E3 del nivel estratégico: la alerta de abandono.
+                //
+                // OTD-VEN-19 lleva MONTO (facturación 12m y valor en riesgo), y
+                // como en todos los compuestos el corte lo hace la RUTA: Bodega
+                // y Despacho fuera. El VENDEDOR entra —es quien ejecuta el gesto
+                // comercial— y el servicio lo recorta a SU cartera. El ANALISTA
+                // queda fuera a propósito: esto no es una lectura de análisis,
+                // es una lista de personas a las que hay que llamar.
+                //
+                // La línea es REDUNDANTE con el comodín de abajo, que hoy
+                // concede los mismos tres roles, y se escribe igual: si mañana
+                // el comodín se ensancha, este endpoint no debe heredarlo por
+                // accidente.
+                .requestMatchers(HttpMethod.GET, "/api/informes/ventas/clientes-en-riesgo")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "VENDEDOR")
                 // Resto de informes de Ventas (VEN-01/02/08/15): llevan MONTO, por
                 // lo que BODEGA y DESPACHO quedan fuera por segregación financiera
                 // (el motor lo respalda: sin SELECT sobre pedido.total, carrito ni
@@ -401,6 +416,18 @@ public class SecurityConfig {
                         "/api/informes/compras/ciclo-compra",
                         "/api/informes/compras/evolucion-costo")
                     .hasAnyAuthority("ADMIN", "GERENTE", "COMPRAS", "ANALISTA")
+                // PREVISION DE DEMANDA (fase E2, §5.1.8) — el lado de COMPRAS.
+                // Sirve a D-11.1 (plan de compra) y D-07.5 (nivel objetivo de
+                // stock). El reparto coincide con el comodin del departamento y
+                // aun asi va enumerada POR NOMBRE: la MISMA pantalla existe bajo
+                // /api/informes/gerencia con OTRO reparto (alli entra el ANALISTA
+                // y aqui no; aqui entra COMPRAS y alli no), y dos rutas gemelas
+                // que se apoyan cada una en el comodin de su departamento
+                // divergen sin que nadie lo decida en cuanto uno de los dos
+                // comodines cambie. No lleva importes —son unidades— pero BODEGA
+                // y DESPACHO quedan fuera: es material de planificacion.
+                .requestMatchers(HttpMethod.GET, "/api/informes/compras/prevision-demanda")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "COMPRAS")
                 // Resto de informes de Compras (COM-01 órdenes, COM-02 cuentas por
                 // pagar, COM-10 catálogo proveedor-producto, COM-09 recuperación al
                 // proveedor): llevan MONTO o COSTO, así que BODEGA y DESPACHO quedan
@@ -553,7 +580,14 @@ public class SecurityConfig {
                         "/api/informes/gerencia/margen-categoria",
                         "/api/informes/gerencia/margen-producto",
                         "/api/informes/gerencia/descuento-total",
-                        "/api/informes/gerencia/efecto-promociones")
+                        "/api/informes/gerencia/efecto-promociones",
+                        // PREVISION DE DEMANDA (fase E2, §5.1.8) — el lado de
+                        // GERENCIA, que sirve a D-10.1: la previsión con la que
+                        // se fijan las metas del período. Mismo reparto que el
+                        // resto de esta línea (se suma el ANALISTA), y por eso
+                        // cae aquí y no en el comodín del departamento, que
+                        // dejaría al analista fuera de su propio trabajo.
+                        "/api/informes/gerencia/prevision-demanda")
                     .hasAnyAuthority("ADMIN", "GERENTE", "ANALISTA")
                 // Resto de informes de Gerencia (GER-01 foto del día, GER-04
                 // cupones, GER-06 marketing vigente): dirección del negocio, con
@@ -563,6 +597,67 @@ public class SecurityConfig {
                 // Los informes son SOLO consulta: cualquier método que no sea GET
                 // sobre /api/informes se rechaza de plano.
                 .requestMatchers("/api/informes/**").denyAll()
+                // ── TABLEROS DE DIRECCION (nivel ESTRATEGICO, fase E1-A) ──────
+                // docs/estrategico/DISENO_NIVEL_ESTRATEGICO.md §4.
+                //
+                // Los TRES tableros de esta fase LLEVAN DINERO —margen, capital,
+                // valor del cliente, monto devuelto—, asi que BODEGA y DESPACHO
+                // quedan FUERA. El motor no puede respaldar ese corte: ClickHouse
+                // no tiene GRANT por columna ni RLS, y el ETL escribe todas las
+                // columnas de importe en tablas planas. La UNICA barrera es esta
+                // ruta (R-5 del diseno), la misma situacion que OTD-LOG-11,
+                // OTD-INV-07 y OTD-GER-08.
+                //
+                // Por eso cada tablero va ENUMERADO POR NOMBRE y no con un
+                // comodin /api/tableros/**: la fase E1-B trae T-4 (operacion y
+                // ultima milla), que es el UNICO SIN dinero y el unico al que
+                // Bodega y Despacho podran entrar. Con un comodin, ese tablero
+                // futuro heredaria el permiso —o forzaria a recordar recortarlo—
+                // y el corte financiero se decidiria por descuido.
+                .requestMatchers(HttpMethod.GET, "/api/tableros/omnicanal",
+                        "/api/tableros/rentabilidad")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "ANALISTA")
+                // T-3 suma SOPORTE, y solo el: entra al tablero por el bloque de
+                // tickets y devoluciones. El recorte de los demas bloques NO lo
+                // puede hacer esta linea —es dentro del mismo endpoint— y lo hace
+                // la CONSULTA: para SOPORTE esos bloques no se ejecutan y el
+                // sobre declara cuales omitio. Es la misma disciplina de COM-08,
+                // un escalon mas fino.
+                .requestMatchers(HttpMethod.GET, "/api/tableros/cliente-posventa")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "ANALISTA", "SOPORTE")
+                // ── Fase E1-B ────────────────────────────────────────────────
+                // T-4 (operacion y ultima milla) es el UNICO tablero SIN dinero
+                // y el unico que DESPACHO y BODEGA pueden abrir. Que puedan
+                // hacerlo depende de DOS cosas a la vez, y las dos son de este
+                // proyecto y no del motor: esta linea, y que su consulta no
+                // seleccione un solo importe (se mide en envios, dias, horas y
+                // unidades). ClickHouse no tiene GRANT por columna que respalde
+                // lo segundo, asi que hay una prueba automatica que recorre la
+                // respuesta buscando columnas monetarias.
+                .requestMatchers(HttpMethod.GET, "/api/tableros/operacion")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "ANALISTA", "DESPACHO", "BODEGA")
+                // T-5 es el gemelo CON dinero de T-4 —el costo del flete y del
+                // retorno— y existe separado precisamente para que T-4 pueda
+                // estar abierto a la operacion. Despacho y Bodega quedan fuera.
+                .requestMatchers(HttpMethod.GET, "/api/tableros/costo-operacion")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "ANALISTA")
+                // T-6 suma COMPRAS: es su objetivo (OE-11) y su centro de costo.
+                // Lleva dinero, asi que Bodega y Despacho siguen fuera.
+                .requestMatchers(HttpMethod.GET, "/api/tableros/abastecimiento")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "COMPRAS", "ANALISTA")
+                // T-7 es DATO SENSIBLE: el corte mas estricto del sistema.
+                // ANALISTA queda fuera A PROPOSITO aunque entre en los otros
+                // seis tableros, y aqui la ruta NO coincide con el motor:
+                // grp_analista SI tiene SELECT sobre log_auditoria (script 19),
+                // asi que esta linea es la unica barrera real. Va enumerada por
+                // nombre por eso mismo.
+                .requestMatchers(HttpMethod.GET, "/api/tableros/gobierno-dato")
+                    .hasAnyAuthority("ADMIN", "GERENTE")
+                // Igual que los informes: los tableros son SOLO consulta. Cualquier
+                // metodo distinto de GET —y cualquier ruta de tablero que no este
+                // enumerada arriba— se rechaza de plano en vez de caer en
+                // anyRequest().authenticated(), que la abriria a los nueve roles.
+                .requestMatchers("/api/tableros/**").denyAll()
                 // Perfil (ficha básica) — usuario autenticado (cualquier rol)
                 .requestMatchers("/api/perfil/**").authenticated()
                 // Todo lo demas requiere autenticacion

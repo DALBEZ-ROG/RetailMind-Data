@@ -961,3 +961,191 @@ clickhouse_connect.driver.exceptions.OperationalError: Error HTTPConnectionPool(
 [2026-07-31 20:51:08] [INFO] [fact_stock_mensual] staging 'fact_stock_mensual_new' creada
 [2026-07-31 20:51:08] [INFO] [fact_stock_mensual] 21,122 filas derivadas dentro de retailmind_dwh
 [2026-07-31 20:51:08] [INFO] [fact_stock_mensual] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 20:20:34] [INFO] [fact_prevision_demanda] staging 'fact_prevision_demanda_new' creada
+[2026-08-01 20:20:34] [INFO] [fact_prevision_demanda] modo=modelo · MAPE total 8.78 % vs estacional 12.22 % · cobertura 87.4 % (770/881) · 41 series con línea base
+[2026-08-01 20:20:36] [INFO] [fact_prevision_demanda] 510 filas calculadas por el modelo
+[2026-08-01 20:20:37] [ERROR] [fact_prevision_demanda] ABORTADA sin publicar: 15 series cuya banda NO se ensancha con el horizonte. La regla 5 de §5.1.9 la exige: que el mes más lejano tenga la banda más ancha es la información, no un defecto del gráfico.
+[2026-08-01 20:21:06] [INFO] [fact_prevision_demanda] modo=modelo · MAPE total 8.78 % vs estacional 12.22 % · cobertura 87.4 % (770/881) · 41 series con línea base
+[2026-08-01 20:21:06] [INFO] [fact_prevision_demanda] 510 filas calculadas por el modelo
+[2026-08-01 20:22:42] [INFO] [fact_prevision_demanda] staging 'fact_prevision_demanda_new' creada
+[2026-08-01 20:22:43] [INFO] [fact_prevision_demanda] modo=modelo · MAPE total 8.78 % vs estacional 12.22 % · cobertura 87.6 % (772/881) · 41 series con línea base
+[2026-08-01 20:22:43] [INFO] [fact_prevision_demanda] 510 filas calculadas por el modelo
+[2026-08-01 20:22:44] [ERROR] [fact_prevision_demanda] ABORTADA sin publicar: 16 series cuya banda RELATIVA no se ensancha con el horizonte. La regla 5 de §5.1.9 la exige: que del mes más lejano se sepa menos es la información, no un defecto del gráfico.
+[2026-08-01 20:23:32] [INFO] [fact_prevision_demanda] modo=modelo · MAPE total 8.78 % vs estacional 12.22 % · cobertura 87.6 % (772/881) · 41 series con línea base
+[2026-08-01 20:23:32] [INFO] [fact_prevision_demanda] 510 filas calculadas por el modelo
+[2026-08-01 20:24:15] [INFO] [fact_prevision_demanda] staging 'fact_prevision_demanda_new' creada
+[2026-08-01 20:24:16] [INFO] [fact_prevision_demanda] modo=modelo · MAPE total 8.78 % vs estacional 12.22 % · cobertura 87.6 % (772/881) · 41 series con línea base
+[2026-08-01 20:24:17] [INFO] [fact_prevision_demanda] 510 filas calculadas por el modelo
+[2026-08-01 20:24:17] [INFO] [fact_prevision_demanda] primera carga — RENAME TABLE
+[2026-08-01 20:24:36] [INFO] [fact_prevision_demanda] staging 'fact_prevision_demanda_new' creada
+[2026-08-01 20:24:37] [INFO] [fact_prevision_demanda] modo=modelo · MAPE total 8.78 % vs estacional 12.22 % · cobertura 87.6 % (772/881) · 41 series con línea base
+[2026-08-01 20:24:37] [INFO] [fact_prevision_demanda] 510 filas calculadas por el modelo
+[2026-08-01 20:24:38] [INFO] [fact_prevision_demanda] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 20:35:14] [INFO] [fact_prevision_demanda] staging 'fact_prevision_demanda_new' creada
+[2026-08-01 20:35:14] [INFO] [fact_prevision_demanda] modo=modelo · MAPE total 8.78 % vs estacional 12.22 % · cobertura 87.6 % (772/881) · 41 series con línea base
+[2026-08-01 20:35:16] [INFO] [fact_prevision_demanda] 510 filas calculadas por el modelo
+[2026-08-01 20:35:16] [INFO] [fact_prevision_demanda] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 20:35:24] [INFO] [dim_fecha] staging 'dim_fecha_new' creada
+[2026-08-01 20:35:24] [INFO] [dim_fecha] 730 días generados (2025-01-01 → 2026-12-31)
+[2026-08-01 20:35:25] [INFO] [dim_fecha] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 20:35:25] [INFO] [dim_producto] staging 'dim_producto_new' creada
+[2026-08-01 20:35:25] [INFO] [dim_producto] 1,221 filas insertadas
+[2026-08-01 20:35:25] [INFO] [dim_producto] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 20:35:26] [INFO] [dim_cliente] staging 'dim_cliente_new' creada
+[2026-08-01 20:35:26] [INFO] [dim_cliente] 72 filas insertadas
+[2026-08-01 20:35:26] [INFO] [dim_cliente] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 20:35:26] [INFO] [dim_proveedor] staging 'dim_proveedor_new' creada
+[2026-08-01 20:35:26] [INFO] [dim_proveedor] 11 filas insertadas
+[2026-08-01 20:35:27] [INFO] [dim_proveedor] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 20:35:27] [INFO] [dim_promocion_producto] staging 'dim_promocion_producto_new' creada
+[2026-08-01 20:35:27] [INFO] [dim_promocion_producto] 232 filas insertadas
+[2026-08-01 20:35:27] [INFO] [dim_promocion_producto] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 20:35:27] [INFO] [fact_pedido] staging 'fact_pedido_new' creada
+[2026-08-01 20:35:28] [INFO] [fact_pedido] 4,083 filas insertadas
+[2026-08-01 20:35:28] [INFO] [fact_pedido] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 20:35:29] [INFO] [fact_venta_linea] staging 'fact_venta_linea_new' creada
+[2026-08-01 20:35:29] [INFO] [fact_venta_linea] 10,384 filas insertadas
+[2026-08-01 20:35:29] [INFO] [fact_venta_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 20:35:30] [INFO] [fact_flujo_caja] staging 'fact_flujo_caja_new' creada
+[2026-08-01 20:35:30] [INFO] [fact_flujo_caja] 4,981 filas insertadas
+[2026-08-01 20:35:30] [INFO] [fact_flujo_caja] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 20:35:30] [INFO] [fact_orden_compra] staging 'fact_orden_compra_new' creada
+[2026-08-01 20:35:31] [INFO] [fact_orden_compra] 865 filas insertadas
+[2026-08-01 20:35:31] [INFO] [fact_orden_compra] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 20:35:31] [INFO] [fact_compra_linea] staging 'fact_compra_linea_new' creada
+[2026-08-01 20:35:32] [INFO] [fact_compra_linea] 2,949 filas insertadas
+[2026-08-01 20:35:32] [INFO] [fact_compra_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 20:35:32] [INFO] [fact_movimiento_inventario] staging 'fact_movimiento_inventario_new' creada
+[2026-08-01 20:35:33] [INFO] [fact_movimiento_inventario] 13,287 filas insertadas
+[2026-08-01 20:35:33] [INFO] [fact_movimiento_inventario] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 20:35:33] [INFO] [fact_envio] staging 'fact_envio_new' creada
+[2026-08-01 20:35:34] [INFO] [fact_envio] 2,872 filas insertadas
+[2026-08-01 20:35:34] [INFO] [fact_envio] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 20:35:34] [INFO] [fact_novedad_envio] staging 'fact_novedad_envio_new' creada
+[2026-08-01 20:35:34] [INFO] [fact_novedad_envio] 176 filas insertadas
+[2026-08-01 20:35:35] [INFO] [fact_novedad_envio] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 20:35:35] [INFO] [fact_devolucion] staging 'fact_devolucion_new' creada
+[2026-08-01 20:35:35] [INFO] [fact_devolucion] 196 filas insertadas
+[2026-08-01 20:35:35] [INFO] [fact_devolucion] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 20:35:36] [INFO] [fact_devolucion_linea] staging 'fact_devolucion_linea_new' creada
+[2026-08-01 20:35:36] [INFO] [fact_devolucion_linea] 274 filas insertadas
+[2026-08-01 20:35:36] [INFO] [fact_devolucion_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 20:35:36] [INFO] [fact_ticket] staging 'fact_ticket_new' creada
+[2026-08-01 20:35:37] [INFO] [fact_ticket] 248 filas insertadas
+[2026-08-01 20:35:37] [INFO] [fact_ticket] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 20:35:37] [INFO] [fact_resena] staging 'fact_resena_new' creada
+[2026-08-01 20:35:37] [INFO] [fact_resena] 344 filas insertadas
+[2026-08-01 20:35:38] [INFO] [fact_resena] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 20:35:38] [INFO] [fact_devolucion_proveedor] staging 'fact_devolucion_proveedor_new' creada
+[2026-08-01 20:35:38] [INFO] [fact_devolucion_proveedor] 38 filas insertadas
+[2026-08-01 20:35:38] [INFO] [fact_devolucion_proveedor] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 20:35:39] [INFO] [fact_stock_mensual] staging 'fact_stock_mensual_new' creada
+[2026-08-01 20:35:39] [INFO] [fact_stock_mensual] 21,122 filas derivadas dentro de retailmind_dwh
+[2026-08-01 20:35:39] [INFO] [fact_stock_mensual] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 20:35:39] [INFO] [fact_prevision_demanda] staging 'fact_prevision_demanda_new' creada
+[2026-08-01 20:35:40] [INFO] [fact_prevision_demanda] modo=modelo · MAPE total 8.78 % vs estacional 12.22 % · cobertura 87.6 % (772/881) · 41 series con línea base
+[2026-08-01 20:35:40] [INFO] [fact_prevision_demanda] 510 filas calculadas por el modelo
+[2026-08-01 20:35:40] [INFO] [fact_prevision_demanda] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 21:26:15] [INFO] [fact_alerta_cliente] staging 'fact_alerta_cliente_new' creada
+[2026-08-01 21:26:15] [INFO] [fact_alerta_cliente] ancla 2026-07-22 · ventana 2026-01-01 (7 meses) · 69 clientes · criticas 3 · atencion 6 · sin muestra 8 · lift 1.99 (p=0.102, 14 positivos)
+[2026-08-01 21:26:16] [INFO] [fact_alerta_cliente] 69 filas calculadas por el modelo
+[2026-08-01 21:26:16] [ERROR] [fact_alerta_cliente] falló
+Traceback (most recent call last):
+  File "C:\Users\ASUS\Documents\UTEQ\6 SEMESTRE\Construccion de software\1M6DatosCS\retailmind\etl\dwh\cargar.py", line 80, in cargar_tabla
+    resultado = cargar_atomico(cliente, tarea)
+  File "C:\Users\ASUS\Documents\UTEQ\6 SEMESTRE\Construccion de software\1M6DatosCS\retailmind\etl\dwh\carga_atomica.py", line 124, in cargar_atomico
+    controles = tarea.controles()
+  File "C:\Users\ASUS\Documents\UTEQ\6 SEMESTRE\Construccion de software\1M6DatosCS\retailmind\etl\dwh\tarea.py", line 143, in controles
+    cur.execute(self.sql_controles())
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+psycopg2.errors.UndefinedColumn: no existe la columna u.rol_id
+LINE 12:             JOIN rol r ON r.id = u.rol_id
+                                          ^
+
+[2026-08-01 21:26:33] [INFO] [fact_alerta_cliente] staging 'fact_alerta_cliente_new' creada
+[2026-08-01 21:26:33] [INFO] [fact_alerta_cliente] ancla 2026-07-22 · ventana 2026-01-01 (7 meses) · 69 clientes · criticas 3 · atencion 6 · sin muestra 8 · lift 1.99 (p=0.102, 14 positivos)
+[2026-08-01 21:26:34] [INFO] [fact_alerta_cliente] 69 filas calculadas por el modelo
+[2026-08-01 21:26:34] [ERROR] [fact_alerta_cliente] falló
+Traceback (most recent call last):
+  File "C:\Users\ASUS\Documents\UTEQ\6 SEMESTRE\Construccion de software\1M6DatosCS\retailmind\etl\dwh\cargar.py", line 80, in cargar_tabla
+    resultado = cargar_atomico(cliente, tarea)
+  File "C:\Users\ASUS\Documents\UTEQ\6 SEMESTRE\Construccion de software\1M6DatosCS\retailmind\etl\dwh\carga_atomica.py", line 124, in cargar_atomico
+    controles = tarea.controles()
+  File "C:\Users\ASUS\Documents\UTEQ\6 SEMESTRE\Construccion de software\1M6DatosCS\retailmind\etl\dwh\tarea.py", line 143, in controles
+    cur.execute(self.sql_controles())
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+psycopg2.errors.InsufficientPrivilege: permiso denegado a la tabla usuario_rol
+
+[2026-08-01 21:26:55] [INFO] [fact_alerta_cliente] staging 'fact_alerta_cliente_new' creada
+[2026-08-01 21:26:55] [INFO] [fact_alerta_cliente] ancla 2026-07-22 · ventana 2026-01-01 (7 meses) · 69 clientes · criticas 3 · atencion 6 · sin muestra 8 · lift 1.99 (p=0.102, 14 positivos)
+[2026-08-01 21:26:55] [INFO] [fact_alerta_cliente] 69 filas calculadas por el modelo
+[2026-08-01 21:26:56] [INFO] [fact_alerta_cliente] primera carga — RENAME TABLE
+[2026-08-01 21:27:47] [INFO] [fact_alerta_cliente] staging 'fact_alerta_cliente_new' creada
+[2026-08-01 21:27:47] [INFO] [fact_alerta_cliente] ancla 2026-07-22 · ventana 2026-01-01 (7 meses) · 69 clientes · criticas 3 · atencion 6 · sin muestra 8 · lift 1.99 (p=0.102, 14 positivos)
+[2026-08-01 21:27:48] [INFO] [fact_alerta_cliente] 69 filas calculadas por el modelo
+[2026-08-01 21:27:48] [INFO] [fact_alerta_cliente] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 21:36:47] [INFO] [dim_fecha] staging 'dim_fecha_new' creada
+[2026-08-01 21:36:47] [INFO] [dim_fecha] 730 días generados (2025-01-01 → 2026-12-31)
+[2026-08-01 21:36:47] [INFO] [dim_fecha] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 21:36:48] [INFO] [dim_producto] staging 'dim_producto_new' creada
+[2026-08-01 21:36:48] [INFO] [dim_producto] 1,221 filas insertadas
+[2026-08-01 21:36:48] [INFO] [dim_producto] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 21:36:48] [INFO] [dim_cliente] staging 'dim_cliente_new' creada
+[2026-08-01 21:36:48] [INFO] [dim_cliente] 72 filas insertadas
+[2026-08-01 21:36:49] [INFO] [dim_cliente] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 21:36:49] [INFO] [dim_proveedor] staging 'dim_proveedor_new' creada
+[2026-08-01 21:36:49] [INFO] [dim_proveedor] 11 filas insertadas
+[2026-08-01 21:36:49] [INFO] [dim_proveedor] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 21:36:49] [INFO] [dim_promocion_producto] staging 'dim_promocion_producto_new' creada
+[2026-08-01 21:36:50] [INFO] [dim_promocion_producto] 232 filas insertadas
+[2026-08-01 21:36:50] [INFO] [dim_promocion_producto] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 21:36:50] [INFO] [fact_pedido] staging 'fact_pedido_new' creada
+[2026-08-01 21:36:50] [INFO] [fact_pedido] 4,083 filas insertadas
+[2026-08-01 21:36:51] [INFO] [fact_pedido] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 21:36:51] [INFO] [fact_venta_linea] staging 'fact_venta_linea_new' creada
+[2026-08-01 21:36:51] [INFO] [fact_venta_linea] 10,384 filas insertadas
+[2026-08-01 21:36:52] [INFO] [fact_venta_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 21:36:52] [INFO] [fact_flujo_caja] staging 'fact_flujo_caja_new' creada
+[2026-08-01 21:36:52] [INFO] [fact_flujo_caja] 4,981 filas insertadas
+[2026-08-01 21:36:52] [INFO] [fact_flujo_caja] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 21:36:53] [INFO] [fact_orden_compra] staging 'fact_orden_compra_new' creada
+[2026-08-01 21:36:53] [INFO] [fact_orden_compra] 865 filas insertadas
+[2026-08-01 21:36:53] [INFO] [fact_orden_compra] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 21:36:54] [INFO] [fact_compra_linea] staging 'fact_compra_linea_new' creada
+[2026-08-01 21:36:54] [INFO] [fact_compra_linea] 2,949 filas insertadas
+[2026-08-01 21:36:54] [INFO] [fact_compra_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 21:36:55] [INFO] [fact_movimiento_inventario] staging 'fact_movimiento_inventario_new' creada
+[2026-08-01 21:36:55] [INFO] [fact_movimiento_inventario] 13,287 filas insertadas
+[2026-08-01 21:36:55] [INFO] [fact_movimiento_inventario] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 21:36:56] [INFO] [fact_envio] staging 'fact_envio_new' creada
+[2026-08-01 21:36:56] [INFO] [fact_envio] 2,872 filas insertadas
+[2026-08-01 21:36:56] [INFO] [fact_envio] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 21:36:56] [INFO] [fact_novedad_envio] staging 'fact_novedad_envio_new' creada
+[2026-08-01 21:36:57] [INFO] [fact_novedad_envio] 176 filas insertadas
+[2026-08-01 21:36:57] [INFO] [fact_novedad_envio] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 21:36:57] [INFO] [fact_devolucion] staging 'fact_devolucion_new' creada
+[2026-08-01 21:36:57] [INFO] [fact_devolucion] 196 filas insertadas
+[2026-08-01 21:36:58] [INFO] [fact_devolucion] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 21:36:58] [INFO] [fact_devolucion_linea] staging 'fact_devolucion_linea_new' creada
+[2026-08-01 21:36:58] [INFO] [fact_devolucion_linea] 274 filas insertadas
+[2026-08-01 21:36:58] [INFO] [fact_devolucion_linea] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 21:36:59] [INFO] [fact_ticket] staging 'fact_ticket_new' creada
+[2026-08-01 21:36:59] [INFO] [fact_ticket] 248 filas insertadas
+[2026-08-01 21:36:59] [INFO] [fact_ticket] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 21:37:00] [INFO] [fact_resena] staging 'fact_resena_new' creada
+[2026-08-01 21:37:00] [INFO] [fact_resena] 344 filas insertadas
+[2026-08-01 21:37:00] [INFO] [fact_resena] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 21:37:00] [INFO] [fact_devolucion_proveedor] staging 'fact_devolucion_proveedor_new' creada
+[2026-08-01 21:37:00] [INFO] [fact_devolucion_proveedor] 38 filas insertadas
+[2026-08-01 21:37:01] [INFO] [fact_devolucion_proveedor] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 21:37:01] [INFO] [fact_stock_mensual] staging 'fact_stock_mensual_new' creada
+[2026-08-01 21:37:01] [INFO] [fact_stock_mensual] 21,122 filas derivadas dentro de retailmind_dwh
+[2026-08-01 21:37:01] [INFO] [fact_stock_mensual] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 21:37:02] [INFO] [fact_prevision_demanda] staging 'fact_prevision_demanda_new' creada
+[2026-08-01 21:37:02] [INFO] [fact_prevision_demanda] modo=modelo · MAPE total 8.78 % vs estacional 12.22 % · cobertura 87.6 % (772/881) · 41 series con línea base
+[2026-08-01 21:37:03] [INFO] [fact_prevision_demanda] 510 filas calculadas por el modelo
+[2026-08-01 21:37:03] [INFO] [fact_prevision_demanda] EXCHANGE TABLES — publicada sin ventana de vacío
+[2026-08-01 21:37:03] [INFO] [fact_alerta_cliente] staging 'fact_alerta_cliente_new' creada
+[2026-08-01 21:37:04] [INFO] [fact_alerta_cliente] ancla 2026-07-22 · ventana 2026-01-01 (7 meses) · 69 clientes · criticas 3 · atencion 6 · sin muestra 8 · lift 1.99 (p=0.102, 14 positivos)
+[2026-08-01 21:37:04] [INFO] [fact_alerta_cliente] 69 filas calculadas por el modelo
+[2026-08-01 21:37:04] [INFO] [fact_alerta_cliente] EXCHANGE TABLES — publicada sin ventana de vacío

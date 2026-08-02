@@ -194,4 +194,32 @@ public class InformesVentasCompuestosController {
             @RequestParam(required = false) String base) {
         return servicio.devolucionesMes(desde, hasta, estado, motivo, base);
     }
+
+    /**
+     * OTD-VEN-19 — Clientes en riesgo (fase E3 del nivel estratégico, §5.2).
+     * GET /api/informes/ventas/clientes-en-riesgo?nivel=&buscar=&page=&size=
+     *
+     * Destinatarios (§5.2.8): <b>ADMIN, GERENTE y VENDEDOR</b>. Lleva MONTO
+     * —facturación 12m y valor en riesgo—, así que Bodega y Despacho quedan
+     * fuera por RUTA. El VENDEDOR entra porque es quien ejecuta el gesto
+     * comercial, y se recorta a SU cartera con {@code alcance: "propio"}.
+     *
+     * {@code nivel} ∈ {alerta (defecto), critica, atencion, normal,
+     * sin_muestra, todos}. Arranca en {@code alerta} a propósito: un informe de
+     * alerta que abre mostrando a los 69 clientes obliga a buscar la alerta
+     * dentro de la lista.
+     *
+     * <b>El resultado del modelo viaja en la cabecera</b>: los tres primeros KPI
+     * son el lift medido, su número de casos positivos y si supera al azar. Es
+     * la regla 4 de §5.2.9 y no es negociable — un modelo que oculta su lift es
+     * indistinguible de uno que funciona.
+     */
+    @GetMapping("/clientes-en-riesgo")
+    public Map<String, Object> clientesEnRiesgo(
+            @RequestParam(required = false) String nivel,
+            @RequestParam(required = false) String buscar,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size) {
+        return servicio.clientesEnRiesgo(nivel, buscar, page, size);
+    }
 }

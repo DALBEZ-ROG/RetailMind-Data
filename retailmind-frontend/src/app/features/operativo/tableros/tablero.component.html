@@ -1,0 +1,263 @@
+<div class="op-page tablero-page" *ngIf="def">
+
+  <div class="section-header">
+    <h2><mat-icon>{{ def.icono }}</mat-icon> {{ def.titulo }}</h2>
+    <p>{{ def.descripcion }}</p>
+    <p class="tablero-objetivo">
+      <span class="objetivo-tag">{{ def.id }}</span>
+      {{ def.objetivo }}
+      <span class="tablero-decisiones" *ngIf="sobre?.decisiones?.length">
+        · Decisiones que sirve: {{ sobre?.decisiones?.join(' · ') }}
+      </span>
+    </p>
+  </div>
+
+  <!-- Marca de agua: de cuándo es el dato que se está mirando. Es la carga MÁS
+       REZAGADA de las tablas del tablero, no la más reciente: un tablero es tan
+       fresco como su fuente más atrasada. -->
+  <div class="marca-agua tablero-marca" *ngIf="sobre?.datosAl">
+    <mat-icon>update</mat-icon>
+    <span>Datos al <strong>{{ sobre?.datosAl }}</strong></span>
+    <span class="marca-fuente" *ngIf="sobre?.fuente">· {{ sobre?.fuente }}</span>
+    <span class="marca-fuente" *ngIf="sobre?.periodo?.ultimoMesConDato">
+      · el histórico llega hasta {{ sobre?.periodo?.ultimoMesConDato }}
+      ({{ sobre?.periodo?.mesesConDato }} meses con dato)
+    </span>
+  </div>
+
+  <!-- Degradación: el almacén no responde. NO es un error de la aplicación. -->
+  <div class="aviso-analitica" *ngIf="avisoAnalitica">
+    <mat-icon>cloud_off</mat-icon> {{ avisoAnalitica }}
+  </div>
+
+  <!-- Filtros -->
+  <div class="op-card" *ngIf="def.filtros.length">
+    <h3><mat-icon>filter_alt</mat-icon> Filtros</h3>
+    <div class="form-grid">
+      <ng-container *ngFor="let f of def.filtros">
+
+        <mat-form-field appearance="outline" *ngIf="f.tipo === 'select'">
+          <mat-label>{{ f.etiqueta }}</mat-label>
+          <mat-select [(ngModel)]="valores[f.param]" (selectionChange)="aplicarFiltros()">
+            <mat-option *ngFor="let o of f.opciones" [value]="o.valor">{{ o.etiqueta }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" *ngIf="f.tipo === 'fecha'">
+          <mat-label>{{ f.etiqueta }}</mat-label>
+          <input matInput type="date" [(ngModel)]="valores[f.param]" (change)="aplicarFiltros()">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" *ngIf="f.tipo === 'texto'">
+          <mat-label>{{ f.etiqueta }}</mat-label>
+          <input matInput [(ngModel)]="valores[f.param]"
+                 (ngModelChange)="f.debounce ? alEscribir() : null"
+                 (change)="f.debounce ? null : aplicarFiltros()">
+          <mat-icon matSuffix>search</mat-icon>
+        </mat-form-field>
+
+      </ng-container>
+    </div>
+    <div class="form-actions">
+      <button class="btn-limpiar" (click)="limpiar()">
+        <mat-icon>filter_alt_off</mat-icon> Limpiar filtros
+      </button>
+      <button class="btn-limpiar" (click)="cargar()">
+        <mat-icon>refresh</mat-icon> Actualizar
+      </button>
+    </div>
+  </div>
+
+  <div class="cargando" *ngIf="loading">
+    <mat-icon>hourglass_top</mat-icon> Calculando el tablero…
+  </div>
+
+  <!-- Tarjetas de cabecera. Cada una lleva su NOTA, que es su denominador:
+       una cifra de dirección sin su base es exactamente la clase de número
+       plausible y equivocado que este nivel persigue. -->
+  <div class="kpi-grid tablero-kpis" *ngIf="sobre?.kpis?.length">
+    <div class="kpi-card" *ngFor="let k of sobre?.kpis">
+      <span class="kpi-label">{{ k.etiqueta }}</span>
+      <span class="kpi-value">{{ formatear(k.valor, k.tipo) }}</span>
+      <span class="kpi-nota" *ngIf="k.nota">{{ k.nota }}</span>
+    </div>
+  </div>
+
+  <!-- Salvedades del tablero entero (no de un bloque concreto) -->
+  <div class="salvedad" *ngFor="let s of sobre?.salvedades">
+    <mat-icon>info</mat-icon>
+    <span><strong>Cómo leer este tablero.</strong> {{ s }}</span>
+  </div>
+
+  <!-- Alcance recortado por el rol: se DECLARA. Un tablero que se recorta en
+       silencio se lee como un tablero completo. -->
+  <div class="aviso-alcance" *ngIf="sobre?.bloquesOmitidos?.length">
+    <mat-icon>visibility_lock</mat-icon>
+    <span>
+      Este tablero se está sirviendo con alcance <strong>{{ sobre?.alcance }}</strong>.
+      No se consultan:
+      <em *ngFor="let o of sobre?.bloquesOmitidos; let i = index">{{ i ? ' · ' : '' }}{{ o.titulo }}</em>.
+      {{ sobre?.bloquesOmitidos?.[0]?.motivo }}
+    </span>
+  </div>
+
+  <!-- ── BLOQUES DEL ALMACÉN ──────────────────────────────────────────── -->
+  <div class="op-card bloque-card" *ngFor="let pres of bloquesVisibles">
+    <ng-container *ngIf="bloque(pres) as b">
+
+      <h3>
+        <mat-icon>{{ def.icono }}</mat-icon>
+        {{ b.titulo }}
+        <span class="conteo">({{ b.filas | number }})</span>
+      </h3>
+
+      <!-- SALVEDAD encima de las cifras, siempre -->
+      <div class="salvedad" *ngIf="b.salvedad">
+        <mat-icon>info</mat-icon>
+        <span><strong>Cómo leer este elemento.</strong> {{ b.salvedad }}</span>
+      </div>
+
+      <div class="muestra-debil" *ngIf="b.muestra">
+        <mat-icon>warning</mat-icon> {{ b.muestra }}
+      </div>
+
+      <!-- DENOMINADOR: obligatorio, y por eso no va escondido en un tooltip -->
+      <div class="denominador">
+        <mat-icon>functions</mat-icon>
+        <span><strong>Sobre qué está calculado.</strong> {{ b.denominador }}</span>
+      </div>
+
+      <p class="ayuda-bloque" *ngIf="pres.ayuda">
+        <mat-icon>lightbulb</mat-icon> {{ pres.ayuda }}
+      </p>
+
+      <!-- Semáforo: tarjetas grandes en vez de gráfico -->
+      <div class="semaforo-grid" *ngIf="b.visualizacion === 'semaforo'">
+        <div class="semaforo-card" *ngFor="let f of b.items; let i = index">
+          <span class="semaforo-valor">{{ formatear(f['clientes'], 'numero') }}</span>
+          <span class="semaforo-pct">{{ formatear(f['clientes_pct'], 'porcentaje') }}</span>
+          <span class="semaforo-etiqueta">{{ f['segmento'] }}</span>
+          <span class="semaforo-pie">
+            {{ formatear(f['pedidos'], 'numero') }} pedidos ·
+            {{ formatear(f['venta'], 'moneda') }}
+          </span>
+        </div>
+      </div>
+
+      <app-tablero-grafico *ngIf="b.visualizacion !== 'semaforo'"
+                           [bloque]="b" [pres]="pres"></app-tablero-grafico>
+
+      <!-- La tabla acompaña SIEMPRE al gráfico: un gráfico sin sus cifras
+           obliga a estimarlas a ojo, y de una estimación a ojo no sale una
+           decisión de trimestre. -->
+      <div class="table-wrapper" *ngIf="b.items.length">
+        <table mat-table [dataSource]="filasDe(pres)">
+          <ng-container *ngFor="let col of pres.columnas" [matColumnDef]="col.campo">
+            <th mat-header-cell *matHeaderCellDef>{{ col.titulo }}</th>
+            <!-- `title` nativo y no matTooltip: una tarjeta de este tablero
+                 puede traer 80 filas por 8 columnas, y una directiva de Angular
+                 por celda multiplicada por seis bloques dejaba la pantalla sin
+                 responder. El texto completo de una celda recortada no necesita
+                 mas que el rotulo del navegador. -->
+            <td mat-cell *matCellDef="let fila"
+                [attr.title]="valorCompleto(col, fila) || null"
+                [class.celda-monto]="col.monto">
+              <span *ngIf="col.tipo === 'chip'; else plano"
+                    class="estado-chip" [ngClass]="claseChip(col, fila)">
+                {{ valor(col, fila) }}
+              </span>
+              <ng-template #plano>{{ valor(col, fila) }}</ng-template>
+            </td>
+          </ng-container>
+          <tr mat-header-row *matHeaderRowDef="columnasDe(pres)"></tr>
+          <tr mat-row *matRowDef="let fila; columns: columnasDe(pres)"></tr>
+        </table>
+      </div>
+
+      <p class="pie-recorte" *ngIf="hayRecorte(pres)">
+        Se muestran las primeras {{ pres.topFilas }} filas del orden que fijó el cálculo,
+        de {{ b.filas | number }} en total.
+      </p>
+
+      <div class="empty-state" *ngIf="!b.items.length">
+        <mat-icon>inbox</mat-icon>
+        <p>Este elemento no tiene filas con los filtros elegidos.</p>
+      </div>
+
+    </ng-container>
+  </div>
+
+  <!-- ── BLOQUES QUE NO SALEN DEL ALMACÉN ─────────────────────────────── -->
+  <div class="op-card bloque-card bloque-externo" *ngFor="let x of def.externos ?? []">
+    <h3>
+      <mat-icon>storage</mat-icon>
+      {{ x.titulo }}
+      <span class="conteo" *ngIf="!externo(x.id).cargando">
+        ({{ externo(x.id).total | number }})
+      </span>
+    </h3>
+
+    <div class="denominador fuente-pg">
+      <mat-icon>alt_route</mat-icon>
+      <span><strong>De dónde sale.</strong> {{ x.nota }}</span>
+    </div>
+
+    <div class="cargando" *ngIf="externo(x.id).cargando">
+      <mat-icon>hourglass_top</mat-icon> Consultando…
+    </div>
+
+    <div class="aviso-alcance" *ngIf="!x.roles.includes(rol)">
+      <mat-icon>visibility_lock</mat-icon>
+      Tu rol no tiene acceso al informe que sirve este bloque, así que no se ha consultado.
+    </div>
+
+    <div class="aviso-analitica" *ngIf="externo(x.id).error">
+      <mat-icon>error_outline</mat-icon> {{ externo(x.id).error }}
+    </div>
+
+    <!-- Resumen del informe que sirve el bloque: va DENTRO de su tarjeta y no
+         arriba con los KPI del tablero, porque es de otra fuente y de otra
+         base de datos. Juntarlos invitaria a sumarlos. -->
+    <div class="kpi-grid kpi-externo" *ngIf="externo(x.id).resumen.length">
+      <div class="kpi-card" *ngFor="let k of externo(x.id).resumen">
+        <span class="kpi-label">{{ k.etiqueta }}</span>
+        <span class="kpi-value">{{ formatear(k.valor, k.tipo) }}</span>
+      </div>
+    </div>
+
+    <p class="pie-recorte" *ngIf="x.topFilas && externo(x.id).total > x.topFilas">
+      Se muestran las primeras {{ x.topFilas }} filas de
+      {{ externo(x.id).total | number }} en total.
+    </p>
+
+    <div class="table-wrapper" *ngIf="externo(x.id).filas.length">
+      <table mat-table [dataSource]="filasExternas(x)">
+        <ng-container *ngFor="let col of x.columnas" [matColumnDef]="col.campo">
+          <th mat-header-cell *matHeaderCellDef>{{ col.titulo }}</th>
+          <td mat-cell *matCellDef="let fila"
+              [attr.title]="valorCompleto(col, fila) || null"
+              [class.celda-monto]="col.monto">{{ valor(col, fila) }}</td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="columnasExternas(x)"></tr>
+        <tr mat-row *matRowDef="let fila; columns: columnasExternas(x)"></tr>
+      </table>
+    </div>
+
+    <div class="empty-state"
+         *ngIf="!externo(x.id).cargando && !externo(x.id).filas.length
+                && !externo(x.id).error && x.roles.includes(rol)">
+      <mat-icon>inbox</mat-icon>
+      <p>{{ x.vacio }}</p>
+    </div>
+  </div>
+
+  <!-- El estado vacío se calla cuando la analítica está caída: el tablero no
+       está vacío porque no haya pasado nada, sino porque no se pudo preguntar. -->
+  <div class="op-card" *ngIf="!loading && !bloquesVisibles.length && !avisoAnalitica">
+    <div class="empty-state">
+      <mat-icon>{{ def.icono }}</mat-icon>
+      <p>No hay ningún elemento que mostrar con los filtros elegidos.</p>
+    </div>
+  </div>
+
+</div>

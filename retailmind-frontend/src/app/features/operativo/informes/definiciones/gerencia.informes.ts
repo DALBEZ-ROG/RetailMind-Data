@@ -1,4 +1,5 @@
 import { ColorChip, DefinicionDepartamento } from '../../../../core/models/informe.model';
+import { informePrevisionDemanda } from './prevision.informe';
 
 /**
  * INFORMES TÁCTICOS DE GERENCIA / DIRECCIÓN — los cinco objetivos del catálogo
@@ -598,6 +599,16 @@ export const INFORMES_GERENCIA: DefinicionDepartamento = {
           monto: true },
         { campo: 'descuento_aplicado',   titulo: 'Descuento',   tipo: 'moneda', monto: true }
       ]
-    }
+    },
+
+    // ── OTD-GER-13 ── PREDICTIVO: fact_prevision_demanda (fase E2, §5.1) ──
+    // El único informe del catálogo que NO describe lo que pasó sino lo que se
+    // espera, y el único que aparece en DOS departamentos. Se declara una sola
+    // vez en `prevision.informe.ts` y Compras importa la misma función: mismo
+    // dato, mismos KPI, misma salvedad, y lo único que cambia es el reparto de
+    // roles, que espeja SecurityConfig.
+    // Aquí sirve a D-10.1: la previsión con la que se fijan las metas del
+    // próximo período.
+    informePrevisionDemanda(['ADMIN', 'GERENTE', 'ANALISTA'])
   ]
 };

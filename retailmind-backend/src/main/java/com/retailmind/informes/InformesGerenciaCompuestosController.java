@@ -25,9 +25,43 @@ import org.springframework.web.bind.annotation.RestController;
 public class InformesGerenciaCompuestosController {
 
     private final InformesGerenciaCompuestosService servicio;
+    private final InformesPrevisionService prevision;
 
-    public InformesGerenciaCompuestosController(InformesGerenciaCompuestosService servicio) {
+    public InformesGerenciaCompuestosController(InformesGerenciaCompuestosService servicio,
+                                                InformesPrevisionService prevision) {
         this.servicio = servicio;
+        this.prevision = prevision;
+    }
+
+    /**
+     * OTD-GER-13 — PREVISIÓN DE DEMANDA a tres meses (fase E2 del nivel
+     * estratégico, §5.1).
+     * GET /api/informes/gerencia/prevision-demanda?nivel=&categoria=&horizonte=
+     *     &buscar=&page=&size=
+     *
+     * Destinatarios (§5.1.8): Administrador, Gerente y Analista. Sirve a
+     * D-10.1, la previsión con la que se fijan las metas del próximo período.
+     *
+     * El MISMO informe se sirve en {@code /api/informes/compras/prevision-demanda}
+     * para Compras: cambia el destinatario, no el dato. Los dos delegan en
+     * {@link InformesPrevisionService} para que no puedan divergir.
+     *
+     * El sobre trae, además de la tabla: {@code serie} (los meses observados y
+     * los previstos en una sola lista, para pintar los dos en el MISMO gráfico)
+     * y {@code salvedad} con las cinco limitaciones que §5.1.10 exige declarar
+     * en pantalla — empezando por la que puede costar dinero: <b>se prevé la
+     * VENTA y no la demanda</b>, así que un quiebre de stock pasado se lee como
+     * demanda baja y se perpetúa comprando de menos.
+     */
+    @GetMapping("/prevision-demanda")
+    public Map<String, Object> previsionDemanda(
+            @RequestParam(required = false) String nivel,
+            @RequestParam(required = false) String categoria,
+            @RequestParam(required = false) Integer horizonte,
+            @RequestParam(required = false) String buscar,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size) {
+        return prevision.previsionDemanda(nivel, categoria, horizonte, buscar, page, size);
     }
 
     /**

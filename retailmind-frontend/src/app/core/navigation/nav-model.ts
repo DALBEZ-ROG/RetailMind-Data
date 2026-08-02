@@ -30,6 +30,13 @@ export type PermisoNav =
   | 'informesLogistica' // informes tácticos de Logística (OTD-LOG-01/02/06/11)
   | 'informesSoporte'  // informes tácticos de Soporte (OTD-SOP-01/04/05)
   | 'informesGerencia' // informes tácticos de Gerencia (OTD-GER-01/04/06/08/09)
+  | 'tableroOmnicanal'    // T-1, tablero de dirección (OE-06)
+  | 'tableroRentabilidad' // T-2, tablero de dirección (OE-07)
+  | 'tableroPosventa'     // T-3, tablero de dirección (OE-08)
+  | 'tableroOperacion'    // T-4, tablero de dirección (OE-09, SIN dinero)
+  | 'tableroCosto'        // T-5, tablero de dirección (OE-09, con dinero)
+  | 'tableroAbastecimiento' // T-6, tablero de dirección (OE-11)
+  | 'tableroGobierno'     // T-7, tablero de dirección (OE-10, DATO SENSIBLE)
   | 'accesos'          // intentos de acceso al sistema (OTD-GER-09, script 53)
   | 'tickets'          // tickets de soporte
   | 'categoriasTicket' // categorías de ticket
@@ -93,6 +100,27 @@ export const ROLES_POR_PERMISO: Record<PermisoNav, readonly string[]> = {
   // SEGURIDAD — el corte más estricto del sistema — y por eso el departamento
   // entero queda en ADMIN + GERENTE. Espeja SecurityConfig.
   informesGerencia: ['ADMIN', 'GERENTE'],
+  // TABLEROS DE DIRECCIÓN (nivel estratégico, fase E1-A). Los tres llevan
+  // dinero —margen, capital, valor del cliente, monto devuelto— y BODEGA y
+  // DESPACHO quedan fuera. En ClickHouse el corte NO lo respalda el motor (no
+  // hay GRANT por columna): lo hace la ruta, enumerada por nombre en
+  // SecurityConfig, que es quien realmente decide.
+  tableroOmnicanal:    ['ADMIN', 'GERENTE', 'ANALISTA'],
+  tableroRentabilidad: ['ADMIN', 'GERENTE', 'ANALISTA'],
+  // T-3 suma SOPORTE, y solo él: entra por el bloque de tickets y
+  // devoluciones. El recorte de los demás bloques ocurre DENTRO del tablero
+  // —el backend no los ejecuta— y el sobre declara cuáles omitió.
+  tableroPosventa:     ['ADMIN', 'GERENTE', 'ANALISTA', 'SOPORTE'],
+  // T-4 es el UNICO tablero sin dinero, y por eso el unico que DESPACHO y
+  // BODEGA pueden abrir: su consulta se mide en envios, dias y unidades.
+  tableroOperacion:    ['ADMIN', 'GERENTE', 'ANALISTA', 'DESPACHO', 'BODEGA'],
+  // T-5 es su gemelo CON dinero: existe separado justamente para que T-4 pueda
+  // estar abierto a la operacion.
+  tableroCosto:        ['ADMIN', 'GERENTE', 'ANALISTA'],
+  tableroAbastecimiento: ['ADMIN', 'GERENTE', 'COMPRAS', 'ANALISTA'],
+  // T-7: DATO SENSIBLE. El ANALISTA queda fuera aunque entre en los otros seis,
+  // y en la auditoria el corte lo hace la RUTA: grp_analista SI lee la tabla.
+  tableroGobierno:     ['ADMIN', 'GERENTE'],
   // Intentos de acceso (OTD-GER-09, script 53): informe solo Admin/Gerencia
   accesos:          ['ADMIN', 'GERENTE'],
   // SOPORTE (9º rol, script 37): bandeja de tickets + FAQ; nada más
@@ -311,6 +339,50 @@ export const DASHBOARD_AREAS: AreaNav[] = [
       { titulo: 'Informes de Gerencia',
         descripcion: 'Foto del día, cupones y marketing vigentes, auditoría y accesos al sistema',
         icono: 'flag', ruta: '/operativo/informes/gerencia', permiso: 'informesGerencia' }
+    ]
+  },
+  {
+    // Tableros de DIRECCIÓN (nivel estratégico, docs/estrategico/
+    // DISENO_NIVEL_ESTRATEGICO.md §4). Van en su propia sección y no dentro de
+    // «Informes Tácticos» porque no son lo mismo: un informe responde «¿cómo va
+    // mi área?» y un tablero responde «¿qué hago con el negocio?». Mezclarlos
+    // invitaría a leer una decisión de trimestre con la cadencia de una
+    // consulta diaria.
+    id: 'tableros',
+    titulo: 'Tableros de Dirección',
+    descripcion: 'Decisiones de trimestre y semestre, sobre el almacén analítico',
+    icono: 'dashboard',
+    acento: '#4527a0',
+    gradiente: 'linear-gradient(135deg, #311b92, #7e57c2)',
+    acciones: [
+      { titulo: 'Omnicanal',
+        descripcion: 'Capacidad por canal, puntos de caída del recorrido y medios de cobro',
+        icono: 'hub', ruta: '/operativo/tableros/omnicanal',
+        permiso: 'tableroOmnicanal' },
+      { titulo: 'Rentabilidad y Rotación',
+        descripcion: 'Qué se descontinúa, política de precio, techo de descuento y capital parado',
+        icono: 'trending_up', ruta: '/operativo/tableros/rentabilidad',
+        permiso: 'tableroRentabilidad' },
+      { titulo: 'Cliente y Posventa',
+        descripcion: 'Valor del cliente, causa de reclamo y producto que devuelve o califica mal',
+        icono: 'diversity_3', ruta: '/operativo/tableros/cliente-posventa',
+        permiso: 'tableroPosventa' },
+      { titulo: 'Operación y Última Milla',
+        descripcion: 'Transportistas, cuello del ciclo, incidencias y merma. Sin cifras de dinero',
+        icono: 'local_shipping', ruta: '/operativo/tableros/operacion',
+        permiso: 'tableroOperacion' },
+      { titulo: 'Costo de la Operación',
+        descripcion: 'Tarifa por zona, costo por kilo, retorno y peso del flete sobre la venta',
+        icono: 'payments', ruta: '/operativo/tableros/costo-operacion',
+        permiso: 'tableroCosto' },
+      { titulo: 'Abastecimiento',
+        descripcion: 'Gasto y ficha por proveedor, entregas, rechazo, deuda y pago puntual',
+        icono: 'inventory_2', ruta: '/operativo/tableros/abastecimiento',
+        permiso: 'tableroAbastecimiento' },
+      { titulo: 'Gobierno del Dato',
+        descripcion: 'Salud del pipeline, antigüedad del dato, auditoría y accesos al sistema',
+        icono: 'verified_user', ruta: '/operativo/tableros/gobierno-dato',
+        permiso: 'tableroGobierno' }
     ]
   },
   {

@@ -301,6 +301,60 @@
       </a>
     </ng-container>
 
+    <!-- Tableros de DIRECCIÓN (nivel estratégico, fase E1-A). Sección propia y
+         no dentro de «Informes Tácticos»: un informe responde «¿cómo va mi
+         área?» y un tablero responde «¿qué hago con el negocio?». Los tres
+         llevan dinero ⇒ sin BODEGA ni DESPACHO; SOPORTE entra solo a Cliente y
+         Posventa, y allí ve únicamente el bloque de tickets y devoluciones. -->
+    <ng-container *ngIf="canTableroOmnicanal || canTableroRentabilidad
+                      || canTableroPosventa || canTableroOperacion
+                      || canTableroCosto || canTableroAbastecimiento
+                      || canTableroGobierno">
+      <div class="sidebar-section-label">Tableros de Dirección</div>
+
+      <a class="nav-item" *ngIf="canTableroOmnicanal"
+         routerLink="/operativo/tableros/omnicanal" routerLinkActive="active">
+        <mat-icon>hub</mat-icon>
+        <span>Omnicanal</span>
+      </a>
+
+      <a class="nav-item" *ngIf="canTableroRentabilidad"
+         routerLink="/operativo/tableros/rentabilidad" routerLinkActive="active">
+        <mat-icon>trending_up</mat-icon>
+        <span>Rentabilidad y Rotación</span>
+      </a>
+
+      <a class="nav-item" *ngIf="canTableroPosventa"
+         routerLink="/operativo/tableros/cliente-posventa" routerLinkActive="active">
+        <mat-icon>diversity_3</mat-icon>
+        <span>Cliente y Posventa</span>
+      </a>
+
+      <a class="nav-item" *ngIf="canTableroOperacion"
+         routerLink="/operativo/tableros/operacion" routerLinkActive="active">
+        <mat-icon>local_shipping</mat-icon>
+        <span>Operación y Última Milla</span>
+      </a>
+
+      <a class="nav-item" *ngIf="canTableroCosto"
+         routerLink="/operativo/tableros/costo-operacion" routerLinkActive="active">
+        <mat-icon>payments</mat-icon>
+        <span>Costo de la Operación</span>
+      </a>
+
+      <a class="nav-item" *ngIf="canTableroAbastecimiento"
+         routerLink="/operativo/tableros/abastecimiento" routerLinkActive="active">
+        <mat-icon>inventory_2</mat-icon>
+        <span>Abastecimiento</span>
+      </a>
+
+      <a class="nav-item" *ngIf="canTableroGobierno"
+         routerLink="/operativo/tableros/gobierno-dato" routerLinkActive="active">
+        <mat-icon>verified_user</mat-icon>
+        <span>Gobierno del Dato</span>
+      </a>
+    </ng-container>
+
     <!-- Soporte Section (tickets ADMIN/GERENTE/CLIENTE; categorías ADMIN; FAQ según SELECT en BD) -->
     <ng-container *ngIf="canTickets || canFaq">
       <div class="sidebar-section-label">Soporte</div>
