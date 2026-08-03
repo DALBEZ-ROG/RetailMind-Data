@@ -56,6 +56,12 @@ public class SecurityConfig {
                 // Gestion de usuarios solo ADMIN
                 .requestMatchers(HttpMethod.POST, "/api/auth/register").hasAuthority("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/auth/usuarios").hasAuthority("ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/auth/roles").hasAuthority("ADMIN")
+                // Modificar (datos + rol) y baja/alta LOGICA: la pantalla de
+                // Usuarios necesita las cuatro opciones del patron de interfaz.
+                // Ninguno de los dos toca la contrasena.
+                .requestMatchers(HttpMethod.PUT, "/api/auth/usuarios/**").hasAuthority("ADMIN")
+                .requestMatchers(HttpMethod.PATCH, "/api/auth/usuarios/**").hasAuthority("ADMIN")
                 .requestMatchers(HttpMethod.DELETE, "/api/auth/usuarios/**").hasAuthority("ADMIN")
                 // ETL solo para ADMIN
                 .requestMatchers("/api/etl/**").hasAuthority("ADMIN")

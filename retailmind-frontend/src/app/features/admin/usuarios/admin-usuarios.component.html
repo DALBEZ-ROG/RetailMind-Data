@@ -1,86 +1,119 @@
-<div class="admin-usuarios-container">
-  <h2 class="page-title"><mat-icon>group</mat-icon> Gestion de Usuarios</h2>
+<div class="op-page">
+  <div class="section-header">
+    <h2><mat-icon>group</mat-icon> Gestión de Usuarios</h2>
+    <p>Cuentas de acceso al sistema: rol, estado y último ingreso.</p>
+  </div>
 
-  <mat-card class="action-card">
-    <button mat-raised-button color="primary" (click)="showForm = !showForm">
-      <mat-icon>person_add</mat-icon> {{ showForm ? 'Cancelar' : 'Nuevo Usuario' }}
-    </button>
-  </mat-card>
-
-  <!-- Formulario crear usuario -->
-  <mat-card class="form-card" *ngIf="showForm">
-    <mat-card-content>
-      <div class="form-grid">
-        <mat-form-field appearance="outline">
-          <mat-label>Username</mat-label>
-          <input matInput [(ngModel)]="newUsername">
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>Password</mat-label>
-          <input matInput type="password" [(ngModel)]="newPassword">
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>Email</mat-label>
-          <input matInput [(ngModel)]="newEmail">
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>Rol</mat-label>
-          <mat-select [(ngModel)]="newRol">
-            <mat-option value="ADMIN">ADMIN</mat-option>
-            <mat-option value="GERENTE">GERENTE</mat-option>
-            <mat-option value="VENDEDOR">VENDEDOR</mat-option>
-            <mat-option value="COMPRAS">COMPRAS</mat-option>
-            <mat-option value="BODEGA">BODEGA</mat-option>
-            <mat-option value="DESPACHO">DESPACHO</mat-option>
-            <mat-option value="ANALISTA">ANALISTA</mat-option>
-            <mat-option value="CLIENTE">CLIENTE</mat-option>
-          </mat-select>
-        </mat-form-field>
-      </div>
-      <button mat-raised-button color="accent" (click)="crearUsuario()">
-        <mat-icon>save</mat-icon> Crear
+  <!-- ── REGLA 1: se entra por los criterios de búsqueda ── -->
+  <div class="op-card">
+    <h3><mat-icon>search</mat-icon> Criterios de búsqueda</h3>
+    <div class="form-grid">
+      <mat-form-field appearance="outline" style="grid-column: span 2;">
+        <mat-label>Buscar</mat-label>
+        <input matInput [(ngModel)]="filtroTexto" (ngModelChange)="aplicarFiltros()"
+               placeholder="Correo, nombre, apellido o teléfono…">
+        <mat-icon matSuffix>search</mat-icon>
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Rol</mat-label>
+        <mat-select [(ngModel)]="filtroRol" (selectionChange)="aplicarFiltros()">
+          <mat-option value="todos">— Todos —</mat-option>
+          <mat-option *ngFor="let r of roles" [value]="r.codigo">
+            {{ r.codigo }} — {{ r.nombre }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Estado</mat-label>
+        <mat-select [(ngModel)]="filtroEstado" (selectionChange)="aplicarFiltros()">
+          <mat-option value="todos">— Todos —</mat-option>
+          <mat-option value="activos">Activos</mat-option>
+          <mat-option value="eliminados">Eliminados</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+    <div class="form-actions">
+      <button class="btn-limpiar" (click)="limpiarFiltros()">
+        <mat-icon>filter_alt_off</mat-icon> Limpiar filtros
       </button>
-    </mat-card-content>
-  </mat-card>
+      <button class="btn-limpiar" (click)="cargar()">
+        <mat-icon>refresh</mat-icon> Actualizar
+      </button>
+    </div>
+  </div>
 
-  <!-- Tabla de usuarios -->
-  <div class="table-wrapper" *ngIf="usuarios.length > 0">
-    <table mat-table [dataSource]="usuarios" class="full-width">
-      <ng-container matColumnDef="username">
-        <th mat-header-cell *matHeaderCellDef>Username</th>
-        <td mat-cell *matCellDef="let r"><strong>{{ r.username }}</strong></td>
-      </ng-container>
-      <ng-container matColumnDef="nombre">
-        <th mat-header-cell *matHeaderCellDef>Email</th>
-        <td mat-cell *matCellDef="let r">{{ r.nombre }}</td>
-      </ng-container>
-      <ng-container matColumnDef="rol">
-        <th mat-header-cell *matHeaderCellDef>Rol</th>
-        <td mat-cell *matCellDef="let r">
-          <mat-chip [class.chip-admin]="r.rol === 'ADMIN'" [class.chip-cliente]="r.rol === 'CLIENTE'">
-            {{ r.rol }}
-          </mat-chip>
-        </td>
-      </ng-container>
-      <ng-container matColumnDef="activo">
-        <th mat-header-cell *matHeaderCellDef>Activo</th>
-        <td mat-cell *matCellDef="let r">
-          <mat-icon [class.icon-active]="r.activo" [class.icon-inactive]="!r.activo">
-            {{ r.activo ? 'check_circle' : 'cancel' }}
-          </mat-icon>
-        </td>
-      </ng-container>
-      <ng-container matColumnDef="acciones">
-        <th mat-header-cell *matHeaderCellDef>Acciones</th>
-        <td mat-cell *matCellDef="let r">
-          <button mat-icon-button color="warn" (click)="eliminarUsuario(r.username)"
-                  *ngIf="r.username !== 'admin@retailmind.com'" matTooltip="Eliminar">
-            <mat-icon>delete</mat-icon>
-          </button>
-        </td>
-      </ng-container>
-      <tr mat-header-row *matHeaderRowDef="['username','nombre','rol','activo','acciones']"></tr>
-      <tr mat-row *matRowDef="let r; columns: ['username','nombre','rol','activo','acciones']"></tr>
-    </table>
+  <!-- ── LA GRILLA + REGLA 2: las cuatro opciones ── -->
+  <div class="op-card">
+    <h3><mat-icon>list</mat-icon> Usuarios ({{ total }})</h3>
+
+    <app-acciones-registro
+        entidad="usuario" articulo="un"
+        [haySeleccion]="!!filaSeleccionada"
+        [nombreSeleccion]="filaSeleccionada?.username ?? null"
+        [puedeEliminar]="puedeEliminar"
+        [motivoNoEliminable]="motivoNoEliminable"
+        (nuevo)="nuevoUsuario()"
+        (modificar)="modificarUsuario()"
+        (eliminar)="eliminarUsuario()"
+        (ver)="verUsuario()">
+    </app-acciones-registro>
+
+    <div class="table-wrapper table-seleccionable" *ngIf="usuarios.length; else vacio">
+      <table mat-table [dataSource]="usuarios">
+        <ng-container matColumnDef="email">
+          <th mat-header-cell *matHeaderCellDef>Correo (acceso)</th>
+          <td mat-cell *matCellDef="let u">
+            <strong>{{ u.username }}</strong>
+            <div class="slug-hint" *ngIf="u.telefono">{{ u.telefono }}</div>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="nombre">
+          <th mat-header-cell *matHeaderCellDef>Nombre</th>
+          <td mat-cell *matCellDef="let u">{{ u.nombre || '—' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="rol">
+          <th mat-header-cell *matHeaderCellDef>Rol</th>
+          <td mat-cell *matCellDef="let u">
+            <span class="stat-chip chip-info">{{ u.rol || 'sin rol' }}</span>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="ultimo">
+          <th mat-header-cell *matHeaderCellDef>Último acceso</th>
+          <td mat-cell *matCellDef="let u">
+            <ng-container *ngIf="u.ultimoAcceso; else nunca">
+              {{ u.ultimoAcceso | date:'dd/MM/yy HH:mm' }}
+            </ng-container>
+            <ng-template #nunca><span class="slug-hint">nunca</span></ng-template>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="creado">
+          <th mat-header-cell *matHeaderCellDef>Creado</th>
+          <td mat-cell *matCellDef="let u">{{ u.fechaCreacion | date:'dd/MM/yy' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="activo">
+          <th mat-header-cell *matHeaderCellDef>Estado</th>
+          <td mat-cell *matCellDef="let u">
+            <span class="estado-chip" [class.ok]="u.activo" [class.error]="!u.activo">
+              {{ u.activo ? 'Activo' : 'Eliminado' }}
+            </span>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="columnas"></tr>
+        <tr mat-row *matRowDef="let u; columns: columnas"
+            (click)="seleccionarFila(u)"
+            [class.fila-seleccionada]="filaSeleccionada?.id === u.id"></tr>
+      </table>
+    </div>
+    <ng-template #vacio>
+      <div class="empty-state" *ngIf="!loading">
+        <mat-icon>group</mat-icon>
+        <p>Sin resultados para los criterios actuales.</p>
+      </div>
+    </ng-template>
+
+    <mat-paginator [length]="total" [pageSize]="tamPagina" [pageIndex]="pagina"
+                   [pageSizeOptions]="[10, 15, 25, 50]"
+                   (page)="cambiarPagina($event)">
+    </mat-paginator>
   </div>
 </div>

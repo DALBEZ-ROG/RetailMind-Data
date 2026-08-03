@@ -15,9 +15,15 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class HorariosAdminService {
 
+    /**
+     * Los 9 roles de grupo del sistema. `grp_soporte` (script 37) faltaba y
+     * hacía imposible crear una ventana para soporte desde la interfaz, aunque
+     * la tabla ya tenía las suyas sembradas.
+     */
     private static final List<String> ROLES_VALIDOS = List.of(
             "grp_gerente", "grp_vendedor", "grp_compras", "grp_bodega",
-            "grp_despacho", "grp_cliente", "grp_analista", "grp_administrador");
+            "grp_despacho", "grp_cliente", "grp_analista", "grp_soporte",
+            "grp_administrador");
 
     private final JdbcTemplate pg;
 

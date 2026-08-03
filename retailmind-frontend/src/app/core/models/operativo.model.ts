@@ -395,3 +395,19 @@ export interface PreguntaProductoRow {
   producto_id?: number; producto?: string;
   cliente_id?: number; cliente?: string | null; es_mia?: boolean;
 }
+
+// ── Administración de usuarios (/admin-usuarios) ─────────────────────────
+export interface UsuarioAdminRow {
+  id: number;
+  username: string;          // el email: es la credencial de login
+  nombre: string;            // nombre + apellido ya concatenados (columna de la grilla)
+  soloNombre: string;        // nombre suelto, para el formulario
+  apellido: string | null;
+  telefono: string | null;
+  rol: string | null;
+  activo: boolean;
+  clienteId: number | null;
+  fechaCreacion: string | null;
+  ultimoAcceso: string | null;
+}
+export interface RolRef { codigo: string; nombre: string; }

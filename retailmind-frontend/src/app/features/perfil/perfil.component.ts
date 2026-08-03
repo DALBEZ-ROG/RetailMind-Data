@@ -14,6 +14,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { environment } from '../../../environments/environment';
+import { ConfirmService } from '../../core/services/confirm.service';
 import { mensajeError } from '../../core/services/api-error.util';
 
 /**
@@ -54,7 +55,8 @@ export class PerfilComponent implements OnInit {
   guardandoDireccion = false;
   dir = this.direccionVacia();
 
-  constructor(private http: HttpClient, private snackBar: MatSnackBar) {}
+  constructor(private http: HttpClient, private snackBar: MatSnackBar,
+              private confirmar: ConfirmService) {}
 
   ngOnInit(): void {
     this.cargarPerfil();
@@ -173,13 +175,27 @@ export class PerfilComponent implements OnInit {
   }
 
   eliminarDireccion(d: any): void {
-    if (!confirm(`¿Eliminar la dirección "${d.alias || d.callePrincipal}"?`)) return;
-    this.http.delete(`${this.base}/direcciones/${d.id}`).subscribe({
-      next: () => {
-        this.snackBar.open('Dirección eliminada', 'OK', { duration: 2000 });
-        this.cargarDirecciones();
-      },
-      error: (e) => this.snackBar.open(mensajeError(e, 'Error al eliminar'), 'Cerrar', { duration: 4000 })
+    // Baja LÓGICA: `PerfilService.eliminarDireccion` hace
+    // `UPDATE direccion SET activo = false, es_predeterminada = false`
+    // (grp_cliente no tiene DELETE sobre direccion, por diseño). Por eso el
+    // mensaje no promete un borrado que no ocurre, ni asusta con los pedidos.
+    this.confirmar.eliminacion(
+      `la dirección «${d.alias || d.callePrincipal}»`,
+      'Dejará de aparecer en tu perfil y de ofrecerse en el checkout. Los pedidos que ya se '
+      + 'enviaron a esta dirección conservan sus datos de envío intactos.'
+      + (d.esPredeterminada
+         ? ' Además es tu dirección predeterminada: al eliminarla te quedas sin ninguna, y '
+           + 'tendrás que marcar otra.'
+         : '')
+    ).subscribe(ok => {
+      if (!ok) return;
+      this.http.delete(`${this.base}/direcciones/${d.id}`).subscribe({
+        next: () => {
+          this.snackBar.open('Dirección eliminada', 'OK', { duration: 2000 });
+          this.cargarDirecciones();
+        },
+        error: (e) => this.snackBar.open(mensajeError(e, 'Error al eliminar'), 'Cerrar', { duration: 4000 })
+      });
     });
   }
 

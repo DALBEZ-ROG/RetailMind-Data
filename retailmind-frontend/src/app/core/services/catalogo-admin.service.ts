@@ -11,7 +11,14 @@ export interface ProductoBody {
   descripcion: string; publicado: boolean; categoriaIds: number[];
 }
 export interface VarianteBody {
-  sku: string; precio: number; costo: number; codigoBarras?: string; esPredeterminada?: boolean;
+  sku: string; precio: number; costo: number;
+  /**
+   * `codigo_barras` es UNIQUE en la BD y NULL no colisiona, pero la cadena
+   * vacía SÍ: sin código de barras hay que mandar `null`, nunca `''`, o la
+   * segunda variante sin código choca con la primera.
+   */
+  codigoBarras?: string | null;
+  esPredeterminada?: boolean;
 }
 
 @Injectable({ providedIn: 'root' })

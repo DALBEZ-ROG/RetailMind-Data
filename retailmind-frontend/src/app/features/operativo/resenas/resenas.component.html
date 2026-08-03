@@ -5,52 +5,57 @@
     <p *ngIf="!esCliente">Moderación de reseñas: aprueba, rechaza y atiende reportes de abuso.</p>
   </div>
 
-  <!-- ══ Vista CLIENTE ══ -->
+  <!-- ══════════════════ Vista CLIENTE ══════════════════ -->
   <ng-container *ngIf="esCliente">
+
+    <!-- ── REGLA 1: criterios sobre MIS reseñas ── -->
     <div class="op-card">
+      <h3><mat-icon>search</mat-icon> Criterios de búsqueda</h3>
+      <div class="form-grid">
+        <mat-form-field appearance="outline" style="grid-column: span 2;">
+          <mat-label>Buscar</mat-label>
+          <input matInput [(ngModel)]="filtroMiTexto" (ngModelChange)="aplicarFiltrosMias()"
+                 placeholder="Producto o título de la reseña…">
+          <mat-icon matSuffix>search</mat-icon>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Estado</mat-label>
+          <mat-select [(ngModel)]="filtroMiEstado" (selectionChange)="aplicarFiltrosMias()">
+            <mat-option value="todos">— Todos —</mat-option>
+            <mat-option *ngFor="let e of estados" [value]="e">{{ e }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
       <div class="form-actions">
-        <button class="btn-aplicar" (click)="showForm = !showForm">
-          <mat-icon>{{ showForm ? 'close' : 'add' }}</mat-icon>
-          {{ showForm ? 'Cancelar' : 'Nueva Reseña' }}
+        <button class="btn-limpiar" (click)="limpiarFiltrosMias()">
+          <mat-icon>filter_alt_off</mat-icon> Limpiar filtros
         </button>
         <button class="btn-limpiar" (click)="cargar()">
           <mat-icon>refresh</mat-icon> Actualizar
         </button>
       </div>
-
-      <div *ngIf="showForm" style="margin-top: 20px;">
-        <p style="font-size: 12px; opacity: 0.75; margin: 0 0 8px;">
-          Solo puedes reseñar productos que has comprado.
-        </p>
-        <div class="form-grid">
-          <app-select-buscable label="Producto comprado" [opciones]="compradosOpc"
-                               [(value)]="form.productoId"></app-select-buscable>
-          <mat-form-field appearance="outline">
-            <mat-label>Calificación</mat-label>
-            <mat-select [(ngModel)]="form.calificacion">
-              <mat-option *ngFor="let c of calificaciones" [value]="c">{{ estrellas(c) }}</mat-option>
-            </mat-select>
-          </mat-form-field>
-          <mat-form-field appearance="outline" style="grid-column: 1 / -1;">
-            <mat-label>Título (opcional)</mat-label>
-            <input matInput [(ngModel)]="form.titulo" maxlength="150">
-          </mat-form-field>
-          <mat-form-field appearance="outline" style="grid-column: 1 / -1;">
-            <mat-label>Comentario (opcional)</mat-label>
-            <textarea matInput rows="3" [(ngModel)]="form.comentario"></textarea>
-          </mat-form-field>
-        </div>
-        <div class="form-actions">
-          <button class="btn-aplicar" (click)="guardar()">
-            <mat-icon>save</mat-icon> Enviar Reseña
-          </button>
-        </div>
-      </div>
     </div>
 
+    <!-- ── LA GRILLA + REGLA 2 ── -->
     <div class="op-card">
       <h3><mat-icon>list</mat-icon> Mis reseñas ({{ misResenas.length }})</h3>
-      <div class="table-wrapper" *ngIf="misResenas.length; else vacioMias">
+
+      <app-acciones-registro
+          entidad="reseña" articulo="una"
+          [haySeleccion]="!!miResenaSeleccionada"
+          [nombreSeleccion]="miResenaSeleccionada?.producto ?? null"
+          [mostrarModificar]="false" [mostrarEliminar]="false"
+          (nuevo)="nuevaResena()" (ver)="verMiResena()">
+      </app-acciones-registro>
+
+      <p class="nota-limitacion">
+        <mat-icon>info</mat-icon>
+        Una reseña enviada no se puede modificar ni retirar desde aquí: el sistema no
+        concede al cliente permiso de escritura sobre una opinión ya publicada. Si contiene
+        un error, repórtala al equipo de soporte.
+      </p>
+
+      <div class="table-wrapper table-seleccionable" *ngIf="misResenas.length; else vacioMias">
         <table mat-table [dataSource]="misResenas">
           <ng-container matColumnDef="producto">
             <th mat-header-cell *matHeaderCellDef>Producto</th>
@@ -64,14 +69,13 @@
             <th mat-header-cell *matHeaderCellDef>Reseña</th>
             <td mat-cell *matCellDef="let r">
               <strong>{{ r.titulo || '—' }}</strong>
-              <div style="font-size: 11px; opacity: 0.7;">{{ r.comentario }}</div>
+              <div class="slug-hint">{{ r.comentario }}</div>
             </td>
           </ng-container>
           <ng-container matColumnDef="estado">
             <th mat-header-cell *matHeaderCellDef>Estado</th>
             <td mat-cell *matCellDef="let r">
-              <span class="estado-chip" [class.ok]="r.estado === 'aprobada'"
-                    [class.error]="r.estado === 'rechazada'">{{ r.estado }}</span>
+              <span class="estado-chip" [ngClass]="claseEstado(r.estado)">{{ r.estado }}</span>
               <span class="stat-chip chip-info" *ngIf="r.compra_verificada"
                     matTooltip="Compra verificada">✓ compra</span>
             </td>
@@ -85,101 +89,184 @@
             <td mat-cell *matCellDef="let r">{{ r.fecha_creacion | date:'dd/MM/yy' }}</td>
           </ng-container>
           <tr mat-header-row *matHeaderRowDef="columnasMias"></tr>
-          <tr mat-row *matRowDef="let r; columns: columnasMias"></tr>
+          <tr mat-row *matRowDef="let r; columns: columnasMias"
+              (click)="seleccionarMia(r)"
+              [class.fila-seleccionada]="miResenaSeleccionada?.id === r.id"></tr>
         </table>
       </div>
       <ng-template #vacioMias>
         <div class="empty-state" *ngIf="!loading">
           <mat-icon>rate_review</mat-icon>
-          <p>Aún no has escrito reseñas.</p>
+          <p>Sin resultados para los criterios actuales.</p>
         </div>
       </ng-template>
     </div>
 
-    <!-- Opiniones aprobadas de un producto: votar y reportar -->
+    <!-- ── Opiniones públicas de un producto ── -->
     <div class="op-card">
-      <h3><mat-icon>reviews</mat-icon> Opiniones de un producto</h3>
+      <h3><mat-icon>reviews</mat-icon> Opiniones de un producto ({{ publicasFiltradas.length }})</h3>
       <div class="form-grid">
         <app-select-buscable label="Producto" [opciones]="productosOpc"
                              [value]="productoSel"
                              (valueChange)="productoSel = $event; verProducto()">
         </app-select-buscable>
+        <mat-form-field appearance="outline">
+          <mat-label>Calificación</mat-label>
+          <mat-select [(ngModel)]="filtroPublicaCalificacion"
+                      (selectionChange)="aplicarFiltrosPublicas()">
+            <mat-option value="todos">— Todas —</mat-option>
+            <mat-option *ngFor="let c of calificaciones" [value]="c">{{ estrellas(c) }}</mat-option>
+          </mat-select>
+        </mat-form-field>
       </div>
-      <div *ngIf="productoSel && !publicas.length" class="empty-state">
-        <mat-icon>reviews</mat-icon>
-        <p>Este producto aún no tiene reseñas aprobadas.</p>
+
+      <app-acciones-registro
+          entidad="opinión" articulo="una"
+          [haySeleccion]="!!publicaSeleccionada"
+          [nombreSeleccion]="publicaSeleccionada?.cliente ?? null"
+          [mostrarNuevo]="false" [mostrarModificar]="false" [mostrarEliminar]="false"
+          (ver)="verPublica()">
+      </app-acciones-registro>
+
+      <!-- Voto y denuncia: NO son mantenimiento de un registro propio, son la
+           señal de la tienda sobre la opinión de otro cliente. Por eso van
+           junto a la grilla, como «Limpiar filtros», y no en el diálogo. -->
+      <div class="form-actions" style="margin: -6px 0 14px;">
+        <button class="btn-limpiar" [disabled]="!puedeVotar" (click)="votar(true)"
+                matTooltip="Marcar la opinión seleccionada como útil">
+          <mat-icon>thumb_up</mat-icon> Útil
+        </button>
+        <button class="btn-limpiar" [disabled]="!puedeVotar" (click)="votar(false)"
+                matTooltip="Marcar la opinión seleccionada como no útil">
+          <mat-icon>thumb_down</mat-icon> No útil
+        </button>
+        <button class="btn-limpiar" [disabled]="!puedeReportar" (click)="reportar()"
+                matTooltip="Denunciar la opinión seleccionada al equipo de moderación">
+          <mat-icon>flag</mat-icon> Reportar
+        </button>
       </div>
-      <div *ngFor="let r of publicas"
-           style="border-radius: 12px; padding: 12px 16px; margin-bottom: 10px;
-                  background: rgba(128, 128, 128, 0.08);">
-        <div style="font-size: 12px; opacity: 0.75;">
-          <strong>{{ r.cliente }}</strong> · {{ r.fecha_creacion | date:'dd/MM/yy' }}
-          <span class="stat-chip chip-info" *ngIf="r.compra_verificada">✓ compra verificada</span>
-          <span class="stat-chip chip-warning" *ngIf="r.es_mia">tu reseña</span>
-        </div>
-        <div style="margin: 4px 0;">{{ estrellas(r.calificacion) }} <strong>{{ r.titulo }}</strong></div>
-        <div style="white-space: pre-wrap; opacity: 0.9;" *ngIf="r.comentario">{{ r.comentario }}</div>
-        <div class="form-actions" style="margin-top: 8px; align-items: center; gap: 8px;">
-          <span class="stat-chip chip-info">útil: {{ r.utiles }} · no útil: {{ r.no_utiles }}</span>
-          <ng-container *ngIf="!r.es_mia">
-            <button mat-icon-button matTooltip="Útil" [disabled]="r.mi_voto !== null"
-                    (click)="votar(r, true)">
-              <mat-icon [style.color]="r.mi_voto === true ? '#4caf50' : ''">thumb_up</mat-icon>
-            </button>
-            <button mat-icon-button matTooltip="No útil" [disabled]="r.mi_voto !== null"
-                    (click)="votar(r, false)">
-              <mat-icon [style.color]="r.mi_voto === false ? '#f44336' : ''">thumb_down</mat-icon>
-            </button>
-            <button mat-icon-button matTooltip="Reportar reseña" (click)="reportando = r">
-              <mat-icon>flag</mat-icon>
-            </button>
+
+      <div class="table-wrapper table-seleccionable" *ngIf="publicasFiltradas.length; else sinPublicas">
+        <table mat-table [dataSource]="publicasFiltradas">
+          <ng-container matColumnDef="cliente">
+            <th mat-header-cell *matHeaderCellDef>Cliente</th>
+            <td mat-cell *matCellDef="let r">
+              <strong>{{ r.cliente }}</strong>
+              <div>
+                <span class="stat-chip chip-info" *ngIf="r.compra_verificada">✓ compra</span>
+                <span class="stat-chip chip-warning" *ngIf="r.es_mia">tu reseña</span>
+              </div>
+            </td>
           </ng-container>
-        </div>
-        <!-- Formulario de reporte -->
-        <div *ngIf="reportando?.id === r.id" style="margin-top: 8px;">
-          <div class="form-grid">
-            <mat-form-field appearance="outline">
-              <mat-label>Motivo</mat-label>
-              <mat-select [(ngModel)]="reporteForm.motivo">
-                <mat-option *ngFor="let m of motivos" [value]="m">{{ m }}</mat-option>
-              </mat-select>
-            </mat-form-field>
-            <mat-form-field appearance="outline">
-              <mat-label>Comentario (opcional)</mat-label>
-              <input matInput [(ngModel)]="reporteForm.comentario">
-            </mat-form-field>
-          </div>
-          <div class="form-actions">
-            <button class="btn-aplicar" (click)="reportar()">
-              <mat-icon>flag</mat-icon> Enviar reporte
-            </button>
-            <button class="btn-limpiar" (click)="reportando = null">Cancelar</button>
-          </div>
-        </div>
+          <ng-container matColumnDef="calificacion">
+            <th mat-header-cell *matHeaderCellDef>Calificación</th>
+            <td mat-cell *matCellDef="let r">{{ estrellas(r.calificacion) }}</td>
+          </ng-container>
+          <ng-container matColumnDef="opinion">
+            <th mat-header-cell *matHeaderCellDef>Opinión</th>
+            <td mat-cell *matCellDef="let r">
+              <strong>{{ r.titulo || '—' }}</strong>
+              <div class="slug-hint">{{ r.comentario }}</div>
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="votos">
+            <th mat-header-cell *matHeaderCellDef>Votos</th>
+            <td mat-cell *matCellDef="let r">
+              <span class="stat-chip chip-info">👍 {{ r.utiles }} · 👎 {{ r.no_utiles }}</span>
+              <div class="slug-hint" *ngIf="r.mi_voto !== null">ya votaste</div>
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="fecha">
+            <th mat-header-cell *matHeaderCellDef>Fecha</th>
+            <td mat-cell *matCellDef="let r">{{ r.fecha_creacion | date:'dd/MM/yy' }}</td>
+          </ng-container>
+          <tr mat-header-row *matHeaderRowDef="columnasPublicas"></tr>
+          <tr mat-row *matRowDef="let r; columns: columnasPublicas"
+              (click)="seleccionarPublica(r)"
+              [class.fila-seleccionada]="publicaSeleccionada?.id === r.id"></tr>
+        </table>
       </div>
+      <ng-template #sinPublicas>
+        <div class="empty-state">
+          <mat-icon>reviews</mat-icon>
+          <p>{{ productoSel ? 'Este producto aún no tiene reseñas aprobadas.'
+                            : 'Elige un producto para ver sus opiniones.' }}</p>
+        </div>
+      </ng-template>
     </div>
   </ng-container>
 
-  <!-- ══ Vista PERSONAL (moderación) ══ -->
+  <!-- ══════════════════ Vista PERSONAL (moderación) ══════════════════ -->
   <ng-container *ngIf="!esCliente">
+
+    <!-- ── REGLA 1: criterios de la bandeja de reseñas ── -->
     <div class="op-card">
+      <h3><mat-icon>search</mat-icon> Criterios de búsqueda</h3>
       <div class="form-grid">
+        <mat-form-field appearance="outline" style="grid-column: span 2;">
+          <mat-label>Buscar</mat-label>
+          <input matInput [(ngModel)]="filtroTexto" (ngModelChange)="aplicarFiltros()"
+                 placeholder="Producto, cliente, título o comentario…">
+          <mat-icon matSuffix>search</mat-icon>
+        </mat-form-field>
         <mat-form-field appearance="outline">
-          <mat-label>Filtrar por estado</mat-label>
-          <mat-select [(ngModel)]="filtroEstado" (selectionChange)="cargar()">
-            <mat-option value="">— Todos —</mat-option>
+          <mat-label>Estado</mat-label>
+          <mat-select [(ngModel)]="filtroEstado" (selectionChange)="aplicarFiltros()">
+            <mat-option value="todos">— Todos —</mat-option>
             <mat-option *ngFor="let e of estados" [value]="e">{{ e }}</mat-option>
           </mat-select>
         </mat-form-field>
-        <div class="form-actions" style="align-self: center;">
-          <button class="btn-limpiar" (click)="cargar()">
-            <mat-icon>refresh</mat-icon> Actualizar
-          </button>
-        </div>
+        <mat-form-field appearance="outline">
+          <mat-label>Calificación</mat-label>
+          <mat-select [(ngModel)]="filtroCalificacion" (selectionChange)="aplicarFiltros()">
+            <mat-option value="todos">— Todas —</mat-option>
+            <mat-option *ngFor="let c of calificaciones" [value]="c">{{ estrellas(c) }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Denuncias</mat-label>
+          <mat-select [(ngModel)]="filtroReportadas" (selectionChange)="aplicarFiltros()">
+            <mat-option value="todos">— Todas —</mat-option>
+            <mat-option value="con">Con reportes pendientes</mat-option>
+            <mat-option value="sin">Sin reportes pendientes</mat-option>
+          </mat-select>
+        </mat-form-field>
       </div>
+      <div class="form-actions">
+        <button class="btn-limpiar" (click)="limpiarFiltros()">
+          <mat-icon>filter_alt_off</mat-icon> Limpiar filtros
+        </button>
+        <button class="btn-limpiar" (click)="cargar()">
+          <mat-icon>refresh</mat-icon> Actualizar
+        </button>
+      </div>
+    </div>
 
+    <!-- ── LA GRILLA + REGLA 2 ── -->
+    <div class="op-card">
       <h3><mat-icon>list</mat-icon> Reseñas ({{ resenas.length }})</h3>
-      <div class="table-wrapper" *ngIf="resenas.length; else vacio">
+
+      <app-acciones-registro
+          entidad="reseña" articulo="una"
+          [haySeleccion]="!!resenaSeleccionada"
+          [nombreSeleccion]="resenaSeleccionada
+              ? (resenaSeleccionada.producto + ' · ' + (resenaSeleccionada.titulo || 'sin título'))
+              : null"
+          [puedeEliminar]="resenaSeleccionada?.estado !== 'rechazada'"
+          [motivoNoEliminable]="motivoResenaNoEliminable"
+          [mostrarNuevo]="false"
+          (modificar)="modificarResena()"
+          (eliminar)="eliminarResena()"
+          (ver)="verResena()">
+      </app-acciones-registro>
+
+      <p class="nota-limitacion">
+        <mat-icon>info</mat-icon>
+        La reseña nace del cliente con compra verificada: desde moderación no se crea
+        ninguna. «Modificar» gobierna su estado de publicación, nunca el texto del cliente.
+      </p>
+
+      <div class="table-wrapper table-seleccionable" *ngIf="resenas.length; else vacio">
         <table mat-table [dataSource]="resenas">
           <ng-container matColumnDef="producto">
             <th mat-header-cell *matHeaderCellDef>Producto</th>
@@ -197,7 +284,7 @@
             <th mat-header-cell *matHeaderCellDef>Reseña</th>
             <td mat-cell *matCellDef="let r">
               <strong>{{ r.titulo || '—' }}</strong>
-              <div style="font-size: 11px; opacity: 0.7; max-width: 280px;">{{ r.comentario }}</div>
+              <div class="slug-hint" style="max-width: 280px;">{{ r.comentario }}</div>
               <span class="stat-chip chip-info" *ngIf="r.compra_verificada">✓ compra verificada</span>
             </td>
           </ng-container>
@@ -224,72 +311,108 @@
             <th mat-header-cell *matHeaderCellDef>Creada</th>
             <td mat-cell *matCellDef="let r">{{ r.fecha_creacion | date:'dd/MM/yy HH:mm' }}</td>
           </ng-container>
-          <ng-container matColumnDef="acciones">
-            <th mat-header-cell *matHeaderCellDef>Moderación</th>
-            <td mat-cell *matCellDef="let r">
-              <button mat-icon-button *ngIf="transiciones(r.estado).includes('aprobada')"
-                      matTooltip="Aprobar" (click)="moderar(r, 'aprobada')">
-                <mat-icon style="color: #4caf50;">check_circle</mat-icon>
-              </button>
-              <button mat-icon-button *ngIf="transiciones(r.estado).includes('rechazada')"
-                      matTooltip="Rechazar / ocultar" (click)="moderar(r, 'rechazada')">
-                <mat-icon style="color: #f44336;">block</mat-icon>
-              </button>
-            </td>
-          </ng-container>
           <tr mat-header-row *matHeaderRowDef="columnas"></tr>
-          <tr mat-row *matRowDef="let r; columns: columnas"></tr>
+          <tr mat-row *matRowDef="let r; columns: columnas"
+              (click)="seleccionarResena(r)"
+              [class.fila-seleccionada]="resenaSeleccionada?.id === r.id"></tr>
         </table>
       </div>
       <ng-template #vacio>
         <div class="empty-state" *ngIf="!loading">
           <mat-icon>rate_review</mat-icon>
-          <p>No hay reseñas {{ filtroEstado ? 'en estado "' + filtroEstado + '"' : 'todavía' }}.</p>
+          <p>Sin resultados para los criterios actuales.</p>
         </div>
       </ng-template>
     </div>
 
-    <!-- Reportes de abuso -->
+    <!-- ── Bandeja de reportes de abuso: sus criterios y su barra ── -->
     <div class="op-card">
       <h3><mat-icon>flag</mat-icon> Reportes de reseñas ({{ reportes.length }})</h3>
       <div class="form-grid">
         <mat-form-field appearance="outline">
-          <mat-label>Filtrar por estado</mat-label>
-          <mat-select [(ngModel)]="filtroReporte" (selectionChange)="cargarReportes()">
-            <mat-option value="">— Todos —</mat-option>
+          <mat-label>Estado</mat-label>
+          <mat-select [(ngModel)]="filtroReporte" (selectionChange)="aplicarFiltrosReportes()">
+            <mat-option value="todos">— Todos —</mat-option>
             <mat-option *ngFor="let e of estadosReporte" [value]="e">{{ e }}</mat-option>
           </mat-select>
         </mat-form-field>
-      </div>
-      <div *ngIf="!reportes.length" class="empty-state">
-        <mat-icon>flag</mat-icon>
-        <p>No hay reportes {{ filtroReporte ? 'en estado "' + filtroReporte + '"' : '' }}.</p>
-      </div>
-      <div *ngFor="let rep of reportes"
-           style="border-radius: 12px; padding: 12px 16px; margin-bottom: 10px;
-                  background: rgba(255, 193, 7, 0.08);">
-        <div style="font-size: 12px; opacity: 0.75;">
-          <strong>{{ rep.reportado_por || 'Cliente' }}</strong> reportó por
-          <span class="stat-chip chip-warning">{{ rep.motivo }}</span>
-          · {{ rep.fecha_creacion | date:'dd/MM/yy HH:mm' }}
-          <span class="estado-chip" [ngClass]="claseEstado(rep.estado)">{{ rep.estado }}</span>
-        </div>
-        <div *ngIf="rep.comentario" style="font-size: 12px; opacity: 0.8;">"{{ rep.comentario }}"</div>
-        <div style="margin-top: 6px; padding: 8px 12px; border-left: 3px solid rgba(128,128,128,0.4);">
-          <strong>{{ rep.producto }}</strong> · {{ estrellas(rep.calificacion) }}
-          · reseña {{ rep.resena_estado }}<br>
-          <em>{{ rep.resena_titulo }}</em>
-          <div style="font-size: 11px; opacity: 0.7;">{{ rep.resena_comentario }}</div>
-        </div>
-        <div class="form-actions" *ngIf="rep.estado === 'pendiente'" style="margin-top: 8px;">
-          <button class="btn-aplicar" (click)="resolverReporte(rep, 'atendido')">
-            <mat-icon>task_alt</mat-icon> Atender
+        <mat-form-field appearance="outline">
+          <mat-label>Motivo</mat-label>
+          <mat-select [(ngModel)]="filtroMotivo" (selectionChange)="aplicarFiltrosReportes()">
+            <mat-option value="todos">— Todos —</mat-option>
+            <mat-option *ngFor="let m of motivos" [value]="m">{{ m }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <div class="form-actions" style="align-self: center;">
+          <button class="btn-limpiar" (click)="limpiarFiltrosReportes()">
+            <mat-icon>filter_alt_off</mat-icon> Limpiar filtros
           </button>
-          <button class="btn-limpiar" (click)="resolverReporte(rep, 'descartado')">
-            <mat-icon>close</mat-icon> Descartar
+          <button class="btn-limpiar" (click)="cargarReportes()">
+            <mat-icon>refresh</mat-icon> Actualizar
           </button>
         </div>
       </div>
+
+      <app-acciones-registro
+          entidad="reporte" articulo="un"
+          [haySeleccion]="!!reporteSeleccionado"
+          [nombreSeleccion]="reporteSeleccionado
+              ? (reporteSeleccionado.motivo + ' · ' + reporteSeleccionado.producto) : null"
+          [puedeEliminar]="reporteSeleccionado?.estado === 'pendiente'"
+          [motivoNoEliminable]="motivoReporteNoEliminable"
+          [mostrarNuevo]="false"
+          (modificar)="modificarReporte()"
+          (eliminar)="eliminarReporte()"
+          (ver)="verReporte()">
+      </app-acciones-registro>
+
+      <div class="table-wrapper table-seleccionable" *ngIf="reportes.length; else sinReportes">
+        <table mat-table [dataSource]="reportes">
+          <ng-container matColumnDef="motivo">
+            <th mat-header-cell *matHeaderCellDef>Motivo</th>
+            <td mat-cell *matCellDef="let rep">
+              <span class="stat-chip chip-warning">{{ rep.motivo }}</span>
+              <div class="slug-hint" *ngIf="rep.comentario">"{{ rep.comentario }}"</div>
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="resena">
+            <th mat-header-cell *matHeaderCellDef>Reseña reportada</th>
+            <td mat-cell *matCellDef="let rep">
+              <strong>{{ rep.producto }}</strong> · {{ estrellas(rep.calificacion) }}
+              <div class="slug-hint" style="max-width: 320px;">
+                {{ rep.resena_titulo || '(sin título)' }} — {{ rep.resena_comentario }}
+              </div>
+              <span class="estado-chip" [ngClass]="claseEstado(rep.resena_estado)">
+                reseña {{ rep.resena_estado }}
+              </span>
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="reportadoPor">
+            <th mat-header-cell *matHeaderCellDef>Reportado por</th>
+            <td mat-cell *matCellDef="let rep">{{ rep.reportado_por || 'Cliente' }}</td>
+          </ng-container>
+          <ng-container matColumnDef="estado">
+            <th mat-header-cell *matHeaderCellDef>Estado</th>
+            <td mat-cell *matCellDef="let rep">
+              <span class="estado-chip" [ngClass]="claseEstado(rep.estado)">{{ rep.estado }}</span>
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="fecha">
+            <th mat-header-cell *matHeaderCellDef>Fecha</th>
+            <td mat-cell *matCellDef="let rep">{{ rep.fecha_creacion | date:'dd/MM/yy HH:mm' }}</td>
+          </ng-container>
+          <tr mat-header-row *matHeaderRowDef="columnasReportes"></tr>
+          <tr mat-row *matRowDef="let rep; columns: columnasReportes"
+              (click)="seleccionarReporte(rep)"
+              [class.fila-seleccionada]="reporteSeleccionado?.id === rep.id"></tr>
+        </table>
+      </div>
+      <ng-template #sinReportes>
+        <div class="empty-state">
+          <mat-icon>flag</mat-icon>
+          <p>Sin resultados para los criterios actuales.</p>
+        </div>
+      </ng-template>
     </div>
   </ng-container>
 </div>

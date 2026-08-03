@@ -10,6 +10,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { VentasService } from '../../../core/services/ventas.service';
 import { ReferenciasService } from '../../../core/services/referencias.service';
+import { ConfirmService } from '../../../core/services/confirm.service';
 import { mensajeError } from '../../../core/services/api-error.util';
 import {
   PedidoVentaRow, CatalogoRef, EnvioDetalle, SeguimientoRow, DetalleLogistico,
@@ -55,7 +56,7 @@ export class DespachosComponent implements OnInit {
   procesando = false;
 
   constructor(private ventas: VentasService, private referencias: ReferenciasService,
-              private snackBar: MatSnackBar) {}
+              private snackBar: MatSnackBar, private confirmar: ConfirmService) {}
 
   ngOnInit(): void {
     this.cargarPedidos();
@@ -223,11 +224,33 @@ export class DespachosComponent implements OnInit {
     });
   }
 
+  /**
+   * Devolver al almacén es IRREVERSIBLE: `VentasService.devolverAlmacen` deja
+   * el envío 'devuelto' y el pedido en 'no_entregado', que es TERMINAL (no
+   * hay transición de salida en el servicio). Por eso confirma antes.
+   */
   devolverAlmacen(): void {
     const abierta = this.novedadAbierta;
     if (!abierta) return;
+    const pedido = this.pedidosEnTransito.find(p => p.id === this.pedidoNovedadId);
+    this.confirmar.confirmar({
+      titulo: 'Confirmar devolución al almacén',
+      mensaje: `¿Devolver al almacén el envío del pedido `
+             + `${pedido?.numero ?? '#' + this.pedidoNovedadId}?`,
+      consecuencia:
+        'El envío quedará «devuelto» y el pedido pasará a NO ENTREGADO, que es un estado '
+        + 'terminal: ya no se podrá reprogramar la entrega ni entregarlo. El stock NO se '
+        + 'reingresa aquí —eso lo decide la inspección física de bodega, como en la RMA— y el '
+        + 'reembolso al cliente queda pendiente de gestionarse por ticket de soporte y '
+        + 'gerencia. La alternativa reversible es «Reprogramar entrega».',
+      textoAceptar: 'Devolver al almacén',
+      tono: 'peligro'
+    }).subscribe(ok => { if (ok) this.ejecutarDevolucionAlmacen(abierta.id); });
+  }
+
+  private ejecutarDevolucionAlmacen(novedadId: number): void {
     this.procesandoNovedad = true;
-    this.ventas.devolverAlmacen(abierta.id, this.observacionResolucion).subscribe({
+    this.ventas.devolverAlmacen(novedadId, this.observacionResolucion).subscribe({
       next: info => {
         this.trasAccionNovedad(info,
           'Envío devuelto al almacén — el pedido queda NO ENTREGADO (sin reingreso de stock)');

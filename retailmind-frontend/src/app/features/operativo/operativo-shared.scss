@@ -1,6 +1,13 @@
 // Estilos compartidos por las pantallas operativas (catálogo, compras,
 // inventario, ventas, horarios). Complementa las clases globales del
 // diseño Dubai en styles.scss (.glass-card, .section-header, .btn-aplicar…).
+//
+// PATRÓN DE INTERFAZ (docs/PATRON_UI.md): los dos botones del formulario de
+// acción —.btn-aceptar y .btn-cancelar (regla 4)— NO están aquí, sino en
+// styles.scss junto a .btn-aplicar/.btn-limpiar. Motivo: el formulario del
+// patrón es un DIÁLOGO y el CDK lo monta en un overlay fuera del árbol DOM
+// del componente, donde una hoja con encapsulación de componente no llega.
+// Aquí solo vive lo que se pinta DENTRO de la pantalla.
 
 .op-page {
   padding: 24px;
@@ -61,6 +68,13 @@
   gap: 12px;
   align-items: center;
   margin-top: 8px;
+}
+
+// Grilla del patrón: la fila es seleccionable, y se nota (regla 2 — sin
+// selección no hay Modificar/Eliminar/Ver).
+.table-seleccionable {
+  tr.mat-mdc-row { cursor: pointer; }
+  tr.fila-seleccionada td { box-shadow: inset 3px 0 0 var(--primary); }
 }
 
 .table-wrapper {
@@ -178,4 +192,44 @@
 
   mat-icon { font-size: 48px; width: 48px; height: 48px; opacity: 0.4; }
   p { margin-top: 8px; font-size: 14px; }
+}
+
+/* Limitación declarada de una pantalla: por qué falta una de las cuatro
+   opciones del patrón (docs/PATRON_UI.md §8.12). Va justo debajo de la barra
+   de acciones, para que el hueco se lea como una decisión y no como un olvido. */
+.nota-limitacion {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(26, 35, 126, 0.05);
+  border-left: 3px solid rgba(26, 35, 126, 0.25);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+
+  mat-icon {
+    flex: 0 0 auto;
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    opacity: 0.7;
+  }
+}
+
+/* Aviso permanente de riesgo operativo (Horarios de Acceso): un rol sin
+   ninguna ventana activa está fuera del sistema, y eso debe verse siempre,
+   no solo cuando alguien abre un diálogo. */
+.aviso-critico {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  border-left: 4px solid #ef6c00;
+  font-size: 13px;
+  line-height: 1.55;
+
+  mat-icon { flex: 0 0 auto; color: #ef6c00; }
+  strong { color: #e65100; }
 }

@@ -12,8 +12,10 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -35,13 +37,16 @@ public class AuthController {
 
     private final AuthService authService;
     private final PostgresUserRepository usuarioRepo;
+    private final UsuarioAdminService usuarioAdmin;
     private final PasswordEncoder passwordEncoder;
 
     public AuthController(AuthService authService,
                           PostgresUserRepository usuarioRepo,
+                          UsuarioAdminService usuarioAdmin,
                           PasswordEncoder passwordEncoder) {
         this.authService = authService;
         this.usuarioRepo = usuarioRepo;
+        this.usuarioAdmin = usuarioAdmin;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -130,7 +135,7 @@ public class AuthController {
             }
 
             long id = usuarioRepo.crearUsuario(email, passwordEncoder.encode(password),
-                    nombre, apellido, rolCodigo);
+                    nombre, apellido, body.get("telefono"), rolCodigo);
 
             return ResponseEntity.ok(Map.of("success", true, "id", id, "mensaje", "Usuario creado"));
         } catch (Exception e) {
@@ -139,7 +144,10 @@ public class AuthController {
         }
     }
 
-    /** GET /api/auth/usuarios - Solo ADMIN */
+    /**
+     * GET /api/auth/usuarios - Solo ADMIN.
+     * NUNCA devuelve password_hash: el hash se queda en el repositorio.
+     */
     @GetMapping("/usuarios")
     public ResponseEntity<?> listarUsuarios() {
         try {
@@ -149,9 +157,15 @@ public class AuthController {
                         m.put("id", u.id());
                         m.put("username", u.email());
                         m.put("nombre", u.apellido() != null ? u.nombre() + " " + u.apellido() : u.nombre());
+                        // Nombre y apellido por separado: la pantalla los edita como campos
+                        m.put("soloNombre", u.nombre());
+                        m.put("apellido", u.apellido());
+                        m.put("telefono", u.telefono());
                         m.put("rol", u.rolCodigo());
                         m.put("activo", u.activo());
                         m.put("clienteId", u.clienteId());
+                        m.put("fechaCreacion", u.fechaCreacion());
+                        m.put("ultimoAcceso", u.ultimoAcceso());
                         return m;
                     })
                     .collect(Collectors.toList());
@@ -160,6 +174,41 @@ public class AuthController {
             return ResponseEntity.internalServerError()
                     .body(Map.of("error", "Error al listar usuarios: " + e.getMessage()));
         }
+    }
+
+    /** GET /api/auth/roles - Solo ADMIN. Lista blanca de roles desde la BD. */
+    @GetMapping("/roles")
+    public ResponseEntity<?> listarRoles() {
+        return ResponseEntity.ok(usuarioRepo.rolesActivos());
+    }
+
+    /**
+     * PUT /api/auth/usuarios/{id} - Solo ADMIN. Modifica datos y ROL.
+     * El email es inmutable y la contraseña NO viaja por aquí.
+     */
+    @PutMapping("/usuarios/{id}")
+    public ResponseEntity<?> modificarUsuario(@PathVariable long id,
+                                              @RequestBody Map<String, String> body) {
+        usuarioAdmin.modificar(id, body.get("nombre"), body.get("apellido"),
+                body.get("telefono"), body.get("rol"));
+        return ResponseEntity.ok(Map.of("success", true, "mensaje", "Usuario actualizado"));
+    }
+
+    /**
+     * PATCH /api/auth/usuarios/{id}/activo - Solo ADMIN. Baja/alta LÓGICA:
+     * es lo que la pantalla llama «Eliminar». El usuario deja de poder entrar
+     * y su historial se conserva intacto.
+     */
+    @PatchMapping("/usuarios/{id}/activo")
+    public ResponseEntity<?> cambiarActivo(@PathVariable long id,
+                                           @RequestBody Map<String, Boolean> body) {
+        Boolean activo = body.get("activo");
+        if (activo == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "El campo 'activo' es requerido"));
+        }
+        usuarioAdmin.cambiarActivo(id, activo);
+        return ResponseEntity.ok(Map.of("success", true,
+                "mensaje", activo ? "Usuario reactivado" : "Usuario eliminado (baja lógica)"));
     }
 
     /** DELETE /api/auth/usuarios/{email} - Solo ADMIN */

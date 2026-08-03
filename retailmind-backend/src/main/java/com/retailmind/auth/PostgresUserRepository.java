@@ -23,10 +23,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class PostgresUserRepository {
 
     public record PgUsuario(Long id, String email, String passwordHash, String nombre,
-                            String apellido, boolean activo, String rolCodigo, Long clienteId) {}
+                            String apellido, String telefono, boolean activo, String rolCodigo,
+                            Long clienteId, java.time.OffsetDateTime fechaCreacion,
+                            java.time.OffsetDateTime ultimoAcceso) {}
 
     private static final String BASE_SELECT = """
-            SELECT u.id, u.email, u.password_hash, u.nombre, u.apellido, u.activo,
+            SELECT u.id, u.email, u.password_hash, u.nombre, u.apellido, u.telefono, u.activo,
+                   u.fecha_creacion, u.ultimo_acceso,
                    r.codigo AS rol_codigo,
                    fn_cliente_id_de_usuario(u.id) AS cliente_id
             FROM usuario u
@@ -40,9 +43,12 @@ public class PostgresUserRepository {
             rs.getString("password_hash"),
             rs.getString("nombre"),
             rs.getString("apellido"),
+            rs.getString("telefono"),
             rs.getBoolean("activo"),
             rs.getString("rol_codigo"),
-            rs.getObject("cliente_id") == null ? null : rs.getLong("cliente_id"));
+            rs.getObject("cliente_id") == null ? null : rs.getLong("cliente_id"),
+            rs.getObject("fecha_creacion", java.time.OffsetDateTime.class),
+            rs.getObject("ultimo_acceso", java.time.OffsetDateTime.class));
 
     private final JdbcTemplate pg;
 
@@ -71,6 +77,13 @@ public class PostgresUserRepository {
         return n != null && n > 0;
     }
 
+    /** Lista blanca de roles asignables, tomada del propio motor. */
+    @Transactional(readOnly = true)
+    public List<java.util.Map<String, Object>> rolesActivos() {
+        return pg.queryForList(
+                "SELECT codigo, nombre FROM rol WHERE activo ORDER BY id");
+    }
+
     @Transactional(readOnly = true)
     public List<PgUsuario> findAll() {
         return pg.query(BASE_SELECT + " ORDER BY u.email", ROW_MAPPER);
@@ -80,17 +93,66 @@ public class PostgresUserRepository {
     @Transactional
     public long crearUsuario(String email, String passwordHash, String nombre,
                              String apellido, String rolCodigo) {
+        return crearUsuario(email, passwordHash, nombre, apellido, null, rolCodigo);
+    }
+
+    @Transactional
+    public long crearUsuario(String email, String passwordHash, String nombre,
+                             String apellido, String telefono, String rolCodigo) {
         Long id = pg.queryForObject("""
-                INSERT INTO usuario (email, password_hash, nombre, apellido, email_verificado, activo)
-                VALUES (?, ?, ?, ?, true, true)
+                INSERT INTO usuario (email, password_hash, nombre, apellido, telefono,
+                                     email_verificado, activo)
+                VALUES (?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), true, true)
                 RETURNING id
-                """, Long.class, email, passwordHash, nombre, apellido);
+                """, Long.class, email, passwordHash, nombre, apellido, telefono);
         pg.update("""
                 INSERT INTO usuario_rol (usuario_id, rol_id)
                 SELECT ?, id FROM rol WHERE codigo = ?
                 ON CONFLICT (usuario_id, rol_id) DO NOTHING
                 """, id, rolCodigo);
         return id;
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<PgUsuario> findById(long id) {
+        List<PgUsuario> res = pg.query(BASE_SELECT + " WHERE u.id = ? LIMIT 1", ROW_MAPPER, id);
+        return res.isEmpty() ? Optional.empty() : Optional.of(res.get(0));
+    }
+
+    /**
+     * Datos de perfil del usuario. NO toca `email` (es la credencial de login
+     * y la clave con la que le apunta media aplicación), NO toca
+     * `password_hash` y NO escribe `fecha_actualizacion` (trg_usuario_touch).
+     */
+    @Transactional
+    public void actualizarDatos(long id, String nombre, String apellido, String telefono) {
+        pg.update("""
+                UPDATE usuario
+                SET nombre = ?, apellido = NULLIF(?, ''), telefono = NULLIF(?, '')
+                WHERE id = ?""", nombre, apellido, telefono, id);
+    }
+
+    /**
+     * Deja al usuario con EXACTAMENTE un rol. El código ya viene validado
+     * contra la tabla `rol` por {@link #rolExiste(String)} (lista blanca del
+     * propio motor), nunca se concatena en el SQL.
+     */
+    @Transactional
+    public void asignarRolUnico(long id, String rolCodigo) {
+        pg.update("""
+                DELETE FROM usuario_rol
+                WHERE usuario_id = ?
+                  AND rol_id <> (SELECT id FROM rol WHERE codigo = ?)""", id, rolCodigo);
+        pg.update("""
+                INSERT INTO usuario_rol (usuario_id, rol_id)
+                SELECT ?, id FROM rol WHERE codigo = ?
+                ON CONFLICT (usuario_id, rol_id) DO NOTHING""", id, rolCodigo);
+    }
+
+    /** Baja/alta lógica: un usuario inactivo no puede iniciar sesión (AuthService). */
+    @Transactional
+    public void cambiarActivo(long id, boolean activo) {
+        pg.update("UPDATE usuario SET activo = ? WHERE id = ?", activo, id);
     }
 
     @Transactional

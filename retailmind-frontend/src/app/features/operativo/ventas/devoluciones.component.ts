@@ -12,6 +12,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { Observable } from 'rxjs';
 import { DevolucionesService } from '../../../core/services/devoluciones.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { ConfirmService } from '../../../core/services/confirm.service';
 import { mensajeError } from '../../../core/services/api-error.util';
 import {
   CatalogoRef, DevolucionRow, DevolucionRma
@@ -56,7 +57,7 @@ export class DevolucionesComponent implements OnInit {
   referenciaReembolso = '';
 
   constructor(private rma: DevolucionesService, private auth: AuthService,
-              private snackBar: MatSnackBar) {}
+              private snackBar: MatSnackBar, private confirmar: ConfirmService) {}
 
   // Acciones visibles por rol (espeja SecurityConfig; el backend decide)
   get esAdmin(): boolean    { return this.auth.hasRole('ADMIN'); }
@@ -135,12 +136,33 @@ export class DevolucionesComponent implements OnInit {
       'Devolución APROBADA — guía de retorno generada');
   }
 
+  /**
+   * Rechazar es IRREVERSIBLE: `DevolucionService.rechazar` deja la devolución
+   * en 'rechazada', estado TERMINAL (ninguna transición lo admite como
+   * origen), y marca el ticket como resuelto. Por eso confirma antes.
+   */
   rechazar(): void {
     if (!this.motivoRechazo.trim()) {
       this.snackBar.open('Indica el motivo del rechazo', 'Cerrar', { duration: 3000 });
       return;
     }
-    this.transicion(this.rma.rechazar(this.detalle!.id, this.motivoRechazo), 'Devolución RECHAZADA');
+    const d = this.detalle!;
+    this.confirmar.confirmar({
+      titulo: 'Confirmar rechazo de la devolución',
+      mensaje: `¿Rechazar la devolución ${d.numero} del pedido ${d.numero_pedido}?`,
+      consecuencia:
+        '«Rechazada» es un estado terminal: la devolución no admite ninguna transición '
+        + 'posterior, no se recibe mercancía y no se reembolsa nada. El ticket de soporte '
+        + 'asociado queda RESUELTO y el cliente recibe en él el motivo que escribiste; si '
+        + 'responde, el ticket se reabre. El cliente conserva el producto y puede volver a '
+        + 'solicitar la devolución mientras siga dentro del plazo de 30 días.',
+      textoAceptar: 'Rechazar la devolución',
+      tono: 'peligro'
+    }).subscribe(ok => {
+      if (ok) {
+        this.transicion(this.rma.rechazar(d.id, this.motivoRechazo), 'Devolución RECHAZADA');
+      }
+    });
   }
 
   transito(): void  { this.transicion(this.rma.transito(this.detalle!.id, this.observacion), 'Paquete EN TRÁNSITO'); }

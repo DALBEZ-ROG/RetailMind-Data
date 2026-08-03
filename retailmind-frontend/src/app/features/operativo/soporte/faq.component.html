@@ -2,62 +2,74 @@
   <div class="section-header">
     <h2><mat-icon>quiz</mat-icon> Preguntas Frecuentes</h2>
     <p *ngIf="esGestion">Gestión del centro de ayuda: pregunta, respuesta, categoría y orden.</p>
-    <p *ngIf="!esGestion">Respuestas a las dudas más comunes. Si no encuentras la tuya, crea un ticket de soporte.</p>
+    <p *ngIf="!esGestion">Respuestas a las dudas más comunes. Si no encuentras la tuya,
+      crea un ticket de soporte.</p>
   </div>
 
-  <!-- Gestión (ADMIN edita; GERENTE consulta) -->
+  <!-- ══ GESTIÓN (ADMIN edita; GERENTE consulta) ══ -->
   <ng-container *ngIf="esGestion">
-    <div class="op-card" *ngIf="esAdmin">
+
+    <!-- ── REGLA 1: se entra por los criterios de búsqueda ── -->
+    <div class="op-card">
+      <h3><mat-icon>search</mat-icon> Criterios de búsqueda</h3>
+      <div class="form-grid">
+        <mat-form-field appearance="outline" style="grid-column: span 2;">
+          <mat-label>Buscar</mat-label>
+          <input matInput [(ngModel)]="filtroTexto" (ngModelChange)="aplicarFiltros()"
+                 placeholder="Texto de la pregunta o de la respuesta…">
+          <mat-icon matSuffix>search</mat-icon>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Categoría</mat-label>
+          <mat-select [(ngModel)]="filtroCategoriaId" (selectionChange)="aplicarFiltros()">
+            <mat-option value="todos">— Todas —</mat-option>
+            <mat-option [value]="null">Sin categoría</mat-option>
+            <mat-option *ngFor="let c of categoriasRef" [value]="c.id">{{ c.nombre }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Estado</mat-label>
+          <mat-select [(ngModel)]="filtroEstado" (selectionChange)="aplicarFiltros()">
+            <mat-option value="todos">— Todos —</mat-option>
+            <mat-option value="activos">Activas</mat-option>
+            <mat-option value="eliminados">Eliminadas</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
       <div class="form-actions">
-        <button class="btn-aplicar" (click)="showForm ? showForm = false : nuevo()">
-          <mat-icon>{{ showForm ? 'close' : 'add' }}</mat-icon>
-          {{ showForm ? 'Cancelar' : 'Nueva FAQ' }}
+        <button class="btn-limpiar" (click)="limpiarFiltros()">
+          <mat-icon>filter_alt_off</mat-icon> Limpiar filtros
         </button>
         <button class="btn-limpiar" (click)="cargar()">
           <mat-icon>refresh</mat-icon> Actualizar
         </button>
       </div>
-
-      <div *ngIf="showForm" style="margin-top: 20px;">
-        <h3 *ngIf="editandoId !== null"><mat-icon>edit</mat-icon> Editando FAQ #{{ editandoId }}</h3>
-        <div class="form-grid">
-          <mat-form-field appearance="outline">
-            <mat-label>Categoría (opcional)</mat-label>
-            <mat-select [(ngModel)]="form.categoriaId">
-              <mat-option [value]="null">— Sin categoría —</mat-option>
-              <mat-option *ngFor="let c of categoriasRef" [value]="c.id">{{ c.nombre }}</mat-option>
-            </mat-select>
-          </mat-form-field>
-          <mat-form-field appearance="outline">
-            <mat-label>Orden</mat-label>
-            <input matInput type="number" min="0" [(ngModel)]="form.orden">
-          </mat-form-field>
-          <mat-form-field appearance="outline" style="grid-column: 1 / -1;">
-            <mat-label>Pregunta</mat-label>
-            <input matInput [(ngModel)]="form.pregunta" maxlength="300">
-          </mat-form-field>
-          <mat-form-field appearance="outline" style="grid-column: 1 / -1;">
-            <mat-label>Respuesta</mat-label>
-            <textarea matInput rows="3" [(ngModel)]="form.respuesta"></textarea>
-          </mat-form-field>
-        </div>
-        <div class="form-actions">
-          <button class="btn-aplicar" (click)="guardar()">
-            <mat-icon>save</mat-icon> {{ editandoId === null ? 'Crear FAQ' : 'Guardar Cambios' }}
-          </button>
-        </div>
-      </div>
     </div>
 
+    <!-- ── LA GRILLA + REGLA 2: las cuatro opciones ── -->
     <div class="op-card">
-      <h3><mat-icon>list</mat-icon> FAQ ({{ faqs.length }})</h3>
-      <div class="table-wrapper" *ngIf="faqs.length; else vacioGestion">
+      <h3><mat-icon>list</mat-icon> Preguntas frecuentes ({{ faqs.length }})</h3>
+
+      <app-acciones-registro
+          entidad="pregunta" articulo="una"
+          [haySeleccion]="!!filaSeleccionada"
+          [nombreSeleccion]="filaSeleccionada?.pregunta ?? null"
+          [puedeEliminar]="!!filaSeleccionada?.activo"
+          [motivoNoEliminable]="motivoNoEliminable"
+          [mostrarNuevo]="esAdmin" [mostrarModificar]="esAdmin" [mostrarEliminar]="esAdmin"
+          (nuevo)="nuevaFaq()"
+          (modificar)="modificarFaq()"
+          (eliminar)="eliminarFaq()"
+          (ver)="verFaq()">
+      </app-acciones-registro>
+
+      <div class="table-wrapper table-seleccionable" *ngIf="faqs.length; else vacioGestion">
         <table mat-table [dataSource]="faqs">
           <ng-container matColumnDef="pregunta">
             <th mat-header-cell *matHeaderCellDef>Pregunta</th>
             <td mat-cell *matCellDef="let f">
               <strong>{{ f.pregunta }}</strong>
-              <div style="font-size: 11px; opacity: 0.7; white-space: pre-wrap;">{{ f.respuesta }}</div>
+              <div class="slug-hint" style="white-space: pre-wrap;">{{ f.respuesta }}</div>
             </td>
           </ng-container>
           <ng-container matColumnDef="categoria">
@@ -69,40 +81,31 @@
             <td mat-cell *matCellDef="let f"><span class="stat-chip chip-info">{{ f.orden }}</span></td>
           </ng-container>
           <ng-container matColumnDef="activo">
-            <th mat-header-cell *matHeaderCellDef>Activa</th>
+            <th mat-header-cell *matHeaderCellDef>Estado</th>
             <td mat-cell *matCellDef="let f">
               <span class="estado-chip" [class.ok]="f.activo" [class.error]="!f.activo">
-                {{ f.activo ? 'Activa' : 'Inactiva' }}
+                {{ f.activo ? 'Activa' : 'Eliminada' }}
               </span>
             </td>
           </ng-container>
-          <ng-container matColumnDef="acciones">
-            <th mat-header-cell *matHeaderCellDef>Acciones</th>
-            <td mat-cell *matCellDef="let f">
-              <ng-container *ngIf="esAdmin">
-                <button mat-icon-button matTooltip="Editar" (click)="editar(f)">
-                  <mat-icon>edit</mat-icon>
-                </button>
-                <button mat-icon-button matTooltip="Activar / desactivar" (click)="toggleActivo(f)">
-                  <mat-icon>{{ f.activo ? 'toggle_on' : 'toggle_off' }}</mat-icon>
-                </button>
-              </ng-container>
-            </td>
-          </ng-container>
           <tr mat-header-row *matHeaderRowDef="columnas"></tr>
-          <tr mat-row *matRowDef="let f; columns: columnas"></tr>
+          <tr mat-row *matRowDef="let f; columns: columnas"
+              (click)="seleccionarFila(f)"
+              [class.fila-seleccionada]="filaSeleccionada?.id === f.id"></tr>
         </table>
       </div>
       <ng-template #vacioGestion>
         <div class="empty-state" *ngIf="!loading">
           <mat-icon>quiz</mat-icon>
-          <p>No hay preguntas frecuentes todavía. Crea la primera.</p>
+          <p>Sin resultados para los criterios actuales.</p>
         </div>
       </ng-template>
     </div>
   </ng-container>
 
-  <!-- Centro de ayuda (solo lectura: FAQ activas) -->
+  <!-- ══ CENTRO DE AYUDA (solo lectura: FAQ activas) ══
+       No es una pantalla de mantenimiento: es el escaparate de ayuda que ve
+       el cliente, así que no lleva grilla de gestión ni barra de acciones. -->
   <div class="op-card" *ngIf="!esGestion">
     <h3><mat-icon>help_center</mat-icon> Centro de ayuda ({{ faqsActivas.length }})</h3>
     <mat-accordion *ngIf="faqsActivas.length; else vacioAyuda">

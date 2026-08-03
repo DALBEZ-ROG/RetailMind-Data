@@ -15,6 +15,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatChipsModule } from '@angular/material/chips';
 import { GestionDatosService } from './gestion-datos.service';
+import { ConfirmService } from '../../../core/services/confirm.service';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
 
@@ -95,7 +96,8 @@ export class GestionDatosComponent implements OnInit {
   constructor(
     private service: GestionDatosService,
     private snackBar: MatSnackBar,
-    private http: HttpClient
+    private http: HttpClient,
+    private confirmar: ConfirmService
   ) {}
 
   ngOnInit(): void {
@@ -165,10 +167,20 @@ export class GestionDatosComponent implements OnInit {
   cancelEdit(): void { this.editingEvento = null; }
 
   deleteEvento(eventPk: number): void {
-    if (!confirm('¿Eliminar evento #' + eventPk + '? Esta accion no se puede deshacer.')) return;
-    this.service.deleteFactEvento(eventPk).subscribe({
-      next: () => { this.msgOk('Evento eliminado'); this.loadFactEventos(); },
-      error: (e) => this.msgErr(e)
+    // Borrado FÍSICO en ClickHouse: `ALTER TABLE retailmind.fact_eventos
+    // DELETE ... SETTINGS mutations_sync = 1` (GestionDatosService:99).
+    // No hay baja lógica ni papelera: la fila desaparece del hecho.
+    this.confirmar.eliminacion(
+      `el evento #${eventPk}`,
+      'Se borra FÍSICAMENTE de la tabla de hechos de ClickHouse (fact_eventos). No hay baja '
+      + 'lógica ni papelera: la fila desaparece y los informes de analítica que la contaban '
+      + 'cambiarán. No se puede deshacer.'
+    ).subscribe(ok => {
+      if (!ok) return;
+      this.service.deleteFactEvento(eventPk).subscribe({
+        next: () => { this.msgOk('Evento eliminado'); this.loadFactEventos(); },
+        error: (e) => this.msgErr(e)
+      });
     });
   }
 
@@ -205,11 +217,45 @@ export class GestionDatosComponent implements OnInit {
   }
 
   deleteDim(tabla: string, id: number): void {
-    if (!confirm('¿Eliminar registro #' + id + '?')) return;
-    this.service.deleteDimension(tabla, id).subscribe({
-      next: () => { this.msgOk('Registro eliminado'); this.loadDimension(tabla); },
-      error: (e) => this.msgErr(e)
+    // Borrado FÍSICO en ClickHouse (GestionDatosService:131). ClickHouse no
+    // tiene claves foráneas: los eventos que apuntan a este id NO se borran,
+    // se quedan sin descripción en los informes.
+    const fila = this.filasDimension(tabla).find(r => r.id === id);
+    this.confirmar.eliminacion(
+      `${this.etiquetaDimension(tabla)} «${fila?.nombre ?? '#' + id}»`,
+      'Se borra FÍSICAMENTE de ClickHouse, sin baja lógica. Los eventos de fact_eventos que '
+      + 'usan este identificador NO se borran: quedan huérfanos y en los informes aparecerán '
+      + 'sin nombre. No se puede deshacer.'
+    ).subscribe(ok => {
+      if (!ok) return;
+      this.service.deleteDimension(tabla, id).subscribe({
+        next: () => { this.msgOk('Registro eliminado'); this.loadDimension(tabla); },
+        error: (e) => this.msgErr(e)
+      });
     });
+  }
+
+  /** Filas ya cargadas de la dimensión, para nombrar lo que se va a borrar. */
+  private filasDimension(tabla: string): any[] {
+    switch (tabla) {
+      case 'dim-canal': return this.canales;
+      case 'dim-region': return this.regiones;
+      case 'dim-dispositivo': return this.dispositivos;
+      case 'dim-categoria': return this.categorias;
+      case 'dim-fuente-trafico': return this.fuentes;
+      default: return [];
+    }
+  }
+
+  private etiquetaDimension(tabla: string): string {
+    switch (tabla) {
+      case 'dim-canal': return 'el canal';
+      case 'dim-region': return 'la región';
+      case 'dim-dispositivo': return 'el dispositivo';
+      case 'dim-categoria': return 'la categoría';
+      case 'dim-fuente-trafico': return 'la fuente de tráfico';
+      default: return 'el registro';
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -231,10 +277,20 @@ export class GestionDatosComponent implements OnInit {
   }
 
   deleteProducto(id: string): void {
-    if (!confirm('¿Eliminar producto ' + id + '?')) return;
-    this.service.deleteProducto(id).subscribe({
-      next: () => { this.msgOk('Producto eliminado'); this.loadProductos(); },
-      error: (e) => this.msgErr(e)
+    // Borrado FÍSICO en retailmind.dim_producto (GestionDatosService:168).
+    // Es la dimensión ANALÍTICA legada, NO el catálogo de la tienda: el
+    // producto de PostgreSQL no se toca.
+    this.confirmar.eliminacion(
+      `el producto ${id} de la dimensión analítica`,
+      'Se borra FÍSICAMENTE de retailmind.dim_producto (ClickHouse). El catálogo de la tienda '
+      + 'vive en PostgreSQL y NO se ve afectado, pero los eventos de fact_eventos con este '
+      + 'product_id quedarán sin marca ni precio en los informes. No se puede deshacer.'
+    ).subscribe(ok => {
+      if (!ok) return;
+      this.service.deleteProducto(id).subscribe({
+        next: () => { this.msgOk('Producto eliminado'); this.loadProductos(); },
+        error: (e) => this.msgErr(e)
+      });
     });
   }
 
@@ -257,10 +313,20 @@ export class GestionDatosComponent implements OnInit {
   }
 
   deleteUsuario(id: string): void {
-    if (!confirm('¿Eliminar usuario ' + id + '?')) return;
-    this.service.deleteUsuario(id).subscribe({
-      next: () => { this.msgOk('Usuario eliminado'); this.loadUsuarios(); },
-      error: (e) => this.msgErr(e)
+    // Borrado FÍSICO en retailmind.dim_usuario (GestionDatosService:194).
+    // Es el visitante ANALÍTICO legado, no la cuenta de la aplicación (esa
+    // se gestiona en /admin-usuarios contra PostgreSQL, con baja lógica).
+    this.confirmar.eliminacion(
+      `el visitante ${id} de la dimensión analítica`,
+      'Se borra FÍSICAMENTE de retailmind.dim_usuario (ClickHouse). NO es la cuenta de acceso '
+      + 'al sistema —esa se gestiona en Usuarios, contra PostgreSQL—, pero sus eventos en '
+      + 'fact_eventos quedarán sin región ni dispositivo en los informes. No se puede deshacer.'
+    ).subscribe(ok => {
+      if (!ok) return;
+      this.service.deleteUsuario(id).subscribe({
+        next: () => { this.msgOk('Usuario eliminado'); this.loadUsuarios(); },
+        error: (e) => this.msgErr(e)
+      });
     });
   }
 

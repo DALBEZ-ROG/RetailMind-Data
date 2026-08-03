@@ -1,51 +1,84 @@
 <div class="op-page">
   <div class="section-header">
     <h2><mat-icon>schedule</mat-icon> Horarios de Acceso por Rol</h2>
-    <p>Ventanas horarias (grupo_horario) que la base de datos aplica a cada grupo. Fuera de ventana, el motor bloquea la operación.</p>
+    <p>Ventanas horarias (grupo_horario) que la base de datos aplica a cada grupo. Fuera de ventana, el motor bloquea la operación y el inicio de sesión.</p>
   </div>
 
+  <!-- Aviso permanente: un rol sin ninguna ventana activa está fuera del sistema -->
+  <div class="op-card aviso-critico" *ngIf="rolesSinVentanaActiva.length">
+    <mat-icon>gpp_maybe</mat-icon>
+    <div>
+      <strong>Hay roles sin ninguna ventana activa:</strong>
+      {{ rolesSinVentanaActiva.join(', ') }}.
+      Sus usuarios no pueden iniciar sesión ningún día. Restaura una ventana desde
+      Modificar o crea una nueva.
+    </div>
+  </div>
+
+  <!-- ── REGLA 1: se entra por los criterios de búsqueda ── -->
   <div class="op-card">
-    <div class="form-actions">
-      <button class="btn-aplicar" (click)="showForm = !showForm">
-        <mat-icon>{{ showForm ? 'close' : 'add_alarm' }}</mat-icon>
-        {{ showForm ? 'Cancelar' : 'Nueva Ventana' }}
-      </button>
-      <button class="btn-limpiar" (click)="cargar()"><mat-icon>refresh</mat-icon> Actualizar</button>
+    <h3><mat-icon>search</mat-icon> Criterios de búsqueda</h3>
+    <div class="form-grid">
+      <mat-form-field appearance="outline">
+        <mat-label>Rol de grupo</mat-label>
+        <mat-select [(ngModel)]="filtroRol" (selectionChange)="aplicarFiltros()">
+          <mat-option value="todos">— Todos —</mat-option>
+          <mat-option *ngFor="let r of roles" [value]="r">{{ r }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Día de la semana</mat-label>
+        <mat-select [(ngModel)]="filtroDia" (selectionChange)="aplicarFiltros()">
+          <mat-option value="todos">— Todos —</mat-option>
+          <mat-option *ngFor="let d of dias; let i = index" [value]="i">{{ d }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Estado</mat-label>
+        <mat-select [(ngModel)]="filtroEstado" (selectionChange)="aplicarFiltros()">
+          <mat-option value="todos">— Todos —</mat-option>
+          <mat-option value="activas">Activas</mat-option>
+          <mat-option value="inactivas">Eliminadas (inactivas)</mat-option>
+        </mat-select>
+      </mat-form-field>
     </div>
-
-    <div *ngIf="showForm" style="margin-top:20px;">
-      <div class="form-grid">
-        <mat-form-field appearance="outline">
-          <mat-label>Rol de grupo</mat-label>
-          <mat-select [(ngModel)]="nueva.rolGrupo">
-            <mat-option *ngFor="let r of roles" [value]="r">{{ r }}</mat-option>
-          </mat-select>
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>Día</mat-label>
-          <mat-select [(ngModel)]="nueva.diaSemana">
-            <mat-option *ngFor="let d of dias; let i = index" [value]="i">{{ d }}</mat-option>
-          </mat-select>
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>Hora inicio</mat-label>
-          <input matInput type="time" [(ngModel)]="nueva.horaInicio">
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>Hora fin</mat-label>
-          <input matInput type="time" [(ngModel)]="nueva.horaFin">
-        </mat-form-field>
-      </div>
-      <div class="form-actions">
-        <mat-slide-toggle [(ngModel)]="nueva.activo">Activa</mat-slide-toggle>
-        <button class="btn-aplicar" (click)="crear()"><mat-icon>save</mat-icon> Crear Ventana</button>
-      </div>
+    <div class="form-actions">
+      <button class="btn-limpiar" (click)="limpiarFiltros()">
+        <mat-icon>filter_alt_off</mat-icon> Limpiar filtros
+      </button>
+      <button class="btn-limpiar" (click)="cargar()">
+        <mat-icon>refresh</mat-icon> Actualizar
+      </button>
     </div>
   </div>
 
+  <!-- ── LA GRILLA + REGLA 2: las cuatro opciones ── -->
   <div class="op-card">
     <h3><mat-icon>table_view</mat-icon> Ventanas configuradas ({{ ventanas.length }})</h3>
-    <div class="table-wrapper" *ngIf="ventanas.length; else vacio">
+
+    <app-acciones-registro
+        entidad="ventana horaria" articulo="una"
+        [haySeleccion]="!!filaSeleccionada"
+        [nombreSeleccion]="filaSeleccionada
+            ? (filaSeleccionada.rol_grupo + ' · ' + dias[filaSeleccionada.dia_semana]
+               + ' ' + filaSeleccionada.hora_inicio + '–' + filaSeleccionada.hora_fin)
+            : null"
+        [puedeEliminar]="!!filaSeleccionada?.activo"
+        [motivoNoEliminable]="motivoNoEliminable"
+        (nuevo)="nuevaVentana()"
+        (modificar)="modificarVentana()"
+        (eliminar)="eliminarVentana()"
+        (ver)="verVentana()">
+    </app-acciones-registro>
+
+    <p class="nota-limitacion">
+      <mat-icon>info</mat-icon>
+      «Eliminar» aquí no borra la fila: la desactiva, que es lo que cierra el acceso.
+      <strong>grp_administrador no aparece en la lista</strong> porque el administrador está
+      exento de horario por diseño: darle una ventana solo podría restringirlo.
+    </p>
+
+    <div class="table-wrapper table-seleccionable" *ngIf="ventanas.length; else vacio">
       <table mat-table [dataSource]="ventanas">
         <ng-container matColumnDef="rol">
           <th mat-header-cell *matHeaderCellDef>Rol de grupo</th>
@@ -57,61 +90,31 @@
         </ng-container>
         <ng-container matColumnDef="inicio">
           <th mat-header-cell *matHeaderCellDef>Inicio</th>
-          <td mat-cell *matCellDef="let v">
-            <ng-container *ngIf="!editando[v.id]; else editInicio">{{ v.hora_inicio }}</ng-container>
-            <ng-template #editInicio>
-              <mat-form-field appearance="outline" subscriptSizing="dynamic" style="width:110px;">
-                <input matInput type="time" [(ngModel)]="v.hora_inicio">
-              </mat-form-field>
-            </ng-template>
-          </td>
+          <td mat-cell *matCellDef="let v">{{ v.hora_inicio }}</td>
         </ng-container>
         <ng-container matColumnDef="fin">
           <th mat-header-cell *matHeaderCellDef>Fin</th>
-          <td mat-cell *matCellDef="let v">
-            <ng-container *ngIf="!editando[v.id]; else editFin">{{ v.hora_fin }}</ng-container>
-            <ng-template #editFin>
-              <mat-form-field appearance="outline" subscriptSizing="dynamic" style="width:110px;">
-                <input matInput type="time" [(ngModel)]="v.hora_fin">
-              </mat-form-field>
-            </ng-template>
-          </td>
+          <td mat-cell *matCellDef="let v">{{ v.hora_fin }}</td>
         </ng-container>
         <ng-container matColumnDef="activo">
-          <th mat-header-cell *matHeaderCellDef>Activa</th>
+          <th mat-header-cell *matHeaderCellDef>Estado</th>
           <td mat-cell *matCellDef="let v">
-            <ng-container *ngIf="!editando[v.id]; else editActivo">
-              <span class="estado-chip" [class.ok]="v.activo" [class.error]="!v.activo">
-                {{ v.activo ? 'Activa' : 'Inactiva' }}
-              </span>
-            </ng-container>
-            <ng-template #editActivo>
-              <mat-slide-toggle [(ngModel)]="v.activo"></mat-slide-toggle>
-            </ng-template>
-          </td>
-        </ng-container>
-        <ng-container matColumnDef="acciones">
-          <th mat-header-cell *matHeaderCellDef>Acciones</th>
-          <td mat-cell *matCellDef="let v">
-            <button mat-icon-button *ngIf="!editando[v.id]" (click)="editando[v.id] = true" matTooltip="Editar">
-              <mat-icon>edit</mat-icon>
-            </button>
-            <ng-container *ngIf="editando[v.id]">
-              <button mat-icon-button color="primary" (click)="guardar(v)" matTooltip="Guardar">
-                <mat-icon>save</mat-icon>
-              </button>
-              <button mat-icon-button (click)="editando[v.id] = false; cargar()" matTooltip="Cancelar">
-                <mat-icon>close</mat-icon>
-              </button>
-            </ng-container>
+            <span class="estado-chip" [class.ok]="v.activo" [class.error]="!v.activo">
+              {{ v.activo ? 'Activa' : 'Eliminada' }}
+            </span>
           </td>
         </ng-container>
         <tr mat-header-row *matHeaderRowDef="columnas"></tr>
-        <tr mat-row *matRowDef="let v; columns: columnas"></tr>
+        <tr mat-row *matRowDef="let v; columns: columnas"
+            (click)="seleccionarFila(v)"
+            [class.fila-seleccionada]="filaSeleccionada?.id === v.id"></tr>
       </table>
     </div>
     <ng-template #vacio>
-      <div class="empty-state" *ngIf="!loading"><mat-icon>schedule</mat-icon><p>No hay ventanas horarias configuradas.</p></div>
+      <div class="empty-state" *ngIf="!loading">
+        <mat-icon>schedule</mat-icon>
+        <p>Sin resultados para los criterios actuales.</p>
+      </div>
     </ng-template>
   </div>
 </div>

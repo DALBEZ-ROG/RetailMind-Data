@@ -298,6 +298,84 @@ body {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// PATRÓN DE INTERFAZ — LOS DOS ÚNICOS BOTONES DE UN FORMULARIO DE ACCIÓN
+// (regla 4: Aceptar y Cancelar, sin más verbos. Ver docs/PATRON_UI.md)
+//
+// Viven aquí y no en operativo-shared.scss porque los formularios del patrón
+// son DIÁLOGOS: el CDK los renderiza en un overlay fuera del árbol DOM del
+// componente, así que una hoja de estilos con encapsulación de componente no
+// los alcanza. Son hermanos de .btn-aplicar / .btn-limpiar y comparten su
+// lenguaje visual: gradiente para la acción principal, fantasma para la
+// secundaria.
+// ══════════════════════════════════════════════════════════════════════════════
+.btn-aceptar {
+  height: 44px !important;
+  padding: 0 26px !important;
+  background: var(--primary-gradient) !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 12px !important;
+  font-family: 'Inter', sans-serif !important;
+  font-weight: 700 !important;
+  font-size: 13px !important;
+  letter-spacing: 0.3px !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  box-shadow: 0 4px 15px rgba(26, 35, 126, 0.3) !important;
+  transition: all 0.3s ease !important;
+
+  &:hover:not(:disabled) {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 24px rgba(26, 35, 126, 0.4) !important;
+  }
+
+  // Aceptar deshabilitado = el formulario aún no es válido.
+  &:disabled {
+    opacity: 0.45 !important;
+    cursor: not-allowed !important;
+    box-shadow: none !important;
+    transform: none !important;
+  }
+
+  // Confirmación de una acción destructiva (ConfirmService, tono 'peligro').
+  &.peligro {
+    background: linear-gradient(135deg, #c62828 0%, #e53935 100%) !important;
+    box-shadow: 0 4px 15px rgba(198, 40, 40, 0.3) !important;
+
+    &:hover:not(:disabled) { box-shadow: 0 8px 24px rgba(198, 40, 40, 0.4) !important; }
+  }
+
+  mat-icon { font-size: 18px !important; }
+}
+
+.btn-cancelar {
+  height: 44px !important;
+  padding: 0 22px !important;
+  background: transparent !important;
+  color: #546e7a !important;
+  border: 1.5px solid #e0e0e0 !important;
+  border-radius: 12px !important;
+  font-family: 'Inter', sans-serif !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  transition: all 0.3s ease !important;
+
+  &:hover {
+    border-color: #b0bec5 !important;
+    color: #1a237e !important;
+    background: rgba(26, 35, 126, 0.04) !important;
+  }
+
+  mat-icon { font-size: 18px !important; }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // GLOBAL FILTER CONTAINER
 // ══════════════════════════════════════════════════════════════════════════════
 .filtros-container {

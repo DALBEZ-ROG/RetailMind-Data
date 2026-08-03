@@ -13,6 +13,7 @@ import { ComprasService } from '../../../core/services/compras.service';
 import { ReferenciasService } from '../../../core/services/referencias.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { SelectBuscableComponent, OpcionBuscable } from '../../../core/components/select-buscable/select-buscable.component';
+import { ConfirmService } from '../../../core/services/confirm.service';
 import { mensajeError } from '../../../core/services/api-error.util';
 import {
   ProveedorRef, BodegaRef, VarianteRef, OrdenCompraRow, OrdenCompraDetalle
@@ -51,7 +52,8 @@ export class OrdenesCompraComponent implements OnInit {
   procesando = false;
 
   constructor(private compras: ComprasService, private referencias: ReferenciasService,
-              private auth: AuthService, private snackBar: MatSnackBar) {}
+              private auth: AuthService, private snackBar: MatSnackBar,
+              private confirmar: ConfirmService) {}
 
   /** El botón Aprobar solo aplica a GERENTE/ADMIN (espeja SecurityConfig). */
   get puedeAprobar(): boolean {
@@ -147,7 +149,27 @@ export class OrdenesCompraComponent implements OnInit {
     });
   }
 
+  /**
+   * Aprobar es IRREVERSIBLE: `ComprasService.aprobarOrden` deja la orden en
+   * 'confirmada' (no existe un estado 'aprobada' en el check de la tabla) y
+   * `/api/compras` no expone ningún endpoint que devuelva la orden a
+   * 'enviada'. Por eso confirma antes, y el mensaje dice qué se abre.
+   */
   aprobarOrden(o: OrdenCompraRow): void {
+    this.confirmar.confirmar({
+      titulo: 'Confirmar aprobación de la orden',
+      mensaje: `¿Aprobar la orden ${o.numero} del proveedor ${o.proveedor}?`,
+      consecuencia:
+        'La orden pasará de «enviada» a «confirmada» y quedará habilitada para recibir '
+        + 'mercancía y, tras la recepción completa, para facturarse. La aprobación NO se '
+        + 'puede deshacer: el sistema no ofrece ninguna acción que devuelva la orden a '
+        + '«enviada».',
+      textoAceptar: 'Aprobar la orden',
+      tono: 'peligro'
+    }).subscribe(ok => { if (ok) this.ejecutarAprobacion(o); });
+  }
+
+  private ejecutarAprobacion(o: OrdenCompraRow): void {
     this.procesando = true;
     this.compras.aprobarOrden(o.id).subscribe({
       next: r => {
