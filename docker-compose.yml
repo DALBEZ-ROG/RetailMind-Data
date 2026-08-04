@@ -1,95 +1,334 @@
-version: "3.8"
+# =====================================================================
+# RetailMind — compose objetivo (§5 de docs/DESPLIEGUE_DISENO.md)
+#
+# 6 servicios: postgres, clickhouse, backend, frontend, etl y pgadmin.
+# `pocketbase` SE ELIMINO: era el origen del pipeline de la etapa
+# anterior y ninguna pieza operativa lo toca (§5.7).
+#
+#   Desarrollo  (backend y frontend en el anfitrion):
+#       docker compose up -d                    -> postgres + clickhouse
+#   Demo / feria (todo dentro de Docker):
+#       docker compose --profile demo up -d --build
+#   Herramientas (a demanda, no consumen memoria en la feria):
+#       docker compose --profile tools run --rm etl python -m etl.dwh.run_etl
+#       docker compose --profile tools up -d pgadmin
+#
+# `.env` fija COMPOSE_PROFILES=demo para que la feria sea LITERALMENTE
+# `docker compose up -d`; quien desarrolle usa
+# `docker compose up -d postgres clickhouse`.
+#
+# ---------------------------------------------------------------------
+# ANTES DEL PRIMER `up`, EN ESTA MAQUINA — leer esto entero
+#
+# Hay contenedores VIVOS de dos proyectos anteriores atados a los MISMOS
+# volumenes. Dos servidores sobre un mismo directorio de datos es
+# corrupcion, no un conflicto de puertos. Hay que bajarlos primero:
+#
+#     docker compose -p 1m6datoscs down                                  # clickhouse viejo
+#     docker compose -f deploy/postgres/docker-compose.migracion.yml down # postgres de la migracion
+#
+# Ninguno de los dos `down` lleva `-v`: los volumenes se conservan y este
+# compose los reutiliza (el de PostgreSQL ya trae la base restaurada y
+# verificada; el de ClickHouse trae un dato irreproducible).
+# =====================================================================
+
+name: retailmind          # fija el prefijo de red y volumenes: ya no
+                          # depende del nombre de la carpeta (§2.2)
+
+networks:
+  retailmind:
+    name: retailmind_net  # nombre FIJO: el compose de Airflow se
+                          # enganchara como red externa (§7)
+
+volumes:
+  # --- PostgreSQL: reproducible, luego NO external ---------------------
+  # En una maquina nueva tiene que crearse solo para que
+  # `docker-entrypoint-initdb.d` restaure la base. Con `external: true`
+  # un clon del repositorio no arrancaria nunca.
+  # El `name:` explicito NO es cosmetico: en esta maquina existe un
+  # volumen huerfano `1m6datoscs_postgres_data` con datos de PostgreSQL
+  # **15**; sin nombre propio, Docker podria caer sobre el y la imagen 18
+  # se negaria a arrancar con «database files are incompatible».
+  pg_data:
+    name: retailmind_pg_data
+    # AVISO ESPERADO en esta maquina, no es un error: como el volumen lo
+    # creo el compose de la migracion, `up` imprime
+    #   «volume "retailmind_pg_data" already exists but was created for
+    #    project "retailmind-migracion" (expected "retailmind")»
+    # Docker lo REUTILIZA igualmente —es lo que queremos: ahi esta la
+    # base ya restaurada y verificada—; solo avisa de que la etiqueta de
+    # proyecto no coincide. NO hay que "arreglarlo" poniendo
+    # `external: true` (rompe la maquina nueva) ni borrando el volumen
+    # (borra la base). Desaparece solo el dia que el volumen se cree
+    # desde cero bajo este proyecto.
+
+  # --- ClickHouse: IRREPRODUCIBLE, luego SI external -------------------
+  # `retailmind.fact_eventos` (2.823.245 filas) solo existe aqui: el
+  # 96,2 % lo genero un script con semilla no fijada y el resto es un
+  # dataset externo. Perder el volumen = perder las pantallas de
+  # analitica PARA SIEMPRE.
+  # `external: true` es la pieza que evita el PEOR fallo posible del
+  # despliegue: arrancar con un almacen vacio y creer que todo funciona.
+  # Si el volumen no esta, `up` se niega a arrancar y lo dice.
+  clickhouse_data:
+    name: 1m6datoscs_clickhouse_data
+    external: true
+
+secrets:
+  # La imagen de PostgreSQL admite `POSTGRES_PASSWORD_FILE`, asi que la
+  # contrasena del superusuario NO viaja por una variable de entorno
+  # (visible en `docker inspect` y en `docker compose config`).
+  pg_superuser:
+    file: ./deploy/secrets/pg_superuser.txt
 
 services:
-  pocketbase:
-    image: ghcr.io/muchobien/pocketbase:latest
-    ports:
-      - "8091:8090"
+
+  # ===================================================================
+  # postgres — la UNICA base transaccional del sistema
+  # ===================================================================
+  postgres:
+    image: postgres:18            # FIJA, no `:latest`: un dump de 18 no
+                                  # restaura en 17
+    environment:
+      POSTGRES_DB: retailmind
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/pg_superuser
+      # El locale del origen es `Spanish_Ecuador.1252` (libc de Windows)
+      # y NO EXISTE en Debian: un `pg_dump --create` fallaria con
+      # «invalid locale name», mensaje que no sugiere la causa. Con ICU
+      # `es-EC` el texto acentuado ordena como se espera y la
+      # restauracion va SIN --create.
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale-provider=icu --icu-locale=es-EC --locale=C.UTF-8"
+      # Estas dos las lee `deploy/postgres/initdb/02_restaurar.sh`, que
+      # aborta de forma ruidosa si faltan. Solo se usan en la PRIMERA
+      # creacion del volumen.
+      PG_APP_PASSWORD: ${PG_APP_PASSWORD:?falta PG_APP_PASSWORD}
+      PG_ETL_PASSWORD: ${PG_ETL_PASSWORD:?falta PG_ETL_PASSWORD}
+      TZ: America/Guayaquil
+    secrets:
+      - pg_superuser
     volumes:
-      - pocketbase_data:/pb_data
+      # OJO: la imagen 18+ monta en `/var/lib/postgresql`, NO en
+      # `/var/lib/postgresql/data` (convencion hasta la 17). Desde la 18
+      # el directorio lleva la version — PGDATA=/var/lib/postgresql/18/docker
+      # — para que `pg_upgrade --link` no cruce el limite del montaje.
+      # Con la ruta antigua la imagen DETECTA el volumen huerfano y se
+      # niega a arrancar; el mensaje habla de `pg_upgrade` y despista.
+      - pg_data:/var/lib/postgresql
+      # Directorio PROPIO con exactamente tres archivos, y solo se
+      # ejecuta con el volumen vacio. JAMAS montar aqui
+      # `retailmind/sql/postgres/`: son 93 scripts y 8 son
+      # `99_revert_*.sql`; el orden lexicografico los correria AL FINAL
+      # y desharia la siembra completa.
+      - ./deploy/postgres/initdb:/docker-entrypoint-initdb.d:ro
+    ports:
+      # 5433 mientras el PostgreSQL local siga vivo; el CORTE (§9.6) es
+      # poner PG_PORT=5432 en `.env`, no editar este archivo.
+      - "${PG_PORT:-5433}:5432"
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8090/api/health"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d retailmind"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 60s
+    networks: [retailmind]
     restart: unless-stopped
 
+  # ===================================================================
+  # clickhouse — SOLO analitica. Con esto apagado el sistema entero
+  # sigue funcionando y solo la analitica degrada, con aviso.
+  # ===================================================================
   clickhouse:
-    image: clickhouse/clickhouse-server:latest
+    image: clickhouse/clickhouse-server:26.4.2.10   # la version que
+                                                    # ESCRIBIO el volumen
     user: "101:101"
-    ports:
-      - "8123:8123"
-      - "9000:9000"
     environment:
-      CLICKHOUSE_DB: ${CH_DATABASE}
+      # El almacen VIVO es `retailmind_dwh`. La base legada `retailmind`
+      # sigue existiendo en el volumen y `analytics/` la nombra
+      # cualificada, asi que no se pierde nada.
+      # (Estas tres solo actuan si el volumen esta vacio; aqui no lo
+      # esta, luego son declarativas: dicen a quien lea que base manda.)
+      CLICKHOUSE_DB: retailmind_dwh
       CLICKHOUSE_USER: ${CH_USER}
       CLICKHOUSE_PASSWORD: ${CH_PASSWORD}
+      TZ: America/Guayaquil
     volumes:
       - clickhouse_data:/var/lib/clickhouse
     ulimits:
-      nofile:
-        soft: 262144
-        hard: 262144
+      nofile: { soft: 262144, hard: 262144 }
+    ports:
+      # 8123 se sigue publicando: el ETL corriendo EN EL ANFITRION
+      # (modo desarrollo) lo necesita.
+      - "8123:8123"
+      - "9000:9000"
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8123/ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks: [retailmind]
     restart: unless-stopped
 
+  # ===================================================================
+  # backend — Spring Boot. Es el servicio que mas cambia respecto del
+  # compose anterior: alli no recibia UNA SOLA variable de PostgreSQL y
+  # caia en `localhost:5432` DENTRO del contenedor, con lo que fallaba
+  # todo lo operativo empezando por el login.
+  # ===================================================================
   backend:
     build: ./retailmind-backend
-    ports:
-      - "8080:8080"
-    volumes:
-      - ./retailmind:/etl
+    profiles: ["demo"]
     environment:
-      CLICKHOUSE_DATASOURCE_URL: jdbc:ch://clickhouse:8123/${CH_DATABASE}?compress=0
+      # --- lo que faltaba por completo ---
+      POSTGRES_DATASOURCE_URL: jdbc:postgresql://postgres:5432/retailmind
+      POSTGRES_DATASOURCE_USERNAME: retailmind_app
+      POSTGRES_DATASOURCE_PASSWORD: ${PG_APP_PASSWORD:?falta PG_APP_PASSWORD}
+      # --- ClickHouse ---
+      # La URL apunta a la base LEGADA a proposito: `analytics/` la
+      # necesita por defecto y los informes compuestos cualifican
+      # `retailmind_dwh.tabla` explicitamente.
+      CLICKHOUSE_DATASOURCE_URL: jdbc:ch://clickhouse:8123/retailmind?compress=0
       CLICKHOUSE_DATASOURCE_USERNAME: ${CH_USER}
       CLICKHOUSE_DATASOURCE_PASSWORD: ${CH_PASSWORD}
       CH_HOST: clickhouse
       CH_PORT: "8123"
-      CH_DATABASE: ${CH_DATABASE}
+      CH_DATABASE: retailmind
       CH_USER: ${CH_USER}
       CH_PASSWORD: ${CH_PASSWORD}
-      INIT_SCRIPTS_PATH: /etl
+      JWT_SECRET: ${JWT_SECRET:?falta JWT_SECRET}
+      # --- ETL invocado DESDE el backend (boton y @Scheduled) ---
       ETL_SCRIPTS_PATH: /etl
-      ETL_PYTHON_PATH: python
-      PB_URL: http://pocketbase:8090
-      PB_EMAIL: ${PB_EMAIL}
-      PB_PASSWORD: ${PB_PASSWORD}
+      DWH_ETL_PATH: /etl
+      DWH_PYTHON_PATH: python    # ← lo que faltaba: en la imagen NO
+      ETL_PYTHON_PATH: python    #   existe `py`, solo `python`
+      ETL_PG_HOST: postgres      # ← ahora SI alcanzable
+      ETL_PG_PORT: "5432"
+      ETL_PG_DATABASE: retailmind
+      ETL_PG_USER: retailmind_etl
+      ETL_PG_PASSWORD: ${PG_ETL_PASSWORD:?falta PG_ETL_PASSWORD}
+      ETL_CH_HOST: clickhouse
+      ETL_CH_PORT: "8123"
+      ETL_CH_DATABASE: retailmind_dwh
+      ETL_CH_USER: ${CH_USER}
+      ETL_CH_PASSWORD: ${CH_PASSWORD}
+      # El dia que Airflow tome el relevo hay que poner DWH_CRON=-. Si
+      # no, a las 02:00 disparan LOS DOS y dos cargas concurrentes
+      # compiten por el `EXCHANGE TABLES` del mismo destino. Que sea una
+      # variable es lo que hace ese apagado un cambio de `.env` y no una
+      # recompilacion.
+      DWH_CRON: ${DWH_CRON:-0 0 2 * * *}
+      DWH_ZONA: America/Guayaquil
+      TZ: America/Guayaquil
+    volumes:
+      # Es lo que permite que el boton «Actualizar almacen» y el
+      # @Scheduled funcionen DENTRO del contenedor. Con DWH_PYTHON_PATH
+      # y las ETL_PG_* de arriba, por primera vez el pipeline completo
+      # corre dentro de Docker.
+      # Las ETL_* se pasan por entorno AUNQUE `retailmind/.env` este
+      # montado: `conexiones.py` llama a `load_dotenv()` SIN
+      # `override=True`, asi que el entorno del contenedor manda.
+      - ./retailmind:/etl
+    ports:
+      - "8080:8080"
     depends_on:
+      postgres:
+        condition: service_healthy    # el backend no arranca antes que su base
       clickhouse:
-        condition: service_healthy
+        condition: service_started    # a proposito NO service_healthy:
+                                      # el invariante del sistema es que
+                                      # con ClickHouse apagado TODO
+                                      # funciona y solo la analitica
+                                      # degrada. Condicionarlo lo
+                                      # convertiria en dependencia dura.
+    healthcheck:
+      # Comprueba el CUERPO y no el codigo HTTP: /api/health responde
+      # 200 tambien con PostgreSQL caido, con `status: DOWN`. Es
+      # `permitAll`, asi que no necesita token.
+      # 127.0.0.1 por la misma razon que en `frontend`: aqui funciona con
+      # `localhost` solo porque Tomcat abre doble pila, que es suerte y
+      # no diseno. Fijarlo lo hace determinista.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/api/health | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 90s    # margen para que Spring levante sin marcarse enfermo
+    networks: [retailmind]
     restart: unless-stopped
 
+  # ===================================================================
+  # frontend — Angular servido por nginx
+  # ===================================================================
   frontend:
     build: ./retailmind-frontend
+    profiles: ["demo"]
     ports:
       - "4200:80"
     depends_on:
-      - backend
+      backend:
+        # nginx resuelve `backend` AL ARRANCAR y, si el contenedor aun no
+        # existe, falla el arranque del propio nginx. Esperar a
+        # `service_healthy` elimina esa carrera y garantiza que la
+        # primera pantalla que vea el publico ya responda.
+        condition: service_healthy
+    healthcheck:
+      # 127.0.0.1 y NO `localhost`: dentro del contenedor `localhost`
+      # resuelve a 127.0.0.1 **y a ::1**, el wget de busybox prueba IPv6
+      # primero y nginx solo declara `listen 80;` (IPv4). Con `localhost`
+      # el healthcheck da «Connection refused» ETERNAMENTE aunque la
+      # pagina se sirva perfectamente — y como el `frontend` es el ultimo
+      # de la cadena, el sintoma es un `unhealthy` permanente en la
+      # pantalla que el publico SI esta viendo funcionar.
+      test: ["CMD-SHELL", "wget --spider -q http://127.0.0.1/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks: [retailmind]
     restart: unless-stopped
 
+  # ===================================================================
+  # etl — mismo servicio, proposito NUEVO
+  # Deja de ser un contenedor ocioso con `tail -f /dev/null` y pasa a ser
+  # el EJECUTOR PUNTUAL del pipeline, ya conectado a las dos bases.
+  # Es ademas el ENSAYO del operador de Airflow: cada tarea del DAG sera
+  # exactamente uno de estos comandos. Si funciona aqui, funciona alli.
+  # ===================================================================
   etl:
     build: ./retailmind
+    profiles: ["tools"]        # NO arranca con `up`: se invoca a demanda
     environment:
-      CH_HOST: clickhouse
-      CH_PORT: "8123"
-      CH_DATABASE: ${CH_DATABASE}
-      CH_USER: ${CH_USER}
-      CH_PASSWORD: ${CH_PASSWORD}
-      PB_URL: http://pocketbase:8090
-      PB_EMAIL: ${PB_EMAIL}
-      PB_PASSWORD: ${PB_PASSWORD}
-    depends_on:
-      clickhouse:
-        condition: service_healthy
-      pocketbase:
-        condition: service_healthy
-    command: tail -f /dev/null
-    restart: unless-stopped
+      ETL_PG_HOST: postgres
+      ETL_PG_PORT: "5432"
+      ETL_PG_DATABASE: retailmind
+      ETL_PG_USER: retailmind_etl
+      ETL_PG_PASSWORD: ${PG_ETL_PASSWORD:?falta PG_ETL_PASSWORD}
+      ETL_CH_HOST: clickhouse
+      ETL_CH_PORT: "8123"
+      ETL_CH_DATABASE: retailmind_dwh
+      ETL_CH_USER: ${CH_USER}
+      ETL_CH_PASSWORD: ${CH_PASSWORD}
+      TZ: America/Guayaquil
+    volumes:
+      - ./retailmind:/app      # WORKDIR de la imagen
+    networks: [retailmind]
+    # Sin `command`: se usa como
+    #   docker compose --profile tools run --rm etl python -m etl.dwh.run_etl
+    #   docker compose --profile tools run --rm etl python -m etl.dwh.validar_dwh
 
-volumes:
-  clickhouse_data:
-  pocketbase_data:
+  # ===================================================================
+  # pgadmin — opcional, solo si en la feria hace falta ensenar el
+  # esquema, los roles o las politicas RLS sin abrir una terminal.
+  # ===================================================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    profiles: ["tools"]
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@retailmind.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      TZ: America/Guayaquil
+    ports:
+      - "5050:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [retailmind]

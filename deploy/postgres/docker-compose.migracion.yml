@@ -1,0 +1,83 @@
+# =====================================================================
+# docker-compose.migracion.yml — SOLO el servicio `postgres`.
+#
+# Este NO es el compose objetivo (§5 del diseno). Es el compose de la
+# FASE A (convivencia): levanta unicamente la base contenerizada en el
+# puerto 5433 mientras el PostgreSQL local sigue vivo y sirviendo en el
+# 5432. El compose completo con backend, frontend, clickhouse y etl es
+# la tarea siguiente.
+#
+#   Levantar:  docker compose -f deploy/postgres/docker-compose.migracion.yml up -d
+#   Apagar:    docker compose -f deploy/postgres/docker-compose.migracion.yml down
+#   Marcha atras total (borra el volumen y vuelve a empezar):
+#              docker compose -f ... down -v
+#
+# Coste de dar marcha atras: CERO. El local no se toca.
+# =====================================================================
+
+name: retailmind-migracion
+
+volumes:
+  pg_data:
+    # Nombre EXPLICITO. Sin `name:`, Docker lo llamaria
+    # `<proyecto>_pg_data` y quedaria atado al nombre de la carpeta.
+    # Ademas ya existe en esta maquina un volumen `1m6datoscs_postgres_data`
+    # con un directorio de datos de PostgreSQL **15** (resto de una
+    # iteracion anterior): si el compose cayera sobre el, la imagen 18 se
+    # negaria a arrancar con «database files are incompatible with server».
+    name: retailmind_pg_data
+
+services:
+  postgres:
+    # Version FIJA, no `:latest`. El local es PostgreSQL 18.3 y un dump
+    # de 18 no restaura en 17.
+    image: postgres:18
+    container_name: retailmind-postgres
+    environment:
+      POSTGRES_DB: retailmind
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/pg_superuser
+      # El locale del origen es `Spanish_Ecuador.1252` (libc de Windows)
+      # y NO EXISTE en Debian. Se crea con ICU es-EC, que si ordena el
+      # texto acentuado como se espera, y se restaura SIN --create.
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale-provider=icu --icu-locale=es-EC --locale=C.UTF-8"
+      TZ: America/Guayaquil
+      # Las lee 02_restaurar.sh. `esta_en_horario()` esta anclada a
+      # America/Guayaquil DENTRO de la funcion, asi que la restriccion
+      # horaria no depende de TZ; TZ solo afecta a los registros.
+      PG_APP_PASSWORD: ${PG_APP_PASSWORD:?falta PG_APP_PASSWORD}
+      PG_ETL_PASSWORD: ${PG_ETL_PASSWORD:?falta PG_ETL_PASSWORD}
+    secrets:
+      - pg_superuser
+    volumes:
+      # OJO: en la imagen 18+ el punto de montaje es `/var/lib/postgresql`
+      # y NO `/var/lib/postgresql/data` (que era la convencion hasta la 17).
+      # A partir de la 18 el directorio de datos lleva la version en el
+      # nombre — PGDATA = /var/lib/postgresql/18/docker — para que
+      # `pg_upgrade --link` no tropiece con el limite del montaje.
+      # Montarlo en la ruta antigua NO arranca vacio en silencio: la
+      # imagen DETECTA el volumen huerfano y se niega a arrancar con
+      # «there appears to be PostgreSQL data in /var/lib/postgresql/data
+      # (unused mount/volume)». Es un fallo ruidoso y correcto, pero el
+      # mensaje habla de `pg_upgrade` y no de la ruta, asi que despista.
+      - pg_data:/var/lib/postgresql
+      # Directorio PROPIO con exactamente tres archivos. JAMAS montar
+      # `retailmind/sql/postgres/`: son 93 scripts y 8 son
+      # `99_revert_*.sql`; el orden lexicografico los ejecutaria AL
+      # FINAL y desharia la siembra completa.
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+    ports:
+      # 5433 mientras el PostgreSQL local siga vivo en el 5432.
+      # El remapeo a 5432 es el corte (Fase B), y solo tras V1..V11.
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d retailmind"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
+secrets:
+  pg_superuser:
+    file: ../secrets/pg_superuser.txt

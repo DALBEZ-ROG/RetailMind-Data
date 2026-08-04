@@ -3,11 +3,16 @@
 Tienda PyME con back-office completo. **PostgreSQL (BD `retailmind`, ~103 tablas) es la ÚNICA
 base transaccional** — incluida la TIENDA DEL CLIENTE (catálogo `/api/catalogo` con ~1.214
 productos reales cargados del dataset original vía ETL puntual, carrito, wishlist,
-perfil/direcciones, checkout y mis pedidos, migrados 2026-07-11). Con Docker apagado TODO el
-sistema funciona. ClickHouse es **solo analítica** (paquete `analytics/` + señal de eventos para recomendaciones): con ClickHouse
-apagado TODO el sistema funciona; solo analytics/recomendaciones se degradan con aviso. Si algún
-documento viejo dice "PostgreSQL eliminado" o describe la tienda sobre ClickHouse, está
-desactualizado: ignóralo.
+perfil/direcciones, checkout y mis pedidos, migrados 2026-07-11). **Desde el 2026-08-03 PostgreSQL
+corre EN UN CONTENEDOR** (puerto 5432), así que la vieja frase «con Docker apagado todo funciona»
+YA NO VALE: sin Docker no hay base. Lo que SÍ sigue en pie —y es el invariante de diseño que hay
+que respetar— es que **ClickHouse es solo analítica** (paquete `analytics/` + señal de eventos para
+recomendaciones): con ClickHouse apagado TODO el sistema funciona y solo analytics/recomendaciones
+se degradan con aviso (probado: `status: UP` / `analytics: DEGRADED` en ~5 s acotados, informes
+simples intactos, compuestos y tableros con `analiticaDisponible: false`, y recuperación **sin
+reiniciar el backend**). Por eso el compose declara `clickhouse: service_started` y NUNCA
+`service_healthy`. Si algún documento viejo dice "PostgreSQL eliminado", describe la tienda sobre
+ClickHouse o afirma que PostgreSQL corre local, está desactualizado: ignóralo.
 
 ## Stack
 
@@ -63,20 +68,48 @@ desactualizado: ignóralo.
 
 ## Cómo correr
 
-```bash
-# Backend (puerto 8080; si está ocupado por otra app usar 8081 y detenerlo al terminar)
-cd retailmind-backend && mvn spring-boot:run
+**TODO está contenerizado desde el 2026-08-03** (ver `docs/DESPLIEGUE_EJECUTADO.md`). El compose
+raíz tiene **6 servicios** (`postgres`, `clickhouse`, `backend`, `frontend`, `etl` y `pgadmin`);
+`pocketbase` se ELIMINÓ. `.env` fija `COMPOSE_PROFILES=demo`, así que:
 
-# Frontend (puerto 4200)
+```bash
+# TODO el sistema (los 4 servicios, listo en ~28 s)
+docker compose up -d
+
+# Tras cambiar código Java o Angular: SIN --build el contenedor sigue con la imagen vieja
+docker compose up -d --build
+
+# MODO DESARROLLO: solo la base y la analítica en Docker; backend y frontend a mano
+docker compose up -d postgres clickhouse
+docker compose stop backend frontend      # libera 8080 y 4200
+cd retailmind-backend  && mvn spring-boot:run     # necesita application-local.properties
 cd retailmind-frontend && npm start
 
 # Verificación mínima antes de dar por bueno un cambio
 mvn compile   &&   ng build
 ```
 
-PostgreSQL corre **local** (`localhost:5432/retailmind`); ClickHouse/PocketBase van por
-docker-compose (5 servicios: pocketbase, clickhouse, backend, frontend, etl). Para inspeccionar el
-esquema usa el MCP `retailmind` (solo lectura) o psycopg2 (`postgres/1250143656@localhost:5432`).
+**Puertos**: el **5432 es el CONTENEDOR** (PostgreSQL 18.4, la base VIVA). El PostgreSQL **local**
+(18.3 Windows, servicio `postgresql-x64-18`) se movió al **5433** y ahí viven las 12 bases de otras
+materias más una copia congelada de `retailmind` — sirve de marcha atrás, no se desinstala. Para
+inspeccionar el esquema usa el MCP `retailmind` (solo lectura), que ya apunta al contenedor.
+
+**Secretos**: NO hay contraseñas en el código ni en este archivo. `application.properties` dejó de
+tener valores por defecto para `postgres.datasource.password` y `jwt.secret` — la app **falla al
+arrancar** si faltan, a propósito. Fuera de Docker los toma de
+`retailmind-backend/application-local.properties` (gitignored, vía `spring.config.import` con
+`optional:`); dentro, del entorno del compose. Las credenciales de motor viven en `.env`,
+`retailmind/.env` y `deploy/secrets/pg_superuser.txt`, los cuatro **fuera del índice de git**.
+
+**Trampas del despliegue** (detalle en `docs/DESPLIEGUE_EJECUTADO.md` §8):
+- Un cambio de **Java/Angular NO entra solo**: la imagen está horneada, hace falta `--build`. El
+  **Python del ETL sí es inmediato** porque `./retailmind` va montado, no copiado.
+- Los **datos viven en el volumen, no en la imagen**: reconstruir NO los borra.
+- Un **script SQL nuevo NO se aplica solo**: `deploy/postgres/initdb/` corre una única vez, con el
+  volumen vacío. Para aplicarlo:
+  `docker compose exec -T postgres psql -U postgres -d retailmind < ruta/script.sql`.
+- Ningún `down` debe llevar **`-v`**: el volumen de ClickHouse guarda un dato irreproducible
+  (`fact_eventos`, 2.823.245 filas) y por eso va declarado `external: true`.
 
 ## Credenciales de desarrollo
 
@@ -85,9 +118,19 @@ esquema usa el MCP `retailmind` (solo lectura) o psycopg2 (`postgres/1250143656@
   `analista@retailmind.com`): `Retail2026!` (script 27); `soporte@retailmind.com`:
   `Retail2026!` (script 37)
 - Clientes demo (`maria.lopez@demo.com`, `carlos.vera@demo.com`): `Cliente2026!` (script 26)
-- **Rol de motor del ETL** (no es un usuario de la app, no tiene login web):
-  `retailmind_etl` / `Etl2026!` (script 85). Sus parámetros de conexión viven en
-  `retailmind/.env` como `ETL_PG_*` / `ETL_CH_*`.
+
+> **Estas credenciales de LOGIN siguen intactas** tras la rotación del 2026-08-03 (verificado:
+> los 10 usuarios entran). Lo que se rotó fueron **cuatro secretos internos que nadie teclea** —
+> el superusuario `postgres` del contenedor, los roles `retailmind_app` y `retailmind_etl`, y el
+> `jwt.secret`—, porque estaban en claro y versionados. **Ya no aparecen en ningún archivo
+> rastreado por git**, así que NO los escribas aquí: viven en `.env` (`PG_APP_PASSWORD`,
+> `PG_ETL_PASSWORD`, `JWT_SECRET`), `retailmind/.env` (`ETL_PG_PASSWORD`) y
+> `deploy/secrets/pg_superuser.txt`. El **superusuario del PostgreSQL local (5433) NO se rotó**:
+> esa contraseña la comparten los MCP de otras materias.
+
+- **Rol de motor del ETL** (no es un usuario de la app, no tiene login web): `retailmind_etl`
+  (script 85), LOGIN + BYPASSRLS + solo lectura por cuatro capas. Contraseña en `retailmind/.env`
+  como `ETL_PG_*` / `ETL_CH_*`.
 
 ## Qué está hecho / qué falta
 
@@ -842,8 +885,30 @@ las tres primeras tarjetas**. Degradación probada con `docker stop`: 200 con
 `docs/tactico/PATRON_INFORMES.md` §21; los 8 supuestos que no se sostuvieron, en
 `docs/estrategico/CORRECCIONES_DISENO_ETL.md` (CE4.1 a CE4.8).
 
-**Pendiente**: contenerización completa (PostgreSQL sigue local, fuera de compose) y, si se
-decide, el DAG de Airflow de §7 (`run_etl.py` ya orquesta con orden topológico). El MODELO DE
+**CONTENERIZACIÓN COMPLETA (2026-08-03, sin script — bitácora en `docs/DESPLIEGUE_EJECUTADO.md`)**:
+PostgreSQL migrado al contenedor y **cortado** (el contenedor sirve en el **5432**, el local pasó al
+**5433** y queda como marcha atrás de un minuto). Las **11 verificaciones** de §9.5 del diseño
+pasaron —95 políticas RLS, 109 columnas con ACL, 13 funciones SECURITY DEFINER, 1.354 GRANT, las 4
+sumas de columnas GENERATED al centavo— con `diff` de salidas contra el local, no leyendo números.
+El `docker-compose.yml` objetivo está escrito y probado de punta a punta: los 4 servicios `healthy`
+en **28 s**, los 10 usuarios entran, 4 pantallas operativas + informe simple + compuesto + **los 7
+tableros** + **los 2 modelos** responden 200, el invariante de ClickHouse apagado se cumple
+(`status: UP` / `analytics: DEGRADED` en 5 s acotados, y recuperación **sin reiniciar el backend**)
+y el **ETL corrió DENTRO de Docker por primera vez**: 21/21 tablas, 66.079 filas, **49/49
+controles**. Credenciales internas rotadas. Si vas a tocar esto: (1) la imagen **`postgres:18` monta
+en `/var/lib/postgresql`**, NO en `/var/lib/postgresql/data` —desde la 18 el directorio lleva la
+versión (`PGDATA=/var/lib/postgresql/18/docker`)— y con la ruta antigua la imagen **se niega a
+arrancar** con un mensaje que habla de `pg_upgrade` y despista; (2) **un ACL que `pg_dump` no emite
+NO es un privilegio perdido**: omite el GRANT cuando coincide con el que el objeto tendría por
+defecto, así que se compara el privilegio EFECTIVO con `has_function_privilege`, no el texto del
+ACL; (3) comparar catálogos entre dos motores exige **`COLLATE "C"` en todo `ORDER BY` de texto**
+(origen `Spanish_Ecuador.1252`, destino ICU `es-EC`) o el diff acusa una diferencia inexistente;
+(4) un **healthcheck contra `localhost` dentro de un contenedor** resuelve a `::1` primero y nginx
+solo escucha IPv4 → `unhealthy` eterno **con la página sirviéndose bien**: siempre `127.0.0.1`;
+(5) al interpretar un 403 de bodega/despacho/compras, **mira el reloj antes que la migración**
+(`fuera_horario` bloquea el LOGIN entero). **Pendiente**: si se decide, el DAG de Airflow de §7
+(`run_etl.py` ya orquesta con orden topológico) — y el día que tome el relevo hay que poner
+**`DWH_CRON=-`**, o a las 02:00 disparan los dos y compiten por el `EXCHANGE TABLES`. El MODELO DE
 DATOS está **COMPLETO**: las **19 tablas de hechos** del DWH más `fact_prevision_demanda` y
 `fact_alerta_cliente` — **21 tablas, 64.664 filas**, cargadas y validadas (**49 controles en
 verde**). El **CATÁLOGO TÁCTICO también**: 30 informes simples + **39 compuestos**. Y el **NIVEL

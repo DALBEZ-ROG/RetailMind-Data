@@ -10,3 +10,21 @@ retailmind-backend/logs/
 retailmind-frontend/.angular/
 retailmind-frontend/dist/
 clickhouse-data/
+
+# Secretos de despliegue (Docker secrets) y dump de migracion
+deploy/secrets/
+deploy/postgres/initdb/*.dump
+
+deploy/postgres/.env
+
+# Configuracion local con secretos (usar .env.example como plantilla)
+.env
+retailmind/.env
+
+# Bytecode de Python (lo genera el ETL al correr dentro del contenedor,
+# porque ./retailmind esta montado como volumen)
+__pycache__/
+*.pyc
+
+# Secretos del modo desarrollo
+application-local.properties
