@@ -1,0 +1,647 @@
+<div class="op-page">
+  <div class="section-header">
+    <h2><mat-icon>shield</mat-icon> Permisos del Motor</h2>
+    <p>
+      El mapa REAL de la seguridad de RetailMind, leído de los catálogos de PostgreSQL
+      (<code>pg_roles</code>, <code>pg_class.relacl</code>, <code>pg_attribute.attacl</code>,
+      <code>pg_policies</code>). El control de acceso de este sistema vive en el MOTOR,
+      no en tablas de aplicación.
+    </p>
+  </div>
+
+  <!-- ── PORTADA: las cifras, contrastables una a una contra el motor ── -->
+  <div class="total-banner" *ngIf="mapa">
+    <div class="total-item">
+      <div class="lbl">Roles de grupo</div>
+      <div class="val">{{ mapa.resumen.roles_grupo }}</div>
+    </div>
+    <div class="total-item">
+      <div class="lbl">Políticas RLS</div>
+      <div class="val">{{ mapa.resumen.politicas_rls }}</div>
+    </div>
+    <div class="total-item">
+      <div class="lbl">Tablas con RLS</div>
+      <div class="val">{{ mapa.resumen.tablas_con_rls }}</div>
+    </div>
+    <div class="total-item">
+      <div class="lbl">Columnas con ACL propia</div>
+      <div class="val">{{ mapa.resumen.columnas_con_acl }}</div>
+      <div class="lbl">en {{ mapa.resumen.tablas_con_acl_columna }} tablas</div>
+    </div>
+    <div class="total-item">
+      <div class="lbl">GRANT de tabla a grp_*</div>
+      <div class="val">{{ mapa.resumen.grants_tabla | number }}</div>
+      <div class="lbl">+{{ mapa.resumen.grants_maintain }} MAINTAIN</div>
+    </div>
+    <div class="total-item">
+      <div class="lbl">Usuarios activos</div>
+      <div class="val">{{ mapa.resumen.usuarios_activos }}</div>
+    </div>
+  </div>
+
+  <p class="nota-limitacion" *ngIf="mapa">
+    <mat-icon>info</mat-icon>
+    <span>
+      Las tablas <code>permiso</code> y <code>rol_permiso</code> del esquema existen pero están
+      <strong>VACÍAS</strong>: son vestigiales y esta pantalla no las usa.
+      El <strong>GRANT de tabla</strong> cuenta los 7 privilegios del estándar SQL —la cifra de
+      la bitácora de despliegue—; los {{ mapa.resumen.grants_maintain }} de
+      <code>MAINTAIN</code> van aparte porque existen desde PostgreSQL&nbsp;17 y
+      <code>information_schema</code> no los modela.
+    </span>
+  </p>
+
+  <mat-tab-group animationDuration="150ms" *ngIf="mapa">
+
+    <!-- ══════════ 0. EDITOR DE ROL — los interruptores ══════════ -->
+    <mat-tab label="Editor de rol">
+      <div class="op-card">
+        <h3><mat-icon>tune</mat-icon> Qué puede hacer cada rol</h3>
+
+        <div class="editor-cabecera">
+          <mat-form-field appearance="outline" class="editor-rol">
+            <mat-label>Rol</mat-label>
+            <mat-select [(ngModel)]="rolEditor" (selectionChange)="cargarEditor()">
+              <mat-option value="">— Elige un rol —</mat-option>
+              <mat-option *ngFor="let r of rolesEditables" [value]="r">
+                {{ r }}
+                <span class="chip-propio" *ngIf="esRolPropio(r)">propio</span>
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <button class="btn-aplicar" (click)="crearRol()" [disabled]="guardando">
+            <mat-icon>add</mat-icon> Crear rol
+          </button>
+          <button class="btn-limpiar btn-peligro-suave"
+                  [disabled]="!rolPropioSeleccionado || guardando"
+                  [matTooltip]="rolPropioSeleccionado
+                      ? 'Elimina este rol y todas sus piezas'
+                      : 'Solo se pueden eliminar los roles que creaste tú'"
+                  (click)="eliminarRol()">
+            <mat-icon>delete</mat-icon> Eliminar rol
+          </button>
+        </div>
+
+        <p class="nota-limitacion">
+          <mat-icon>info</mat-icon>
+          <span>
+            <strong>grp_administrador no aparece</strong>: es el rol con el que operas (R1).
+            Sobre los otros ocho del sistema cada interruptor <strong>pide confirmación</strong>,
+            porque tienen usuarios y pantallas detrás; sobre un rol <strong>propio</strong> se
+            aplica directo — es un sandbox del que no depende nada.
+          </span>
+        </p>
+
+        <!-- Ficha del rol propio seleccionado -->
+        <div class="ficha-rol" *ngIf="rolPropioSeleccionado as rp">
+          <div class="ficha-item">
+            <span class="lbl">Código de aplicación</span><span class="val">{{ rp.codigo }}</span>
+          </div>
+          <div class="ficha-item">
+            <span class="lbl">Rol de motor</span><span class="val">{{ rp.rol_grupo }}</span>
+          </div>
+          <div class="ficha-item">
+            <span class="lbl">Imita en pantallas a</span>
+            <span class="val">{{ rp.rol_base_codigo || '— ninguno —' }}</span>
+          </div>
+          <div class="ficha-item">
+            <span class="lbl">Usuarios</span><span class="val">{{ rp.usuarios }}</span>
+          </div>
+          <div class="ficha-item">
+            <span class="lbl">Políticas RLS</span><span class="val">{{ rp.politicas }}</span>
+          </div>
+          <div class="ficha-item">
+            <span class="lbl">Ventanas horarias</span><span class="val">{{ rp.ventanas }}</span>
+          </div>
+        </div>
+
+        <div class="editor-filtros" *ngIf="rolEditor">
+          <mat-form-field appearance="outline">
+            <mat-label>Buscar tabla</mat-label>
+            <input matInput [(ngModel)]="filtroTablaEditor"
+                   (ngModelChange)="aplicarFiltroEditor()" placeholder="pedido, factura…">
+            <mat-icon matSuffix>search</mat-icon>
+          </mat-form-field>
+          <mat-checkbox [(ngModel)]="soloConPermisos" (ngModelChange)="aplicarFiltroEditor()">
+            Solo tablas donde ya tiene algo
+          </mat-checkbox>
+          <span class="editor-conteo">{{ filasEditor.length }} tabla(s)</span>
+        </div>
+
+        <mat-progress-bar mode="indeterminate" *ngIf="cargandoEditor"></mat-progress-bar>
+
+        <div class="empty-state" *ngIf="!rolEditor">
+          <mat-icon>tune</mat-icon>
+          <p>Elige un rol para ver y cambiar sus privilegios con los interruptores.</p>
+        </div>
+
+        <div class="empty-state" *ngIf="rolEditor && !filasEditor.length && !cargandoEditor">
+          <mat-icon>toggle_off</mat-icon>
+          <p>
+            Este rol no tiene ningún privilegio todavía.
+            Desmarca «Solo tablas donde ya tiene algo» para empezar a darle permisos.
+          </p>
+        </div>
+
+        <div class="tabla-interruptores" *ngIf="rolEditor && filasEditor.length">
+          <div class="ti-cabecera">
+            <span class="ti-tabla">Tabla</span>
+            <span class="ti-priv" *ngFor="let p of privilegios">{{ p }}</span>
+            <span class="ti-extra">Detalle</span>
+          </div>
+
+          <ng-container *ngFor="let f of filasEditor">
+            <div class="ti-fila" [class.ti-abierta]="tablaExpandida === f.tabla">
+              <span class="ti-tabla">
+                <strong>{{ f.tabla }}</strong>
+                <span class="chip-rls" *ngIf="f.con_rls"
+                      matTooltip="Esta tabla tiene RLS: conceder SELECT no basta si el rol no
+                                  tiene una política que lo nombre — leería CERO FILAS sin dar
+                                  ningún error. Los roles creados aquí reciben la suya al nacer.">
+                  RLS
+                </span>
+              </span>
+
+              <span class="ti-priv" *ngFor="let p of privilegios">
+                <mat-slide-toggle
+                    [checked]="f.estado[p]"
+                    [disabled]="f.ocupado[p] || guardando"
+                    (change)="alternar(f, p, $event.checked)">
+                </mat-slide-toggle>
+              </span>
+
+              <span class="ti-extra">
+                <button class="btn-detalle" (click)="alternarDetalle(f)"
+                        [matTooltip]="'Privilegios por COLUMNA de ' + f.tabla">
+                  <mat-icon>{{ tablaExpandida === f.tabla ? 'expand_less' : 'expand_more' }}</mat-icon>
+                  <span *ngIf="f.columnasConPermiso" class="chip-col">
+                    {{ f.columnasConPermiso }}
+                  </span>
+                </button>
+              </span>
+            </div>
+
+            <!-- Detalle por columnas -->
+            <div class="ti-detalle" *ngIf="tablaExpandida === f.tabla">
+              <p class="ti-detalle-nota">
+                <mat-icon>info</mat-icon>
+                Los privilegios de columna solo <strong>SUMAN</strong>. Si el interruptor de la
+                tabla ya está encendido, el de la columna no cambia nada — se marca en gris.
+                Para restringir una columna: apaga el de la tabla y enciende solo las columnas
+                permitidas. Así está hecha la segregación financiera de Bodega y Despacho.
+              </p>
+              <div class="ti-col-cabecera">
+                <span>Columna</span><span>SELECT</span><span>INSERT</span><span>UPDATE</span>
+              </div>
+              <div class="ti-col-fila" *ngFor="let c of columnasEditor">
+                <span class="ti-col-nombre">{{ c.columna }}</span>
+                <span *ngFor="let p of ['SELECT','INSERT','UPDATE']"
+                      [class.ti-cubierta]="c.cubierta[p]">
+                  <mat-slide-toggle
+                      [checked]="c.estado[p]"
+                      [disabled]="c.ocupado[p] || guardando"
+                      [matTooltip]="c.cubierta[p]
+                          ? 'El privilegio de TABLA ya incluye esta columna: encenderlo o
+                             apagarlo aquí no cambia nada en la práctica.' : ''"
+                      (change)="alternarColumna(f, c, p, $event.checked)">
+                  </mat-slide-toggle>
+                </span>
+              </div>
+            </div>
+          </ng-container>
+        </div>
+      </div>
+    </mat-tab>
+
+    <!-- ══════════ 1. ROLES ══════════ -->
+    <mat-tab label="Roles">
+      <div class="op-card">
+        <h3><mat-icon>groups</mat-icon> Roles del motor ({{ roles.length }})</h3>
+        <p class="nota-limitacion">
+          <mat-icon>info</mat-icon>
+          <span>
+            Los <strong>9 grupos</strong> son NOLOGIN: nadie se conecta con ellos. La aplicación
+            entra como <code>retailmind_app</code> (NOINHERIT, sin privilegios de negocio) y
+            <em>asume</em> el rol del usuario en cada transacción con
+            <code>SET LOCAL ROLE</code>. Por eso <code>retailmind_app</code> aparece como
+            <strong>«pertenece a 9»</strong> y casi sin privilegios propios, y cada grupo
+            aparece con <strong>1 miembro</strong>, que es él.
+          </span>
+        </p>
+        <div class="table-wrapper">
+          <table mat-table [dataSource]="roles">
+            <ng-container matColumnDef="rol">
+              <th mat-header-cell *matHeaderCellDef>Rol de motor</th>
+              <td mat-cell *matCellDef="let r">
+                <strong>{{ r.rol_motor }}</strong>
+                <span class="rol-app" *ngIf="r.rol_app">{{ r.rol_app }}</span>
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="clase">
+              <th mat-header-cell *matHeaderCellDef>Clase</th>
+              <td mat-cell *matCellDef="let r">
+                <span class="estado-chip"
+                      [class.ok]="r.clase === 'grupo'"
+                      [class.warn]="r.clase === 'servicio'"
+                      [class.error]="r.clase === 'superusuario'">{{ r.clase }}</span>
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="usuarios">
+              <th mat-header-cell *matHeaderCellDef>Usuarios</th>
+              <td mat-cell *matCellDef="let r">
+                <span *ngIf="r.usuarios_total; else sinUsuarios">
+                  {{ r.usuarios_activos }}
+                  <span class="tenue" *ngIf="r.usuarios_total !== r.usuarios_activos">
+                    / {{ r.usuarios_total }}
+                  </span>
+                </span>
+                <ng-template #sinUsuarios><span class="tenue">—</span></ng-template>
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="tabla">
+              <th mat-header-cell *matHeaderCellDef>Privilegios de tabla</th>
+              <td mat-cell *matCellDef="let r">{{ r.permisos_tabla | number }}</td>
+            </ng-container>
+            <ng-container matColumnDef="columna">
+              <th mat-header-cell *matHeaderCellDef>De columna</th>
+              <td mat-cell *matCellDef="let r">
+                <span [class.destacado]="r.permisos_columna > 0">{{ r.permisos_columna }}</span>
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="politicas">
+              <th mat-header-cell *matHeaderCellDef>Políticas RLS</th>
+              <td mat-cell *matCellDef="let r">{{ r.politicas }}</td>
+            </ng-container>
+            <ng-container matColumnDef="atributos">
+              <th mat-header-cell *matHeaderCellDef>Atributos</th>
+              <td mat-cell *matCellDef="let r">
+                <span class="estado-chip neutral" *ngIf="r.puede_login">LOGIN</span>
+                <span class="estado-chip error" *ngIf="r.bypass_rls">BYPASSRLS</span>
+                <span class="estado-chip error" *ngIf="r.es_superusuario">SUPERUSER</span>
+                <span class="estado-chip neutral" *ngIf="r.miembros_motor"
+                      matTooltip="Roles que son miembros de éste. En los 9 grupos es
+                                  siempre retailmind_app, que es como la aplicación
+                                  puede asumirlos.">
+                  {{ r.miembros_motor }} miembro(s)
+                </span>
+                <span class="estado-chip ok" *ngIf="r.pertenece_a"
+                      matTooltip="De cuántos roles es miembro ÉSTE. Los 9 de
+                                  retailmind_app son lo que hace posible el
+                                  SET LOCAL ROLE: sin ellos la aplicación entera
+                                  responde 403.">
+                  pertenece a {{ r.pertenece_a }}
+                </span>
+              </td>
+            </ng-container>
+            <tr mat-header-row *matHeaderRowDef="columnasRol"></tr>
+            <tr mat-row *matRowDef="let r; columns: columnasRol"></tr>
+          </table>
+        </div>
+      </div>
+    </mat-tab>
+
+    <!-- ══════════ 2. USUARIOS POR ROL ══════════ -->
+    <mat-tab label="Usuarios por rol">
+      <div class="op-card">
+        <h3><mat-icon>search</mat-icon> Criterios de búsqueda</h3>
+        <div class="form-grid">
+          <mat-form-field appearance="outline">
+            <mat-label>Rol de grupo</mat-label>
+            <mat-select [(ngModel)]="filtroUsuarioRol">
+              <mat-option value="">— Todos —</mat-option>
+              <mat-option *ngFor="let r of rolesGrupo" [value]="r">{{ r }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+        </div>
+      </div>
+      <div class="op-card">
+        <h3><mat-icon>badge</mat-icon> Quién pertenece a qué ({{ usuarios.length }})</h3>
+        <div class="table-wrapper">
+          <table mat-table [dataSource]="usuarios">
+            <ng-container matColumnDef="usuario">
+              <th mat-header-cell *matHeaderCellDef>Usuario</th>
+              <td mat-cell *matCellDef="let u">{{ u.nombre }} {{ u.apellido }}</td>
+            </ng-container>
+            <ng-container matColumnDef="email">
+              <th mat-header-cell *matHeaderCellDef>Correo</th>
+              <td mat-cell *matCellDef="let u">{{ u.email }}</td>
+            </ng-container>
+            <ng-container matColumnDef="rol_app">
+              <th mat-header-cell *matHeaderCellDef>Rol de aplicación</th>
+              <td mat-cell *matCellDef="let u">{{ u.rol_nombre }}</td>
+            </ng-container>
+            <ng-container matColumnDef="rol_motor">
+              <th mat-header-cell *matHeaderCellDef>Rol de motor</th>
+              <td mat-cell *matCellDef="let u"><code>{{ u.rol_motor }}</code></td>
+            </ng-container>
+            <ng-container matColumnDef="estado">
+              <th mat-header-cell *matHeaderCellDef>Estado</th>
+              <td mat-cell *matCellDef="let u">
+                <span class="estado-chip" [class.ok]="u.activo" [class.error]="!u.activo">
+                  {{ u.activo ? 'Activo' : 'Inactivo' }}
+                </span>
+              </td>
+            </ng-container>
+            <tr mat-header-row *matHeaderRowDef="columnasUsuario"></tr>
+            <tr mat-row *matRowDef="let u; columns: columnasUsuario"></tr>
+          </table>
+        </div>
+      </div>
+    </mat-tab>
+
+    <!-- ══════════ 3. PERMISOS (y la PARTE 2: conceder / revocar) ══════════ -->
+    <mat-tab label="Permisos">
+      <div class="op-card">
+        <h3><mat-icon>search</mat-icon> Criterios de búsqueda</h3>
+        <div class="form-grid">
+          <mat-form-field appearance="outline">
+            <mat-label>Rol de grupo</mat-label>
+            <mat-select [(ngModel)]="filtroRol" (selectionChange)="cargarPermisos()">
+              <mat-option value="">— Todos —</mat-option>
+              <mat-option *ngFor="let r of rolesGrupo" [value]="r">{{ r }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Tabla</mat-label>
+            <input matInput [(ngModel)]="filtroTabla" (change)="cargarPermisos()"
+                   placeholder="nombre exacto, p. ej. pedido">
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Privilegio</mat-label>
+            <mat-select [(ngModel)]="filtroPrivilegio" (selectionChange)="cargarPermisos()">
+              <mat-option value="">— Todos —</mat-option>
+              <mat-option value="SELECT">SELECT</mat-option>
+              <mat-option value="INSERT">INSERT</mat-option>
+              <mat-option value="UPDATE">UPDATE</mat-option>
+              <mat-option value="DELETE">DELETE</mat-option>
+              <mat-option value="TRUNCATE">TRUNCATE</mat-option>
+              <mat-option value="REFERENCES">REFERENCES</mat-option>
+              <mat-option value="TRIGGER">TRIGGER</mat-option>
+              <mat-option value="MAINTAIN">MAINTAIN</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Tipo de permiso</mat-label>
+            <mat-select [(ngModel)]="filtroTipo" (selectionChange)="cargarPermisos()">
+              <mat-option value="">— Tabla y columna —</mat-option>
+              <mat-option value="tabla">Solo de TABLA</mat-option>
+              <mat-option value="columna">Solo de COLUMNA</mat-option>
+            </mat-select>
+          </mat-form-field>
+        </div>
+        <div class="form-actions">
+          <button class="btn-limpiar" (click)="limpiarFiltros()">
+            <mat-icon>filter_alt_off</mat-icon> Limpiar filtros
+          </button>
+          <button class="btn-limpiar" (click)="cargarTodo()">
+            <mat-icon>refresh</mat-icon> Actualizar
+          </button>
+        </div>
+      </div>
+
+      <div class="op-card">
+        <h3>
+          <mat-icon>vpn_key</mat-icon>
+          Privilegios vigentes ({{ filas.length | number }})
+        </h3>
+
+        <app-acciones-registro
+            entidad="privilegio" articulo="un"
+            [haySeleccion]="!!filaSeleccionada"
+            [nombreSeleccion]="nombreSeleccion()"
+            [puedeEliminar]="puedeRevocar"
+            [motivoNoEliminable]="motivoNoRevocable"
+            [mostrarModificar]="false"
+            [mostrarVer]="false"
+            (nuevo)="conceder()"
+            (eliminar)="revocar()">
+        </app-acciones-registro>
+
+        <p class="nota-limitacion">
+          <mat-icon>info</mat-icon>
+          <span>
+            Un privilegio es una <strong>asociación</strong> (rol × objeto × privilegio), no un
+            registro con campos: por eso la barra no ofrece «Modificar» ni «Ver».
+            <strong>Nuevo</strong> ejecuta un <code>GRANT</code> y <strong>Eliminar</strong> un
+            <code>REVOKE</code> reales contra el motor; a diferencia de un borrado, revocar
+            <strong>es reversible</strong> desde aquí mismo.
+            Todo cambio queda en <code>log_auditoria</code> con tu usuario.
+          </span>
+        </p>
+
+        <!-- El motivo va VISIBLE y no solo en el tooltip del botón: un
+             <button disabled> no emite eventos de ratón, así que el matTooltip
+             de «Eliminar» nunca llega a mostrarse. En una pantalla de seguridad
+             el usuario tiene que poder LEER por qué no puede hacer algo. -->
+        <p class="motivo-bloqueo" *ngIf="motivoNoRevocable">
+          <mat-icon>gpp_maybe</mat-icon>
+          <span>{{ motivoNoRevocable }}</span>
+        </p>
+
+        <div class="protecciones">
+          <div class="proteccion" *ngFor="let p of mapa.protegidos"
+               [matTooltip]="p.porque" matTooltipClass="tooltip-ancho">
+            <span class="proteccion-id">{{ p.id }}</span>
+            <span class="proteccion-txt">{{ p.titulo }}</span>
+          </div>
+        </div>
+
+        <div class="table-wrapper table-seleccionable" *ngIf="filas.length; else vacio">
+          <table mat-table [dataSource]="filas">
+            <ng-container matColumnDef="rol">
+              <th mat-header-cell *matHeaderCellDef>Rol</th>
+              <td mat-cell *matCellDef="let f"><strong>{{ f.rol_motor }}</strong></td>
+            </ng-container>
+            <ng-container matColumnDef="objeto">
+              <th mat-header-cell *matHeaderCellDef>Objeto</th>
+              <td mat-cell *matCellDef="let f">
+                {{ f.tabla }}<span class="col-nombre" *ngIf="f.columna">.{{ f.columna }}</span>
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="alcance">
+              <th mat-header-cell *matHeaderCellDef>Alcance</th>
+              <td mat-cell *matCellDef="let f">
+                <span class="estado-chip" [class.neutral]="!f.columna" [class.warn]="f.columna">
+                  {{ f.columna ? 'COLUMNA' : 'TABLA' }}
+                </span>
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="privilegio">
+              <th mat-header-cell *matHeaderCellDef>Privilegio</th>
+              <td mat-cell *matCellDef="let f"><code>{{ f.privilegio }}</code></td>
+            </ng-container>
+            <ng-container matColumnDef="nota">
+              <th mat-header-cell *matHeaderCellDef>Nota</th>
+              <td mat-cell *matCellDef="let f">
+                <span class="tenue" *ngIf="f.columna && f.cubierto_por_tabla"
+                      matTooltip="Los privilegios de columna solo SUMAN: el rol ya tiene este
+                                  privilegio sobre la tabla entera, así que esta entrada no
+                                  restringe nada.">
+                  cubierto por el de tabla
+                </span>
+              </td>
+            </ng-container>
+            <tr mat-header-row *matHeaderRowDef="columnasPermiso"></tr>
+            <tr mat-row *matRowDef="let f; columns: columnasPermiso"
+                (click)="seleccionarFila(f)"
+                [class.fila-seleccionada]="filaSeleccionada?.clave === f.clave"></tr>
+          </table>
+        </div>
+
+        <div class="total-banner compacto" *ngIf="filas.length">
+          <div class="total-item">
+            <div class="lbl">De tabla (estándar SQL)</div>
+            <div class="val">{{ totalTablaEstandar | number }}</div>
+          </div>
+          <div class="total-item">
+            <div class="lbl">De tabla (MAINTAIN)</div>
+            <div class="val">{{ totalTablaMaintain | number }}</div>
+          </div>
+          <div class="total-item">
+            <div class="lbl">De columna</div>
+            <div class="val">{{ (filas.length - totalTablaEstandar - totalTablaMaintain) | number }}</div>
+          </div>
+        </div>
+
+        <ng-template #vacio>
+          <div class="empty-state" *ngIf="!loading">
+            <mat-icon>vpn_key_off</mat-icon>
+            <p>Ningún privilegio coincide con los criterios actuales.</p>
+          </div>
+        </ng-template>
+      </div>
+    </mat-tab>
+
+    <!-- ══════════ 4. POLÍTICAS RLS ══════════ -->
+    <mat-tab label="Políticas RLS">
+      <div class="op-card">
+        <h3><mat-icon>search</mat-icon> Criterios de búsqueda</h3>
+        <div class="form-grid">
+          <mat-form-field appearance="outline">
+            <mat-label>Tabla</mat-label>
+            <input matInput [(ngModel)]="filtroPoliticaTabla" (change)="filtrarPoliticas()"
+                   placeholder="nombre exacto, p. ej. pedido">
+          </mat-form-field>
+        </div>
+      </div>
+      <div class="op-card">
+        <h3><mat-icon>policy</mat-icon> Políticas de seguridad por fila ({{ politicas.length }})</h3>
+        <p class="nota-limitacion">
+          <mat-icon>info</mat-icon>
+          <span>
+            <code>pol_horario</code> está declarada con <code>cmd = ALL</code>, y
+            <strong>ALL incluye SELECT</strong>: fuera de la ventana horaria el motor no
+            devuelve un error, devuelve <strong>cero filas</strong>. Es el motivo por el que el
+            ETL nocturno necesita un rol con <code>BYPASSRLS</code>.
+          </span>
+        </p>
+        <div class="table-wrapper">
+          <table mat-table [dataSource]="politicas">
+            <ng-container matColumnDef="tabla">
+              <th mat-header-cell *matHeaderCellDef>Tabla</th>
+              <td mat-cell *matCellDef="let p"><strong>{{ p.tabla }}</strong></td>
+            </ng-container>
+            <ng-container matColumnDef="politica">
+              <th mat-header-cell *matHeaderCellDef>Política</th>
+              <td mat-cell *matCellDef="let p"><code>{{ p.politica }}</code></td>
+            </ng-container>
+            <ng-container matColumnDef="comando">
+              <th mat-header-cell *matHeaderCellDef>Comando</th>
+              <td mat-cell *matCellDef="let p">
+                <span class="estado-chip" [class.error]="p.comando === 'ALL'"
+                      [class.neutral]="p.comando !== 'ALL'">{{ p.comando }}</span>
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="roles">
+              <th mat-header-cell *matHeaderCellDef>Roles</th>
+              <td mat-cell *matCellDef="let p" class="celda-roles">{{ p.roles }}</td>
+            </ng-container>
+            <ng-container matColumnDef="explicacion">
+              <th mat-header-cell *matHeaderCellDef>Qué hace</th>
+              <td mat-cell *matCellDef="let p" class="celda-explicacion">
+                {{ p.explicacion }}
+                <div class="ingredientes">
+                  <span class="estado-chip warn" *ngIf="p.restringePorHorario">horario</span>
+                  <span class="estado-chip ok" *ngIf="p.restringePorCliente">cliente propio</span>
+                  <span class="estado-chip neutral" *ngIf="p.usaSubconsulta">subconsulta</span>
+                </div>
+              </td>
+            </ng-container>
+            <tr mat-header-row *matHeaderRowDef="columnasPolitica"></tr>
+            <tr mat-row *matRowDef="let p; columns: columnasPolitica"></tr>
+          </table>
+        </div>
+      </div>
+    </mat-tab>
+
+    <!-- ══════════ 5. RESTRICCIÓN HORARIA ══════════ -->
+    <mat-tab label="Restricción horaria">
+      <div class="op-card">
+        <h3><mat-icon>schedule</mat-icon> Ventana horaria por rol ({{ horarios.length }})</h3>
+        <p class="nota-limitacion">
+          <mat-icon>info</mat-icon>
+          <span>
+            La columna «Ahora» la calcula <code>esta_en_horario()</code>, la
+            <strong>misma función</strong> que evalúan las {{ mapa.resumen.tablas_con_rls }}
+            políticas <code>pol_horario</code>: no es una segunda opinión de la aplicación.
+            Su veredicto es del <strong>rol entero</strong>, así que solo se muestra en la
+            ventana de HOY; las de otros días quedan con «—».
+            Roles con la ventana abierta en este momento:
+            <strong>{{ rolesDentroDeHorario.join(', ') || 'ninguno' }}</strong>.
+            Las ventanas se editan en <em>Horarios de Acceso</em>.
+          </span>
+        </p>
+        <div class="table-wrapper">
+          <table mat-table [dataSource]="horarios">
+            <ng-container matColumnDef="rol">
+              <th mat-header-cell *matHeaderCellDef>Rol de grupo</th>
+              <td mat-cell *matCellDef="let h"><strong>{{ h.rol_grupo }}</strong></td>
+            </ng-container>
+            <ng-container matColumnDef="dia">
+              <th mat-header-cell *matHeaderCellDef>Día</th>
+              <td mat-cell *matCellDef="let h">
+                {{ dias[h.dia_semana] }}
+                <span class="estado-chip ok" *ngIf="h.es_hoy">hoy</span>
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="ventana">
+              <th mat-header-cell *matHeaderCellDef>Ventana</th>
+              <td mat-cell *matCellDef="let h">{{ h.hora_inicio }} – {{ h.hora_fin }}</td>
+            </ng-container>
+            <ng-container matColumnDef="estado">
+              <th mat-header-cell *matHeaderCellDef>Estado</th>
+              <td mat-cell *matCellDef="let h">
+                <span class="estado-chip" [class.ok]="h.activo" [class.error]="!h.activo">
+                  {{ h.activo ? 'Activa' : 'Inactiva' }}
+                </span>
+              </td>
+            </ng-container>
+            <!-- El veredicto de esta_en_horario() es del ROL, no de esta fila:
+                 pintarlo en las 7 filas del rol haría que un «Domingo 08:00–13:00»
+                 dijera «Dentro» un miércoles. Solo se muestra en la ventana de HOY,
+                 que es la única sobre la que la pregunta tiene sentido. -->
+            <ng-container matColumnDef="ahora">
+              <th mat-header-cell *matHeaderCellDef>Ahora</th>
+              <td mat-cell *matCellDef="let h">
+                <span *ngIf="h.es_hoy; else otroDia" class="estado-chip"
+                      [class.ok]="h.dentro_ahora" [class.error]="!h.dentro_ahora"
+                      matTooltip="Lo calcula esta_en_horario() para el rol completo.">
+                  {{ h.dentro_ahora ? 'Dentro' : 'Fuera' }}
+                </span>
+                <ng-template #otroDia><span class="tenue">—</span></ng-template>
+              </td>
+            </ng-container>
+            <tr mat-header-row *matHeaderRowDef="columnasHorario"></tr>
+            <tr mat-row *matRowDef="let h; columns: columnasHorario"></tr>
+          </table>
+        </div>
+      </div>
+    </mat-tab>
+  </mat-tab-group>
+
+  <div class="empty-state" *ngIf="loading">
+    <mat-icon>shield</mat-icon>
+    <p>Leyendo los catálogos del motor…</p>
+  </div>
+</div>
