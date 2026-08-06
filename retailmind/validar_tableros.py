@@ -34,19 +34,15 @@ import urllib.request
 from decimal import Decimal
 from typing import Any, Callable
 
-import psycopg2
+#: Rol `retailmind_etl` (solo lectura + BYPASSRLS), resuelto desde el entorno
+#: por el MISMO camino que el pipeline: sin credencial escrita y sin valor por
+#: defecto que apunte al motor equivocado — el 5432 es el CONTENEDOR desde la
+#: contenerización, y el PostgreSQL local quedó en el 5433.
+from conexion_verificacion import pg_lectura
 
 API = os.environ.get("RETAILMIND_API", "http://localhost:8080")
 USUARIO = os.environ.get("RETAILMIND_USER", "admin@retailmind.com")
 CLAVE = os.environ.get("RETAILMIND_PASS", "Admin2026!")
-
-PG = dict(
-    host=os.environ.get("ETL_PG_HOST", "localhost"),
-    port=int(os.environ.get("ETL_PG_PORT", "5432")),
-    dbname=os.environ.get("ETL_PG_DB", "retailmind"),
-    user=os.environ.get("ETL_PG_USER", "retailmind_etl"),
-    password=os.environ.get("ETL_PG_PASSWORD", "Etl2026!"),
-)
 
 # Un centavo de tolerancia sobre el dinero, cero sobre los conteos: el redondeo
 # de un porcentaje no es una diferencia, una fila de más sí lo es.
@@ -899,7 +895,8 @@ def main() -> int:
     args = ap.parse_args()
 
     print("Verificación de los tableros de dirección (fase E1-A)")
-    print(f"API: {API}   ·   PostgreSQL: {PG['user']}@{PG['dbname']}")
+    print(f"API: {API}   ·   PostgreSQL: "
+          f"{os.environ.get('ETL_PG_USER')}@{os.environ.get('ETL_PG_DATABASE')}")
 
     jwt = token()
     r = Resultado()
@@ -908,7 +905,7 @@ def main() -> int:
         "T-4": validar_t4, "T-5": validar_t5, "T-6": validar_t6, "T-7": validar_t7,
     }
 
-    with psycopg2.connect(**PG) as cx:
+    with pg_lectura() as cx:
         with cx.cursor() as cur:
             for clave, fn in controles.items():
                 if args.tablero and args.tablero != clave:

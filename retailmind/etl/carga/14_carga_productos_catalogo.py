@@ -2,6 +2,15 @@
 14_carga_productos_catalogo.py — Carga inicial (one-time) de los productos del
 dataset original al catálogo operativo de PostgreSQL.
 
+>>> HISTÓRICO. YA SE EJECUTÓ (2026-07-10) y NO hay que volver a correrlo. <<<
+Se conserva porque es el origen documentado del catálogo vivo y del puente
+P####↔`producto.slug` (§4.4 de `docs/estrategico/DIAGNOSTICO_CLICKHOUSE.md`),
+no porque quede trabajo por hacer. Es idempotente, así que re-ejecutarlo no
+duplicaría nada, pero tampoco arreglaría nada: los valores que sembró aquí
+—`costo = price*0.6` y stock plano de 100— los REESCRIBIERON después los
+scripts 67 (bandas de costo por categoría) y 74-84 (abastecimiento y kardex),
+y este script no los volvería a tocar (ON CONFLICT ... DO NOTHING).
+
 Fuente : retailmind/data/stage/datos.parquet (eventos; solo se usan las
          columnas product_id, category, brand, price). Autosuficiente: NO
          requiere ClickHouse ni PocketBase levantados.
@@ -24,10 +33,15 @@ naturales (marca.nombre, categoria.slug, producto.slug, producto_variante.sku,
 inventario (producto_variante_id, bodega_id)); re-ejecutarlo no duplica nada.
 
 Se conecta como `postgres` (seed administrativo de datos maestros, igual que
-los scripts 25/26/27 de sql/postgres): NO pasa por el backend transaccional.
-OJO: el .env del proyecto apunta a una BD antigua; aquí la BD es `retailmind`
-explícita (se puede sobreescribir con las variables PG_HOST/PG_PORT/PG_DB/
-PG_USER/PG_PASSWORD).
+los scripts 25/26/27 de sql/postgres): NO pasa por el backend transaccional,
+así que ni `retailmind_etl` —solo lectura— ni `retailmind_app` —NOINHERIT, sin
+privilegios de negocio hasta el `SET LOCAL ROLE` del backend— servirían.
+La conexión sale del ENTORNO (`retailmind/.env`, vía python-dotenv, igual que
+`etl/dwh/conexiones.py`): host/puerto/base de `ETL_PG_HOST`/`ETL_PG_PORT`/
+`ETL_PG_DATABASE`, y la clave del superusuario de `PG_SUPERUSER_PASSWORD` o
+del secreto `deploy/secrets/pg_superuser.txt`. Sin valores por defecto: falta
+una y el script muere diciendo cuál. OJO con el `DB_NAME` del .env, que apunta
+a la BD antigua; aquí NO se usa.
 
 Todo corre en UNA transacción con commit al final.
 """
@@ -43,18 +57,58 @@ from pathlib import Path
 
 import pandas as pd
 import psycopg2
+from dotenv import load_dotenv
 from psycopg2.extras import execute_values
 
 # ── Configuración ────────────────────────────────────────────────────────────
-PARQUET = Path(__file__).resolve().parents[2] / "data" / "stage" / "datos.parquet"
+RAIZ_ETL = Path(__file__).resolve().parents[2]
+RAIZ_PROYECTO = RAIZ_ETL.parent
+PARQUET = RAIZ_ETL / "data" / "stage" / "datos.parquet"
 
-PG = dict(
-    host=os.getenv("PG_HOST", "localhost"),
-    port=int(os.getenv("PG_PORT", "5432")),
-    dbname=os.getenv("PG_DB", "retailmind"),          # NO usar el DB_NAME del .env (apunta a BD antigua)
-    user=os.getenv("PG_USER", "postgres"),
-    password=os.getenv("PG_PASSWORD", "1250143656"),
-)
+load_dotenv(RAIZ_ETL / ".env")          # sin override: el entorno manda
+load_dotenv(RAIZ_PROYECTO / ".env")
+
+SECRETO_SUPERUSUARIO = RAIZ_PROYECTO / "deploy" / "secrets" / "pg_superuser.txt"
+
+
+def _clave_superusuario() -> str:
+    """Del entorno o del secreto de Docker. Nunca un valor por defecto."""
+    clave = os.getenv("PG_SUPERUSER_PASSWORD")
+    if clave:
+        return clave
+    if SECRETO_SUPERUSUARIO.is_file():
+        clave = SECRETO_SUPERUSUARIO.read_text(encoding="utf-8").strip()
+        if clave:
+            return clave
+    sys.exit(
+        "ERROR: falta la contraseña del superusuario de PostgreSQL.\n"
+        "  Se busca en PG_SUPERUSER_PASSWORD y luego en\n"
+        f"  {SECRETO_SUPERUSUARIO}"
+    )
+
+
+def _conexion() -> dict:
+    """
+    Parámetros de conexión desde el entorno, sin defecto silencioso.
+
+    Desde la contenerización el 5432 es el CONTENEDOR y el PostgreSQL local
+    quedó en el 5433: caer en un `localhost:5432` por defecto no es un detalle,
+    es escribir datos maestros en la base que no toca.
+    """
+    variables = {"host": "ETL_PG_HOST", "port": "ETL_PG_PORT",
+                 "dbname": "ETL_PG_DATABASE"}       # NO el DB_NAME del .env (BD antigua)
+    cfg = {campo: os.getenv(var) for campo, var in variables.items()}
+    cfg["user"] = os.getenv("PG_SUPERUSER_USER", "postgres")   # nombre de rol, no secreto
+
+    faltantes = [var for campo, var in variables.items() if not cfg[campo]]
+    if faltantes:
+        sys.exit(
+            f"ERROR: faltan variables de conexión: {', '.join(faltantes)}.\n"
+            f"  Defínelas en {RAIZ_ETL / '.env'} (plantilla: .env.example)."
+        )
+    cfg["port"] = int(cfg["port"])
+    cfg["password"] = _clave_superusuario()
+    return cfg
 
 BODEGA_PRINCIPAL = "Bodega Central Quevedo"
 STOCK_INICIAL = 100
@@ -113,7 +167,7 @@ def main() -> None:
     print(f"Parquet: {len(prods)} productos únicos, "
           f"{prods['category'].nunique()} categorías, {prods['brand'].nunique()} marcas")
 
-    conn = psycopg2.connect(**PG)
+    conn = psycopg2.connect(**_conexion())
     try:
         with conn, conn.cursor() as cur:
             antes = _conteos(cur)

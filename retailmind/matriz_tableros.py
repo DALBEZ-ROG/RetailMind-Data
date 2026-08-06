@@ -31,15 +31,16 @@ import urllib.error
 import urllib.request
 from datetime import datetime
 
-import psycopg2
+from conexion_verificacion import pg_admin
 
 API = os.environ.get("RETAILMIND_API", "http://localhost:8080")
 
 #: Superusuario: ensanchar un horario es una ESCRITURA y `retailmind_etl` es de
 #: solo lectura por construcción. La verificación de cifras (validar_tableros.py)
 #: sigue yendo con el rol de lectura; esto es una preparación de la prueba.
-PG_ADMIN = dict(host="localhost", port=5432, dbname="retailmind",
-                user="postgres", password="1250143656")
+#: La conexión sale del entorno (`ETL_PG_*` + el secreto del superusuario):
+#: aquí no hay credencial escrita, y el destino es el CONTENEDOR, no el
+#: PostgreSQL local que quedó en el 5433.
 
 CREDENCIALES = {
     "ADMIN":    ("admin@retailmind.com",    "Admin2026!"),
@@ -269,7 +270,7 @@ def correr() -> int:
 
 def main() -> int:
     print("Matriz rol × tablero — nivel estratégico, los SIETE tableros")
-    cx = psycopg2.connect(**PG_ADMIN)
+    cx = pg_admin()
     cx.autocommit = True
     previo: list[tuple] = []
     try:

@@ -44,19 +44,17 @@ import urllib.parse
 import urllib.request
 from datetime import datetime
 
-import psycopg2
+from conexion_verificacion import pg_admin, pg_lectura
 
 API = os.environ.get("RETAILMIND_API", "http://localhost:8080")
 
-#: Superusuario: ensanchar un horario es una ESCRITURA y `retailmind_etl` es de
-#: solo lectura por construcción.
-PG_ADMIN = dict(host="localhost", port=5432, dbname="retailmind",
-                user="postgres", password="1250143656")
-
-#: Rol de SOLO LECTURA para las cifras de control, como en el resto del
-#: pipeline: con BYPASSRLS, para que `pol_horario` no filtre en silencio.
-PG_LECTURA = dict(host="localhost", port=5432, dbname="retailmind",
-                  user="retailmind_etl", password="Etl2026!")
+#: Dos conexiones, las dos resueltas desde el entorno (`ETL_PG_*` + el secreto
+#: del superusuario), sin ninguna credencial escrita en el código:
+#:   · `pg_admin()`   — superusuario: ensanchar un horario es una ESCRITURA y
+#:     `retailmind_etl` es de solo lectura por construcción.
+#:   · `pg_lectura()` — rol `retailmind_etl` para las cifras de control, como
+#:     en el resto del pipeline: con BYPASSRLS, para que `pol_horario` no
+#:     filtre en silencio y la comparación se haga contra cero filas.
 
 CREDENCIALES = {
     "ADMIN":    ("admin@retailmind.com",    "Admin2026!"),
@@ -154,7 +152,7 @@ def pedir(ruta: str, jwt: str, **filtros) -> tuple[int, dict]:
 
 def universo() -> dict:
     """El catálogo que DEBE previsionarse, según la base transaccional."""
-    cx = psycopg2.connect(**PG_LECTURA)
+    cx = pg_lectura()
     try:
         with cx.cursor() as cur:
             cur.execute("""
@@ -191,7 +189,7 @@ def universo() -> dict:
 
 def serie_real() -> dict[str, int]:
     """Unidades vendidas por mes, no canceladas — la serie del gráfico."""
-    cx = psycopg2.connect(**PG_LECTURA)
+    cx = pg_lectura()
     try:
         with cx.cursor() as cur:
             cur.execute("""
@@ -386,7 +384,7 @@ def correr() -> int:
 
 def main() -> int:
     print("Matriz rol × endpoint y cifras — PREVISIÓN DE DEMANDA (fase E2)")
-    cx = psycopg2.connect(**PG_ADMIN)
+    cx = pg_admin()
     cx.autocommit = True
     previo: list[tuple] = []
     try:

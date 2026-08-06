@@ -50,19 +50,17 @@ import urllib.parse
 import urllib.request
 from datetime import datetime
 
-import psycopg2
+from conexion_verificacion import pg_admin, pg_lectura
 
 API = os.environ.get("RETAILMIND_API", "http://localhost:8080")
 
-#: Superusuario: ensanchar un horario es una ESCRITURA y `retailmind_etl` es de
-#: solo lectura por construcción.
-PG_ADMIN = dict(host="localhost", port=5432, dbname="retailmind",
-                user="postgres", password="1250143656")
-
-#: Rol de SOLO LECTURA para las cifras de control: con BYPASSRLS, para que
-#: `pol_horario` no filtre en silencio y devuelva cero filas sin dar error.
-PG_LECTURA = dict(host="localhost", port=5432, dbname="retailmind",
-                  user="retailmind_etl", password="Etl2026!")
+#: Dos conexiones, las dos resueltas desde el entorno (`ETL_PG_*` + el secreto
+#: del superusuario), sin ninguna credencial escrita en el código:
+#:   · `pg_admin()`   — superusuario: ensanchar un horario es una ESCRITURA y
+#:     `retailmind_etl` es de solo lectura por construcción.
+#:   · `pg_lectura()` — rol `retailmind_etl` para las cifras de control: con
+#:     BYPASSRLS, para que `pol_horario` no filtre en silencio y devuelva cero
+#:     filas sin dar error.
 
 CREDENCIALES = {
     "ADMIN":    ("admin@retailmind.com",    "Admin2026!"),
@@ -169,7 +167,7 @@ _VENTA = """
 
 def control() -> dict:
     """El reparto por nivel, recalculado en PostgreSQL desde cero."""
-    cx = psycopg2.connect(**PG_LECTURA)
+    cx = pg_lectura()
     try:
         with cx.cursor() as cur:
             cur.execute(_VENTA + """
@@ -215,7 +213,7 @@ def cartera_de(email_vendedor: str) -> set[str]:
     `vendedor_id` y casa por nombre, así que aquí se parte del id —que es lo que
     el JWT identifica— y se compara el conjunto resultante.
     """
-    cx = psycopg2.connect(**PG_LECTURA)
+    cx = pg_lectura()
     try:
         with cx.cursor() as cur:
             cur.execute(_VENTA + """
@@ -338,7 +336,7 @@ def main() -> int:
     print(f"  criticas {ctrl['criticas']} · atencion {ctrl['atencion']} · "
           f"en alerta {ctrl['en_alerta']} · sin muestra {ctrl['sin_muestra']}")
 
-    admin = psycopg2.connect(**PG_ADMIN)
+    admin = pg_admin()
     admin.autocommit = False
     fallos: list[str] = []
     celdas = ok = 0
