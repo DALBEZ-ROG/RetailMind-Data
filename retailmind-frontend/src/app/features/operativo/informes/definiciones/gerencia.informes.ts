@@ -258,7 +258,12 @@ export const INFORMES_GERENCIA: DefinicionDepartamento = {
           { valor: 'novedad_envio',       etiqueta: 'Novedades de envío' },
           { valor: 'devolucion_proveedor', etiqueta: 'Devoluciones a proveedor' },
           { valor: 'item_defectuoso',     etiqueta: 'Ítems defectuosos' },
-          { valor: 'producto_proveedor',  etiqueta: 'Catálogo proveedor-producto' }
+          { valor: 'producto_proveedor',  etiqueta: 'Catálogo proveedor-producto' },
+          // Seguridad del motor (scripts 86 y 87). Esta lista tiene que espejar
+          // TABLAS_AUDITADAS del backend: una entidad auditada que falte aquí se
+          // ve en el listado pero no se puede aislar, y pedirla da 400.
+          { valor: 'pg_privilegio',       etiqueta: 'Privilegios del motor (GRANT/REVOKE)' },
+          { valor: 'rol_personalizado',   etiqueta: 'Roles propios (alta y baja)' }
         ] },
         { param: 'accion', etiqueta: 'Acción', tipo: 'select', opciones: [
           { valor: '',       etiqueta: 'Todas las acciones' },

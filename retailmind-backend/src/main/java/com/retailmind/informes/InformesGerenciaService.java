@@ -81,10 +81,23 @@ public class InformesGerenciaService extends InformeServiceBase {
      * tabla más, el informe la muestra igual — solo no se podrá filtrar por
      * ella hasta añadirla aquí.
      */
+    /**
+     * Lista blanca del filtro «Registro afectado».
+     *
+     * OJO al añadir una entidad auditada nueva: si no se registra AQUÍ (y en el
+     * desplegable de `gerencia.informes.ts`), sus filas se ven en el listado sin
+     * filtrar pero no se pueden AISLAR, y pedirlas por parámetro devuelve un 400.
+     * Pasó con las dos del script 86/87: para una auditoría de seguridad,
+     * «enséñame todos los cambios de privilegio» es justo la consulta que se
+     * quiere hacer.
+     */
     private static final Set<String> TABLAS_AUDITADAS = Set.of(
             "pedido", "envio", "orden_compra", "factura_compra", "resena",
             "pregunta_producto", "novedad_envio", "devolucion_proveedor",
-            "item_defectuoso", "producto_proveedor");
+            "item_defectuoso", "producto_proveedor",
+            // Seguridad del motor: cambios de privilegio (script 86) y altas/bajas
+            // de roles propios (script 87).
+            "pg_privilegio", "rol_personalizado");
 
     /**
      * Resultado de un intento de acceso: los dos desenlaces + los cuatro

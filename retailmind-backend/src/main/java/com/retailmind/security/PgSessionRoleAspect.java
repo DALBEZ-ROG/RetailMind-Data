@@ -1,7 +1,7 @@
 package com.retailmind.security;
 
 import java.sql.Connection;
-import java.sql.Statement;
+import java.sql.PreparedStatement;
 
 import javax.sql.DataSource;
 
@@ -28,9 +28,15 @@ import com.retailmind.auth.AppUserPrincipal;
  * ejecuta después de abrir la tx) y, como primera sentencia:
  *
  *   1. Lee el usuario autenticado del SecurityContext (poblado por el JWT filter).
- *   2. Mapea su rol de app al grp_* SOLO vía la lista blanca {@link DbGroupRole}.
- *   3. Ejecuta SET LOCAL ROLE grp_x sobre la conexión de la transacción.
- *   4. Si es CLIENTE, además SET LOCAL app.cliente_id = <id> (RLS de aislamiento).
+ *   2. Resuelve su rol de motor: la lista blanca {@link DbGroupRole} para los 9
+ *      roles del sistema, o el `grp_*` de su rol PERSONALIZADO (script 87).
+ *   3. Lo asume con set_config('role', ?, true) — equivalente a SET LOCAL ROLE,
+ *      pero con el nombre como PARÁMETRO LIGADO en vez de concatenado.
+ *   4. Si es CLIENTE, además app.cliente_id = <id> (RLS de aislamiento).
+ *
+ * El paso 3 es el que permite que un rol creado en caliente funcione sin
+ * debilitar nada: la garantía de que un nombre de rol no puede inyectar SQL ya
+ * no depende de que el nombre venga de un enum, sino de que NUNCA se concatena.
  *
  * SET LOCAL muere con el COMMIT/ROLLBACK: la conexión vuelve al pool de Hikari
  * como retailmind_app (NOINHERIT, sin privilegios de negocio), limpia.
@@ -70,7 +76,11 @@ public class PgSessionRoleAspect {
         }
 
         DbGroupRole rol = DbGroupRole.fromCodigo(principal.getRolCodigo()).orElse(null);
-        if (rol == null) {
+
+        // Rol de motor a asumir: el del enum para los 9 del sistema, o el que
+        // trae el principal si el usuario lleva un rol PERSONALIZADO (script 87).
+        String pgRole = rol != null ? rol.getPgRole() : principal.getRolMotor();
+        if (pgRole == null) {
             logger.warn("Rol de app '{}' sin mapeo a grupo de PostgreSQL; la tx corre sin SET ROLE",
                     principal.getRolCodigo());
             return pjp.proceed();
@@ -78,12 +88,22 @@ public class PgSessionRoleAspect {
 
         Connection con = DataSourceUtils.getConnection(pgDataSource);
         try {
-            try (Statement st = con.createStatement()) {
-                // rol.getPgRole() sale del enum (lista blanca): no hay inyección posible
-                st.execute("SET LOCAL ROLE " + rol.getPgRole());
-                if (rol == DbGroupRole.CLIENTE && principal.getClienteId() != null) {
-                    // Long → literal numérico seguro
-                    st.execute("SET LOCAL app.cliente_id = '" + principal.getClienteId() + "'");
+            // set_config('role', ?, true) EN VEZ DE «SET LOCAL ROLE » + nombre.
+            // Es equivalente (mismo GUC, mismo alcance de transacción) pero el
+            // nombre viaja como PARÁMETRO LIGADO, así que deja de existir la
+            // concatenación de un identificador — y con ella la única vía por la
+            // que un nombre de rol podría inyectar SQL. Eso es lo que permite
+            // que el nombre venga de la BD (rol personalizado) sin debilitar
+            // nada: antes la seguridad la daba el enum, ahora la da el protocolo.
+            try (PreparedStatement ps = con.prepareStatement("SELECT set_config('role', ?, true)")) {
+                ps.setString(1, pgRole);
+                ps.execute();
+            }
+            if (rol == DbGroupRole.CLIENTE && principal.getClienteId() != null) {
+                try (PreparedStatement ps =
+                             con.prepareStatement("SELECT set_config('app.cliente_id', ?, true)")) {
+                    ps.setString(1, String.valueOf(principal.getClienteId()));
+                    ps.execute();
                 }
             }
         } finally {

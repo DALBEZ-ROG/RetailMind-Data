@@ -43,8 +43,15 @@ ClickHouse o afirma que PostgreSQL corre local, está desactualizado: ignóralo.
   (el script 19 lo revocó a PUBLIC) y política RLS propia en cada tabla con RLS (las
   pol_horario enumeran los grupos). Patrón completo en `37_rol_soporte.sql`.
 - La app conecta como `retailmind_app` (LOGIN **NOINHERIT**, sin privilegios de negocio) y asume
-  el rol del usuario **por transacción** con `SET LOCAL ROLE` (aspecto
-  `security/PgSessionRoleAspect`, excluye `analytics/`).
+  el rol del usuario **por transacción** con **`set_config('role', ?, true)`** (aspecto
+  `security/PgSessionRoleAspect`, excluye `analytics/`). **Desde el 2026-08-06 ya NO es
+  `SET LOCAL ROLE ` + nombre**: es equivalente (mismo GUC, mismo alcance de transacción) pero el
+  nombre del rol viaja como **PARÁMETRO LIGADO**, así que no se concatena un identificador en
+  ningún punto. Ese cambio es lo que permite que el rol venga de la BD —los roles personalizados
+  del script 87— sin debilitar nada: la garantía de no-inyección ya no depende de que el nombre
+  salga del enum `DbGroupRole`, sino de que NUNCA se concatena. Probado:
+  `set_config('role','grp_x; DROP TABLE marca',true)` → «role does not exist». `app.cliente_id`
+  viaja por el mismo camino (verificado: el cliente sigue viendo sus 21 pedidos, no 4.083).
 - Consecuencia: **TODO acceso a Postgres debe ir dentro de `@Transactional`** — si no, corre sin
   privilegios y falla o (peor) se salta la seguridad de motor.
 - La BD devuelve SQLState 42501 por privilegio/horario; `GlobalExceptionHandler` lo traduce a 403.
@@ -69,11 +76,13 @@ ClickHouse o afirma que PostgreSQL corre local, está desactualizado: ignóralo.
 ## Cómo correr
 
 **TODO está contenerizado desde el 2026-08-03** (ver `docs/DESPLIEGUE_EJECUTADO.md`). El compose
-raíz tiene **6 servicios** (`postgres`, `clickhouse`, `backend`, `frontend`, `etl` y `pgadmin`);
-`pocketbase` se ELIMINÓ. `.env` fija `COMPOSE_PROFILES=demo`, así que:
+raíz declara **6 servicios** y `pocketbase` se ELIMINÓ: `postgres` y `clickhouse` (sin perfil,
+siempre arrancan), `backend` y `frontend` (perfil `demo`), `etl` y `pgadmin` (perfil `tools`, a
+demanda). Como `.env` fija `COMPOSE_PROFILES=demo`, un `up -d` a secas levanta **los cuatro
+primeros**:
 
 ```bash
-# TODO el sistema (los 4 servicios, listo en ~28 s)
+# TODO el sistema (los 4 servicios del perfil demo, listo en ~28 s)
 docker compose up -d
 
 # Tras cambiar código Java o Angular: SIN --build el contenedor sigue con la imagen vieja
@@ -99,7 +108,9 @@ tener valores por defecto para `postgres.datasource.password` y `jwt.secret` —
 arrancar** si faltan, a propósito. Fuera de Docker los toma de
 `retailmind-backend/application-local.properties` (gitignored, vía `spring.config.import` con
 `optional:`); dentro, del entorno del compose. Las credenciales de motor viven en `.env`,
-`retailmind/.env` y `deploy/secrets/pg_superuser.txt`, los cuatro **fuera del índice de git**.
+`retailmind/.env` y `deploy/secrets/pg_superuser.txt` — esos tres más
+`application-local.properties` son los **cuatro archivos con secretos, todos fuera del índice de
+git** (verificado). `.env.example` es la plantilla versionada: lleva las CLAVES sin los VALORES.
 
 **Trampas del despliegue** (detalle en `docs/DESPLIEGUE_EJECUTADO.md` §8):
 - Un cambio de **Java/Angular NO entra solo**: la imagen está horneada, hace falta `--build`. El
@@ -918,6 +929,52 @@ ESTRATÉGICO está CERRADO**: 7 tableros, las 19 decisiones de dashboard y **los
 `docs/estrategico/DISENO_NIVEL_ESTRATEGICO.md`; **los dos están corregidos en
 `docs/estrategico/CORRECCIONES_DISENO_ETL.md` — 57 supuestos que no se sostuvieron; léelo antes
 de tocar cualquier tabla**.
+
+**PERMISOS DEL MOTOR — LA PANTALLA QUE ENSEÑA LA SEGURIDAD (2026-08-05/06, scripts 86 y 87)**:
+`/operativo/seguridad/permisos`, **solo ADMIN** (6+3 endpoints ENUMERADOS uno a uno en
+`SecurityConfig`, nunca por comodín). Seis pestañas: **Editor de rol** (interruptores),
+Roles, Usuarios por rol, Permisos (grilla plana auditable), Políticas RLS y Restricción
+horaria. Todo sale de `pg_catalog`: las tablas `permiso`/`rol_permiso` están VACÍAS y son
+vestigiales. Cifras contrastadas contra el motor: 9 roles · 95 políticas · 50 tablas con RLS ·
+**109 columnas con ACL en 14 tablas** · **1.355 GRANT** (era 1.354; +1 por la tabla nueva
+`rol_personalizado`) + 113 MAINTAIN aparte.
+Si vas a tocar esto: (1) **un GRANT ejecutado por quien NO es propietario NO FALLA** — emite
+`WARNING: no privileges were granted` y no hace nada, así que sin `fn_admin_cambiar_permiso`
+(script 86, SECURITY DEFINER) la pantalla respondería 200 a cada clic sin cambiar el motor; la
+función **verifica el privilegio efectivo antes y después** y devuelve `aplicado`; (2)
+**`information_schema` filtra por `pg_has_role` y miente por debajo EN SILENCIO**:
+`role_table_grants` da **1.354** como superusuario y **738** bajo `grp_administrador`, que es el
+rol con el que corre la pantalla — todo se lee con `aclexplode()` sobre `pg_catalog`, y los de
+COLUMNA desde `pg_attribute.attacl`, nunca desde `column_privileges` (expande los heredados);
+(3) **los privilegios de columna solo SUMAN**: revocar una columna a un rol que tiene el
+privilegio de TABLA no cambia nada — para restringir hay que revocar la tabla y conceder las
+columnas, que es exactamente como está hecha la segregación financiera (bodega: 90 ACL de
+columna y CERO SELECT de tabla sobre `pedido`); (4) LECTURA no necesita SECURITY DEFINER
+(`grp_administrador` lee `pg_catalog` entero), solo la ESCRITURA. **Cuatro protecciones**: R1
+`grp_administrador` no se toca; R2 identidad (`usuario`/`usuario_rol`/`rol`/`permiso`/
+`rol_permiso`) cerrada en AMBAS direcciones —ahí lo peligroso es CONCEDER, por `password_hash`—
+y rastro/compuerta (`log_auditoria`/`log_acceso`/`grupo_horario`) solo prohíbe REVOKE; R3 solo
+los `grp_*` son destinatarios (deja fuera a `retailmind_app`/`retailmind_etl`/PUBLIC **por
+construcción**); R4 solo tabla/columna y SELECT/INSERT/UPDATE/DELETE (USAGE ON SCHEMA y las
+membresías quedan fuera porque no hay parámetro que las exprese). Todo cambio va a
+`log_auditoria` como `pg_privilegio` con el autor del JWT.
+
+**ROLES PROPIOS (script 87)**: `fn_admin_crear_rol` / `fn_admin_eliminar_rol` + tabla
+`rol_personalizado`. Un `CREATE ROLE` a secas da un rol **INSERVIBLE y falla en silencio**:
+hacen falta **SEIS piezas** —NOLOGIN · `GRANT USAGE ON SCHEMA public` (el 19 se lo revocó a
+PUBLIC) · `GRANT <rol> TO retailmind_app` (sin ella `SET LOCAL ROLE` falla y la app entera da
+403) · 7 ventanas en `grupo_horario` (sin ellas el script 53 BLOQUEA el login) · **una política
+RLS por cada una de las 50 tablas con RLS** (el defecto de RLS es DENEGAR: con SELECT y sin
+política lee **CERO FILAS sin un solo error**) · fila en `rol` con `es_sistema = false`—. El rol
+nace SIN privilegios; se encienden con los interruptores. **`rol_base` decide PANTALLAS, no
+datos**: `SecurityConfig` es código compilado y no conoce roles creados en caliente, así que la
+authority del JWT es la del rol base mientras que contra el motor se asume el rol PROPIO — dos
+usuarios en la misma pantalla viendo datos distintos. Probado de punta a punta: el usuario del
+rol nuevo entra a `/api/ventas/pedidos` y recibe **403 del motor** hasta que se le encienden los
+privilegios. Solo se elimina lo que tenga marca de catálogo **y** fila propia **y** cero
+usuarios. Trampas de PL/pgSQL que costaron tiempo: un alias de tabla `r` choca con la variable
+de bucle `r record` («record is not assigned yet»), y una columna de `RETURNS TABLE` con el
+mismo nombre que una columna real da «ambiguous».
 
 **Deuda técnica conocida** (tablas huérfanas, requieren bloque dedicado):
 

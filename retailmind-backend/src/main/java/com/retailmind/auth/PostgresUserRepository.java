@@ -25,16 +25,30 @@ public class PostgresUserRepository {
     public record PgUsuario(Long id, String email, String passwordHash, String nombre,
                             String apellido, String telefono, boolean activo, String rolCodigo,
                             Long clienteId, java.time.OffsetDateTime fechaCreacion,
-                            java.time.OffsetDateTime ultimoAcceso) {}
+                            java.time.OffsetDateTime ultimoAcceso,
+                            /** grp_* del rol PERSONALIZADO; null en los 9 del sistema. */
+                            String rolMotor,
+                            /** Rol del sistema al que imita para las RUTAS; null = ninguno. */
+                            String rolBaseCodigo) {}
 
+    /**
+     * El LEFT JOIN a {@code rol_personalizado} (script 87) es lo que permite que
+     * un rol creado en caliente funcione: trae el rol de motor a asumir y el rol
+     * base que decide qué pantallas ve. Para los 9 del sistema no hay fila y las
+     * dos columnas llegan NULL, así que el comportamiento es exactamente el de
+     * antes.
+     */
     private static final String BASE_SELECT = """
             SELECT u.id, u.email, u.password_hash, u.nombre, u.apellido, u.telefono, u.activo,
                    u.fecha_creacion, u.ultimo_acceso,
                    r.codigo AS rol_codigo,
+                   rp.rol_grupo AS rol_motor,
+                   rp.rol_base_codigo,
                    fn_cliente_id_de_usuario(u.id) AS cliente_id
             FROM usuario u
             LEFT JOIN usuario_rol ur ON ur.usuario_id = u.id
             LEFT JOIN rol r ON r.id = ur.rol_id AND r.activo
+            LEFT JOIN rol_personalizado rp ON rp.rol_id = r.id
             """;
 
     private static final RowMapper<PgUsuario> ROW_MAPPER = (rs, rowNum) -> new PgUsuario(
@@ -48,7 +62,9 @@ public class PostgresUserRepository {
             rs.getString("rol_codigo"),
             rs.getObject("cliente_id") == null ? null : rs.getLong("cliente_id"),
             rs.getObject("fecha_creacion", java.time.OffsetDateTime.class),
-            rs.getObject("ultimo_acceso", java.time.OffsetDateTime.class));
+            rs.getObject("ultimo_acceso", java.time.OffsetDateTime.class),
+            rs.getString("rol_motor"),
+            rs.getString("rol_base_codigo"));
 
     private final JdbcTemplate pg;
 

@@ -144,6 +144,12 @@
         <span>Intentos de Acceso</span>
       </a>
 
+      <!-- Permisos del motor (script 86): SOLO ADMIN -->
+      <a *ngIf="canPermisosMotor" class="nav-item" routerLink="/operativo/seguridad/permisos" routerLinkActive="active">
+        <mat-icon>shield</mat-icon>
+        <span>Permisos del Motor</span>
+      </a>
+
       <ng-container *ngIf="canCompras">
         <a class="nav-item" routerLink="/operativo/compras/ordenes" routerLinkActive="active">
           <mat-icon>shopping_cart_checkout</mat-icon>

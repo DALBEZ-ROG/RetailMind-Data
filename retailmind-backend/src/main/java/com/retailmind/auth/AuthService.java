@@ -56,7 +56,19 @@ public class AuthService implements UserDetailsService {
             throw new UsernameNotFoundException("Usuario desactivado: " + email);
         }
 
-        String rol = usuario.rolCodigo() != null ? usuario.rolCodigo() : "SIN_ROL";
+        // La AUTHORITY decide qué RUTAS ve el usuario, y SecurityConfig es
+        // código compilado que solo conoce los 9 códigos del sistema. Un rol
+        // PERSONALIZADO (script 87) entraría y recibiría 403 en todas las
+        // pantallas, así que para las rutas usa el código de su ROL BASE.
+        //
+        // Contra el MOTOR, en cambio, va con SU propio rol (rolMotor): mismas
+        // pantallas, distintos privilegios. Esa separación es justo lo que hace
+        // demostrable el sistema — y también significa que el rol base NO
+        // concede nada en la base de datos, solo dibuja pantallas.
+        String rolRutas = usuario.rolBaseCodigo() != null
+                ? usuario.rolBaseCodigo()
+                : (usuario.rolCodigo() != null ? usuario.rolCodigo() : "SIN_ROL");
+
         String nombreCompleto = usuario.apellido() != null
                 ? usuario.nombre() + " " + usuario.apellido()
                 : usuario.nombre();
@@ -64,10 +76,11 @@ public class AuthService implements UserDetailsService {
         return new AppUserPrincipal(
                 usuario.email(),
                 usuario.passwordHash(),
-                List.of(new SimpleGrantedAuthority(rol)),
+                List.of(new SimpleGrantedAuthority(rolRutas)),
                 usuario.id(),
                 usuario.clienteId(),
                 usuario.rolCodigo(),
+                usuario.rolMotor(),
                 nombreCompleto);
     }
 

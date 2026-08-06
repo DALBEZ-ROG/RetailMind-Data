@@ -428,6 +428,17 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/operativo/seguridad/accesos.component').then(m => m.AccesosComponent)
   },
+  // ── Seguridad: mapa de privilegios del motor y GRANT/REVOKE en vivo
+  //    (script 86). SOLO ADMIN, igual que sus seis endpoints en SecurityConfig:
+  //    publica el mapa completo de quién puede qué y ejecuta cambios reales de
+  //    privilegio contra PostgreSQL.
+  {
+    path: 'operativo/seguridad/permisos',
+    canActivate: [authGuard, roleGuard(['ADMIN'])],
+    loadComponent: () =>
+      import('./features/operativo/seguridad/permisos-motor.component')
+        .then(m => m.PermisosMotorComponent)
+  },
   // ── Módulo marketing (lectura ADMIN/GERENTE; escrituras solo ADMIN, espeja SecurityConfig)
   {
     path: 'operativo/marketing/cupones',

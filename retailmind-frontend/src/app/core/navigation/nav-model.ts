@@ -38,6 +38,7 @@ export type PermisoNav =
   | 'tableroAbastecimiento' // T-6, tablero de dirección (OE-11)
   | 'tableroGobierno'     // T-7, tablero de dirección (OE-10, DATO SENSIBLE)
   | 'accesos'          // intentos de acceso al sistema (OTD-GER-09, script 53)
+  | 'permisosMotor'    // mapa de privilegios del motor y GRANT/REVOKE (script 86)
   | 'tickets'          // tickets de soporte
   | 'categoriasTicket' // categorías de ticket
   | 'faq'              // preguntas frecuentes
@@ -123,6 +124,11 @@ export const ROLES_POR_PERMISO: Record<PermisoNav, readonly string[]> = {
   tableroGobierno:     ['ADMIN', 'GERENTE'],
   // Intentos de acceso (OTD-GER-09, script 53): informe solo Admin/Gerencia
   accesos:          ['ADMIN', 'GERENTE'],
+  // Permisos del motor: SOLO ADMIN. Es el corte más estricto del sistema —más
+  // que los dos informes sensibles de seguridad— porque no solo PUBLICA el mapa
+  // completo de quién puede qué (media hoja de ruta para saltarse la
+  // segregación), sino que EJECUTA GRANT y REVOKE reales contra PostgreSQL.
+  permisosMotor:    ['ADMIN'],
   // SOPORTE (9º rol, script 37): bandeja de tickets + FAQ; nada más
   tickets:          ['ADMIN', 'GERENTE', 'CLIENTE', 'SOPORTE'],
   categoriasTicket: ['ADMIN'],
@@ -420,7 +426,7 @@ export const DASHBOARD_AREAS: AreaNav[] = [
   {
     id: 'seguridad',
     titulo: 'Seguridad',
-    descripcion: 'Control de acceso por horario',
+    descripcion: 'Roles, privilegios del motor y control de acceso por horario',
     icono: 'security',
     acento: '#546e7a',
     gradiente: 'linear-gradient(135deg, #37474f, #78909c)',
@@ -428,7 +434,10 @@ export const DASHBOARD_AREAS: AreaNav[] = [
       { titulo: 'Horarios de Acceso', descripcion: 'Ventanas horarias por grupo de rol',
         icono: 'schedule', ruta: '/operativo/horarios', permiso: 'admin' },
       { titulo: 'Intentos de Acceso', descripcion: 'Quién intentó entrar y falló, desde dónde y por qué',
-        icono: 'login', ruta: '/operativo/seguridad/accesos', permiso: 'accesos' }
+        icono: 'login', ruta: '/operativo/seguridad/accesos', permiso: 'accesos' },
+      { titulo: 'Permisos del Motor',
+        descripcion: 'Roles, privilegios de tabla y columna, políticas RLS y GRANT/REVOKE en vivo',
+        icono: 'shield', ruta: '/operativo/seguridad/permisos', permiso: 'permisosMotor' }
     ]
   },
   {

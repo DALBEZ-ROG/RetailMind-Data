@@ -257,6 +257,25 @@ public class SecurityConfig {
                 // de log_acceso). El REGISTRO lo escribe el flujo de login (público).
                 .requestMatchers(HttpMethod.GET, "/api/seguridad/accesos")
                     .hasAnyAuthority("ADMIN", "GERENTE")
+                // Mapa de la seguridad del motor y administración de privilegios
+                // (script 86). SOLO ADMIN, y los seis endpoints ENUMERADOS uno a
+                // uno: nada de "/api/seguridad/**". Los cuatro GET publican el
+                // mapa completo de privilegios del sistema —incluido qué NO ve
+                // cada rol, que es media hoja de ruta para quien quiera saltarse
+                // la segregación— y los dos POST ejecutan GRANT/REVOKE reales
+                // contra el motor. Un comodín que mañana cubriera un endpoint
+                // nuevo sería una puerta abierta que nadie decidió abrir.
+                .requestMatchers(HttpMethod.GET, "/api/seguridad/mapa",
+                        "/api/seguridad/permisos", "/api/seguridad/politicas",
+                        "/api/seguridad/objetos",
+                        "/api/seguridad/roles-personalizados").hasAuthority("ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/seguridad/permisos/conceder",
+                        "/api/seguridad/permisos/revocar",
+                        "/api/seguridad/roles-personalizados").hasAuthority("ADMIN")
+                // Crear y ELIMINAR un rol de motor es la operación más
+                // delicada de la pantalla: se enumera con su verbo propio.
+                .requestMatchers(HttpMethod.DELETE, "/api/seguridad/roles-personalizados/*")
+                    .hasAuthority("ADMIN")
                 // ── INFORMES TÁCTICOS (docs/tactico/CATALOGO_OBJETIVOS_TACTICOS.md) ──
                 // Convención: /api/informes/{departamento}/{informe}, todos GET de
                 // solo lectura. Se declaran del más específico al más general.

@@ -169,6 +169,15 @@ docs/DESPLIEGUE_DISENO.md           corregido con los 3 puntos + addendum fechad
   tablas · 110 tablas y 89 con filas · 4 sumas de columnas GENERATED idénticas al centavo ·
   13 funciones SECURITY DEFINER de `postgres` · `seq_numero_documento = 114021` · 110 secuencias ·
   `pgcrypto 1.4` + `plpgsql 1.0` · 90 triggers · 379 índices · **1.354 GRANT a `grp_*`**.
+
+  > **Actualización 2026-08-06** — estas cifras son la foto del corte. Los scripts **86 y 87**
+  > (pantalla de Permisos del Motor) las movieron a propósito y de forma acotada:
+  > **1.354 → 1.355 GRANT** (la tabla nueva `rol_personalizado` y su SELECT para
+  > `grp_administrador`) y **13 → 16 funciones SECURITY DEFINER**
+  > (`fn_admin_cambiar_permiso`, `fn_admin_crear_rol`, `fn_admin_eliminar_rol`). Las demás
+  > siguen exactas: 95 políticas, 50 tablas con RLS, 109 columnas con ACL en 14 tablas.
+  > Mientras exista un rol propio, políticas y roles suben (cada rol añade 50 políticas y 1
+  > rol de motor) y vuelven a su sitio al eliminarlo — verificado en los dos sentidos.
 - **V10** (motor): `42501` para bodega sobre `pedido.total`, **0** para cliente sin
   `app.cliente_id` (RLS), **4.083** para gerente, y las 4 capas de solo-lectura del ETL en pie.
   Repetido **después** del corte y **después** de la rotación.

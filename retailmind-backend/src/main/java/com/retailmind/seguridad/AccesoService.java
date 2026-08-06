@@ -70,11 +70,24 @@ public class AccesoService {
     @Transactional(readOnly = true)
     public boolean estaEnHorario(String rolCodigo) {
         Optional<DbGroupRole> grp = DbGroupRole.fromCodigo(rolCodigo);
-        if (grp.isEmpty()) {
+        String pgRole = grp.map(DbGroupRole::getPgRole).orElse(null);
+
+        if (pgRole == null) {
+            // Rol PERSONALIZADO (script 87): su grp_* vive en rol_personalizado.
+            // Sin esto la compuerta horaria lo dejaría pasar SIEMPRE —el
+            // comportamiento para roles sin mapeo— y un rol nuevo quedaría
+            // exento de la única restricción que sus 7 ventanas declaran.
+            pgRole = pg.query("""
+                    SELECT rp.rol_grupo
+                    FROM rol_personalizado rp
+                    JOIN rol r ON r.id = rp.rol_id
+                    WHERE r.codigo = ? AND r.activo""",
+                    rs -> rs.next() ? rs.getString(1) : null, rolCodigo);
+        }
+        if (pgRole == null) {
             return true;
         }
-        Boolean ok = pg.queryForObject("SELECT esta_en_horario(?)",
-                Boolean.class, grp.get().getPgRole());
+        Boolean ok = pg.queryForObject("SELECT esta_en_horario(?)", Boolean.class, pgRole);
         return ok == null || ok;
     }
 

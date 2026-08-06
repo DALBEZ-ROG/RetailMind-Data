@@ -102,7 +102,8 @@ export class AppComponent {
     '/operativo/resenas': 'Reseñas de Productos',
     '/operativo/resenas/preguntas': 'Preguntas de Productos',
     '/operativo/horarios': 'Horarios de Acceso',
-    '/operativo/seguridad/accesos': 'Intentos de Acceso'
+    '/operativo/seguridad/accesos': 'Intentos de Acceso',
+    '/operativo/seguridad/permisos': 'Permisos del Motor'
   };
 
   constructor(
@@ -172,6 +173,8 @@ export class AppComponent {
   get canTableroAbastecimiento(): boolean { return this.nav.can('tableroAbastecimiento'); }
   get canTableroGobierno(): boolean { return this.nav.can('tableroGobierno'); }
   get canAccesos(): boolean    { return this.nav.can('accesos'); }
+  /** Permisos del Motor (script 86): SOLO ADMIN, como sus 6 endpoints. */
+  get canPermisosMotor(): boolean { return this.nav.can('permisosMotor'); }
   get canTickets(): boolean    { return this.nav.can('tickets'); }
   get canCategoriasTicket(): boolean { return this.nav.can('categoriasTicket'); }
   get canFaq(): boolean        { return this.nav.can('faq'); }
