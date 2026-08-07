@@ -1,6 +1,6 @@
 # RetailMind — contexto para Claude Code
 
-Tienda PyME con back-office completo. **PostgreSQL (BD `retailmind`, ~103 tablas) es la ÚNICA
+Tienda PyME con back-office completo. **PostgreSQL (BD `retailmind`, 111 tablas) es la ÚNICA
 base transaccional** — incluida la TIENDA DEL CLIENTE (catálogo `/api/catalogo` con ~1.214
 productos reales cargados del dataset original vía ETL puntual, carrito, wishlist,
 perfil/direcciones, checkout y mis pedidos, migrados 2026-07-11). **Desde el 2026-08-03 PostgreSQL
@@ -39,6 +39,10 @@ ClickHouse o afirma que PostgreSQL corre local, está desactualizado: ignóralo.
   grp_bodega, grp_despacho, grp_cliente, grp_analista, grp_soporte` — con matriz de privilegios
   GRANT, **RLS** (cliente aislado vía `app.cliente_id`) y **restricción por horario**
   (`grupo_horario` + `esta_en_horario()` + triggers). Admin exento de horario; soporte 24/7.
+  **Desde el 2026-08-06 (script 88) las VENTANAS de los 8 roles están en 24/7**, así que hoy el
+  horario no bloquea a nadie: lo que cambió son las FILAS de `grupo_horario`, no el mecanismo
+  —triggers, políticas y funciones siguen intactos y verificados— (ver el bloque de scripts
+  88-90 al final).
   OJO al crear un rol nuevo: además de los GRANTs necesita `GRANT USAGE ON SCHEMA public`
   (el script 19 lo revocó a PUBLIC) y política RLS propia en cada tabla con RLS (las
   pol_horario enumeran los grupos). Patrón completo en `37_rol_soporte.sql`.
@@ -76,10 +80,11 @@ ClickHouse o afirma que PostgreSQL corre local, está desactualizado: ignóralo.
 ## Cómo correr
 
 **TODO está contenerizado desde el 2026-08-03** (ver `docs/DESPLIEGUE_EJECUTADO.md`). El compose
-raíz declara **6 servicios** y `pocketbase` se ELIMINÓ: `postgres` y `clickhouse` (sin perfil,
+raíz declara **9 servicios** y `pocketbase` se ELIMINÓ: `postgres` y `clickhouse` (sin perfil,
 siempre arrancan), `backend` y `frontend` (perfil `demo`), `etl` y `pgadmin` (perfil `tools`, a
-demanda). Como `.env` fija `COMPOSE_PROFILES=demo`, un `up -d` a secas levanta **los cuatro
-primeros**:
+demanda) y `airflow-init`/`airflow-webserver`/`airflow-scheduler` (perfil `airflow`, ver el bloque
+de orquestación al final). Como `.env` fija `COMPOSE_PROFILES=demo`, un `up -d` a secas levanta
+**los cuatro primeros**:
 
 ```bash
 # TODO el sistema (los 4 servicios del perfil demo, listo en ~28 s)
@@ -917,12 +922,15 @@ ACL; (3) comparar catálogos entre dos motores exige **`COLLATE "C"` en todo `OR
 (4) un **healthcheck contra `localhost` dentro de un contenedor** resuelve a `::1` primero y nginx
 solo escucha IPv4 → `unhealthy` eterno **con la página sirviéndose bien**: siempre `127.0.0.1`;
 (5) al interpretar un 403 de bodega/despacho/compras, **mira el reloj antes que la migración**
-(`fuera_horario` bloquea el LOGIN entero). **Pendiente**: si se decide, el DAG de Airflow de §7
-(`run_etl.py` ya orquesta con orden topológico) — y el día que tome el relevo hay que poner
-**`DWH_CRON=-`**, o a las 02:00 disparan los dos y compiten por el `EXCHANGE TABLES`. El MODELO DE
+(`fuera_horario` bloquea el LOGIN entero). El DAG de Airflow que esta bitácora dejaba pendiente
+YA ESTÁ (2026-08-06, ver el bloque «ORQUESTACIÓN DEL ETL CON AIRFLOW» al final), y con él
+**`DWH_CRON=-`** ya está puesto. El MODELO DE
 DATOS está **COMPLETO**: las **19 tablas de hechos** del DWH más `fact_prevision_demanda` y
-`fact_alerta_cliente` — **21 tablas, 64.664 filas**, cargadas y validadas (**49 controles en
-verde**). El **CATÁLOGO TÁCTICO también**: 30 informes simples + **39 compuestos**. Y el **NIVEL
+`fact_alerta_cliente` — **21 tablas, 66.079 filas**, cargadas y validadas (**49 controles en
+verde**). Esa es la cifra del MODELO; la base `retailmind_dwh` tiene **22 objetos** porque
+además está la bitácora `etl_ejecucion`, que NO es del modelo y por eso no se suma
+(contarla da 66.743). El **CATÁLOGO TÁCTICO también**: 30 informes simples + **39
+compuestos**. Y el **NIVEL
 ESTRATÉGICO está CERRADO**: 7 tableros, las 19 decisiones de dashboard y **los 2 modelos**
 (previsión de demanda y alerta de abandono). El diseño del pipeline vive en
 `docs/estrategico/DISENO_ETL_CLICKHOUSE.md` y el del nivel estratégico en
@@ -975,6 +983,54 @@ privilegios. Solo se elimina lo que tenga marca de catálogo **y** fila propia *
 usuarios. Trampas de PL/pgSQL que costaron tiempo: un alias de tabla `r` choca con la variable
 de bucle `r record` («record is not assigned yet»), y una columna de `RETURNS TABLE` con el
 mismo nombre que una columna real da «ambiguous».
+
+**VENTANAS HORARIAS EN 24/7 — EL MECANISMO INTACTO (2026-08-06, scripts 88, 89 y 90)**: el 88
+puso las ventanas de `grupo_horario` en `[00:00:00, 24:00:00)` los 7 días. **La restricción por
+horario NO se eliminó ni se debilitó: solo cambiaron FILAS DE DATOS.** Verificado hoy contra el
+motor: siguen los **34 triggers `trg_horario_*`**, las **50 políticas `pol_horario`** con
+`cmd = ALL`, las 50 tablas con RLS y los md5 de `esta_en_horario()`, `fn_grupo_actual()` y
+`fn_bloquear_fuera_horario()` sin cambio; ni un GRANT tocado. El motivo es de PRESENTACIÓN: las
+ventanas viejas dejaban a los seis roles de personal bloqueados **1.986-1.988 minutos de cada
+10.080 (19,7 % de la semana)**, y como `pol_horario` es `cmd = ALL` —y ALL incluye SELECT— un
+fallo dentro de esa franja no da error: **RLS filtra y devuelve CERO FILAS en silencio**.
+Respaldo del estado previo en `seed_backup.hor88_grupo_horario_20260806`.
+La frontera es `24:00:00` y no `23:59`: `esta_en_horario()` compara con el intervalo SEMIABIERTO
+`[hora_inicio, hora_fin)` y un cast desde un instante real nunca puede valer `24:00:00`, así que
+es la única frontera que no deja un microsegundo fuera.
+Para DEMOSTRAR la restricción en vivo están los hermanos, que el 88 no ejecuta: **89**
+(`-v rol=grp_x`, estrecha la ventana de UN rol a un rango que excluye el momento actual y
+ABORTA si `esta_en_horario()` sigue en true) y **90** (restaura el 24/7 y ABORTA si algún rol
+queda con un solo minuto bloqueado). **OJO**: `grupo_horario` NO está congelado — la pantalla de
+admin (`HorariosAdminService:50/61`, INSERT/UPDATE para `grp_administrador`) puede reescribir
+esas ventanas. **Y hoy HAY una fila desviada**: `grp_analista` domingo (`grupo_horario` id 54)
+quedó en `00:00-23:30`, o sea 30 minutos bloqueados de 10.080 — la única de las 56. No lo dejó
+ningún script (el 90 aborta si eso pasa); se escribió por esa pantalla. Detalle y ficha en
+`docs/PROPUESTA_DEUDA_TECNICA.md`.
+
+**ORQUESTACIÓN DEL ETL CON AIRFLOW (2026-08-06, perfil `airflow`)**: Apache Airflow 2.10.5 con el
+DAG **`retailmind_dwh`** (`retailmind/airflow/dags/retailmind_dwh.py`) = **21 tareas de carga, una
+por tabla, más `validar_dwh`**; cada tarea es un `BashOperator` que invoca `run_etl.py`, sin lógica
+de negocio dentro. Sus metadatos viven en una base **separada** llamada `airflow` del MISMO
+contenedor PostgreSQL: la base `retailmind` no se toca. Tres servicios (`airflow-init`,
+`airflow-webserver` en el **8081**, `airflow-scheduler`) bajo el perfil `airflow`, que **NO
+arranca** con un `up -d` a secas porque `.env` fija `COMPOSE_PROFILES=demo`:
+
+```bash
+docker compose --profile airflow up -d      # web en http://localhost:8081
+docker compose exec airflow-scheduler airflow dags unpause retailmind_dwh
+```
+
+Estado verificado hoy: DAG **ACTIVO** (`is_paused = False`) con schedule **`0 2 * * *`**. Como
+Airflow tomó el relevo, el `@Scheduled` del backend está APAGADO con **`DWH_CRON=-`** (en `.env` y
+confirmado en el entorno del contenedor vivo); si se reactivara, a las 02:00 dispararían los dos y
+competirían por el `EXCHANGE TABLES`. Trampas: (1) **un DAG PAUSADO encola los disparos manuales
+sin ejecutarlos** — se quedan en `queued` y arrancan de golpe al despausarlo, así que despausa
+antes de disparar; (2) **una corrida escribe 22 pares de marcadores `corrida` en `etl_ejecucion`,
+no uno** (verificado: 22 `en_curso` + 22 cierres en la corrida de las 10:30), porque cada tarea es
+un proceso `run_etl.py` independiente que abre y cierra su propio marcador — los datos son
+correctos y el backend ya lee de forma defensiva (`DwhActualizacionService` colapsa con
+`argMax`); (3) `airflow-init` necesita el mismo bloque de entorno que los otros dos, de ahí los
+anclas YAML `x-airflow-env` / `x-airflow-volumes`.
 
 **Deuda técnica conocida** (tablas huérfanas, requieren bloque dedicado):
 
