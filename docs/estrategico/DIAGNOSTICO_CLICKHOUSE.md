@@ -42,7 +42,7 @@ los `slug` del catálogo de PostgreSQL, con precios idénticos—, que es un *ma
 
 | Fuente | Contenido relevante |
 |---|---|
-| `.env` (raíz) | `CH_HOST=clickhouse`, `CH_PORT=8123`, `CH_DATABASE=retailmind`, `CH_USER=default`, `CH_PASSWORD=retail…` (elidida) |
+| `.env` (raíz) | `CH_HOST=clickhouse`, `CH_PORT=8123`, `CH_DATABASE=retailmind`, `CH_USER`, `CH_PASSWORD` (**valores no reproducidos**; `.env` está gitignored) |
 | `docker-compose.yml` | Servicio `clickhouse` (imagen `clickhouse/clickhouse-server:latest`), puertos `8123`/`9000`, volumen nombrado `clickhouse_data`, healthcheck a `/ping` |
 | `retailmind-backend/src/main/resources/application.properties` | `clickhouse.datasource.url` con **default hardcodeado** `jdbc:ch://172.29.94.38:8123/retailmind?compress=0` (una IP de WSL de otra máquina/sesión) y `CH_HOST` por defecto en la misma IP |
 | `retailmind/config/clickhouse_connection.py` | Cliente `clickhouse_connect`, mismos defaults (`172.29.94.38`, usuario `default`) |

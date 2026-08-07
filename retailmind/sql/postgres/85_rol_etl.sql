@@ -85,14 +85,72 @@
 -- Idempotente y transaccional.
 -- ============================================================================
 
+-- ============================================================================
+-- LA CONTRASENA NO ESTA EN ESTE ARCHIVO — se pasa al ejecutarlo
+-- ============================================================================
+-- Hasta el 2026-08-06 este script llevaba la contrasena del rol escrita en
+-- claro, dos veces, en un archivo versionado en git. Ahora llega como VARIABLE
+-- de psql y el archivo no la conoce:
+--
+--   docker compose exec -T -e PGPASSWORD_ETL="$PG_ETL_PASSWORD" postgres \
+--       psql -U postgres -d retailmind -v etl_password="$PG_ETL_PASSWORD" \
+--       < retailmind/sql/postgres/85_rol_etl.sql
+--
+-- o, mas simple, desde la raiz del proyecto (donde vive `.env`):
+--
+--   set -a; . ./.env; set +a
+--   docker compose exec -T postgres psql -U postgres -d retailmind \
+--       -v etl_password="$PG_ETL_PASSWORD" < retailmind/sql/postgres/85_rol_etl.sql
+--
+-- El valor VIVO es `PG_ETL_PASSWORD` en el `.env` de la raiz (y su gemelo
+-- `ETL_PG_PASSWORD` en `retailmind/.env`, que es el que lee el pipeline). Los
+-- dos archivos estan fuera del indice de git.
+--
+-- DOS DETALLES QUE COSTARON UN RATO Y CONVIENE NO REDESCUBRIR:
+--
+--  1. **`:variable` NO se interpola dentro de `$$ ... $$`.** psql sustituye a
+--     nivel lexico y respeta el dollar-quoting, asi que un `:etl_password`
+--     dentro del bloque `DO` habria llegado al servidor como texto literal y
+--     habria creado el rol con la contrasena «:etl_password». Por eso el rol se
+--     crea SIN contrasena dentro del `DO` y la contrasena se aplica en el
+--     `ALTER ROLE` de fuera, que ya existia y se ejecuta siempre.
+--  2. **La contrasena que habia aqui ya no servia**: se roto el 2026-08-03 y el
+--     literal versionado llevaba dias siendo falso. Comprobado antes de
+--     retirarlo: con ese valor, `retailmind_etl` recibe «password
+--     authentication failed». Es decir, el archivo no solo filtraba una
+--     credencial, filtraba una EQUIVOCADA — lo segundo es lo que habria hecho
+--     perder una tarde a quien intentara usarla.
+-- ============================================================================
+
+-- Guardia: sin la variable, ABORTA. Antes de tener guardia, ejecutar el script
+-- sin `-v` habria puesto la contrasena literal «:etl_password» al rol y roto el
+-- ETL en silencio hasta la siguiente corrida.
+-- `\quit` SIEMPRE sale con codigo 0 —no acepta argumento, y psql avisa de que
+-- lo ignora—, asi que por si solo dejaria a un despliegue automatizado creyendo
+-- que el script fue bien. Con ON_ERROR_STOP activo, el RAISE de abajo aborta
+-- con codigo distinto de cero ANTES de llegar al \quit.
+\set ON_ERROR_STOP on
+\if :{?etl_password}
+\else
+  \echo '[ERROR] Falta la variable `etl_password`.'
+  \echo '        Ejecutalo con:  psql ... -v etl_password="$PG_ETL_PASSWORD" < 85_rol_etl.sql'
+  DO $guardia$ BEGIN
+      RAISE EXCEPTION 'Falta la variable psql `etl_password`: el script no se ejecuta.';
+  END $guardia$;
+  \quit
+\endif
+
 BEGIN;
 
 -- ------------------------------------------------------------------ 1) El rol
+-- Se crea SIN contrasena: dentro de `$$ ... $$` psql no interpola variables
+-- (ver la nota 1 de la cabecera). La contrasena la pone el ALTER ROLE de abajo,
+-- que corre SIEMPRE, tanto si el rol acaba de nacer como si ya existia.
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'retailmind_etl') THEN
-        CREATE ROLE retailmind_etl LOGIN PASSWORD 'Etl2026!';
-        RAISE NOTICE 'Rol retailmind_etl creado';
+        CREATE ROLE retailmind_etl LOGIN;
+        RAISE NOTICE 'Rol retailmind_etl creado (sin contrasena todavia)';
     ELSE
         RAISE NOTICE 'Rol retailmind_etl ya existia; se converge a los atributos esperados';
     END IF;
@@ -100,6 +158,8 @@ END $$;
 
 -- Converge los atributos en cada corrida (idempotencia real, no "si no existe").
 -- BYPASSRLS es el motivo de ser de este rol; el resto son NEGACIONES explicitas.
+-- `:'etl_password'` (con comillas simples) hace que psql lo emita como literal
+-- SQL correctamente escapado; nunca se concatena a mano.
 ALTER ROLE retailmind_etl
     LOGIN
     BYPASSRLS
@@ -108,7 +168,7 @@ ALTER ROLE retailmind_etl
     NOCREATEROLE
     NOREPLICATION
     NOINHERIT
-    PASSWORD 'Etl2026!';
+    PASSWORD :'etl_password';
 
 -- Capa 4 de solo-lectura: toda transaccion de este rol nace READ ONLY.
 ALTER ROLE retailmind_etl SET default_transaction_read_only = on;

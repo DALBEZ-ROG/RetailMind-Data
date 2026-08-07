@@ -193,7 +193,9 @@ Tabla **`retailmind.dim_producto`** (definida en `09_load_clickhouse.py`), carga
 5. **No escribir IDs identity.** Dejar que PostgreSQL asigne `id`; mapear `product_id`→`producto` por `slug`/lookup, no por id.
 6. **Tipos:** todo el Parquet es string; castear `price` a numérico (hay 1.189 precios distintos) antes de insertar.
 7. **Nombre de producto artificial.** El dataset no tiene nombres reales; los productos serán sintéticos (marca + código). Confirmar si es aceptable para el catálogo público.
-8. **Config `.env` desalineada.** `retailmind/.env` apunta `DB_NAME=CDRetail_IntelligenceViejo2` (nombre antiguo), mientras la BD operativa real es **`retailmind`**. Si el ETL usa ese `.env`, ajustarlo a `retailmind` con credenciales `postgres/1250143656@localhost:5432/retailmind`.
+8. **Config `.env` desalineada.** `retailmind/.env` apunta `DB_NAME=CDRetail_IntelligenceViejo2` (nombre antiguo), mientras la BD operativa real es **`retailmind`**. Si el ETL usa ese `.env`, ajustarlo a `retailmind`; las credenciales viven en `retailmind/.env` (gitignored) y **nunca se escriben aquí**.
+
+> **Nota de actualización (2026-08-05).** Este informe es un diagnóstico **histórico** del 2026-07-10 y su contexto de despliegue ya no vale: desde el 2026-08-03 PostgreSQL corre **en un contenedor** publicado en el **5432**, el PostgreSQL local pasó al **5433**, y las credenciales de motor (`postgres` del contenedor, `retailmind_app`, `retailmind_etl`, `jwt.secret`) fueron **rotadas**. La contraseña que este punto 8 traía en claro se retiró por eso. Estado real: `docs/DESPLIEGUE_EJECUTADO.md`.
 
 ---
 

@@ -196,6 +196,10 @@ services:
       CH_USER: ${CH_USER}
       CH_PASSWORD: ${CH_PASSWORD}
       JWT_SECRET: ${JWT_SECRET:?falta JWT_SECRET}
+      # Semilla del usuario admin (DataInitializer). SIN `:?` a proposito: no
+      # condiciona el arranque, solo la creacion del admin en una base vacia.
+      # Antes estaba compilada en el jar como constante de DataInitializer.
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       # --- ETL invocado DESDE el backend (boton y @Scheduled) ---
       ETL_SCRIPTS_PATH: /etl
       DWH_ETL_PATH: /etl
