@@ -167,6 +167,7 @@ export const INFORMES_COMPRAS: DefinicionDepartamento = {
     {
       id: 'OTD-COM-01',
       endpoint: 'ordenes',
+      fuente: 'simple',
       titulo: 'Órdenes de compra por estado',
       descripcion: 'Todas las órdenes con su estado, proveedor y monto. Las que esperan '
                  + 'el visto bueno de Gerencia salen primero: sin aprobar no se recibe.',
@@ -208,6 +209,7 @@ export const INFORMES_COMPRAS: DefinicionDepartamento = {
     {
       id: 'OTD-COM-02',
       endpoint: 'cuentas-por-pagar',
+      fuente: 'simple',
       titulo: 'Cuentas por pagar',
       descripcion: 'Cuánto le debemos a cada proveedor y qué cuotas ya vencieron. La '
                  + 'situación se calcula hoy contra la fecha de vencimiento.',
@@ -255,6 +257,7 @@ export const INFORMES_COMPRAS: DefinicionDepartamento = {
     {
       id: 'OTD-COM-08',
       endpoint: 'defectuosos',
+      fuente: 'simple',
       titulo: 'Defectuosos y devoluciones a proveedor',
       descripcion: 'Mercancía defectuosa esperando devolución y en qué paso va cada una. '
                  + 'Sin proveedor asignado, Compras no puede agruparla ni enviarla.',
@@ -301,6 +304,7 @@ export const INFORMES_COMPRAS: DefinicionDepartamento = {
     {
       id: 'OTD-COM-10',
       endpoint: 'catalogo-proveedor',
+      fuente: 'simple',
       titulo: 'Catálogo proveedor–producto',
       descripcion: 'A quién conviene comprarle cada producto: costo, plazo de entrega, '
                  + 'cantidad mínima y proveedor preferido.',
@@ -341,6 +345,7 @@ export const INFORMES_COMPRAS: DefinicionDepartamento = {
     {
       id: 'OTD-COM-09',
       endpoint: 'recuperacion-proveedor',
+      fuente: 'compuesto',
       titulo: 'Recuperación al proveedor por mercancía defectuosa',
       descripcion: 'Cuánto se recupera del proveedor, en nota de crédito o en reposición. '
                  + 'MUESTRA DÉBIL: hay pocas devoluciones resueltas, así que la columna '
@@ -412,6 +417,7 @@ export const INFORMES_COMPRAS: DefinicionDepartamento = {
     {
       id: 'OTD-COM-11',
       endpoint: 'entregas-incompletas',
+      fuente: 'simple',
       titulo: 'Quién entrega incompleto',
       descripcion: 'Lo que se pidió contra lo que de verdad llegó, línea a línea. Por '
                  + 'defecto solo cuentan las órdenes YA entregadas: una orden cancelada o '
@@ -458,6 +464,7 @@ export const INFORMES_COMPRAS: DefinicionDepartamento = {
     {
       id: 'OTD-COM-03',
       endpoint: 'puntualidad-pago',
+      fuente: 'compuesto',
       titulo: 'Puntualidad de pago al proveedor',
       descripcion: 'Pagos hechos antes o después del vencimiento. Anticipo y retraso van '
                  + 'en columnas SEPARADAS a propósito: promediados juntos se cancelan y un '
@@ -514,6 +521,7 @@ export const INFORMES_COMPRAS: DefinicionDepartamento = {
     {
       id: 'OTD-COM-04',
       endpoint: 'gasto-mensual',
+      fuente: 'compuesto',
       titulo: 'Gasto de compras por proveedor y mes',
       descripcion: 'Cuánto gastamos de verdad. El gasto es lo que el proveedor FACTURA, no '
                  + 'el total de la orden: cuando la entrega es parcial factura lo que '
@@ -557,6 +565,7 @@ export const INFORMES_COMPRAS: DefinicionDepartamento = {
     {
       id: 'OTD-COM-05',
       endpoint: 'cumplimiento-plazo',
+      fuente: 'compuesto',
       titulo: 'Cumplimiento del plazo prometido',
       descripcion: 'La fecha que el proveedor prometió contra el día en que la mercancía '
                  + 'llegó de verdad. La columna «Medidas» es el denominador de todo lo '
@@ -603,6 +612,7 @@ export const INFORMES_COMPRAS: DefinicionDepartamento = {
     {
       id: 'OTD-COM-06',
       endpoint: 'ciclo-compra',
+      fuente: 'compuesto',
       titulo: 'Días reales del ciclo de compra',
       descripcion: 'Cuánto tarda de verdad la mercancía en llegar desde que se emite la '
                  + 'orden, exista o no promesa de por medio. No es el informe anterior con '
@@ -645,6 +655,7 @@ export const INFORMES_COMPRAS: DefinicionDepartamento = {
     {
       id: 'OTD-COM-07',
       endpoint: 'rechazos',
+      fuente: 'compuesto',
       titulo: 'Mercancía rechazada en puerta',
       descripcion: 'Cuánta mercancía llega mal y por qué. El porcentaje va sobre lo que '
                  + 'FÍSICAMENTE LLEGÓ (aceptado + rechazado) y no sobre lo que se pidió: '
@@ -705,6 +716,7 @@ export const INFORMES_COMPRAS: DefinicionDepartamento = {
     {
       id: 'OTD-COM-12',
       endpoint: 'evolucion-costo',
+      fuente: 'compuesto',
       titulo: 'Evolución del costo de compra',
       descripcion: 'Cómo cambia el precio que cobra el proveedor por cada producto entre '
                  + 'una compra y la siguiente. La variación se mide dentro de la serie de '

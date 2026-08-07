@@ -74,6 +74,14 @@ export interface DefinicionInforme {
   id: string;
   /** Segmento final de la ruta REST: /api/informes/{depto}/{endpoint}. */
   endpoint: string;
+  /**
+   * SIMPLE (PostgreSQL) o COMPUESTO (ClickHouse). Obligatorio a propósito: lo
+   * decide el controlador del backend que sirve `endpoint` (ver
+   * `FuenteInforme`), así que un informe nuevo no puede entrar en la pantalla
+   * sin declarar de dónde sale — y el contador del selector no puede quedarse
+   * corto por un olvido.
+   */
+  fuente: FuenteInforme;
   titulo: string;
   descripcion: string;
   icono: string;
@@ -105,6 +113,20 @@ export interface DefinicionInforme {
    */
   graficoPrevision?: boolean;
 }
+
+/**
+ * De dónde sale el informe, que es lo mismo que decir si es SIMPLE o COMPUESTO.
+ *
+ * NO es una clasificación nueva: es la que ya existe en el backend, donde cada
+ * departamento tiene DOS controladores y el reparto es el mecanismo real —
+ * `Informes<Depto>Controller` (PostgreSQL, foto del presente) sirve los
+ * SIMPLES y `Informes<Depto>CompuestosController` (ClickHouse, `retailmind_dwh`)
+ * sirve los COMPUESTOS. El catálogo la documenta en
+ * `docs/tactico/CATALOGO_OBJETIVOS_TACTICOS.md` §2 y los propios archivos de
+ * definiciones ya la traían escrita en sus comentarios de bloque; este campo
+ * solo la hace legible por la pantalla, para pintarla y para contarla.
+ */
+export type FuenteInforme = 'simple' | 'compuesto';
 
 /** Departamento con sus informes. Un archivo de definiciones por departamento. */
 export interface DefinicionDepartamento {

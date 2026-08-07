@@ -141,7 +141,7 @@
           <td mat-cell *matCellDef="let t">
             <span class="stat-chip" [class.chip-warning]="t.prioridad === 'alta' || t.prioridad === 'urgente'"
                   [class.chip-info]="t.prioridad === 'baja' || t.prioridad === 'media'">
-              {{ t.prioridad }}
+              {{ t.prioridad | codigoLegible }}
             </span>
           </td>
         </ng-container>
@@ -225,7 +225,7 @@
       </span>
       <span class="stat-chip" [class.chip-warning]="detalle.prioridad === 'alta' || detalle.prioridad === 'urgente'"
             [class.chip-info]="detalle.prioridad === 'baja' || detalle.prioridad === 'media'">
-        prioridad: {{ detalle.prioridad }}
+        prioridad: {{ detalle.prioridad | codigoLegible }}
       </span>
       <span class="stat-chip" *ngIf="!esCliente" [class.chip-warning]="detalle.sla_vencido" class="stat-chip chip-info">
         SLA: {{ slaTexto(detalle) }}

@@ -63,8 +63,10 @@
             <mat-label>Rol</mat-label>
             <mat-select [(ngModel)]="rolEditor" (selectionChange)="cargarEditor()">
               <mat-option value="">— Elige un rol —</mat-option>
-              <mat-option *ngFor="let r of rolesEditables" [value]="r">
-                {{ r }}
+              <!-- [value] = nombre REAL del rol en PostgreSQL: es el que se
+                   manda a fn_admin_cambiar_permiso. El pipe solo lo pinta. -->
+              <mat-option *ngFor="let r of rolesEditables" [value]="r" [title]="r">
+                {{ r | rolGrupo }} <span class="cod-motor">{{ r }}</span>
                 <span class="chip-propio" *ngIf="esRolPropio(r)">propio</span>
               </mat-option>
             </mat-select>
@@ -99,7 +101,10 @@
             <span class="lbl">Código de aplicación</span><span class="val">{{ rp.codigo }}</span>
           </div>
           <div class="ficha-item">
-            <span class="lbl">Rol de motor</span><span class="val">{{ rp.rol_grupo }}</span>
+            <span class="lbl">Rol de motor</span>
+            <span class="val" [title]="rp.rol_grupo">
+              {{ rp.rol_grupo | rolGrupo }} <span class="cod-motor">{{ rp.rol_grupo }}</span>
+            </span>
           </div>
           <div class="ficha-item">
             <span class="lbl">Imita en pantallas a</span>
@@ -234,7 +239,8 @@
             <ng-container matColumnDef="rol">
               <th mat-header-cell *matHeaderCellDef>Rol de motor</th>
               <td mat-cell *matCellDef="let r">
-                <strong>{{ r.rol_motor }}</strong>
+                <strong [title]="r.rol_motor">{{ r.rol_motor | rolGrupo }}</strong>
+                <span class="cod-motor">{{ r.rol_motor }}</span>
                 <span class="rol-app" *ngIf="r.rol_app">{{ r.rol_app }}</span>
               </td>
             </ng-container>
@@ -310,7 +316,9 @@
             <mat-label>Rol de grupo</mat-label>
             <mat-select [(ngModel)]="filtroUsuarioRol">
               <mat-option value="">— Todos —</mat-option>
-              <mat-option *ngFor="let r of rolesGrupo" [value]="r">{{ r }}</mat-option>
+              <mat-option *ngFor="let r of rolesGrupo" [value]="r" [title]="r">
+                {{ r | rolGrupo }} <span class="cod-motor">{{ r }}</span>
+              </mat-option>
             </mat-select>
           </mat-form-field>
         </div>
@@ -333,7 +341,9 @@
             </ng-container>
             <ng-container matColumnDef="rol_motor">
               <th mat-header-cell *matHeaderCellDef>Rol de motor</th>
-              <td mat-cell *matCellDef="let u"><code>{{ u.rol_motor }}</code></td>
+              <td mat-cell *matCellDef="let u" [title]="u.rol_motor">
+                {{ u.rol_motor | rolGrupo }} <span class="cod-motor">{{ u.rol_motor }}</span>
+              </td>
             </ng-container>
             <ng-container matColumnDef="estado">
               <th mat-header-cell *matHeaderCellDef>Estado</th>
@@ -359,7 +369,9 @@
             <mat-label>Rol de grupo</mat-label>
             <mat-select [(ngModel)]="filtroRol" (selectionChange)="cargarPermisos()">
               <mat-option value="">— Todos —</mat-option>
-              <mat-option *ngFor="let r of rolesGrupo" [value]="r">{{ r }}</mat-option>
+              <mat-option *ngFor="let r of rolesGrupo" [value]="r" [title]="r">
+                {{ r | rolGrupo }} <span class="cod-motor">{{ r }}</span>
+              </mat-option>
             </mat-select>
           </mat-form-field>
           <mat-form-field appearance="outline">
@@ -451,7 +463,9 @@
           <table mat-table [dataSource]="filas">
             <ng-container matColumnDef="rol">
               <th mat-header-cell *matHeaderCellDef>Rol</th>
-              <td mat-cell *matCellDef="let f"><strong>{{ f.rol_motor }}</strong></td>
+              <td mat-cell *matCellDef="let f" [title]="f.rol_motor">
+                <strong>{{ f.rol_motor | rolGrupo }}</strong>
+              </td>
             </ng-container>
             <ng-container matColumnDef="objeto">
               <th mat-header-cell *matHeaderCellDef>Objeto</th>
@@ -555,7 +569,9 @@
             </ng-container>
             <ng-container matColumnDef="roles">
               <th mat-header-cell *matHeaderCellDef>Roles</th>
-              <td mat-cell *matCellDef="let p" class="celda-roles">{{ p.roles }}</td>
+              <td mat-cell *matCellDef="let p" class="celda-roles" [title]="p.roles">
+                {{ p.roles | rolGrupo }}
+              </td>
             </ng-container>
             <ng-container matColumnDef="explicacion">
               <th mat-header-cell *matHeaderCellDef>Qué hace</th>
@@ -588,7 +604,8 @@
             Su veredicto es del <strong>rol entero</strong>, así que solo se muestra en la
             ventana de HOY; las de otros días quedan con «—».
             Roles con la ventana abierta en este momento:
-            <strong>{{ rolesDentroDeHorario.join(', ') || 'ninguno' }}</strong>.
+            <strong [title]="rolesDentroDeHorario.join(', ')">
+              {{ rolesDentroDeHorarioTexto || 'ninguno' }}</strong>.
             Las ventanas se editan en <em>Horarios de Acceso</em>.
           </span>
         </p>
@@ -596,7 +613,9 @@
           <table mat-table [dataSource]="horarios">
             <ng-container matColumnDef="rol">
               <th mat-header-cell *matHeaderCellDef>Rol de grupo</th>
-              <td mat-cell *matCellDef="let h"><strong>{{ h.rol_grupo }}</strong></td>
+              <td mat-cell *matCellDef="let h" [title]="h.rol_grupo">
+                <strong>{{ h.rol_grupo | rolGrupo }}</strong>
+              </td>
             </ng-container>
             <ng-container matColumnDef="dia">
               <th mat-header-cell *matHeaderCellDef>Día</th>

@@ -17,6 +17,7 @@ import { mensajeError } from '../../../core/services/api-error.util';
 import {
   CatalogoRef, DevolucionRow, DevolucionRma
 } from '../../../core/models/operativo.model';
+import { CodigoLegiblePipe } from '../../../core/pipes/etiquetas.pipe';
 
 /**
  * Tablero RMA / logística inversa. Una sola pantalla para todo el pipeline;
@@ -31,7 +32,7 @@ import {
   selector: 'app-devoluciones',
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
-    MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule, MatTooltipModule],
+    MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule, MatTooltipModule, CodigoLegiblePipe],
   templateUrl: './devoluciones.component.html',
   styleUrl: '../operativo-shared.scss'
 })

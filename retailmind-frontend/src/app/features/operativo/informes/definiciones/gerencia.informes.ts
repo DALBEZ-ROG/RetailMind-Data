@@ -113,6 +113,7 @@ export const INFORMES_GERENCIA: DefinicionDepartamento = {
     {
       id: 'OTD-GER-01',
       endpoint: 'foto-dia',
+      fuente: 'simple',
       titulo: 'Foto del día',
       descripcion: 'Qué se pidió, qué se cobró y qué está esperando una decisión. Sin fecha '
                  + 'se consulta hoy; los pendientes son SIEMPRE al momento, no de ese día.',
@@ -140,6 +141,7 @@ export const INFORMES_GERENCIA: DefinicionDepartamento = {
     {
       id: 'OTD-GER-04',
       endpoint: 'cupones',
+      fuente: 'simple',
       titulo: 'Cupones y usos restantes',
       descripcion: 'Qué cupones están sueltos ahí fuera, cuántos usos les quedan y cuándo '
                  + 'dejan de valer. La situación se recalcula con las mismas reglas del checkout.',
@@ -187,6 +189,7 @@ export const INFORMES_GERENCIA: DefinicionDepartamento = {
     {
       id: 'OTD-GER-06',
       endpoint: 'marketing',
+      fuente: 'simple',
       titulo: 'Marketing vigente',
       descripcion: 'Qué tenemos en la calle hoy: promociones con los productos que abarcan, '
                  + 'campañas y banners, todos medidos con la misma vara de vigencia.',
@@ -238,6 +241,7 @@ export const INFORMES_GERENCIA: DefinicionDepartamento = {
     {
       id: 'OTD-GER-08',
       endpoint: 'auditoria',
+      fuente: 'simple',
       titulo: 'Auditoría del sistema',
       descripcion: 'Quién hizo qué: aprobaciones, despachos, registros de factura y '
                  + 'moderaciones, con autor, fecha y el antes/después del cambio.',
@@ -292,6 +296,7 @@ export const INFORMES_GERENCIA: DefinicionDepartamento = {
     {
       id: 'OTD-GER-09',
       endpoint: 'accesos',
+      fuente: 'simple',
       titulo: 'Intentos de acceso',
       descripcion: 'Quién entró y quién no pudo, desde qué IP y por qué. «Fuera de su horario» '
                  + 'no es un error de credenciales: es la ventana del grupo bloqueando el login.',
@@ -331,6 +336,7 @@ export const INFORMES_GERENCIA: DefinicionDepartamento = {
     {
       id: 'OTD-GER-02',
       endpoint: 'balanza',
+      fuente: 'compuesto',
       titulo: 'Balanza mensual: cobros contra pagos',
       descripcion: 'El dinero que ENTRA por cobros de cliente contra el que SALE hacia '
                  + 'proveedores, mes a mes. Mide CAJA —movimiento real de dinero—, no lo '
@@ -369,6 +375,7 @@ export const INFORMES_GERENCIA: DefinicionDepartamento = {
     {
       id: 'OTD-GER-05',
       endpoint: 'descuento-cupones',
+      fuente: 'compuesto',
       titulo: 'Descuento otorgado por cupón',
       descripcion: 'Qué cupones canjearon los clientes y cuánto le costaron al negocio, mes a '
                  + 'mes. «Descuento canjeado» es lo que registró el canje y «Descuento en el '
@@ -415,6 +422,7 @@ export const INFORMES_GERENCIA: DefinicionDepartamento = {
     {
       id: 'OTD-GER-03',
       endpoint: 'margen-categoria',
+      fuente: 'compuesto',
       titulo: 'Ganancia por categoría',
       descripcion: 'Qué categorías dejan más ganancia, sobre la venta NETA: ya lleva '
                  + 'descontadas las dos capas de descuento y excluido el IVA. El grano de '
@@ -465,6 +473,7 @@ export const INFORMES_GERENCIA: DefinicionDepartamento = {
     {
       id: 'OTD-GER-10',
       endpoint: 'margen-producto',
+      fuente: 'compuesto',
       titulo: 'Margen producto por producto',
       descripcion: 'La vista fina de la ganancia, con buscador por nombre o SKU. Solo '
                  + 'aparecen los productos CON venta en el período: uno sin ventas no '
@@ -511,6 +520,7 @@ export const INFORMES_GERENCIA: DefinicionDepartamento = {
     {
       id: 'OTD-GER-11',
       endpoint: 'descuento-total',
+      fuente: 'compuesto',
       titulo: 'Descuento total entregado',
       descripcion: 'Las DOS capas del descuento —promoción por línea y cupón prorrateado— '
                  + 'separadas y sumadas. Se deciden en sitios distintos: la promo la pone '
@@ -567,6 +577,7 @@ export const INFORMES_GERENCIA: DefinicionDepartamento = {
     {
       id: 'OTD-GER-07',
       endpoint: 'efecto-promociones',
+      fuente: 'compuesto',
       titulo: 'Efecto de las promociones: antes vs durante',
       descripcion: 'Unidades por DÍA del producto antes de su promoción y durante ella. '
                  + 'MUESTRA DÉBIL: muchas filas se calculan sobre una o dos ventas, así '

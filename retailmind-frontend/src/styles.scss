@@ -611,6 +611,20 @@ select.select-premium,
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// CÓDIGO INTERNO JUNTO AL NOMBRE LEGIBLE
+// Cuando la interfaz traduce un identificador del motor (`grp_analista` →
+// «Analista»), el crudo no desaparece: se pinta en tono menor al lado, o va en
+// el `title`. Es global porque aparece dentro de paneles de `mat-select`, que
+// el CDK monta en un overlay fuera del árbol del componente.
+// ══════════════════════════════════════════════════════════════════════════════
+.cod-motor {
+  font-family: 'Consolas', 'Menlo', monospace;
+  font-size: 11px;
+  color: var(--text-light);
+  margin-left: 6px;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // DIÁLOGOS "DUBAI" (panelClass: dubai-dialog) — glass card sobre el overlay
 // ══════════════════════════════════════════════════════════════════════════════
 .dubai-dialog .mat-mdc-dialog-surface {
@@ -642,4 +656,53 @@ select.select-premium,
 
 .dubai-dialog .mat-mdc-dialog-content {
   padding-top: 8px !important;
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// ESPACIADO DEL CONTENIDO DEL DIÁLOGO — la corrección del encimado
+//
+// El defecto era COMÚN a todos los diálogos, no del formulario de horarios, y
+// viene de cómo Angular Material (MDC) coloca el subscript de un campo:
+//
+//   .mat-mdc-form-field-hint-wrapper  →  position: absolute
+//   .mat-mdc-form-field-bottom-align::before  →  reserva UNA línea (16 px) fija
+//
+// Es decir, el `mat-hint` NO ocupa sitio en el flujo: se dibuja encima de lo que
+// venga detrás, y el hueco reservado es de una sola línea. En cuanto el texto de
+// ayuda envuelve a dos líneas —«El rol de una ventana existente no se cambia.»
+// en una columna estrecha— la segunda línea cae SOBRE el elemento siguiente. En
+// el diálogo de ventana horaria ese elemento era la casilla «Activa (si se
+// desmarca, equivale a eliminar)».
+//
+// La corrección devuelve el subscript al flujo normal y conserva la reserva de
+// una línea como altura MÍNIMA, para que los campos sin ayuda sigan alineados
+// con los que sí la tienen. Va aquí, en la hoja global, y no en cada diálogo
+// porque el CDK monta el diálogo en un overlay FUERA del árbol del componente:
+// una hoja con encapsulación no lo alcanza (§2.4 y trampa 2 de PATRON_UI.md).
+// ──────────────────────────────────────────────────────────────────────────────
+.dubai-dialog {
+  .mat-mdc-form-field-subscript-wrapper {
+    min-height: 16px;
+
+    // La reserva fija sobra: ahora la altura la da el contenido real.
+    &.mat-mdc-form-field-bottom-align::before { content: none; }
+  }
+
+  .mat-mdc-form-field-hint-wrapper,
+  .mat-mdc-form-field-error-wrapper {
+    position: static;
+    padding-top: 2px;
+  }
+
+  // Aire alrededor de las casillas y los avisos que van sueltos en el cuerpo
+  // del formulario, que hasta ahora quedaban pegados al campo anterior.
+  .mat-mdc-dialog-content {
+    > mat-checkbox,
+    > .mat-mdc-checkbox {
+      display: block;
+      margin: 6px 0;
+    }
+
+    > p { margin-top: 12px; }
+  }
 }

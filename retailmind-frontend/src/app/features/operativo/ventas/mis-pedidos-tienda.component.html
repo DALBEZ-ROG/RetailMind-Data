@@ -25,7 +25,7 @@
             <span class="estado-chip"
                   [class.ok]="['entregado','despachado','facturado','preparado'].includes(p.estado)"
                   [class.warn]="p.estado === 'devuelto'"
-                  [class.error]="['cancelado','no_entregado'].includes(p.estado)">{{ p.estado }}</span>
+                  [class.error]="['cancelado','no_entregado'].includes(p.estado)">{{ p.estado | codigoLegible }}</span>
           </td>
         </ng-container>
         <ng-container matColumnDef="total">
@@ -56,8 +56,8 @@
       <span class="estado-chip"
             [class.ok]="['pagado','facturado','preparado','entregado'].includes(detalle.estado)"
             [class.warn]="['despachado','en_preparacion'].includes(detalle.estado)"
-            [class.error]="['devuelto','cancelado','no_entregado'].includes(detalle.estado)">{{ detalle.estado }}</span>
-      <span class="stat-chip chip-info">Canal: {{ detalle.canal }}</span>
+            [class.error]="['devuelto','cancelado','no_entregado'].includes(detalle.estado)">{{ detalle.estado | codigoLegible }}</span>
+      <span class="stat-chip chip-info">Canal: {{ detalle.canal | codigoLegible }}</span>
       <span class="stat-chip chip-info" *ngIf="detalle.transportista">
         <mat-icon style="font-size:14px;height:14px;width:14px;">local_shipping</mat-icon>
         Envío con {{ detalle.transportista }}<ng-container *ngIf="detalle.dias_entrega_min">
@@ -65,7 +65,7 @@
       </span>
       <span class="stat-chip chip-info" *ngIf="detalle.envio">
         <mat-icon style="font-size:14px;height:14px;width:14px;">local_shipping</mat-icon>
-        Guía {{ detalle.envio.numero_guia }} ({{ detalle.envio.estado }})
+        Guía {{ detalle.envio.numero_guia }} ({{ detalle.envio.estado | codigoLegible }})
       </span>
       <button class="btn-limpiar" *ngIf="detalle.factura" (click)="verFacturaPdf()">
         <mat-icon>picture_as_pdf</mat-icon> Factura {{ detalle.factura.numero }}
@@ -206,7 +206,7 @@
     <div *ngIf="detalle.historial?.length" style="margin-top: 16px;">
       <h3><mat-icon>history</mat-icon> Historial</h3>
       <div class="dato" *ngFor="let h of detalle.historial">
-        <span class="estado-chip ok">{{ h.estado }}</span>
+        <span class="estado-chip ok">{{ h.estado | codigoLegible }}</span>
         {{ h.comentario }} · {{ h.fecha_creacion | date:'short' }}
       </div>
     </div>
@@ -216,7 +216,7 @@
       <h3><mat-icon>route</mat-icon> Seguimiento del envío</h3>
       <div class="dato" *ngFor="let s of seguimiento">
         <span class="estado-chip" [class.ok]="s.estado === 'entregado'"
-              [class.warn]="s.estado !== 'entregado'">{{ s.estado }}</span>
+              [class.warn]="s.estado !== 'entregado'">{{ s.estado | codigoLegible }}</span>
         {{ s.descripcion }} — {{ s.ubicacion }} · {{ s.fecha_evento | date:'short' }}
       </div>
     </div>
@@ -245,14 +245,14 @@
         </ng-container>
         <ng-container matColumnDef="motivo">
           <th mat-header-cell *matHeaderCellDef>Motivo</th>
-          <td mat-cell *matCellDef="let d">{{ d.motivo }}</td>
+          <td mat-cell *matCellDef="let d">{{ d.motivo | codigoLegible }}</td>
         </ng-container>
         <ng-container matColumnDef="estado">
           <th mat-header-cell *matHeaderCellDef>Estado</th>
           <td mat-cell *matCellDef="let d">
             <span class="estado-chip" [class.ok]="chipDevolucion(d.estado) === 'ok'"
                   [class.warn]="chipDevolucion(d.estado) === 'warn'"
-                  [class.error]="chipDevolucion(d.estado) === 'error'">{{ d.estado }}</span>
+                  [class.error]="chipDevolucion(d.estado) === 'error'">{{ d.estado | codigoLegible }}</span>
           </td>
         </ng-container>
         <ng-container matColumnDef="monto">
@@ -278,12 +278,12 @@
       <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:10px;">
         <span class="estado-chip" [class.ok]="chipDevolucion(devolucion.estado) === 'ok'"
               [class.warn]="chipDevolucion(devolucion.estado) === 'warn'"
-              [class.error]="chipDevolucion(devolucion.estado) === 'error'">{{ devolucion.estado }}</span>
+              [class.error]="chipDevolucion(devolucion.estado) === 'error'">{{ devolucion.estado | codigoLegible }}</span>
         <span class="stat-chip chip-info" *ngIf="devolucion.guia_retorno">
           Guía {{ devolucion.guia_retorno }} · {{ devolucion.transportista }}
         </span>
         <span class="stat-chip chip-success" *ngIf="devolucion.monto_reembolsado">
-          Reembolsado {{ devolucion.monto_reembolsado | currency:'USD' }} · {{ devolucion.metodo_reembolso }}
+          Reembolsado {{ devolucion.monto_reembolsado | currency:'USD' }} · {{ devolucion.metodo_reembolso | codigoLegible }}
         </span>
         <button class="btn-limpiar" *ngIf="devolucion.guia_retorno" (click)="verGuiaPdf()">
           <mat-icon>picture_as_pdf</mat-icon> Guía de retorno PDF
@@ -305,14 +305,14 @@
         <span class="estado-chip" *ngIf="it.resultado_inspeccion"
               [class.ok]="it.resultado_inspeccion === 'apto_reventa'"
               [class.warn]="it.resultado_inspeccion === 'defectuoso'"
-              [class.error]="it.resultado_inspeccion === 'rechazado'">{{ it.resultado_inspeccion }}</span>
+              [class.error]="it.resultado_inspeccion === 'rechazado'">{{ it.resultado_inspeccion | codigoLegible }}</span>
       </div>
       <div style="margin-top:10px;">
         <h3><mat-icon>history</mat-icon> Seguimiento</h3>
         <div class="dato" *ngFor="let h of devolucion.historial">
           <span class="estado-chip" [class.ok]="chipDevolucion(h.estado) === 'ok'"
                 [class.warn]="chipDevolucion(h.estado) === 'warn'"
-                [class.error]="chipDevolucion(h.estado) === 'error'">{{ h.estado }}</span>
+                [class.error]="chipDevolucion(h.estado) === 'error'">{{ h.estado | codigoLegible }}</span>
           {{ h.comentario }} · {{ h.fecha_creacion | date:'short' }}
         </div>
       </div>

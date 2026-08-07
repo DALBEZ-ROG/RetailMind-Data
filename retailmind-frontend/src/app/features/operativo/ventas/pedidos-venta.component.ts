@@ -21,6 +21,7 @@ import { mensajeError } from '../../../core/services/api-error.util';
 import {
   ClienteRef, BodegaRef, VarianteRef, CatalogoRef, PedidoVentaRow, PedidoVentaDetalle
 } from '../../../core/models/operativo.model';
+import { CodigoLegiblePipe } from '../../../core/pipes/etiquetas.pipe';
 
 interface LineaPedido { varianteId: number | null; cantidad: number; }
 
@@ -29,7 +30,7 @@ interface LineaPedido { varianteId: number | null; cantidad: number; }
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatCheckboxModule,
-    MatSnackBarModule, MatTooltipModule, MatPaginatorModule, SelectBuscableComponent],
+    MatSnackBarModule, MatTooltipModule, MatPaginatorModule, SelectBuscableComponent, CodigoLegiblePipe],
   templateUrl: './pedidos-venta.component.html',
   styleUrl: '../operativo-shared.scss'
 })

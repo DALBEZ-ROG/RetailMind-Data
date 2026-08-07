@@ -17,6 +17,7 @@ import {
   CatalogoRef, DevolucionRow, DevolucionRma, ElegibilidadDevolucion,
   NovedadEnvioRow, PedidoVentaRow, PedidoVentaDetalle, SeguimientoRow
 } from '../../../core/models/operativo.model';
+import { CodigoLegiblePipe } from '../../../core/pipes/etiquetas.pipe';
 
 /**
  * CU-O-20: MIS PEDIDOS (rol CLIENTE). RLS (app.cliente_id) devuelve solo lo
@@ -30,7 +31,7 @@ import {
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink, MatTableModule, MatIconModule,
     MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule,
-    MatSnackBarModule, MatTooltipModule],
+    MatSnackBarModule, MatTooltipModule, CodigoLegiblePipe],
   templateUrl: './mis-pedidos-tienda.component.html',
   styleUrl: '../operativo-shared.scss'
 })

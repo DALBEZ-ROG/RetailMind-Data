@@ -11,7 +11,7 @@
         <mat-label>Pedido</mat-label>
         <mat-select [(ngModel)]="pedidoId">
           <mat-option *ngFor="let p of pedidos" [value]="p.id">
-            {{ p.numero }} — {{ p.cliente }} ({{ p.total | currency:'USD' }} · {{ p.estado }})
+            {{ p.numero }} — {{ p.cliente }} ({{ p.total | currency:'USD' }} · {{ p.estado | codigoLegible }})
           </mat-option>
         </mat-select>
         <mat-hint>Solo pedidos pagados y aún sin factura</mat-hint>
@@ -75,7 +75,7 @@
           <td mat-cell *matCellDef="let f">
             <span class="estado-chip"
                   [class.ok]="f.estado === 'emitida' || f.estado === 'autorizada'"
-                  [class.error]="f.estado === 'anulada'">{{ f.estado }}</span>
+                  [class.error]="f.estado === 'anulada'">{{ f.estado | codigoLegible }}</span>
           </td>
         </ng-container>
         <ng-container matColumnDef="acciones">

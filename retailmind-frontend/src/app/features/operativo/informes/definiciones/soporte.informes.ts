@@ -73,6 +73,7 @@ export const INFORMES_SOPORTE: DefinicionDepartamento = {
     {
       id: 'OTD-SOP-01',
       endpoint: 'bandeja',
+      fuente: 'simple',
       titulo: 'Bandeja de tickets',
       descripcion: 'Qué hay sobre la mesa: estado, urgencia, categoría y quién lo atiende. '
                  + 'Primero lo que ya pasó su fecha límite.',
@@ -129,6 +130,7 @@ export const INFORMES_SOPORTE: DefinicionDepartamento = {
     {
       id: 'OTD-SOP-04',
       endpoint: 'por-categoria',
+      fuente: 'simple',
       titulo: 'Tickets por categoría',
       descripcion: 'De qué se queja la gente, para atacar la causa y no el síntoma. '
                  + 'Una categoría en cero también informa: ese frente está tranquilo.',
@@ -161,6 +163,7 @@ export const INFORMES_SOPORTE: DefinicionDepartamento = {
     {
       id: 'OTD-SOP-05',
       endpoint: 'por-agente',
+      fuente: 'simple',
       titulo: 'Carga por agente',
       descripcion: 'Cómo está repartido el trabajo del equipo. La cola «(sin asignar)» sale '
                  + 'primero: es la que nadie tomó.',
@@ -203,6 +206,7 @@ export const INFORMES_SOPORTE: DefinicionDepartamento = {
     {
       id: 'OTD-SOP-02',
       endpoint: 'cumplimiento-sla',
+      fuente: 'compuesto',
       titulo: 'Cumplimiento del tiempo prometido',
       descripcion: 'La base se parte en CUATRO y no en un porcentaje sobre el total: de '
                  + 'un ticket abierto no se sabe si cumplirá, y contarlo como '
@@ -253,6 +257,7 @@ export const INFORMES_SOPORTE: DefinicionDepartamento = {
     {
       id: 'OTD-SOP-03',
       endpoint: 'tiempo-resolucion',
+      fuente: 'compuesto',
       titulo: 'Tiempo de resolución por tipo de problema',
       descripcion: 'Horas entre la apertura y el CIERRE, por categoría. La base son los '
                  + 'tickets con cierre y no los que están en estado «resuelto»: resolver '
@@ -303,6 +308,7 @@ export const INFORMES_SOPORTE: DefinicionDepartamento = {
     {
       id: 'OTD-SOP-06',
       endpoint: 'primera-respuesta',
+      fuente: 'compuesto',
       titulo: 'Horas hasta la primera respuesta',
       descripcion: 'Cuánto tarda el equipo en contestar por primera vez. «Primera '
                  + 'respuesta» = primer mensaje del equipo VISIBLE para el cliente; una '
@@ -356,6 +362,7 @@ export const INFORMES_SOPORTE: DefinicionDepartamento = {
     {
       id: 'OTD-SOP-07',
       endpoint: 'tiempos-agente',
+      fuente: 'compuesto',
       titulo: 'Tiempo de resolución por agente',
       descripcion: 'Carga y tiempos de cada persona del equipo. La columna «Cerrados» es '
                  + 'el denominador y va antes que las horas: con dos o tres casos, la '
@@ -405,6 +412,7 @@ export const INFORMES_SOPORTE: DefinicionDepartamento = {
     {
       id: 'OTD-SOP-08',
       endpoint: 'productos-reclamados',
+      fuente: 'compuesto',
       titulo: 'Productos que más problemas generan',
       descripcion: 'Reclamos y devoluciones por producto, en un solo ranking. Solo entra '
                  + 'lo que se puede atribuir a un producto: los tickets sin producto '

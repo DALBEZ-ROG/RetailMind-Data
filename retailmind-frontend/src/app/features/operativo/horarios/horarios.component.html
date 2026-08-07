@@ -9,7 +9,7 @@
     <mat-icon>gpp_maybe</mat-icon>
     <div>
       <strong>Hay roles sin ninguna ventana activa:</strong>
-      {{ rolesSinVentanaActiva.join(', ') }}.
+      <span [title]="rolesSinVentanaActiva.join(', ')">{{ rolesSinVentanaActivaTexto }}</span>.
       Sus usuarios no pueden iniciar sesión ningún día. Restaura una ventana desde
       Modificar o crea una nueva.
     </div>
@@ -23,7 +23,9 @@
         <mat-label>Rol de grupo</mat-label>
         <mat-select [(ngModel)]="filtroRol" (selectionChange)="aplicarFiltros()">
           <mat-option value="todos">— Todos —</mat-option>
-          <mat-option *ngFor="let r of roles" [value]="r">{{ r }}</mat-option>
+          <!-- OJO: el [value] es el identificador CRUDO del rol de PostgreSQL y
+               así viaja al filtro y al backend. El pipe solo cambia lo que se ve. -->
+          <mat-option *ngFor="let r of roles" [value]="r">{{ r | rolGrupo }}</mat-option>
         </mat-select>
       </mat-form-field>
       <mat-form-field appearance="outline">
@@ -60,7 +62,7 @@
         entidad="ventana horaria" articulo="una"
         [haySeleccion]="!!filaSeleccionada"
         [nombreSeleccion]="filaSeleccionada
-            ? (filaSeleccionada.rol_grupo + ' · ' + dias[filaSeleccionada.dia_semana]
+            ? ((filaSeleccionada.rol_grupo | rolGrupo) + ' · ' + dias[filaSeleccionada.dia_semana]
                + ' ' + filaSeleccionada.hora_inicio + '–' + filaSeleccionada.hora_fin)
             : null"
         [puedeEliminar]="!!filaSeleccionada?.activo"
@@ -82,7 +84,11 @@
       <table mat-table [dataSource]="ventanas">
         <ng-container matColumnDef="rol">
           <th mat-header-cell *matHeaderCellDef>Rol de grupo</th>
-          <td mat-cell *matCellDef="let v"><strong>{{ v.rol_grupo }}</strong></td>
+          <!-- El identificador del motor (`grp_…`) sigue siendo consultable en el
+               `title` de la celda: se ve limpio, pero no se pierde para depurar. -->
+          <td mat-cell *matCellDef="let v" [title]="v.rol_grupo">
+            <strong>{{ v.rol_grupo | rolGrupo }}</strong>
+          </td>
         </ng-container>
         <ng-container matColumnDef="dia">
           <th mat-header-cell *matHeaderCellDef>Día</th>

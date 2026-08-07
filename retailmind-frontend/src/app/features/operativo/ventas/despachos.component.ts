@@ -16,6 +16,7 @@ import {
   PedidoVentaRow, CatalogoRef, EnvioDetalle, SeguimientoRow, DetalleLogistico,
   NovedadesEnvioRes, NovedadEnvioRow
 } from '../../../core/models/operativo.model';
+import { CodigoLegiblePipe } from '../../../core/pipes/etiquetas.pipe';
 
 /**
  * Despacho (script 39): solo pedidos PREPARADOS por bodega. Al seleccionar el
@@ -28,7 +29,7 @@ import {
   selector: 'app-despachos',
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
-    MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule],
+    MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule, CodigoLegiblePipe],
   templateUrl: './despachos.component.html',
   styleUrl: '../operativo-shared.scss'
 })

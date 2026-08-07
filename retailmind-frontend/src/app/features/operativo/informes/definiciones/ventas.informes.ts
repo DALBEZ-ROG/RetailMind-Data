@@ -135,6 +135,7 @@ export const INFORMES_VENTAS: DefinicionDepartamento = {
     {
       id: 'OTD-VEN-01',
       endpoint: 'cartera-pedidos',
+      fuente: 'simple',
       titulo: 'Cartera de pedidos por estado',
       descripcion: 'Todos los pedidos y en qué paso del proceso está cada uno hoy.',
       icono: 'receipt_long',
@@ -183,6 +184,7 @@ export const INFORMES_VENTAS: DefinicionDepartamento = {
     {
       id: 'OTD-VEN-02',
       endpoint: 'por-vendedor',
+      fuente: 'simple',
       titulo: 'Ventas por vendedor',
       descripcion: 'Pedidos y monto de cada vendedor en el período, para evaluar el '
                  + 'cumplimiento individual. Un vendedor solo ve lo suyo.',
@@ -209,6 +211,7 @@ export const INFORMES_VENTAS: DefinicionDepartamento = {
     {
       id: 'OTD-VEN-08',
       endpoint: 'carritos-abandonados',
+      fuente: 'simple',
       titulo: 'Carritos abandonados',
       descripcion: 'Carritos que el cliente dejó a medias sin llegar a pagar, con su '
                  + 'antigüedad y contenido.',
@@ -243,6 +246,7 @@ export const INFORMES_VENTAS: DefinicionDepartamento = {
     {
       id: 'OTD-VEN-10',
       endpoint: 'moderacion',
+      fuente: 'simple',
       titulo: 'Cola de moderación',
       descripcion: 'Reseñas en espera de aprobación y preguntas de producto sin atender. '
                  + 'Solo moderadores (Administración y Gerencia).',
@@ -278,6 +282,7 @@ export const INFORMES_VENTAS: DefinicionDepartamento = {
     {
       id: 'OTD-VEN-15',
       endpoint: 'avance-meta',
+      fuente: 'simple',
       titulo: 'Venta contra la meta del mes',
       descripcion: 'Meta del período vigente contra la venta real acumulada, con el '
                  + 'porcentaje de avance.',
@@ -317,6 +322,7 @@ export const INFORMES_VENTAS: DefinicionDepartamento = {
     {
       id: 'OTD-VEN-16',
       endpoint: 'participacion-canal',
+      fuente: 'simple',
       titulo: 'Participación de la venta por canal',
       descripcion: 'Cuánto pone cada canal de entrada —tienda en línea, mostrador y teléfono— '
                  + 'en la venta del período: pedidos, monto, ticket promedio y porcentaje de '
@@ -365,6 +371,7 @@ export const INFORMES_VENTAS: DefinicionDepartamento = {
     {
       id: 'OTD-VEN-06',
       endpoint: 'evolucion-mensual',
+      fuente: 'compuesto',
       titulo: 'Evolución de la venta por mes y categoría',
       descripcion: 'Cómo evoluciona la venta mes a mes, con el desglose por categoría de '
                  + 'producto: unidades, venta neta, margen, peso de cada categoría en su mes '
@@ -411,6 +418,7 @@ export const INFORMES_VENTAS: DefinicionDepartamento = {
     {
       id: 'OTD-VEN-05',
       endpoint: 'clientes',
+      fuente: 'compuesto',
       titulo: 'Compra por cliente',
       descripcion: 'El negocio visto desde el cliente: cuánto gastó cada uno, en cuántos '
                  + 'pedidos y cuándo compró por última vez. El dinero excluye los pedidos '
@@ -452,6 +460,7 @@ export const INFORMES_VENTAS: DefinicionDepartamento = {
     {
       id: 'OTD-VEN-07',
       endpoint: 'ticket-promedio',
+      fuente: 'compuesto',
       titulo: 'Valor promedio del pedido por canal',
       descripcion: 'Cuánto vale un pedido típico, mes a mes y por canal de entrada. Junto al '
                  + 'promedio va la MEDIANA: el promedio lo mueve un pedido grande y la mediana '
@@ -490,6 +499,7 @@ export const INFORMES_VENTAS: DefinicionDepartamento = {
     {
       id: 'OTD-VEN-13',
       endpoint: 'evolucion-canal',
+      fuente: 'compuesto',
       titulo: 'Evolución de la participación por canal',
       descripcion: 'Cómo cambia mes a mes el peso de cada canal —tienda en línea, mostrador y '
                  + 'teléfono— en la venta. La cuota se mide sobre PEDIDOS y sobre MONTO, y casi '
@@ -523,6 +533,7 @@ export const INFORMES_VENTAS: DefinicionDepartamento = {
     {
       id: 'OTD-VEN-09',
       endpoint: 'formas-cobro',
+      fuente: 'compuesto',
       titulo: 'Mezcla de formas de cobro',
       descripcion: 'Con qué se cobra —efectivo, tarjeta o transferencia— y cómo cambia esa '
                  + 'mezcla mes a mes. Cuenta COBROS y no pedidos, porque un pedido puede '
@@ -563,6 +574,7 @@ export const INFORMES_VENTAS: DefinicionDepartamento = {
     {
       id: 'OTD-VEN-12',
       endpoint: 'cobros-fallidos',
+      fuente: 'compuesto',
       titulo: 'Cobros rechazados y su motivo',
       descripcion: 'Cuántos intentos de cobro se rechazan y por qué, mes a mes: dónde se está '
                  + 'perdiendo venta en el paso del pago. El monto es lo que se INTENTÓ cobrar '
@@ -598,6 +610,7 @@ export const INFORMES_VENTAS: DefinicionDepartamento = {
     {
       id: 'OTD-VEN-11',
       endpoint: 'resenas',
+      fuente: 'compuesto',
       titulo: 'Calificación de los productos',
       descripcion: 'Lo que los clientes puntúan, y cómo se mueve. El orden por defecto es '
                  + 'por VOLUMEN de reseñas y no por nota: un producto con un solo cinco '
@@ -651,6 +664,7 @@ export const INFORMES_VENTAS: DefinicionDepartamento = {
     {
       id: 'OTD-VEN-14',
       endpoint: 'devoluciones',
+      fuente: 'compuesto',
       titulo: 'Devoluciones y su peso sobre la venta',
       descripcion: 'Cuánto vuelve cada mes y qué porcentaje de la venta representa. '
                  + 'ATENCIÓN a la base del porcentaje: por defecto divide lo devuelto EN '
@@ -708,6 +722,7 @@ export const INFORMES_VENTAS: DefinicionDepartamento = {
     {
       id: 'OTD-VEN-19',
       endpoint: 'clientes-en-riesgo',
+      fuente: 'compuesto',
       titulo: 'Clientes en riesgo',
       descripcion: 'Clientes cuyo silencio es inusual PARA SU PROPIO RITMO de compra, '
                  + 'ordenados por valor en riesgo. Lee primero las tres tarjetas del '

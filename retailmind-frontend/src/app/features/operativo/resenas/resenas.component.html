@@ -75,7 +75,7 @@
           <ng-container matColumnDef="estado">
             <th mat-header-cell *matHeaderCellDef>Estado</th>
             <td mat-cell *matCellDef="let r">
-              <span class="estado-chip" [ngClass]="claseEstado(r.estado)">{{ r.estado }}</span>
+              <span class="estado-chip" [ngClass]="claseEstado(r.estado)">{{ r.estado | codigoLegible }}</span>
               <span class="stat-chip chip-info" *ngIf="r.compra_verificada"
                     matTooltip="Compra verificada">✓ compra</span>
             </td>
@@ -291,7 +291,7 @@
           <ng-container matColumnDef="estado">
             <th mat-header-cell *matHeaderCellDef>Estado</th>
             <td mat-cell *matCellDef="let r">
-              <span class="estado-chip" [ngClass]="claseEstado(r.estado)">{{ r.estado }}</span>
+              <span class="estado-chip" [ngClass]="claseEstado(r.estado)">{{ r.estado | codigoLegible }}</span>
             </td>
           </ng-container>
           <ng-container matColumnDef="votos">
@@ -371,7 +371,7 @@
           <ng-container matColumnDef="motivo">
             <th mat-header-cell *matHeaderCellDef>Motivo</th>
             <td mat-cell *matCellDef="let rep">
-              <span class="stat-chip chip-warning">{{ rep.motivo }}</span>
+              <span class="stat-chip chip-warning">{{ rep.motivo | codigoLegible }}</span>
               <div class="slug-hint" *ngIf="rep.comentario">"{{ rep.comentario }}"</div>
             </td>
           </ng-container>
@@ -394,7 +394,7 @@
           <ng-container matColumnDef="estado">
             <th mat-header-cell *matHeaderCellDef>Estado</th>
             <td mat-cell *matCellDef="let rep">
-              <span class="estado-chip" [ngClass]="claseEstado(rep.estado)">{{ rep.estado }}</span>
+              <span class="estado-chip" [ngClass]="claseEstado(rep.estado)">{{ rep.estado | codigoLegible }}</span>
             </td>
           </ng-container>
           <ng-container matColumnDef="fecha">

@@ -21,6 +21,7 @@ import {
   TicketRow, TicketDetalle, MensajeTicketRow, CategoriaTicketRef,
   UsuarioSoporteRef, PedidoSoporteRef, ProductoTicketRef, ClienteRef
 } from '../../../core/models/operativo.model';
+import { CodigoLegiblePipe } from '../../../core/pipes/etiquetas.pipe';
 
 /** Espeja las transiciones del backend (SoporteService.TRANSICIONES). */
 const TRANSICIONES: Record<string, string[]> = {
@@ -44,7 +45,7 @@ const TRANSICIONES: Record<string, string[]> = {
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatAutocompleteModule,
-    MatCheckboxModule, MatSnackBarModule, MatTooltipModule, MatButtonToggleModule],
+    MatCheckboxModule, MatSnackBarModule, MatTooltipModule, MatButtonToggleModule, CodigoLegiblePipe],
   templateUrl: './tickets.component.html',
   styleUrl: '../operativo-shared.scss'
 })

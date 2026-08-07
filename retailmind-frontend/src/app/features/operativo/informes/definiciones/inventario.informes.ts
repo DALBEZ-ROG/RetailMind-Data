@@ -150,6 +150,7 @@ export const INFORMES_INVENTARIO: DefinicionDepartamento = {
     {
       id: 'OTD-INV-01',
       endpoint: 'bajo-minimo',
+      fuente: 'simple',
       titulo: 'Productos bajo mínimo',
       descripcion: 'Variantes que cayeron por debajo de su tope mínimo, con el faltante '
                  + 'que hay que reponer en cada bodega.',
@@ -174,6 +175,7 @@ export const INFORMES_INVENTARIO: DefinicionDepartamento = {
     {
       id: 'OTD-INV-02',
       endpoint: 'stock-bodega',
+      fuente: 'simple',
       titulo: 'Stock actual por bodega',
       descripcion: 'Existencias de cada variante en cada almacén, separando lo apartado '
                  + 'para pedidos de lo realmente disponible.',
@@ -207,6 +209,7 @@ export const INFORMES_INVENTARIO: DefinicionDepartamento = {
     {
       id: 'OTD-INV-03',
       endpoint: 'kardex',
+      fuente: 'simple',
       titulo: 'Kardex de un producto',
       descripcion: 'Historial de entradas y salidas: qué se movió, cuándo, por qué y con '
                  + 'qué saldo quedó. Escribe el SKU o el nombre para seguir un producto.',
@@ -261,6 +264,7 @@ export const INFORMES_INVENTARIO: DefinicionDepartamento = {
     {
       id: 'OTD-INV-05',
       endpoint: 'ajustes',
+      fuente: 'simple',
       titulo: 'Ajustes de inventario',
       descripcion: 'Mercancía perdida o sobrante detectada en los ajustes, con su motivo '
                  + 'y el impacto real en existencias. Un ajuste anulado queda en neto 0.',
@@ -306,6 +310,7 @@ export const INFORMES_INVENTARIO: DefinicionDepartamento = {
     {
       id: 'OTD-INV-06',
       endpoint: 'transferencias',
+      fuente: 'simple',
       titulo: 'Transferencias entre bodegas',
       descripcion: 'Traslados de mercancía: cuáles van en camino y cuáles ya se '
                  + 'recibieron. Una transferencia pendiente aún no movió stock.',
@@ -344,6 +349,7 @@ export const INFORMES_INVENTARIO: DefinicionDepartamento = {
     {
       id: 'OTD-INV-07',
       endpoint: 'valor-inventario',
+      fuente: 'simple',
       titulo: 'Valor del inventario por categoría',
       descripcion: 'Cuánto dinero hay parado en mercancía almacenada, por categoría y '
                  + 'bodega, valorizado al costo vigente de cada variante.',
@@ -372,6 +378,7 @@ export const INFORMES_INVENTARIO: DefinicionDepartamento = {
     {
       id: 'OTD-INV-08',
       endpoint: 'sobre-stock',
+      fuente: 'simple',
       titulo: 'Sobre-stock',
       descripcion: 'Variantes por encima del tope máximo deseado, con el exceso que está '
                  + 'ocupando espacio y capital en bodega.',
@@ -405,6 +412,7 @@ export const INFORMES_INVENTARIO: DefinicionDepartamento = {
     {
       id: 'OTD-INV-04',
       endpoint: 'rotacion',
+      fuente: 'compuesto',
       titulo: 'Rotación por categoría',
       descripcion: 'Qué categorías rotan y cuáles se quedan paradas. La rotación son las '
                  + 'unidades VENDIDAS del período divididas por el stock promedio mensual; '
@@ -442,6 +450,7 @@ export const INFORMES_INVENTARIO: DefinicionDepartamento = {
     {
       id: 'OTD-INV-09',
       endpoint: 'capital-inmovilizado',
+      fuente: 'compuesto',
       titulo: 'Capital inmovilizado mes a mes',
       descripcion: 'Cómo evoluciona el dinero parado en mercancía almacenada, mes a mes, '
                  + 'para saber si la bodega se está llenando o vaciando de capital. '
@@ -481,6 +490,7 @@ export const INFORMES_INVENTARIO: DefinicionDepartamento = {
     {
       id: 'OTD-INV-10',
       endpoint: 'mermas',
+      fuente: 'compuesto',
       titulo: 'Mermas y sobrantes por motivo',
       descripcion: 'Mercancía perdida y sobrante acumulada por período y motivo, para '
                  + 'atacar las causas de la pérdida. Solo ajustes de inventario reales: '

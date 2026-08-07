@@ -35,7 +35,7 @@
         </ng-container>
         <ng-container matColumnDef="motivo">
           <th mat-header-cell *matHeaderCellDef>Motivo</th>
-          <td mat-cell *matCellDef="let d">{{ d.motivo }}</td>
+          <td mat-cell *matCellDef="let d">{{ d.motivo | codigoLegible }}</td>
         </ng-container>
         <ng-container matColumnDef="monto">
           <th mat-header-cell *matHeaderCellDef>Monto</th>
@@ -46,7 +46,7 @@
           <td mat-cell *matCellDef="let d">
             <span class="estado-chip" [class.ok]="chipEstado(d.estado) === 'ok'"
                   [class.warn]="chipEstado(d.estado) === 'warn'"
-                  [class.error]="chipEstado(d.estado) === 'error'">{{ d.estado }}</span>
+                  [class.error]="chipEstado(d.estado) === 'error'">{{ d.estado | codigoLegible }}</span>
           </td>
         </ng-container>
         <ng-container matColumnDef="fecha">
@@ -78,17 +78,17 @@
     <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:12px;">
       <span class="estado-chip" [class.ok]="chipEstado(detalle.estado) === 'ok'"
             [class.warn]="chipEstado(detalle.estado) === 'warn'"
-            [class.error]="chipEstado(detalle.estado) === 'error'">{{ detalle.estado }}</span>
+            [class.error]="chipEstado(detalle.estado) === 'error'">{{ detalle.estado | codigoLegible }}</span>
       <span class="stat-chip chip-info">Pedido {{ detalle.numero_pedido }}</span>
       <span class="stat-chip chip-info" *ngIf="detalle.cliente">{{ detalle.cliente }}</span>
-      <span class="stat-chip chip-info">Motivo: {{ detalle.motivo }}</span>
+      <span class="stat-chip chip-info">Motivo: {{ detalle.motivo | codigoLegible }}</span>
       <span class="stat-chip chip-info" *ngIf="detalle.ticket_numero">Ticket {{ detalle.ticket_numero }}</span>
       <span class="stat-chip chip-info" *ngIf="detalle.guia_retorno">
         <mat-icon style="font-size:14px;height:14px;width:14px;">local_shipping</mat-icon>
         Guía {{ detalle.guia_retorno }} ({{ detalle.transportista }})
       </span>
       <span class="stat-chip chip-success" *ngIf="detalle.monto_reembolsado">
-        Reembolsado {{ detalle.monto_reembolsado | currency:'USD' }} · {{ detalle.metodo_reembolso }}
+        Reembolsado {{ detalle.monto_reembolsado | currency:'USD' }} · {{ detalle.metodo_reembolso | codigoLegible }}
       </span>
       <!-- La guía valoriza los ítems: solo roles con acceso a montos -->
       <button class="btn-limpiar" *ngIf="detalle.guia_retorno && veMontos" (click)="verGuiaPdf()">
@@ -126,7 +126,7 @@
                     [class.ok]="it.resultado_inspeccion === 'apto_reventa'"
                     [class.warn]="it.resultado_inspeccion === 'defectuoso'"
                     [class.error]="it.resultado_inspeccion === 'rechazado'">
-                {{ it.resultado_inspeccion }}</span>
+                {{ it.resultado_inspeccion | codigoLegible }}</span>
               <div *ngIf="it.nota_inspeccion" style="font-size:12px; color:#666;">{{ it.nota_inspeccion }}</div>
             </ng-container>
             <ng-template #capturar>
@@ -232,7 +232,7 @@
       <div class="dato" *ngFor="let h of detalle.historial">
         <span class="estado-chip" [class.ok]="chipEstado(h.estado) === 'ok'"
               [class.warn]="chipEstado(h.estado) === 'warn'"
-              [class.error]="chipEstado(h.estado) === 'error'">{{ h.estado }}</span>
+              [class.error]="chipEstado(h.estado) === 'error'">{{ h.estado | codigoLegible }}</span>
         {{ h.comentario }} — <strong>{{ h.autor }}</strong> · {{ h.fecha_creacion | date:'short' }}
       </div>
     </div>

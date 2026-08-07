@@ -2,6 +2,98 @@
 // Complementa operativo-shared.scss y las clases del diseño "Dubai"
 // (glass-card, premium-card, fuente Inter, variables de styles.scss).
 
+// ── SIMPLE vs. COMPUESTO ────────────────────────────────────────────────
+// Los dos colores salen de la paleta que ya existe en styles.scss: el ÍNDIGO
+// primario (--primary-light) para el informe SIMPLE y el CIAN de acento
+// (--accent) para el COMPUESTO. No entra ningún color nuevo.
+//
+// El color NO es el único portador: cada tarjeta lleva además la PALABRA
+// («Simple» / «Compuesto») y una MARCA de forma distinta —círculo lleno para
+// el simple, rombo hueco para el compuesto—, de modo que la distinción
+// sobrevive a una pantalla en escala de grises o a una daltonía.
+$fuente-simple: var(--primary-light);
+$fuente-compuesto: #0097a7;   // el tono oscuro de --accent-gradient, legible sobre blanco
+
+.marca-fuente,
+.marca-fuente-simple,
+.marca-fuente-compuesto {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+}
+
+.marca-fuente-simple {
+  border-radius: 50%;
+  background: $fuente-simple;
+}
+
+.marca-fuente-compuesto {
+  transform: rotate(45deg);
+  border: 2px solid $fuente-compuesto;
+  background: transparent;
+}
+
+// Recuento sobre el selector. Las dos pastillas son además el filtro por tipo.
+.selector-conteo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  font-size: 12.5px;
+
+  .conteo-total {
+    font-weight: 700;
+    color: var(--text-secondary);
+  }
+
+  .conteo-pastilla {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 12px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    transition: opacity 0.2s ease, box-shadow 0.2s ease;
+
+    &.simple {
+      background: rgba(57, 73, 171, 0.10);
+      border-color: rgba(57, 73, 171, 0.28);
+      color: var(--primary);
+    }
+
+    &.compuesto {
+      background: rgba(0, 151, 167, 0.12);
+      border-color: rgba(0, 151, 167, 0.32);
+      color: #006064;
+    }
+
+    &.apagada { opacity: 0.38; }
+
+    &:hover { box-shadow: var(--shadow-soft); }
+  }
+
+  .conteo-limpiar {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border: none;
+    background: transparent;
+    color: var(--text-light);
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+
+    mat-icon { font-size: 15px; width: 15px; height: 15px; }
+  }
+}
+
 // ── Selector de informe: una píldora de vidrio por objetivo táctico ──────
 .informe-selector {
   display: flex;
@@ -53,6 +145,52 @@
     box-shadow: var(--shadow-medium);
   }
 
+  // Insignia del tipo, dentro de la tarjeta: marca + palabra.
+  .chip-fuente {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-left: 4px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 9.5px;
+    font-weight: 800;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    cursor: help;
+  }
+
+  // El borde izquierdo repite el color del tipo: se ve de un golpe cuál es
+  // cuál en una lista de quince tarjetas, sin leer ninguna insignia.
+  &.fuente-simple {
+    border-left: 4px solid $fuente-simple;
+
+    .chip-fuente {
+      background: rgba(57, 73, 171, 0.10);
+      color: var(--primary);
+    }
+
+    .marca-fuente {
+      border-radius: 50%;
+      background: $fuente-simple;
+    }
+  }
+
+  &.fuente-compuesto {
+    border-left: 4px solid $fuente-compuesto;
+
+    .chip-fuente {
+      background: rgba(0, 151, 167, 0.12);
+      color: #006064;
+    }
+
+    .marca-fuente {
+      transform: rotate(45deg);
+      border: 2px solid $fuente-compuesto;
+      background: transparent;
+    }
+  }
+
   &.activo {
     background: var(--primary-gradient);
     border-color: transparent;
@@ -61,6 +199,19 @@
     mat-icon      { color: white; }
     .chip-id      { color: rgba(255, 255, 255, 0.7); }
     .chip-titulo  { color: white; }
+
+    // Seleccionada, la tarjeta se pinta con el degradado primario: la insignia
+    // pasa a blanco translúcido para seguir siendo legible, y la marca de
+    // forma se conserva porque es la señal que no depende del color.
+    .chip-fuente {
+      background: rgba(255, 255, 255, 0.22) !important;
+      color: white !important;
+    }
+
+    &.fuente-simple .marca-fuente { background: white; }
+    &.fuente-compuesto .marca-fuente { border-color: white; }
+    &.fuente-simple { border-left-color: rgba(255, 255, 255, 0.85); }
+    &.fuente-compuesto { border-left-color: rgba(178, 235, 242, 0.95); }
   }
 }
 

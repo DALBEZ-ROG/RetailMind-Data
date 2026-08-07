@@ -16,6 +16,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { environment } from '../../../environments/environment';
 import { ConfirmService } from '../../core/services/confirm.service';
 import { mensajeError } from '../../core/services/api-error.util';
+import { CodigoLegiblePipe } from '../../core/pipes/etiquetas.pipe';
 
 /**
  * Perfil sobre PostgreSQL. Para el CLIENTE: datos de la tabla cliente
@@ -31,8 +32,7 @@ import { mensajeError } from '../../core/services/api-error.util';
     MatCardModule, MatButtonModule, MatIconModule,
     MatFormFieldModule, MatInputModule, MatSelectModule,
     MatChipsModule, MatCheckboxModule, MatProgressSpinnerModule,
-    MatSnackBarModule, MatTooltipModule
-  ],
+    MatSnackBarModule, MatTooltipModule, CodigoLegiblePipe],
   templateUrl: './perfil.component.html',
   styleUrl: './perfil.component.scss'
 })

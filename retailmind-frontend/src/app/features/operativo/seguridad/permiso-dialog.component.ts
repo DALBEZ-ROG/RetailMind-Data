@@ -11,6 +11,7 @@ import {
   ModoFormComponent, ModoFormulario
 } from '../../../core/components/modo-form/modo-form.component';
 import { ObjetoAdministrable } from '../../../core/models/seguridad.model';
+import { RolGrupoPipe } from '../../../core/pipes/etiquetas.pipe';
 
 export interface PermisoDialogData {
   modo: ModoFormulario;
@@ -45,7 +46,7 @@ export interface PermisoDialogResultado {
   selector: 'app-permiso-dialog',
   standalone: true,
   imports: [CommonModule, FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule,
-    MatSelectModule, MatIconModule, MatRadioModule, ModoFormComponent],
+    MatSelectModule, MatIconModule, MatRadioModule, ModoFormComponent, RolGrupoPipe],
   template: `
     <h2 mat-dialog-title>
       <mat-icon>vpn_key</mat-icon>
@@ -62,7 +63,11 @@ export interface PermisoDialogResultado {
       <mat-form-field appearance="outline">
         <mat-label>Rol de grupo</mat-label>
         <mat-select [(ngModel)]="form.rol">
-          <mat-option *ngFor="let r of data.roles" [value]="r">{{ r }}</mat-option>
+          <!-- El [value] es el nombre REAL del rol de PostgreSQL: es lo que se
+               manda al GRANT. El pipe solo cambia la etiqueta. -->
+          <mat-option *ngFor="let r of data.roles" [value]="r" [title]="r">
+            {{ r | rolGrupo }} <span class="cod-motor">{{ r }}</span>
+          </mat-option>
         </mat-select>
         <mat-hint>grp_administrador no aparece: es el rol con el que operas.</mat-hint>
       </mat-form-field>

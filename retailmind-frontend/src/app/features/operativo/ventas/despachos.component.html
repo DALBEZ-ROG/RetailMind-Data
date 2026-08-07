@@ -72,7 +72,7 @@
 
     <div class="resultado-box" *ngIf="envio">
       <div class="titulo"><mat-icon>check_circle</mat-icon> Pedido despachado</div>
-      <div class="dato">Envío: <strong>{{ envio.numero }}</strong> · Guía: <strong>{{ envio.numero_guia }}</strong> · Estado: <strong>{{ envio.estado }}</strong></div>
+      <div class="dato">Envío: <strong>{{ envio.numero }}</strong> · Guía: <strong>{{ envio.numero_guia }}</strong> · Estado: <strong>{{ envio.estado | codigoLegible }}</strong></div>
       <div class="dato">Pedido: <strong>{{ envio.numero_pedido }}</strong> · Transportista: <strong>{{ envio.transportista }}</strong> · Método: <strong>{{ envio.metodo_envio }}</strong></div>
       <div class="dato">Entrega en: <strong>{{ envio.direccion_entrega }}</strong></div>
       <div class="dato" *ngFor="let d of envio.detalles">{{ d.cantidad }} × {{ d.nombre_producto }} ({{ d.sku }})</div>
@@ -127,7 +127,7 @@
         <div class="dato">Estado del envío:
           <span class="estado-chip" [class.ok]="env.estado === 'en_transito'"
                 [class.error]="env.estado === 'fallido'"
-                [class.warn]="env.estado === 'devuelto'">{{ env.estado }}</span>
+                [class.warn]="env.estado === 'devuelto'">{{ env.estado | codigoLegible }}</span>
           · Intento de entrega <strong>{{ novedadesInfo?.intentos }}</strong>
           de {{ novedadesInfo?.max_intentos ?? 3 }}
         </div>
@@ -210,7 +210,7 @@
       <div class="timeline-item" *ngFor="let s of seguimiento">
         <mat-icon>place</mat-icon>
         <div class="t-info">
-          <div class="t-estado">{{ s.estado }}</div>
+          <div class="t-estado">{{ s.estado | codigoLegible }}</div>
           <div class="t-desc">{{ s.descripcion }} — {{ s.ubicacion }}</div>
           <div class="t-fecha">{{ s.fecha_evento | date:'medium' }}</div>
         </div>

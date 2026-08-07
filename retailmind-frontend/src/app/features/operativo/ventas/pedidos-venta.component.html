@@ -58,7 +58,7 @@
 
     <div class="resultado-box" *ngIf="pedidoCreado">
       <div class="titulo"><mat-icon>check_circle</mat-icon> Pedido creado y stock descontado</div>
-      <div class="dato">Número: <strong>{{ pedidoCreado.numero }}</strong> · Cliente: <strong>{{ pedidoCreado.cliente }}</strong> · Estado: <strong>{{ pedidoCreado.estado }}</strong></div>
+      <div class="dato">Número: <strong>{{ pedidoCreado.numero }}</strong> · Cliente: <strong>{{ pedidoCreado.cliente }}</strong> · Estado: <strong>{{ pedidoCreado.estado | codigoLegible }}</strong></div>
       <div class="total-banner">
         <div class="total-item"><div class="lbl">Subtotal</div><div class="val">{{ pedidoCreado.subtotal | currency:'USD' }}</div></div>
         <div class="total-item"><div class="lbl">IVA</div><div class="val">{{ pedidoCreado.monto_impuesto | currency:'USD' }}</div></div>
@@ -95,7 +95,7 @@
             <span class="estado-chip"
                   [class.ok]="['confirmado','pagado','facturado','preparado'].includes(p.estado)"
                   [class.warn]="p.estado === 'despachado' || p.estado === 'en_preparacion'"
-                  [class.error]="p.estado === 'devuelto' || p.estado === 'cancelado'">{{ p.estado }}</span>
+                  [class.error]="p.estado === 'devuelto' || p.estado === 'cancelado'">{{ p.estado | codigoLegible }}</span>
           </td>
         </ng-container>
         <ng-container matColumnDef="fecha">
@@ -136,7 +136,7 @@
             [class.ok]="['pagado','facturado','preparado','entregado'].includes(detallePedido.estado)"
             [class.warn]="['despachado','en_preparacion'].includes(detallePedido.estado)"
             [class.error]="['devuelto','cancelado'].includes(detallePedido.estado)">
-        Estado: {{ detallePedido.estado }}
+        Estado: {{ detallePedido.estado | codigoLegible }}
       </span>
       <span class="stat-chip chip-info" *ngIf="detallePedido.transportista">
         <mat-icon style="font-size:14px;height:14px;width:14px;">local_shipping</mat-icon>
@@ -161,7 +161,7 @@
       </span>
       <span class="stat-chip chip-info" *ngIf="detallePedido.envio">
         <mat-icon style="font-size:14px;height:14px;width:14px;">local_shipping</mat-icon>
-        Guía {{ detallePedido.envio.numero_guia }} ({{ detallePedido.envio.estado }})
+        Guía {{ detallePedido.envio.numero_guia }} ({{ detallePedido.envio.estado | codigoLegible }})
       </span>
     </div>
 
@@ -239,7 +239,7 @@
       <h3><mat-icon>payments</mat-icon> Pagos ({{ detallePedido.pagos.length }})</h3>
       <div class="dato" *ngFor="let pg of detallePedido.pagos">
         {{ pg.fecha_pago | date:'short' }} · <strong>{{ pg.monto | currency:'USD' }}</strong>
-        · {{ pg.metodo }} ({{ pg.estado }})
+        · {{ pg.metodo | codigoLegible }} ({{ pg.estado | codigoLegible }})
         <span *ngIf="pg.referencia_externa"> · ref. {{ pg.referencia_externa }}</span>
       </div>
     </div>
@@ -293,7 +293,7 @@
       <div class="timeline-item" *ngFor="let h of detallePedido.historial">
         <mat-icon>flag</mat-icon>
         <div class="t-info">
-          <div class="t-estado">{{ h.estado }}</div>
+          <div class="t-estado">{{ h.estado | codigoLegible }}</div>
           <div class="t-desc">{{ h.comentario }}</div>
           <div class="t-fecha">{{ h.fecha_creacion | date:'medium' }}</div>
         </div>

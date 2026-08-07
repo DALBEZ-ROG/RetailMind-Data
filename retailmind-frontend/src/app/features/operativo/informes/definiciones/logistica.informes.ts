@@ -178,6 +178,7 @@ export const INFORMES_LOGISTICA: DefinicionDepartamento = {
     {
       id: 'OTD-LOG-01',
       endpoint: 'cola-despacho',
+      fuente: 'simple',
       titulo: 'Cola de despacho',
       descripcion: 'Pedidos del tramo de salida esperando irse. Los marcados como LISTO '
                  + 'son los únicos que ya se pueden despachar.',
@@ -222,6 +223,7 @@ export const INFORMES_LOGISTICA: DefinicionDepartamento = {
     {
       id: 'OTD-LOG-02',
       endpoint: 'envios',
+      fuente: 'simple',
       titulo: 'Envíos por estado y transportista',
       descripcion: 'Qué va en camino, qué se entregó y qué volvió, con guía y fechas. '
                  + 'Un envío con novedad abierta no se puede marcar como entregado.',
@@ -265,6 +267,7 @@ export const INFORMES_LOGISTICA: DefinicionDepartamento = {
     {
       id: 'OTD-LOG-06',
       endpoint: 'devoluciones',
+      fuente: 'simple',
       titulo: 'Devoluciones de cliente en curso',
       descripcion: 'El ciclo RMA paso a paso, con el motivo del cliente y el resultado de '
                  + 'la inspección: solo lo apto para reventa vuelve al stock.',
@@ -320,6 +323,7 @@ export const INFORMES_LOGISTICA: DefinicionDepartamento = {
     {
       id: 'OTD-LOG-11',
       endpoint: 'costo-envio',
+      fuente: 'simple',
       titulo: 'Costo de envío por zona y transportista',
       descripcion: 'Cuánto cuesta llevar la mercancía a cada zona y con cada transportista, '
                  + 'contra lo que se le cobró al cliente por el flete.',
@@ -353,6 +357,7 @@ export const INFORMES_LOGISTICA: DefinicionDepartamento = {
     {
       id: 'OTD-LOG-12',
       endpoint: 'tiempos-ciclo',
+      fuente: 'compuesto',
       titulo: 'Tiempo por etapa del ciclo del pedido',
       descripcion: 'Cuánto tarda un pedido en cada tramo del camino, para encontrar el cuello '
                  + 'de botella real en vez de suponerlo. Cada etapa declara sobre CUÁNTOS '
@@ -393,6 +398,7 @@ export const INFORMES_LOGISTICA: DefinicionDepartamento = {
     {
       id: 'OTD-LOG-03',
       endpoint: 'cumplimiento-promesa',
+      fuente: 'compuesto',
       titulo: 'Cumplimiento de la fecha prometida',
       descripcion: 'De los envíos ya entregados, cuántos llegaron a más tardar el día que se '
                  + 'le prometió al cliente. Se juzga solo sobre los envíos que tienen LAS DOS '
@@ -442,6 +448,7 @@ export const INFORMES_LOGISTICA: DefinicionDepartamento = {
     {
       id: 'OTD-LOG-04',
       endpoint: 'dias-transito',
+      fuente: 'compuesto',
       titulo: 'Días reales de tránsito',
       descripcion: 'Cuánto tarda de verdad un paquete desde que sale de bodega hasta la puerta '
                  + 'del cliente, sin importar qué fecha se prometió. Junto al promedio van la '
@@ -485,6 +492,7 @@ export const INFORMES_LOGISTICA: DefinicionDepartamento = {
     {
       id: 'OTD-LOG-05',
       endpoint: 'novedades',
+      fuente: 'compuesto',
       titulo: 'Problemas de entrega',
       descripcion: 'Las incidencias de la última milla por tipo y por cómo terminaron: cuántas '
                  + 'ocurren, cuántos intentos toman y cuáles acaban con el paquete de vuelta en '
@@ -538,6 +546,7 @@ export const INFORMES_LOGISTICA: DefinicionDepartamento = {
     {
       id: 'OTD-LOG-11 · serie',
       endpoint: 'costo-envio-mensual',
+      fuente: 'compuesto',
       titulo: 'Evolución mensual del costo de envío',
       descripcion: 'Cómo se mueve el costo del transporte mes a mes, con su costo por kilo. '
                  + 'Responde «¿se está encareciendo?», que es distinto de «¿dónde nos cuesta '
@@ -573,6 +582,7 @@ export const INFORMES_LOGISTICA: DefinicionDepartamento = {
     {
       id: 'OTD-LOG-07',
       endpoint: 'ciclo-devolucion',
+      fuente: 'compuesto',
       titulo: 'Días de ciclo de la devolución',
       descripcion: 'Cuánto tarda un RMA, tramo por tramo. CADA columna de días trae su '
                  + 'propio contador al lado: el ciclo hasta el cierre solo existe en las '
@@ -633,6 +643,7 @@ export const INFORMES_LOGISTICA: DefinicionDepartamento = {
     {
       id: 'OTD-LOG-08',
       endpoint: 'motivos-devolucion',
+      fuente: 'compuesto',
       titulo: 'Motivos de devolución y destino de la mercancía',
       descripcion: 'Por qué devuelven y qué pasa con lo devuelto. Solo lo APTO PARA '
                  + 'REVENTA vuelve al stock vendible; lo defectuoso va al pool de '
@@ -679,6 +690,7 @@ export const INFORMES_LOGISTICA: DefinicionDepartamento = {
     {
       id: 'OTD-LOG-09',
       endpoint: 'tasa-devolucion',
+      fuente: 'compuesto',
       titulo: 'Tasa mensual de devolución sobre los envíos',
       descripcion: 'De cada 100 envíos despachados, cuántos acaban en devolución. '
                  + 'Numerador y denominador NO son la misma población: se cuentan las '
@@ -715,6 +727,7 @@ export const INFORMES_LOGISTICA: DefinicionDepartamento = {
     {
       id: 'OTD-LOG-10',
       endpoint: 'reembolsos',
+      fuente: 'compuesto',
       titulo: 'Reembolsos pagados a clientes',
       descripcion: 'Cuánto dinero se devolvió, por qué vía y por qué motivo. El período '
                  + 'es el del PAGO del reembolso, no el de la solicitud. La columna «Con '

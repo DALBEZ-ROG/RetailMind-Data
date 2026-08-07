@@ -20,8 +20,9 @@ import { AuthService } from '../../../core/services/auth.service';
 import { mensajeError } from '../../../core/services/api-error.util';
 import {
   ColumnaInforme, DefinicionDepartamento, DefinicionInforme, FiltroInforme,
-  KpiInforme, TipoValor
+  FuenteInforme, KpiInforme, TipoValor
 } from '../../../core/models/informe.model';
+import { etiquetaCodigo } from '../../../core/pipes/etiquetas.pipe';
 import { definicionDepartamento } from './definiciones/catalogo-informes';
 import { ActualizacionAlmacenComponent } from './actualizacion-almacen.component';
 import { PrevisionGraficoComponent, PuntoPrevision } from './prevision-grafico.component';
@@ -58,6 +59,16 @@ export class InformesDepartamentoComponent implements OnInit {
   depto?: DefinicionDepartamento;
   /** Informes que el rol actual puede consultar. */
   disponibles: DefinicionInforme[] = [];
+  /**
+   * Los que se están pintando: `disponibles` recortado por el filtro de tipo.
+   *
+   * Es un CAMPO y no un getter: un getter devolvería un array nuevo en cada
+   * ciclo de detección de cambios y `*ngFor` repintaría el selector entero
+   * (trampa §8.6 de `docs/PATRON_UI.md`).
+   */
+  visibles: DefinicionInforme[] = [];
+  /** null = se ven los dos tipos. Lo gobiernan las pastillas del contador. */
+  filtroFuente: FuenteInforme | null = null;
   actual?: DefinicionInforme;
 
   filas: Record<string, any>[] = [];
@@ -122,9 +133,9 @@ export class InformesDepartamentoComponent implements OnInit {
     this.texto$.pipe(debounceTime(350), distinctUntilChanged())
       .subscribe(() => { this.pagina = 0; this.cargar(); });
 
-    if (this.disponibles.length) {
-      this.seleccionar(this.disponibles[0]);
-    }
+    // Calcula `visibles` y abre el primero: sustituye al `seleccionar` suelto
+    // que había aquí, para no consultar dos veces al entrar.
+    this.aplicarFiltroFuente();
   }
 
   // ── Selección de informe ─────────────────────────────────────────────
@@ -143,6 +154,48 @@ export class InformesDepartamentoComponent implements OnInit {
 
   esActual(informe: DefinicionInforme): boolean {
     return this.actual?.id === informe.id;
+  }
+
+  // ── Simples vs. compuestos ───────────────────────────────────────────
+  // Los dos contadores se CALCULAN sobre lo que hay pintado; ninguna cifra
+  // está escrita a mano. Con el filtro puesto, el tipo excluido queda en 0,
+  // que es la lectura correcta: no hay ninguno de ésos en pantalla.
+
+  get conteoSimples(): number {
+    return this.visibles.filter(i => i.fuente === 'simple').length;
+  }
+
+  get conteoCompuestos(): number {
+    return this.visibles.filter(i => i.fuente === 'compuesto').length;
+  }
+
+  /** Pulsar el tipo ya filtrado lo suelta: la pastilla es un interruptor. */
+  alternarFuente(f: FuenteInforme): void {
+    this.filtroFuente = this.filtroFuente === f ? null : f;
+    this.aplicarFiltroFuente();
+  }
+
+  /**
+   * El informe abierto se conserva si sigue visible; si el filtro lo dejó
+   * fuera, se abre el primero de la lista nueva —y si no queda ninguno, la
+   * pantalla se queda sin tabla en vez de consultar un informe invisible.
+   */
+  private aplicarFiltroFuente(): void {
+    this.visibles = this.filtroFuente
+      ? this.disponibles.filter(i => i.fuente === this.filtroFuente)
+      : [...this.disponibles];
+    if (this.actual && this.visibles.some(i => i.id === this.actual!.id)) { return; }
+    if (this.visibles.length) { this.seleccionar(this.visibles[0]); }
+    else { this.actual = undefined; }
+  }
+
+  /** Texto del `title` de la insignia: el porqué del tipo, no solo su nombre. */
+  tituloFuente(informe: DefinicionInforme): string {
+    return informe.fuente === 'compuesto'
+      ? `${informe.id} · COMPUESTO — recorre histórico o cruza períodos; se sirve del `
+        + 'almacén analítico (ClickHouse, retailmind_dwh) y lleva marca de agua «Datos al …».'
+      : `${informe.id} · SIMPLE — responde sobre el estado actual; se consulta directo `
+        + 'contra PostgreSQL, sin pasar por el almacén analítico.';
   }
 
   // ── Consulta ─────────────────────────────────────────────────────────
@@ -265,6 +318,13 @@ export class InformesDepartamentoComponent implements OnInit {
 
   formatear(crudo: any, tipo: TipoValor): string {
     switch (tipo) {
+      // Una PÍLDORA de estado es, por definición, un código de catálogo. Varios
+      // informes simples proyectan `ep.codigo` en vez de `ep.nombre` (OTD-LOG-01
+      // lo hace) y el chip salía con `en_preparacion`. Se traduce aquí, en el
+      // único sitio que pinta las celdas, y no informe por informe; la columna
+      // que trae su propia `etiqueta` no llega hasta aquí y conserva la suya.
+      case 'chip':
+        return etiquetaCodigo(String(crudo));
       case 'moneda':
         return '$' + Number(crudo).toLocaleString('es-EC',
           { minimumFractionDigits: 2, maximumFractionDigits: 2 });

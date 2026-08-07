@@ -11,6 +11,7 @@ import {
   ModoFormComponent, ModoFormulario
 } from '../../../core/components/modo-form/modo-form.component';
 import { VentanaHoraria } from '../../../core/models/operativo.model';
+import { RolGrupoPipe } from '../../../core/pipes/etiquetas.pipe';
 
 export interface HorarioDialogData {
   ventana?: VentanaHoraria;
@@ -43,7 +44,7 @@ export interface HorarioDialogResultado {
   selector: 'app-horario-dialog',
   standalone: true,
   imports: [CommonModule, FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule,
-    MatSelectModule, MatCheckboxModule, MatIconModule, ModoFormComponent],
+    MatSelectModule, MatCheckboxModule, MatIconModule, ModoFormComponent, RolGrupoPipe],
   template: `
     <h2 mat-dialog-title>
       <mat-icon>schedule</mat-icon>
@@ -55,8 +56,13 @@ export interface HorarioDialogResultado {
       <div class="grid">
         <mat-form-field appearance="outline">
           <mat-label>Rol de grupo</mat-label>
+          <!-- CRÍTICO: [value] y [(ngModel)] llevan el identificador CRUDO
+               (\`grp_…\`), que es lo que se manda en el POST y lo que se guarda en
+               \`grupo_horario.rol_grupo\`. El pipe solo cambia la etiqueta visible. -->
           <mat-select [(ngModel)]="form.rolGrupo" [disabled]="!esNuevo">
-            <mat-option *ngFor="let r of data.roles" [value]="r">{{ r }}</mat-option>
+            <mat-option *ngFor="let r of data.roles" [value]="r" [title]="r">
+              {{ r | rolGrupo }}
+            </mat-option>
           </mat-select>
           <mat-hint *ngIf="!esNuevo">El rol de una ventana existente no se cambia.</mat-hint>
         </mat-form-field>

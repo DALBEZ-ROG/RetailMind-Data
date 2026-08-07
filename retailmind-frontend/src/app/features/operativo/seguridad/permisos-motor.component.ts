@@ -18,6 +18,7 @@ import { forkJoin } from 'rxjs';
 
 import { AccionesRegistroComponent } from
   '../../../core/components/acciones-registro/acciones-registro.component';
+import { RolGrupoPipe, nombreRolGrupo } from '../../../core/pipes/etiquetas.pipe';
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { PermisosMotorService } from '../../../core/services/permisos-motor.service';
 import { mensajeError } from '../../../core/services/api-error.util';
@@ -82,7 +83,7 @@ interface FilaEditor {
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatTabsModule, MatTooltipModule,
     MatDialogModule, MatSnackBarModule, MatSlideToggleModule, MatCheckboxModule,
-    MatProgressBarModule, AccionesRegistroComponent],
+    MatProgressBarModule, AccionesRegistroComponent, RolGrupoPipe],
   templateUrl: './permisos-motor.component.html',
   styleUrls: ['../operativo-shared.scss', './permisos-motor.scss']
 })
@@ -261,6 +262,11 @@ export class PermisosMotorComponent implements OnInit {
     return [...dentro].sort();
   }
 
+  /** El mismo listado con los nombres limpios (el crudo va en el `title`). */
+  get rolesDentroDeHorarioTexto(): string {
+    return this.rolesDentroDeHorario.map(nombreRolGrupo).join(', ');
+  }
+
   get tablasConColumnas(): string[] {
     const t = new Set(this.permisosColumna.map(p => p.tabla));
     return [...t].sort();
@@ -309,7 +315,9 @@ export class PermisosMotorComponent implements OnInit {
     const f = this.filaSeleccionada;
     if (!f) { return null; }
     const objeto = f.columna ? `${f.tabla}.${f.columna}` : f.tabla;
-    return `${f.privilegio} sobre ${objeto} → ${f.rol_motor}`;
+    // Los dos nombres: el legible identifica al destinatario y el del motor es
+    // el que se escribirá en el GRANT/REVOKE y quedará en `log_auditoria`.
+    return `${f.privilegio} sobre ${objeto} → ${nombreRolGrupo(f.rol_motor)} (${f.rol_motor})`;
   }
 
   // ── PARTE 2: conceder y revocar ─────────────────────────────────────────

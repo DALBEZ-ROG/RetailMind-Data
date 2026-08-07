@@ -523,6 +523,58 @@ acciones no se tocó ni una vez — sus `mostrarX` y `puedeEliminar` bastaron.
     seguridad en un `finally` que reabre cualquier ventana que quedara cerrada: un fallo a mitad
     de la prueba no puede dejar a un rol fuera del sistema.
 
+## 9.bis Piezas nuevas de presentación (2026-08-06)
+
+Tres mejoras de PINTADO, sin tocar lógica de negocio, contratos de API ni SQL.
+
+### `core/pipes/etiquetas.pipe.ts` — la traducción de identificadores
+
+Dos pipes standalone y sus funciones puras, para que el TypeScript también pueda usarlas:
+
+| Pieza | Qué hace |
+|---|---|
+| `\| rolGrupo` / `nombreRolGrupo()` | `grp_analista` → «Analista». Deja intacto lo que no empieza por `grp_` (`retailmind_app`, `retailmind_etl`), y acepta la lista separada por comas que devuelve `pg_policies`. |
+| `\| codigoLegible` / `etiquetaCodigo()` | `en_preparacion` → «En preparación». Diccionario escrito a mano —con los MISMOS textos que la base guarda en `estado_pedido.nombre` y `tipo_movimiento.nombre`— y caída mecánica para un código no previsto. Un valor que ya viene legible se devuelve tal cual. |
+
+**La regla que no se rompe**: los pipes se aplican SOLO a la interpolación que se ve.
+El `[value]` de un `<mat-option>`, el `[(ngModel)]` y el cuerpo de cualquier petición siguen
+llevando el identificador crudo, porque `grp_*` es el nombre REAL del rol de PostgreSQL del que
+dependen `esta_en_horario()`, `fn_grupo_actual()`, las 95 políticas RLS y los triggers
+`trg_horario_*`. Verificado interceptando el POST del alta de ventana horaria: se elige
+«Analista» en pantalla y el cuerpo que sale es `{"rolGrupo":"grp_analista",…}`.
+
+Y el código crudo **no se borra del DOM**: va en el `title` de la celda, o visible en tono menor
+con la clase global `.cod-motor` en las pantallas donde el nombre del motor es el asunto
+(Permisos del Motor).
+
+### El encimado de los diálogos era COMÚN, no del formulario de horarios
+
+24. **En Angular Material (MDC) el `mat-hint` NO ocupa sitio: se dibuja encima.**
+    `.mat-mdc-form-field-hint-wrapper` es `position: absolute` y el hueco que reserva
+    `.mat-mdc-form-field-bottom-align::before` es de UNA línea fija (16 px). En cuanto el texto
+    de ayuda envuelve a dos líneas —«El rol de una ventana existente no se cambia.» en una
+    columna estrecha— la segunda línea cae SOBRE el elemento siguiente, que en el diálogo de
+    ventana horaria era la casilla «Activa (si se desmarca, equivale a eliminar)».
+    La corrección está en **`styles.scss`, bajo `.dubai-dialog`** —y no en cada diálogo— porque
+    el CDK monta el diálogo en un overlay fuera del árbol del componente (trampa 2): el
+    subscript vuelve al flujo normal y la reserva de una línea pasa a ser `min-height`, para que
+    los campos sin ayuda sigan alineados con los que sí la tienen. Los 18 diálogos del patrón la
+    heredan sin tocarlos.
+
+### El tipo de informe se pinta con TRES señales, no con un color
+
+25. **El color no puede ser el único portador de una distinción.** En el selector de informes
+    tácticos, SIMPLE y COMPUESTO se distinguen por el color del borde (índigo `--primary-light`
+    frente al cian `#0097a7` de `--accent-gradient`, los dos de la paleta que ya existía), por
+    la FORMA de la marca (círculo lleno / rombo hueco) y por la PALABRA de la insignia. Sobre la
+    tarjeta activa —que se pinta con el degradado primario— sobreviven la forma y la palabra.
+    La clasificación **no se inventa**: `DefinicionInforme.fuente` es obligatoria y espeja qué
+    controlador del backend sirve el endpoint (`Informes<Depto>Controller` = PostgreSQL,
+    `Informes<Depto>CompuestosController` = ClickHouse). El contador se calcula de `visibles`,
+    la lista realmente pintada, así que al filtrar baja con ella.
+
+---
+
 ### Coste real de la Fase 2
 
 Cinco pantallas, **6 diálogos nuevos**, **1 servicio Angular de 25 líneas**, **2 clases de

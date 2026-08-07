@@ -74,6 +74,7 @@ export function informePrevisionDemanda(roles: readonly string[]): DefinicionInf
   return {
     id: 'OTD-GER-13',
     endpoint: 'prevision-demanda',
+    fuente: 'compuesto',
     titulo: 'Previsión de demanda (3 meses)',
     descripcion: 'Unidades esperadas para los próximos tres meses, con su banda del '
                + '80 %, en tres niveles: total, categoría y variante. Cada fila lleva '

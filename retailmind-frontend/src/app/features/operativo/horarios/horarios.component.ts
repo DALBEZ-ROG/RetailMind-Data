@@ -17,6 +17,7 @@ import {
   AccionesRegistroComponent
 } from '../../../core/components/acciones-registro/acciones-registro.component';
 import { VentanaHoraria } from '../../../core/models/operativo.model';
+import { RolGrupoPipe, nombreRolGrupo } from '../../../core/pipes/etiquetas.pipe';
 import {
   HorarioDialogComponent, HorarioDialogData, HorarioDialogResultado
 } from './horario-dialog.component';
@@ -41,7 +42,7 @@ type FiltroEstado = 'todos' | 'activas' | 'inactivas';
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule, MatTooltipModule,
-    MatDialogModule, AccionesRegistroComponent],
+    MatDialogModule, AccionesRegistroComponent, RolGrupoPipe],
   templateUrl: './horarios.component.html',
   styleUrl: '../operativo-shared.scss'
 })
@@ -52,6 +53,10 @@ export class HorariosComponent implements OnInit {
    * Los 8 roles sujetos a horario. `grp_soporte` (script 37) faltaba en esta
    * lista: la tabla ya tenía sus 7 ventanas sembradas —cubren las 24 h— pero
    * desde la interfaz no se podía crear ninguna para él.
+   *
+   * **Se guardan con el prefijo y así viajan al backend**: son los nombres
+   * REALES de los roles de PostgreSQL. Lo único que cambia es cómo se pintan
+   * (`| rolGrupo`); el `[value]` de los desplegables sigue siendo esto.
    */
   readonly roles = ['grp_gerente', 'grp_vendedor', 'grp_compras', 'grp_bodega',
                     'grp_despacho', 'grp_cliente', 'grp_analista', 'grp_soporte'];
@@ -203,8 +208,12 @@ export class HorariosComponent implements OnInit {
   private confirmarCierre(v: VentanaHoraria, alAceptar: () => void): void {
     const restantes = this.ventanasActivasRestantes(v);
     const ultima = restantes === 0;
+    // En una confirmación de seguridad van los DOS nombres: el legible para que
+    // se entienda a quién se deja fuera, y el del motor entre paréntesis porque
+    // es el que aparecerá en `grupo_horario` y en cualquier traza del rechazo.
+    const rol = `${nombreRolGrupo(v.rol_grupo)} (${v.rol_grupo})`;
     const consecuencia =
-      `A partir de ese momento, ${v.rol_grupo} NO podrá iniciar sesión ni operar los ` +
+      `A partir de ese momento, ${rol} NO podrá iniciar sesión ni operar los ` +
       `${this.dias[v.dia_semana].toLowerCase()}s entre las ${v.hora_inicio} y las ` +
       `${v.hora_fin}: el rechazo lo hace la propia base de datos (esta_en_horario()), ` +
       'no la interfaz, así que ninguna pantalla puede saltárselo. ' +
@@ -217,7 +226,7 @@ export class HorariosComponent implements OnInit {
 
     this.confirmar.confirmar({
       titulo: ultima ? 'Vas a dejar a un rol fuera del sistema' : 'Confirmar cierre de acceso',
-      mensaje: `¿Seguro que deseas eliminar la ventana de ${v.rol_grupo} del `
+      mensaje: `¿Seguro que deseas eliminar la ventana de ${rol} del `
              + `${this.dias[v.dia_semana].toLowerCase()} (${v.hora_inicio}–${v.hora_fin})?`,
       consecuencia,
       textoAceptar: 'Cerrar el acceso',
@@ -234,5 +243,10 @@ export class HorariosComponent implements OnInit {
   /** Cuántas ventanas activas tiene cada rol: se pinta como aviso. */
   get rolesSinVentanaActiva(): string[] {
     return this.roles.filter(r => !this.todas.some(v => v.rol_grupo === r && v.activo));
+  }
+
+  /** El mismo aviso, con los nombres limpios; el crudo va en el `title`. */
+  get rolesSinVentanaActivaTexto(): string {
+    return this.rolesSinVentanaActiva.map(nombreRolGrupo).join(', ');
   }
 }

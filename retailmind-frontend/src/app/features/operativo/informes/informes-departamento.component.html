@@ -10,9 +10,39 @@
        al terminar, recarga el informe abierto. -->
   <app-actualizacion-almacen (actualizado)="cargar()"></app-actualizacion-almacen>
 
-  <!-- Selector de informe: una tarjeta por objetivo táctico disponible al rol -->
+  <!-- Recuento de lo que se está ofreciendo, por tipo. Se calcula de `visibles`
+       —lo que de verdad hay pintado abajo— y no de una cifra escrita a mano:
+       si el filtro recorta la lista, el contador baja con ella. -->
+  <div class="selector-conteo" *ngIf="disponibles.length">
+    <span class="conteo-total">{{ visibles.length }} de {{ disponibles.length }} informes</span>
+    <button type="button" class="conteo-pastilla simple" [class.apagada]="filtroFuente === 'compuesto'"
+            (click)="alternarFuente('simple')"
+            matTooltip="Informes SIMPLES: se responden sobre la foto del presente, contra
+                        PostgreSQL. Pulsa para ver solo éstos.">
+      <span class="marca-fuente-simple" aria-hidden="true"></span>
+      {{ conteoSimples }} simples
+    </button>
+    <button type="button" class="conteo-pastilla compuesto"
+            [class.apagada]="filtroFuente === 'simple'"
+            (click)="alternarFuente('compuesto')"
+            matTooltip="Informes COMPUESTOS: recorren histórico o cruzan períodos, y se sirven
+                        del almacén analítico (ClickHouse). Pulsa para ver solo éstos.">
+      <span class="marca-fuente-compuesto" aria-hidden="true"></span>
+      {{ conteoCompuestos }} compuestos
+    </button>
+    <button type="button" class="conteo-limpiar" *ngIf="filtroFuente"
+            (click)="alternarFuente(filtroFuente)">
+      <mat-icon>filter_alt_off</mat-icon> Ver todos
+    </button>
+  </div>
+
+  <!-- Selector de informe: una tarjeta por objetivo táctico disponible al rol.
+       El tipo se distingue por TRES señales a la vez —color de la píldora,
+       forma de la marca y la palabra escrita— porque el color solo no puede
+       ser el único portador de la información. -->
   <div class="informe-selector">
-    <button type="button" class="informe-chip" *ngFor="let inf of disponibles"
+    <button type="button" class="informe-chip" *ngFor="let inf of visibles"
+            [ngClass]="'fuente-' + inf.fuente"
             [class.activo]="esActual(inf)" (click)="seleccionar(inf)"
             [matTooltip]="inf.descripcion">
       <mat-icon>{{ inf.icono }}</mat-icon>
@@ -20,7 +50,18 @@
         <span class="chip-id">{{ inf.id }}</span>
         <span class="chip-titulo">{{ inf.titulo }}</span>
       </span>
+      <span class="chip-fuente" [title]="tituloFuente(inf)">
+        <span class="marca-fuente" aria-hidden="true"></span>
+        {{ inf.fuente === 'compuesto' ? 'Compuesto' : 'Simple' }}
+      </span>
     </button>
+  </div>
+
+  <div class="op-card" *ngIf="disponibles.length && !visibles.length">
+    <div class="empty-state">
+      <mat-icon>filter_alt_off</mat-icon>
+      <p>Este departamento no tiene informes {{ filtroFuente }}s disponibles para tu rol.</p>
+    </div>
   </div>
 
   <ng-container *ngIf="actual as informe">

@@ -30,6 +30,7 @@ import {
 import {
   ReporteDialogComponent, ReporteDialogData, ReporteDialogResultado
 } from './reporte-dialog.component';
+import { CodigoLegiblePipe } from '../../../core/pipes/etiquetas.pipe';
 
 /** Espeja las transiciones del backend (ResenasService.TRANSICIONES_RESENA). */
 const TRANSICIONES: Record<string, string[]> = {
@@ -68,7 +69,7 @@ const TRANSICIONES_REPORTE: Record<string, string[]> = {
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule, MatTooltipModule,
-    MatDialogModule, SelectBuscableComponent, AccionesRegistroComponent],
+    MatDialogModule, SelectBuscableComponent, AccionesRegistroComponent, CodigoLegiblePipe],
   templateUrl: './resenas.component.html',
   styleUrl: '../operativo-shared.scss'
 })

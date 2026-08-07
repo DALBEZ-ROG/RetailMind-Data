@@ -205,7 +205,7 @@
                   <mat-chip *ngIf="d.esPredeterminada" class="chip-predeterminada">
                     <mat-icon>star</mat-icon> Predeterminada
                   </mat-chip>
-                  <span class="direccion-tipo">({{ d.tipo }})</span>
+                  <span class="direccion-tipo">({{ d.tipo | codigoLegible }})</span>
                 </div>
                 <p>{{ d.destinatario }}</p>
                 <p>

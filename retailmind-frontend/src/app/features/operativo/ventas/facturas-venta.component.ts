@@ -15,13 +15,14 @@ import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 import { VentasService } from '../../../core/services/ventas.service';
 import { mensajeError } from '../../../core/services/api-error.util';
 import { PedidoVentaRow, FacturaVenta, FacturaVentaRow } from '../../../core/models/operativo.model';
+import { CodigoLegiblePipe } from '../../../core/pipes/etiquetas.pipe';
 
 @Component({
   selector: 'app-facturas-venta',
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule,
-    MatTooltipModule, MatPaginatorModule],
+    MatTooltipModule, MatPaginatorModule, CodigoLegiblePipe],
   templateUrl: './facturas-venta.component.html',
   styleUrl: '../operativo-shared.scss'
 })
