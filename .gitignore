@@ -11,6 +11,11 @@ retailmind-frontend/.angular/
 retailmind-frontend/dist/
 clickhouse-data/
 
+# Logs del ETL: cambian en CADA corrida y ensucian el diff.
+# Salieron del indice con `git rm --cached` (siguen en disco).
+retailmind/logs/
+*.log
+
 # Secretos de despliegue (Docker secrets) y dump de migracion
 deploy/secrets/
 deploy/postgres/initdb/*.dump
