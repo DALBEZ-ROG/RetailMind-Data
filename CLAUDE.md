@@ -127,6 +127,58 @@ git** (verificado). `.env.example` es la plantilla versionada: lleva las CLAVES 
 - Ningún `down` debe llevar **`-v`**: el volumen de ClickHouse guarda un dato irreproducible
   (`fact_eventos`, 2.823.245 filas) y por eso va declarado `external: true`.
 
+## Cierre de sesión («cerramos por hoy»)
+
+Procedimiento fijo para dejar el día cerrado. **Se ejecuta entero, en este orden.**
+
+**1. Verificar antes de tocar el índice.**
+
+```bash
+git status                       # completo, y se REPORTA
+git ls-files --error-unmatch .env    # debe fallar: .env NUNCA se rastrea
+git status --porcelain | grep -i '\.env'   # no debe devolver nada
+```
+
+Los **cuatro archivos con secretos** —`.env`, `retailmind/.env`,
+`deploy/secrets/pg_superuser.txt` y `retailmind-backend/application-local.properties`— van
+fuera del índice, y ahí se quedan.
+
+**2. Barrido de credenciales sobre lo que se va a commitear** (no sobre el repo entero: sobre
+el DIFF y los archivos nuevos). Es el paso que más veces ha salvado un commit:
+
+```bash
+git diff -U0 | grep '^+' | grep -viE '^\+\+\+' \
+  | grep -inE 'password|passwd|contrasen|secret|token|api[_-]?key|BEGIN .*PRIVATE'
+```
+
+Un javadoc citó una vez una contraseña en claro y hubo que **enmendar el commit**; otra vez
+fue un documento nuevo que reproducía la clave de demo mientras explicaba en qué archivos
+estaba. **Si aparece algo, DETENERSE y reportarlo ANTES de commitear** — no commitear y
+arreglar después: lo commiteado ya está en la historia. Ojo con el falso positivo honesto:
+`jwt.secret` es el NOMBRE de una propiedad, no un valor.
+
+**3. Commits agrupados POR TEMA, no por archivo y nunca uno solo con todo.** Un commit = un
+asunto que se pueda revertir sin arrastrar nada más (p. ej. «documentación» y «corrección de
+cifras» van separados aunque toquen el mismo archivo). Mensajes **en español**, en imperativo
+o sustantivo, describiendo el QUÉ y el PORQUÉ, no los archivos.
+
+**4. El push es MANUAL y por decisión explícita. NUNCA automático.** Cerrar la sesión deja los
+commits **locales**, y `git status` dice cuántos van por delante del remoto. El motivo: el
+barrido del paso 2 es la última red antes de que algo salga del equipo — una vez empujado a un
+remoto compartido, un secreto se considera comprometido aunque se borre después (queda en el
+reflog, en los forks y en la caché del servidor), y limpiarlo obliga a reescribir la historia.
+Local es reversible; remoto no.
+
+**5. Reconstruir al terminar**, si se tocó código Java o Angular:
+
+```bash
+docker compose up -d --build     # sin --build la imagen sigue horneada con lo viejo
+```
+
+**Nunca `docker compose down -v`.** El `-v` **destruye los volúmenes**, y con ellos la base
+`retailmind` entera y el `fact_eventos` de ClickHouse (2.823.245 filas irreproducibles). Para
+parar sin perder nada: `docker compose stop` o, como mucho, `docker compose down` **a secas**.
+
 ## Credenciales de desarrollo
 
 - Admin: `admin@retailmind.com` / `Admin2026!`
