@@ -9,12 +9,17 @@ de dos bases de datos**:
   núcleo transaccional vive aquí, **incluida la tienda del cliente** (catálogo `/api/catalogo`
   con ~1.214 productos reales cargados del dataset original vía ETL puntual, carrito, wishlist,
   perfil/direcciones, checkout y mis pedidos — migrados 2026-07-11).
-- **ClickHouse**: **solo analítica** (esquema estrella `fact_eventos` + dimensiones `dim_*`),
-  alimentado por el pipeline ETL de Python desde PocketBase. Con ClickHouse/Docker apagado TODO
-  el sistema funciona; solo analytics/recomendaciones se degradan con aviso.
+- **ClickHouse**: **solo analítica** — la base legada `retailmind` (`fact_eventos` + `dim_*`) y el
+  almacén vivo **`retailmind_dwh`** (21 tablas), alimentado desde PostgreSQL por `retailmind/etl/dwh/`.
+  Con **ClickHouse** apagado TODO el sistema funciona; solo analytics/recomendaciones se degradan
+  con aviso.
 
-> Si algún documento viejo dice "PostgreSQL eliminado" o describe la tienda sobre ClickHouse,
-> está desactualizado: ignorarlo.
+> **Desde el 2026-08-03 el sistema entero corre en Docker**, PostgreSQL incluido
+> (`docs/DESPLIEGUE_EJECUTADO.md`). La vieja frase «con Docker apagado todo funciona» YA NO VALE:
+> sin Docker no hay base. Lo que sigue en pie es el invariante de **ClickHouse**.
+>
+> Si algún documento viejo dice "PostgreSQL eliminado", describe la tienda sobre ClickHouse o
+> afirma que PostgreSQL corre local, está desactualizado: ignorarlo.
 
 El sistema se organiza en tres niveles empresariales:
 
@@ -28,12 +33,13 @@ El sistema se organiza en tres niveles empresariales:
   centralizada (`log_auditoria`) en los procesos críticos, novedades/incidencias de envío
   (script 44), devolución a proveedor de mercancía defectuosa (script 45) y saneamiento
   completo de bugs Tipo 1 (scripts 43 + fix de health 2026-07-18: deuda de bugs reales = 0).
-- **Táctico (toma de decisiones — EN ANÁLISIS, 2026-07-17)**: definidos 25 informes tácticos por
-  departamento (`docs/RetailMind_T11_Analisis_Tactico.pdf`): 12 simples directo de la BDR
-  PostgreSQL y 13 compuestos que se procesarán en ClickHouse vía ETL orquestado por Airflow.
-  Hoy ya corren sobre ClickHouse: sesiones, conversiones, funnel, analytics por
-  región/dispositivo/tráfico y reportes (Excel/PDF).
-- **Estratégico**: dashboard ejecutivo con KPIs.
+- **Táctico (toma de decisiones — TERMINADO)**: **30 informes simples** (directo de PostgreSQL) +
+  **39 compuestos** (contra el almacén `retailmind_dwh` de ClickHouse), en los 6 departamentos.
+  Una sola pantalla genérica parametrizada por archivo declarativo; patrón en
+  `docs/tactico/PATRON_INFORMES.md`.
+- **Estratégico (TERMINADO)**: **7 tableros de dirección** que cubren las 19 decisiones de
+  dashboard, más **2 modelos** (previsión de demanda y alerta de abandono, ambos publicados con
+  su métrica de calidad a la vista). Diseño en `docs/estrategico/DISENO_NIVEL_ESTRATEGICO.md`.
 
 ## Módulos operativos construidos
 
@@ -56,12 +62,15 @@ El sistema se organiza en tres niveles empresariales:
 | Trazabilidad / Auditoría | Script 42 + `auditoria/AuditoriaService`: columnas directas de autor con FK a usuario, SIEMPRE del JWT — `pedido.vendedor_id` (NULL si canal 'web': el autor es el CLIENTE, trazado por `cliente_id`+historial), `envio.despachado_por`, `factura_compra.registrado_por`, `resena.moderado_por`+`fecha_moderacion`, `pregunta_producto.moderado_por`+`fecha_moderacion`; `registrar()` escribe `log_auditoria` (jsonb antes/después, CHECK de acciones, append-only por grants, sin RLS) en crear pedido interno, despachar, registrar factura de compra y moderar reseña/pregunta; el checkout online NO loguea (grp_cliente sin INSERT a propósito) |
 
 ## Pendientes
-- Contenerización completa (PostgreSQL sigue local, fuera de compose). `/api/health` ya sirve
-  como healthcheck de contenedores: responde acotado (~3s) con ClickHouse apagado
-  (`status: UP, analytics: DEGRADED`; fix 2026-07-18 en `ClickHouseConfig`).
-- Orquestación ETL con Airflow — siguiente fase, derivada del análisis del nivel táctico
-  (2026-07-17, `docs/RetailMind_T11_Analisis_Tactico.pdf`): los 13 informes tácticos compuestos
-  se procesarán en ClickHouse alimentado por ese pipeline.
+- ~~Contenerización completa~~ **HECHA el 2026-08-03** (`docs/DESPLIEGUE_EJECUTADO.md`):
+  PostgreSQL migrado al contenedor y **cortado** — el **5432 es el contenedor** (base viva) y el
+  PostgreSQL local pasó al **5433** (plan B + 12 bases de otras materias). Los 4 servicios quedan
+  `healthy` en 28 s; las 11 verificaciones pasaron; el ETL corrió dentro de Docker (21/21 tablas,
+  49/49 controles) y las credenciales internas se rotaron. `/api/health` sirve como healthcheck:
+  responde acotado (~3 s) con ClickHouse apagado (`status: UP, analytics: DEGRADED`).
+- **Orquestación ETL con Airflow** — único pendiente de infraestructura. Contenerizar PostgreSQL
+  eliminó la fricción que lo bloqueaba. Recordatorio: al activarlo hay que poner `DWH_CRON=-` en
+  el `.env`, o el `@Scheduled` del backend y Airflow disparan a la vez.
 
 ## Deuda técnica
 Re-auditada 2026-07-18 (post scripts 43-45) contra el sistema real: **cero bugs reales (Tipo 1)

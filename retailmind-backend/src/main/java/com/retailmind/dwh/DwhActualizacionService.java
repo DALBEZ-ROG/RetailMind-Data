@@ -4,8 +4,6 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -76,6 +74,8 @@ public class DwhActualizacionService {
     private static final String TAREA_VALIDACION = "validar_dwh";
     private static final String EN_CURSO = "en_curso";
     private static final String EXITO = "exito";
+    /** El mismo literal que escribe el orquestador al cerrar en rojo. */
+    private static final String RESULTADO_FALLO_PARCIAL = "fallo_parcial";
 
     /**
      * Pasado este tiempo, una corrida «en curso» se considera ABANDONADA y deja
@@ -304,22 +304,58 @@ public class DwhActualizacionService {
     }
 
     /**
-     * Corrida viva según la bitácora: tiene marcador de apertura, no tiene
-     * marcador de cierre y no ha sobrepasado el límite de abandono.
+     * Corrida viva según la bitácora: quedan marcadores de apertura SIN su
+     * cierre correspondiente, y no ha sobrepasado el límite de abandono.
+     *
+     * <h2>Por qué se comparan aperturas contra cierres y no se exige «cero
+     * cierres»</h2>
+     *
+     * Este método compartía con {@link #detalle} el supuesto de que una corrida
+     * deja UN marcador de apertura y UN cierre. Es cierto cuando la dispara el
+     * botón —un solo proceso {@code run_etl}— y FALSO cuando la orquesta
+     * Airflow: ahí cada tarea del DAG es un proceso independiente y escribe su
+     * propio par, de modo que una corrida de 22 tareas deja 22 aperturas y 22
+     * cierres bajo el MISMO {@code corrida_id}.
+     *
+     * Con la condición anterior ({@code cierres = 0}) bastaba con que la
+     * primera tarea del DAG terminara para que la corrida dejara de
+     * considerarse viva: a partir de ese instante el guardia de concurrencia de
+     * la capa 2 no la veía, y el botón podía lanzar una segunda carga sobre las
+     * mismas tablas mientras el DAG seguía corriendo. No daba error: daba dos
+     * procesos compitiendo por el mismo {@code EXCHANGE TABLES}.
+     *
+     * Comparar los dos conteos funciona en los dos casos: el botón está vivo
+     * con 1 &gt; 0 y muerto con 1 = 1; el DAG está vivo mientras alguna de sus
+     * tareas tenga la apertura sin cerrar.
+     *
+     * LIMITACIÓN DECLARADA: entre dos tareas del DAG no hay ningún proceso
+     * {@code run_etl} vivo, así que en esa rendija los conteos se igualan y la
+     * corrida no se detecta. Es inherente a deducir el estado de una bitácora
+     * que solo conoce procesos: la única forma de cerrarla sería preguntarle a
+     * Airflow, y este servicio no habla con Airflow a propósito.
      */
     private UUID corridaVivaEnBitacora() {
         List<Map<String, Object>> filas = ch.queryForList(
-                "SELECT toString(corrida_id) AS id, max(inicio) AS abierta, "
+                // `abierta` va en epoch por la misma razón que en `detalle`: el
+                // driver no entrega `DateTime('America/Guayaquil')` como
+                // `LocalDateTime`, así que el `instanceof` de antes NUNCA se
+                // cumplía y el corte por abandono no llegaba a evaluarse: una
+                // corrida muerta habría bloqueado el botón para siempre.
+                // `now()` de ClickHouse y `inicio` salen del mismo reloj, con lo
+                // que la resta tampoco depende de la hora de la JVM.
+                "SELECT toString(corrida_id) AS id, "
+                + "       toUnixTimestamp(now()) - toUnixTimestamp(max(inicio)) AS antiguedad_seg, "
+                + "       max(inicio) AS abierta, "
+                + "       countIf(resultado =  ?) AS aperturas, "
                 + "       countIf(resultado <> ?) AS cierres "
                 + "FROM " + BITACORA + " WHERE tarea = ? "
-                + "GROUP BY corrida_id HAVING cierres = 0 "
-                + "ORDER BY abierta DESC LIMIT 1", EN_CURSO, TAREA_CORRIDA);
+                + "GROUP BY corrida_id HAVING aperturas > cierres "
+                + "ORDER BY abierta DESC LIMIT 1", EN_CURSO, EN_CURSO, TAREA_CORRIDA);
         if (filas.isEmpty()) {
             return null;
         }
-        Object abierta = filas.get(0).get("abierta");
-        if (abierta instanceof LocalDateTime inicio
-                && inicio.isBefore(LocalDateTime.now().minus(MINUTOS_ABANDONO, ChronoUnit.MINUTES))) {
+        long antiguedadSeg = numero(filas.get(0).get("antiguedad_seg"));
+        if (antiguedadSeg > MINUTOS_ABANDONO * 60) {
             logger.warn("La corrida {} lleva abierta más de {} min sin cerrarse: "
                     + "se considera abandonada y deja de bloquear.",
                     filas.get(0).get("id"), MINUTOS_ABANDONO);
@@ -328,29 +364,83 @@ public class DwhActualizacionService {
         return UUID.fromString(String.valueOf(filas.get(0).get("id")));
     }
 
-    /** Reconstruye el parte completo de una corrida a partir de sus filas. */
+    /**
+     * Reconstruye el parte completo de una corrida a partir de sus filas.
+     *
+     * <h2>Una corrida puede traer UNO o MUCHOS marcadores</h2>
+     *
+     * El disparo por botón lanza UN proceso {@code run_etl} que carga las 21
+     * tablas, así que deja UN marcador de apertura y UN cierre. Airflow lanza
+     * UN PROCESO POR TAREA del DAG —es lo que permite que el grafo se vea y que
+     * las tablas sin dependencias corran en paralelo—, y cada proceso escribe
+     * su propio par: 22 aperturas y 22 cierres bajo el mismo {@code corrida_id}.
+     *
+     * Este método daba por hecho lo primero. Como el bucle se quedaba con el
+     * ÚLTIMO marcador leído, en una corrida de Airflow «el» marcador de
+     * apertura acababa siendo el de {@code validar_dwh}, que no carga ninguna
+     * tabla y declara «0 tareas en cola». De ahí salía el
+     * <b>«21 de 0 tablas publicadas»</b>: ni un error, ni una excepción, ni un
+     * log — una cifra plausible y falsa, que es el modo de fallo que este
+     * proyecto persigue por encima de los demás.
+     *
+     * La corrección es tratar la corrida como el AGREGADO de sus marcadores y
+     * no como uno solo. Se aplica a los cinco campos que dependían de esa
+     * elección: {@code tareasTotales}, {@code inicio}, {@code fin} +
+     * {@code duracionSeg}, {@code resultado}/{@code exito} y {@code mensaje}.
+     * Los nombres y tipos de la respuesta NO cambian: el frontend no se toca.
+     *
+     * Funciona sobre las corridas YA REGISTRADAS: solo cambia cómo se leen las
+     * filas, no se migra ni se reescribe una sola de ellas.
+     */
     private Map<String, Object> detalle(UUID corrida) {
         List<Map<String, Object>> filas = ch.queryForList(
                 "SELECT tarea, resultado, filas_escritas, filas_leidas, duracion_seg, mensaje, "
                 + "       formatDateTime(inicio, '%d/%m/%Y %H:%i') AS inicio_txt, "
                 + "       formatDateTime(fin, '%d/%m/%Y %H:%i') AS fin_txt, "
-                + "       inicio "
+                // Los instantes viajan como ENTEROS y no como fecha: la columna
+                // es `DateTime('America/Guayaquil')` y el driver de ClickHouse
+                // no la entrega como `LocalDateTime`, así que un `instanceof`
+                // sobre ella falla en silencio y el cálculo se cae al valor de
+                // reserva sin que nada lo diga. Con epoch no hay tipo que
+                // adivinar.
+                + "       toUnixTimestamp(inicio) AS inicio_epoch, "
+                + "       toUnixTimestamp(fin)    AS fin_epoch "
                 + "FROM " + BITACORA + " WHERE corrida_id = toUUID(?) "
                 + "ORDER BY inicio, tarea", corrida.toString());
 
-        Map<String, Object> apertura = null;
-        Map<String, Object> cierre = null;
+        //: PRIMERA apertura y ÚLTIMO cierre — el arranque y el final REALES de
+        //: la corrida. Antes se guardaba el último de cada uno, con lo que en
+        //: Airflow el «inicio» mostrado era el de la última tarea.
+        Map<String, Object> primeraApertura = null;
+        Map<String, Object> ultimoCierre = null;
         Map<String, Object> validacion = null;
         List<Map<String, Object>> tablas = new ArrayList<>();
+
+        long aperturas = 0;
+        long cierres = 0;
+        //: Σ de lo que los marcadores DECLARARON tener en cola. El botón lo
+        //: declara de una vez (21); Airflow, de una en una (21 × 1 + 0 de la
+        //: validación). Suma 21 en ambos casos.
+        long declaradas = 0;
+        //: Un solo cierre con un resultado que no sea «exito» basta para que la
+        //: corrida no lo sea, aunque los posteriores hayan ido bien. En Airflow
+        //: el último cierre es el de `validar_dwh` y taparía un fallo anterior.
+        boolean todosLosCierresBien = true;
 
         for (Map<String, Object> f : filas) {
             String tarea = String.valueOf(f.get("tarea"));
             String resultado = String.valueOf(f.get("resultado"));
             if (TAREA_CORRIDA.equals(tarea)) {
                 if (EN_CURSO.equals(resultado)) {
-                    apertura = f;
+                    aperturas++;
+                    declaradas += numero(f.get("filas_leidas"));
+                    if (primeraApertura == null) {
+                        primeraApertura = f;      // ORDER BY inicio: la primera
+                    }
                 } else {
-                    cierre = f;
+                    cierres++;
+                    ultimoCierre = f;             // ORDER BY inicio: la última
+                    todosLosCierresBien &= EXITO.equals(resultado);
                 }
             } else if (TAREA_VALIDACION.equals(tarea)) {
                 validacion = f;
@@ -359,19 +449,30 @@ public class DwhActualizacionService {
             }
         }
 
-        // Viva si la bitácora la muestra abierta, o si es la que este backend
+        // Viva mientras queden aperturas sin cerrar, o si es la que este backend
         // está ejecutando ahora mismo (todavía sin marcador de apertura).
-        boolean enCurso = (apertura != null && cierre == null) || corrida.equals(activa.get());
+        boolean enCurso = aperturas > cierres || corrida.equals(activa.get());
+
         long completadas = tablas.stream()
                 .filter(f -> EXITO.equals(String.valueOf(f.get("resultado")))).count();
         long filasCargadas = tablas.stream()
                 .filter(f -> EXITO.equals(String.valueOf(f.get("resultado"))))
                 .mapToLong(f -> numero(f.get("filas_escritas"))).sum();
 
-        // El total de tareas lo declara el propio orquestador al abrir; así no
-        // hay que mantener aquí una constante «19» que caducaría con la primera
-        // tabla nueva del modelo.
-        long totales = apertura != null ? numero(apertura.get("filas_leidas")) : tablas.size();
+        // ── El total de tareas ────────────────────────────────────────────
+        // Se CUENTAN las tareas reales de la corrida en vez de creerse lo que
+        // declaró un marcador. `distinct` porque un reintento de Airflow deja
+        // una fila más para la misma tabla (el intento fallido y el bueno), y
+        // ahí «22 tablas» sería tan falso como el «0» que se está arreglando.
+        long tablasDistintas = tablas.stream()
+                .map(f -> String.valueOf(f.get("tarea"))).distinct().count();
+        // El máximo con lo declarado conserva el progreso EN VIVO del botón:
+        // a mitad de esa corrida hay 7 filas de tabla pero el marcador ya
+        // declaró 21, y la pantalla debe seguir diciendo «7 de 21» y no
+        // «7 de 7». En Airflow los dos valores coinciden al terminar; mientras
+        // corre no hay forma de saber cuántas tareas tiene el DAG sin
+        // preguntarle a Airflow, y este servicio no lo hace a propósito.
+        long totales = Math.max(tablasDistintas, declaradas);
 
         List<Map<String, Object>> errores = new ArrayList<>();
         for (Map<String, Object> f : tablas) {
@@ -398,8 +499,11 @@ public class DwhActualizacionService {
                 "filas", numero(f.get("filas_escritas")),
                 "segundos", f.getOrDefault("duracion_seg", 0))).toList());
 
-        if (apertura != null) {
-            res.put("inicio", apertura.get("inicio_txt"));
+        // El arranque de la corrida es la PRIMERA apertura. Tomando la última,
+        // una corrida de Airflow declaraba como hora de inicio la de su tarea
+        // final, que empezó segundos antes de terminar todo.
+        if (primeraApertura != null) {
+            res.put("inicio", primeraApertura.get("inicio_txt"));
         }
         if (enCurso) {
             res.put("resultado", EN_CURSO);
@@ -407,13 +511,38 @@ public class DwhActualizacionService {
                     ? "Actualización iniciada: preparando las cargas."
                     : "Actualización en curso: " + completadas + " de " + totales
                       + " tablas publicadas.");
-        } else if (cierre != null) {
-            String resultado = String.valueOf(cierre.get("resultado"));
-            res.put("resultado", resultado);
-            res.put("fin", cierre.get("fin_txt"));
-            res.put("duracionSeg", cierre.get("duracion_seg"));
-            res.put("mensaje", String.valueOf(cierre.getOrDefault("mensaje", "")));
-            res.put("exito", EXITO.equals(resultado));
+        } else if (ultimoCierre != null) {
+            // El veredicto es de la CORRIDA, no del último proceso que cerró.
+            // En Airflow ese último es `validar_dwh`, que sale en verde aunque
+            // una tabla anterior hubiera fallado: el parte habría dicho «éxito»
+            // con la lista de errores llena justo al lado.
+            boolean ok = todosLosCierresBien && errores.isEmpty();
+            res.put("resultado", ok ? EXITO : RESULTADO_FALLO_PARCIAL);
+            res.put("exito", ok);
+            res.put("fin", ultimoCierre.get("fin_txt"));
+
+            // Duración: con UN marcador vale la que él mismo midió. Con muchos,
+            // sumarlas daría tiempo de CÓMPUTO y no de reloj —las tareas del DAG
+            // corren en paralelo—, así que se mide de punta a punta.
+            Object duracion = ultimoCierre.get("duracion_seg");
+            if (cierres > 1) {
+                Double reloj = segundosDePuntaAPunta(primeraApertura, ultimoCierre);
+                if (reloj != null) {
+                    duracion = reloj;
+                }
+            }
+            res.put("duracionSeg", duracion);
+
+            // Con un solo cierre, su mensaje describe la corrida entera. Con
+            // muchos, el del último describe SOLO su tarea («0 tareas
+            // publicadas · 0 filas»), así que se compone desde los conteos.
+            res.put("mensaje", cierres == 1
+                    ? String.valueOf(ultimoCierre.getOrDefault("mensaje", ""))
+                    : (ok
+                        ? completadas + " tablas publicadas · " + filasCargadas + " filas"
+                          + (validacion != null ? " · controles ejecutados" : "")
+                        : "Fallo parcial: " + errores.size() + " tarea(s) sin publicar de "
+                          + totales + "."));
         }
         if (validacion != null) {
             res.put("validacion", validacion.get("resultado"));
@@ -444,5 +573,34 @@ public class DwhActualizacionService {
 
     private static long numero(Object v) {
         return v instanceof Number n ? n.longValue() : 0L;
+    }
+
+    /**
+     * Segundos de RELOJ entre el arranque de la corrida y su cierre, para las
+     * corridas con varios marcadores (Airflow).
+     *
+     * Sumar las duraciones de los marcadores daría tiempo de CÓMPUTO: las
+     * tareas del DAG sin dependencias corren a la vez, así que la suma es mayor
+     * que el tiempo transcurrido y crecería al añadir paralelismo, que es lo
+     * contrario de lo que la cifra debe contar.
+     *
+     * Los instantes llegan como epoch en segundos ({@code toUnixTimestamp} en
+     * la consulta) justamente para no depender de a qué tipo de Java mapee el
+     * driver de ClickHouse una columna {@code DateTime} con zona.
+     *
+     * Devuelve null si la bitácora no trae los dos instantes; quien llama se
+     * queda entonces con la duración del último marcador.
+     */
+    private static Double segundosDePuntaAPunta(Map<String, Object> apertura,
+                                                Map<String, Object> cierre) {
+        if (apertura == null || cierre == null) {
+            return null;
+        }
+        long desde = numero(apertura.get("inicio_epoch"));
+        long hasta = numero(cierre.get("fin_epoch"));
+        if (desde <= 0 || hasta < desde) {
+            return null;
+        }
+        return (double) (hasta - desde);
     }
 }

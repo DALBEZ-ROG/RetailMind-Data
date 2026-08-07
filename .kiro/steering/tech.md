@@ -2,16 +2,25 @@
 
 > Stack verificado contra el código (pom.xml, package.json, application.properties, esquema real).
 > Arquitectura **híbrida**: PostgreSQL es la BD operativa principal (incluida la tienda del
-> cliente, migrada 2026-07-11); ClickHouse es **solo analítica**. Con ClickHouse apagado TODO
-> funciona; solo analytics/recomendaciones se degradan con aviso. Si algún documento viejo dice
+> cliente, migrada 2026-07-11); ClickHouse es **solo analítica**. Si algún documento viejo dice
 > "PostgreSQL eliminado" o describe la tienda sobre ClickHouse, está desactualizado: ignorarlo.
+>
+> **Desde el 2026-08-03 PostgreSQL corre EN UN CONTENEDOR** (bitácora:
+> `docs/DESPLIEGUE_EJECUTADO.md`), así que la vieja frase «con Docker apagado todo funciona» YA NO
+> VALE: sin Docker no hay base. Lo que SÍ sigue en pie es que **ClickHouse es solo analítica**: con
+> ClickHouse apagado TODO el sistema funciona y solo analytics/recomendaciones se degradan con
+> aviso. Por eso el compose declara `clickhouse: service_started` y NUNCA `service_healthy`.
 
 ## Bases de datos (arquitectura híbrida — dual datasource)
 
 ### PostgreSQL (operativa principal)
 - **BD**: `retailmind` (~103 tablas transaccionales, catálogo con ~1.214 productos reales),
-  local en `localhost:5432` (no está en docker-compose; se administra con los scripts de
-  `retailmind/sql/postgres/`, scripts numerados 01–45 + 99).
+  **en el CONTENEDOR Docker** (`postgres`, PostgreSQL 18.4 Debian) publicado en el
+  **5432 del anfitrión**. El DDL vigente son los scripts numerados de
+  `retailmind/sql/postgres/` (01–85 + 99).
+- **El PostgreSQL local de Windows** (18.3, servicio `postgresql-x64-18`) **se movió al 5433**:
+  ahí viven 12 bases de otras materias más una copia congelada de `retailmind` que sirve de
+  marcha atrás. **No se desinstala.**
 - **Conexión de la app**: usuario `retailmind_app` (LOGIN **NOINHERIT**, sin privilegios de
   negocio directos). Nunca conectar como `postgres` desde la app.
 - **Seguridad de motor**: 9 roles de grupo `grp_administrador`, `grp_gerente`, `grp_vendedor`,
@@ -35,8 +44,14 @@
   grp_cliente sin INSERT a propósito), CHECK de acciones, sin RLS.
 
 ### ClickHouse (solo analítica)
-- Esquema estrella: `fact_eventos` (~2.3M) + dimensiones `dim_*` + tablas legacy de tienda.
-- Alimentado por el ETL Python desde PocketBase. **No usar para el núcleo operativo.**
+- **Dos bases**: `retailmind` (LEGADA — `fact_eventos` ~2,8M + `dim_*`, la lee `analytics/`) y
+  **`retailmind_dwh`** (el almacén VIVO: 21 tablas, 64.664 filas, alimentado desde PostgreSQL por
+  `retailmind/etl/dwh/`). Los informes compuestos y los tableros cualifican `retailmind_dwh`
+  explícitamente.
+- Versión fijada en el compose: **`26.4.2.10`** — nunca `:latest` sobre un motor con formato en
+  disco propio.
+- Su volumen es **`external: true`**: guarda un dato irreproducible y debe fallar si falta.
+- **No usar para el núcleo operativo.**
 
 ## Backend (`retailmind-backend/`)
 - **Language**: Java 17 · **Framework**: Spring Boot 3.5.0 · **Build**: Maven
@@ -86,22 +101,72 @@
 - Recomendaciones con señal ClickHouse + productos PG; degradan a destacados si CH no disponible.
 
 ## ETL Pipeline (`retailmind/`)
-- Python 3.12, clickhouse-connect, pocketbase, pyarrow, pandas
-- Flujo: PocketBase → `data/stage/*.parquet` → ClickHouse (solo analítica)
-- psycopg2 disponible para inspección/administración de PostgreSQL en desarrollo
+- Python 3.12, clickhouse-connect, psycopg2, pyarrow, pandas.
+- **Flujo VIGENTE**: PostgreSQL → `etl/dwh/` → ClickHouse `retailmind_dwh` (21 tablas,
+  carga atómica staging `_new` → validar → `EXCHANGE TABLES`). Corre con el rol de motor
+  `retailmind_etl` (solo lectura, BYPASSRLS).
+- El flujo viejo desde **PocketBase** es histórico: el servicio se **eliminó** del compose.
+- Dentro de Docker el ETL es el servicio `etl` (perfil `tools`) y `./retailmind` va **montado**,
+  así que un cambio de Python entra sin reconstruir la imagen.
 
 ## Infraestructura
-- **Docker Compose (5 servicios)**: `pocketbase`, `clickhouse`, `backend`, `frontend`, `etl`.
-  **PostgreSQL corre local** (fuera de compose) por ahora.
-- **Puertos**: backend 8080 (si está ocupado por otra app, levantar en 8081 con
-  `--server.port=8081` y detenerlo al terminar), frontend 4200, ClickHouse 8123, Postgres 5432.
+
+**TODO está contenerizado desde el 2026-08-03** (bitácora: `docs/DESPLIEGUE_EJECUTADO.md`). El
+compose raíz declara **6 servicios** y `pocketbase` se **ELIMINÓ**:
+
+| Servicio | Perfil | Arranca con `up -d` |
+|---|---|---|
+| `postgres` | — | sí (la base VIVA) |
+| `clickhouse` | — | sí (analítica) |
+| `backend` | `demo` | sí, porque `.env` fija `COMPOSE_PROFILES=demo` |
+| `frontend` | `demo` | sí, ídem |
+| `etl` | `tools` | no: se invoca a demanda |
+| `pgadmin` | `tools` | no: se invoca a demanda |
+
+**Puertos**: **5432 = el CONTENEDOR** (base viva) · **5433 = el PostgreSQL local** (plan B + bases
+de otras materias) · backend 8080 · frontend 4200 · ClickHouse 8123/9000 · pgAdmin 5050.
+
+### Trampas del despliegue (§8 de `docs/DESPLIEGUE_EJECUTADO.md`)
+- Un cambio de **Java o Angular NO entra solo**: la imagen está horneada, hace falta
+  `docker compose up -d --build`. El **Python del ETL sí es inmediato**, porque `./retailmind` va
+  **montado**, no copiado.
+- Los **datos viven en el volumen, no en la imagen**: reconstruir **NO** los borra.
+- Un **script SQL nuevo NO se aplica solo**: `deploy/postgres/initdb/` corre **una única vez**, con
+  el volumen vacío. Para aplicar uno nuevo:
+  `docker compose exec -T postgres psql -U postgres -d retailmind < ruta/al/script.sql`.
+- **Ningún `down` debe llevar `-v`**: el volumen de ClickHouse guarda un dato irreproducible
+  (`fact_eventos`, 2.823.245 filas) y por eso va declarado `external: true`.
+- Al interpretar un **403 de bodega/despacho/compras, mirar el reloj antes que la migración**:
+  `fuera_horario` bloquea el LOGIN entero, así que el rol no llega ni a pedir el endpoint.
+
+### Secretos
+**NO hay contraseñas en el código ni en los documentos de contexto.** `application.properties`
+dejó de tener valores por defecto para `postgres.datasource.password` y `jwt.secret`: la app
+**falla al arrancar** si faltan, a propósito. Dónde vive cada secreto (los cuatro archivos están
+**fuera del índice de git**, verificado):
+
+| Secreto | Dónde vive |
+|---|---|
+| Superusuario `postgres` del contenedor | `deploy/secrets/pg_superuser.txt` (secreto de Docker) |
+| Rol `retailmind_app` | `.env` → `PG_APP_PASSWORD` |
+| Rol `retailmind_etl` | `.env` → `PG_ETL_PASSWORD` · `retailmind/.env` → `ETL_PG_PASSWORD` |
+| `jwt.secret` | `.env` → `JWT_SECRET` |
+| Modo desarrollo (fuera de Docker) | `retailmind-backend/application-local.properties` |
+
+`.env.example` es la plantilla versionada: lleva las **claves sin los valores**.
 
 ## Orquestación del pipeline
-- El ETL se dispara manualmente por un ADMIN vía `/api/etl/**` (`ProcessBuilder`).
-- **PENDIENTE (siguiente fase)**: Apache Airflow. No implementado. El análisis del nivel
-  táctico (2026-07-17, `docs/RetailMind_T11_Analisis_Tactico.pdf`) definió 25 informes por
-  departamento: 12 simples directo de PostgreSQL y 13 compuestos que justifican este pipeline
-  hacia ClickHouse.
+- El ETL se dispara manualmente por un ADMIN vía `/api/etl/**` (`ProcessBuilder`), y
+  automáticamente por el `@Scheduled` del backend según `DWH_CRON` del `.env` (02:00 por defecto).
+  `run_etl.py` ya orquesta las 21 tablas en orden topológico.
+- **PENDIENTE**: Apache Airflow (§7 del diseño de despliegue). Contenerizar PostgreSQL eliminó la
+  fricción que lo bloqueaba; la red `retailmind_net` tiene nombre FIJO justamente para que el
+  compose de Airflow se enganche como red externa. **El día que Airflow tome el relevo hay que
+  poner `DWH_CRON=-` en el `.env`**, o a las 02:00 disparan los dos y dos cargas concurrentes
+  compiten por el `EXCHANGE TABLES` del mismo destino.
+- Estado del catálogo (ya construido, no pendiente): **30 informes simples + 39 compuestos**,
+  7 tableros estratégicos y 2 modelos. Detalle en `CLAUDE.md` y
+  `docs/tactico/PATRON_INFORMES.md`.
 
 ## Reglas de oro (obligatorias en código nuevo)
 1. **Nunca** escribir columnas GENERATED ni totales de cabecera (los ponen triggers de la BD).
@@ -127,15 +192,37 @@
   `soporte@retailmind.com`: `Retail2026!` (script 37)
 - Clientes demo (`maria.lopez@demo.com`, `carlos.vera@demo.com`): `Cliente2026!` (script 26)
 
+> Estas credenciales de **LOGIN** siguen intactas tras la rotación del 2026-08-03 (verificado: los
+> 10 usuarios entran). Lo que se rotó fueron **cuatro secretos internos que nadie teclea** — el
+> superusuario `postgres` del contenedor, `retailmind_app`, `retailmind_etl` y el `jwt.secret` —,
+> porque estaban en claro y versionados. **No los escribas aquí**: ver la tabla de §Secretos.
+> El superusuario del PostgreSQL **local (5433) NO se rotó**: esa contraseña la comparten los MCP
+> de otras materias.
+
 ## Common Commands
+
+### Docker (el sistema entero)
+```bash
+docker compose up -d               # postgres + clickhouse + backend + frontend (~28 s)
+docker compose up -d --build       # OBLIGATORIO tras cambiar codigo Java o Angular
+docker compose down                # NUNCA con -v
+```
+
+### Modo desarrollo (backend y frontend a mano)
+```bash
+docker compose up -d postgres clickhouse   # solo la base y la analitica
+docker compose stop backend frontend       # libera 8080 y 4200
+```
 
 ### Backend
 ```bash
 cd retailmind-backend
 mvn compile                        # Compilar
-mvn spring-boot:run                # Dev server en 8080
+mvn spring-boot:run                # Dev server en 8080 — EXIGE application-local.properties
 mvn spring-boot:run -Dspring-boot.run.arguments=--server.port=8081   # Si 8080 ocupado
 ```
+Sin `application-local.properties` el backend **se niega a arrancar**
+(`Could not resolve placeholder 'JWT_SECRET'`). Es el comportamiento buscado.
 
 ### Frontend
 ```bash
@@ -150,19 +237,23 @@ cd retailmind-backend && mvn compile
 cd retailmind-frontend && ng build
 ```
 
-### ETL (solo analítica)
+### ETL al almacén (solo analítica)
 ```bash
 cd retailmind
-python etl/extraccion/08_extract_pocketbase.py
-python etl/carga/09_load_clickhouse.py
+python -m etl.dwh.cargar --listar          # tablas del DWH
+python -m etl.dwh.cargar --tabla fact_pedido
+python -m etl.dwh.validar_dwh              # 49 controles contra PostgreSQL
 ```
+Dentro de Docker: `docker compose run --rm etl python -m etl.dwh.cargar --tabla X`.
 
-### Docker (analítica + tienda legacy)
+#### Inspección de esquema PostgreSQL
+```
+MCP retailmind (solo lectura) — ya apunta al CONTENEDOR (localhost:5432/retailmind).
+```
+Para entrar por psql sin salir de Docker (no hace falta contraseña, el secreto lo
+resuelve el contenedor):
 ```bash
-docker-compose up -d               # pocketbase, clickhouse, backend, frontend, etl
+docker compose exec -it postgres psql -U postgres -d retailmind
 ```
-
-### Inspección de esquema PostgreSQL
-```
-MCP retailmind (solo lectura) o psycopg2 (postgres/1250143656@localhost:5432/retailmind)
-```
+**Ninguna contraseña se escribe en este archivo ni en ningún otro versionado.** Ver
+§"Secretos" arriba para saber dónde vive cada una.

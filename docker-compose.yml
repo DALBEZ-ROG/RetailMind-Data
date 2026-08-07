@@ -74,12 +74,94 @@ volumes:
     name: 1m6datoscs_clickhouse_data
     external: true
 
+  # --- Airflow: solo sus LOGS de tarea ---------------------------------
+  # Los metadatos viven en la base `airflow` del contenedor PostgreSQL,
+  # no aqui. Este volumen guarda unicamente el log por intento de tarea,
+  # que es lo que se abre en la interfaz al pinchar un cuadrito. Se puede
+  # borrar sin perder nada del pipeline.
+  airflow_logs:
+    name: retailmind_airflow_logs
+
 secrets:
   # La imagen de PostgreSQL admite `POSTGRES_PASSWORD_FILE`, asi que la
   # contrasena del superusuario NO viaja por una variable de entorno
   # (visible en `docker inspect` y en `docker compose config`).
   pg_superuser:
     file: ./deploy/secrets/pg_superuser.txt
+
+# =====================================================================
+# Bloques reutilizables de Airflow (perfil `airflow`)
+# =====================================================================
+# Van como campos de extension `x-` de NIVEL SUPERIOR y no como anclas
+# dentro de un servicio, porque `airflow-init` necesita el mismo entorno
+# MAS una clave propia. Con el ancla colgando de un servicio no hay forma
+# de anadirle nada; con `<<: *airflow_env` si.
+x-airflow-env: &airflow_env
+  # --- metadatos de Airflow (base `airflow`, NO `retailmind`) ---------
+  AIRFLOW_METADB_HOST: postgres
+  AIRFLOW_METADB_PORT: "5432"
+  AIRFLOW_METADB_NAME: airflow
+  AIRFLOW_METADB_USER: airflow
+  AIRFLOW_METADB_PASSWORD: ${AIRFLOW_PG_PASSWORD:?falta AIRFLOW_PG_PASSWORD}
+  # --- Airflow propiamente dicho --------------------------------------
+  AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: >-
+    postgresql+psycopg2://airflow:${AIRFLOW_PG_PASSWORD}@postgres:5432/airflow
+  # LocalExecutor y no Celery: no hace falta Redis ni workers para 22
+  # tareas de segundos. Permite paralelismo real —las 14 tablas sin
+  # dependencias corren a la vez— con UN solo proceso.
+  AIRFLOW__CORE__EXECUTOR: LocalExecutor
+  AIRFLOW__CORE__LOAD_EXAMPLES: "False"   # la interfaz solo ensena el DAG del proyecto
+  AIRFLOW__CORE__DEFAULT_TIMEZONE: America/Guayaquil
+  # El DAG nace PAUSADO: aparece en la interfaz y espera a que alguien
+  # pulse ▶. Con "False", el scheduler lo disparaba SOLO al descubrirlo —y
+  # con `catchup=False` eso es una corrida inmediata—, de modo que en
+  # mitad de una explicacion podia arrancar una carga que nadie pidio.
+  #
+  # PARA DEJAR LA PROGRAMACION DIARIA ACTIVA (02:00 America/Guayaquil):
+  #   a) puntual, sin tocar archivos — el interruptor de la propia
+  #      interfaz, o
+  #        docker compose exec airflow-scheduler airflow dags unpause retailmind_dwh
+  #      (persiste: el estado de pausa vive en la base de metadatos)
+  #   b) permanente para DAGs nuevos — poner "True" aqui y relanzar el
+  #      perfil. Ojo: solo afecta al ALTA de un DAG, no a los ya
+  #      registrados, que conservan el estado que tengan.
+  AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "True"
+  # Sin clave FIJA, Airflow genera una por proceso y el webserver no
+  # puede leer lo que cifro el scheduler.
+  AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:?falta AIRFLOW_FERNET_KEY}
+  AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "False"
+  # La interfaz muestra las horas en la zona del negocio, igual que
+  # `esta_en_horario()` y que el cron que se esta replicando.
+  AIRFLOW__WEBSERVER__DEFAULT_UI_TIMEZONE: America/Guayaquil
+  # --- lo que el ETL necesita para alcanzar las dos bases -------------
+  # Nombres de SERVICIO de la red de Docker, jamas localhost: dentro del
+  # contenedor `localhost` es el propio contenedor.
+  # `conexiones.py` llama a `load_dotenv()` SIN `override=True`, asi que
+  # este entorno gana sobre `retailmind/.env`, que trae valores de
+  # anfitrion.
+  ETL_PG_HOST: postgres
+  ETL_PG_PORT: "5432"
+  ETL_PG_DATABASE: retailmind
+  ETL_PG_USER: retailmind_etl
+  ETL_PG_PASSWORD: ${PG_ETL_PASSWORD:?falta PG_ETL_PASSWORD}
+  ETL_CH_HOST: clickhouse
+  ETL_CH_PORT: "8123"
+  ETL_CH_DATABASE: retailmind_dwh
+  ETL_CH_USER: ${CH_USER}
+  ETL_CH_PASSWORD: ${CH_PASSWORD}
+  PYTHONPATH: /opt/retailmind
+  PYTHONIOENCODING: utf-8    # el ETL imprime acentos y cajas
+  TZ: America/Guayaquil
+  # OJO: las credenciales de la INTERFAZ de Airflow NO van aqui. Este
+  # bloque lo comparten los tres servicios y solo `airflow-init` crea el
+  # usuario, asi que viven en su `environment` propio (mas abajo). Puestas
+  # aqui acabarian tambien en el scheduler y en el webserver, que no las
+  # necesitan para nada.
+
+x-airflow-volumes: &airflow_volumes
+  - ./retailmind/airflow/dags:/opt/airflow/dags:ro
+  - ./retailmind:/opt/retailmind          # el ETL, montado (no copiado)
+  - airflow_logs:/opt/airflow/logs
 
 services:
 
@@ -215,12 +297,15 @@ services:
       ETL_CH_DATABASE: retailmind_dwh
       ETL_CH_USER: ${CH_USER}
       ETL_CH_PASSWORD: ${CH_PASSWORD}
-      # El dia que Airflow tome el relevo hay que poner DWH_CRON=-. Si
-      # no, a las 02:00 disparan LOS DOS y dos cargas concurrentes
-      # compiten por el `EXCHANGE TABLES` del mismo destino. Que sea una
-      # variable es lo que hace ese apagado un cambio de `.env` y no una
-      # recompilacion.
-      DWH_CRON: ${DWH_CRON:-0 0 2 * * *}
+      # AIRFLOW YA TOMO EL RELEVO: el DAG `retailmind_dwh` esta ACTIVO con
+      # `0 2 * * *`, asi que el @Scheduled del backend tiene que quedarse
+      # apagado (`-`). Si los dos corren, a las 02:00 disparan LOS DOS y
+      # dos cargas concurrentes compiten por el `EXCHANGE TABLES` del mismo
+      # destino. Que sea una variable es lo que hace ese apagado un cambio
+      # de `.env` y no una recompilacion.
+      # El DEFECTO tambien es `-`: antes era el cron, y bastaba desplegar
+      # sin la variable en el `.env` para revivir la colision en silencio.
+      DWH_CRON: ${DWH_CRON:--}
       DWH_ZONA: America/Guayaquil
       TZ: America/Guayaquil
     volumes:
@@ -317,6 +402,148 @@ services:
     # Sin `command`: se usa como
     #   docker compose --profile tools run --rm etl python -m etl.dwh.run_etl
     #   docker compose --profile tools run --rm etl python -m etl.dwh.validar_dwh
+
+  # ===================================================================
+  # AIRFLOW — perfil `airflow`, NO arranca con `up -d`
+  # ===================================================================
+  # Tres servicios (init + scheduler + webserver) bajo el perfil
+  # `airflow`. Como `.env` fija COMPOSE_PROFILES=demo, un `up -d` a secas
+  # NO los levanta y el arranque de la feria sigue siendo el de siempre
+  # (~28 s, medido antes y despues de anadir esto). Solo los incorpora:
+  #
+  #     docker compose --profile airflow up -d
+  #
+  # Airflow ENVUELVE el ETL: cada tarea del DAG ejecuta
+  # `python -m etl.dwh.run_etl`, el mismo comando del contenedor `etl` y
+  # el mismo que lanza el boton del backend. Por eso estos servicios
+  # montan `./retailmind` en `/opt/retailmind` en vez de copiar codigo:
+  # un cambio en el pipeline NO obliga a reconstruir la imagen.
+  #
+  # La base de metadatos vive en el MISMO contenedor PostgreSQL, en una
+  # base SEPARADA llamada `airflow`, con rol propio, creada por
+  # `retailmind/airflow/init_metadb.py`. La base `retailmind` no se toca.
+  #
+  # PUERTO 8081 y no 8080: el 8080 es del backend.
+  # ===================================================================
+
+  airflow-init:
+    build: ./retailmind/airflow
+    image: retailmind-airflow:2.10.5
+    profiles: ["airflow"]
+    # Un solo disparo: crea la base de metadatos, migra el esquema de
+    # Airflow y deja el usuario admin. Luego sale. `restart: "no"` es
+    # obligatorio: con la politica por defecto del proyecto
+    # (`unless-stopped`) un contenedor que TERMINA BIEN se reiniciaria en
+    # bucle para siempre.
+    restart: "no"
+    environment:
+      <<: *airflow_env
+      # LA CLAVE DE ESTE SERVICIO, y cuesta un rato descubrirla:
+      # el entrypoint de la imagen oficial ejecuta `airflow db check` y
+      # espera a la base ANTES de lanzar el `command`. Aqui eso es un
+      # circulo: la base y el rol `airflow` no existen todavia porque los
+      # crea justamente el `command`. Sin esto, el init muere con
+      # «ERROR! Maximum number of retries (20) reached» y un
+      # «password authentication failed for user "airflow"» que apunta a
+      # una contrasena mal puesta y no a lo que de verdad pasa.
+      # `0` desactiva esa espera SOLO en el init; el scheduler y el
+      # webserver la conservan, que es donde si tiene sentido.
+      CONNECTION_CHECK_MAX_COUNT: "0"
+      # --- credenciales de la INTERFAZ, solo aqui -----------------------
+      # Vienen del `.env`; en el compose no hay ni un valor escrito. El
+      # `command` las lee con `$${...}` (doble dolar) para que las expanda
+      # el SHELL DEL CONTENEDOR y no Compose: con `${...}` sencillo,
+      # Compose las sustituia al parsear y la contrasena quedaba EN CLARO
+      # dentro del texto del `command`, que es de donde habia que sacarla.
+      # Sin valor por defecto a proposito: un `:-admin` vuelve a ser una
+      # credencial escrita en el compose.
+      AIRFLOW_ADMIN_USER: ${AIRFLOW_ADMIN_USER:?falta AIRFLOW_ADMIN_USER}
+      AIRFLOW_ADMIN_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD:?falta AIRFLOW_ADMIN_PASSWORD}
+    volumes: *airflow_volumes
+    secrets:
+      - pg_superuser        # solo `airflow-init` lo necesita: es quien
+                            # emite el CREATE DATABASE
+    command:
+      - bash
+      - -c
+      - |
+        set -euo pipefail
+        echo "--- 1/3 base de metadatos (no toca retailmind) ---"
+        python /opt/retailmind/airflow/init_metadb.py
+        echo "--- 2/3 esquema de Airflow ---"
+        airflow db migrate
+        echo "--- 3/3 usuario admin ---"
+        # `$$` para que expanda el shell del contenedor y NO Compose: asi la
+        # contrasena no aparece en `docker compose config` ni en el YAML.
+        if airflow users list 2>/dev/null | grep -qw "$${AIRFLOW_ADMIN_USER}"; then
+          echo "El usuario ya existe; se re-aplica la contrasena de .env."
+          airflow users reset-password \
+              --username "$${AIRFLOW_ADMIN_USER}" \
+              --password "$${AIRFLOW_ADMIN_PASSWORD}" >/dev/null
+        else
+          airflow users create \
+              --username "$${AIRFLOW_ADMIN_USER}" \
+              --password "$${AIRFLOW_ADMIN_PASSWORD}" \
+              --firstname RetailMind --lastname Admin \
+              --role Admin --email admin@retailmind.com 2>&1 | tail -1
+        fi
+        echo "--- init COMPLETO ---"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [retailmind]
+
+  airflow-scheduler:
+    build: ./retailmind/airflow
+    image: retailmind-airflow:2.10.5
+    profiles: ["airflow"]
+    # Es quien EJECUTA las tareas con LocalExecutor, asi que es este
+    # contenedor —y no el webserver— el que necesita alcanzar PostgreSQL
+    # y ClickHouse con las ETL_*.
+    environment: *airflow_env
+    volumes: *airflow_volumes
+    command: ["airflow", "scheduler"]
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+      clickhouse:
+        # `service_started` y NO `service_healthy`, por el mismo
+        # invariante que el backend: ClickHouse no es una dependencia
+        # dura del sistema. Si esta caido, el DAG fallara y lo dira, que
+        # es justo lo que debe pasar.
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob --hostname \"$${HOSTNAME}\""]
+      interval: 30s
+      timeout: 20s
+      retries: 5
+      start_period: 60s
+    networks: [retailmind]
+    restart: unless-stopped
+
+  airflow-webserver:
+    build: ./retailmind/airflow
+    image: retailmind-airflow:2.10.5
+    profiles: ["airflow"]
+    environment: *airflow_env
+    volumes: *airflow_volumes
+    command: ["airflow", "webserver"]
+    ports:
+      - "8081:8080"      # 8080 dentro; fuera 8081 porque el backend usa el 8080
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    healthcheck:
+      # 127.0.0.1 y no `localhost`, por la misma razon que en `frontend`:
+      # `localhost` resuelve tambien a ::1 y el chequeo quedaria colgado
+      # en IPv6 con la pagina sirviendose bien.
+      test: ["CMD-SHELL", "curl --fail --silent http://127.0.0.1:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks: [retailmind]
+    restart: unless-stopped
 
   # ===================================================================
   # pgadmin — opcional, solo si en la feria hace falta ensenar el
