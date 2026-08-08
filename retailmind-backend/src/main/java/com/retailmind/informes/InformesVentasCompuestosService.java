@@ -1172,10 +1172,20 @@ public class InformesVentasCompuestosService extends InformeCompuestoServiceBase
             // y cada fila declara sobre cuántas reseñas se calculó su media.
             String orden = "mes".equals(eje) ? "etiqueta ASC" : "resenas DESC, media DESC";
 
+            // `t_categoria` y no `categoria`: el filtro de este informe entra en
+            // el WHERE de esta misma consulta, y con el alias llamado como la
+            // columna ClickHouse lo resuelve contra el AGREGADO y aborta con
+            // ILLEGAL_AGGREGATION (Code 184). El SELECT exterior repone los
+            // nombres del contrato.
             String sqlItems = """
+                SELECT etiqueta, t_categoria AS categoria, t_marca AS marca,
+                       resenas, media, positivas, neutras, negativas, pct_positivas,
+                       verificadas, aprobadas, pendientes, rechazadas,
+                       productos, clientes, ultima_resena
+                FROM (
                 SELECT %s                                        AS etiqueta,
-                       any(categoria)                            AS categoria,
-                       any(marca)                                AS marca,
+                       any(categoria)                            AS t_categoria,
+                       any(marca)                                AS t_marca,
                        count()                                   AS resenas,
                        round(avg(calificacion), 2)               AS media,
                        countIf(calificacion >= 4)                AS positivas,
@@ -1192,6 +1202,7 @@ public class InformesVentasCompuestosService extends InformeCompuestoServiceBase
                 FROM %s.%s
                 WHERE 1 %s
                 GROUP BY etiqueta
+                )
                 ORDER BY %s
                 """.formatted(clave, DWH, TABLA_RESENA, f.where(), orden);
 
@@ -1499,7 +1510,7 @@ public class InformesVentasCompuestosService extends InformeCompuestoServiceBase
             // El recorte del vendedor va DESPUÉS de los filtros del usuario y
             // antes de la paginación: es una restricción de visibilidad, no un
             // filtro, y tiene que aplicarse pase lo que pase.
-            f.y("has(vendedores, ?)", cartera);
+            recorteCartera(f, soloPropio, cartera);
 
             String sql = sqlRiesgo(f.where());
             Map<String, Object> sobre = paginarCh(
@@ -1565,9 +1576,39 @@ public class InformesVentasCompuestosService extends InformeCompuestoServiceBase
                 && p.getNombre() != null) {
             return p.getNombre().trim();
         }
-        // Sin nombre no se puede recortar, y un recorte que falla ABIERTO
-        // enseñaría la cartera entera a un vendedor. Se recorta a nada.
-        return " sin-cartera";
+        // Sin nombre no hay cartera que recortar. El QUE se hace con este
+        // null lo decide `recorteCartera`, y lo decide CERRANDO: aqui no se
+        // inventa ningun nombre centinela.
+        return null;
+    }
+
+    /**
+     * Aplica el recorte de visibilidad del VENDEDOR a su propia cartera.
+     *
+     * <h2>No es un filtro: es una restricción de visibilidad</h2>
+     * Tiene que aplicarse pase lo que pase, y cuando NO se puede aplicar debe
+     * fallar CERRADO. Un recorte que falla abierto le enseñaría a un vendedor
+     * la cartera entera —los 69 clientes con su facturación y su valor en
+     * riesgo—, que es justo lo que el recorte existe para impedir.
+     *
+     * <h2>El caso «no hay nombre» se cierra en el SQL, no con un nombre falso</h2>
+     * Antes se devolvía un nombre centinela que ningún vendedor podía tener.
+     * Funcionaba, pero lo hacía imposible con un carácter NUL incrustado en el
+     * literal Java, y ese NUL viajaba como PARÁMETRO LIGADO al driver de
+     * ClickHouse: un carácter de control dentro de un dato, que ningún contrato
+     * garantiza que se transporte igual y que puede convertir un «no veo nada»
+     * en un error del driver. La condición imposible se declara donde le
+     * corresponde —en el SQL— y se lee sola.
+     */
+    private static void recorteCartera(Filtros f, boolean soloPropio, String cartera) {
+        if (!soloPropio) {
+            return;                        // Gerencia y Administración: sin recorte.
+        }
+        if (cartera == null) {
+            f.y("1 = 0");                  // Sin nombre no hay cartera: cero filas.
+            return;
+        }
+        f.y("has(vendedores, ?)", cartera);
     }
 
     private static String sqlRiesgo(String where) {
@@ -1634,7 +1675,7 @@ public class InformesVentasCompuestosService extends InformeCompuestoServiceBase
         // filtro de nivel: «9 en alerta de 69» es la cifra que da sentido al 9, y
         // con el filtro aplicado diría «9 de 9».
         Filtros u = new Filtros();
-        u.y("has(vendedores, ?)", cartera);
+        recorteCartera(u, soloPropio, cartera);
         Map<String, Object> t = ch.queryForMap(
                 "SELECT count() AS clientes, "
                 + "     countIf(nivel_alerta IN ('critica', 'atencion')) AS en_alerta, "
@@ -1838,8 +1879,12 @@ public class InformesVentasCompuestosService extends InformeCompuestoServiceBase
         return """
             SELECT producto_nombre          AS producto,
                    any(sku)                 AS sku,
-                   any(categoria)           AS categoria,
-                   any(marca)               AS marca,
+                   -- `t_` también en las DIMENSIONES y no solo en las medidas:
+                   -- el filtro por categoría de este informe entra en el WHERE
+                   -- de ESTE agregado, y con el alias homónimo ClickHouse lo
+                   -- resuelve contra el `any()` (ILLEGAL_AGGREGATION, Code 184).
+                   any(categoria)           AS t_categoria,
+                   any(marca)               AS t_marca,
                    sum(cantidad)            AS t_unidades,
                    countDistinct(pedido_id) AS t_pedidos,
                    sum(venta_neta)          AS t_venta
@@ -1851,14 +1896,16 @@ public class InformesVentasCompuestosService extends InformeCompuestoServiceBase
 
     private static String sqlTopProductos(String where) {
         return """
-            SELECT producto, sku, categoria, marca,
+            SELECT producto, sku,
+                   t_categoria AS categoria,
+                   t_marca     AS marca,
                    t_unidades  AS unidades,
                    t_pedidos   AS pedidos,
                    t_venta     AS venta,
                    precio_medio,
                    participacion_pct
             FROM (
-                SELECT producto, sku, categoria, marca, t_unidades, t_pedidos, t_venta,
+                SELECT producto, sku, t_categoria, t_marca, t_unidades, t_pedidos, t_venta,
                        -- El precio medio SI es dinero y se queda en Decimal:
                        -- dividir un Decimal entre un entero conserva la escala
                        -- del operando izquierdo, que aqui son 2 decimales.

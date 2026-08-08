@@ -515,7 +515,8 @@ public class TableroClientePosventaService extends TableroServiceBase {
         Object[] args = f.args();
 
         List<Map<String, Object>> items = ch.queryForList(
-                "SELECT producto_variante_id AS variante_id, sku, producto, categoria, marca, "
+                "SELECT producto_variante_id AS variante_id, sku, producto, "
+                + "       t_categoria AS categoria, t_marca AS marca, "
                 + "       motivo, lineas, unidades, monto, "
                 + "       t_reingresadas AS unidades_reingresadas, "
                 + "       reingreso_pct, unidades_producto "
@@ -523,8 +524,12 @@ public class TableroClientePosventaService extends TableroServiceBase {
                 + "  SELECT producto_variante_id, "
                 + "         any(sku) AS sku, "
                 + "         any(producto_nombre) AS producto, "
-                + "         any(categoria) AS categoria, "
-                + "         any(marca) AS marca, "
+                // Mismo motivo que `t_reingresadas` de tres líneas abajo, pero
+                // por el WHERE y no por el pct: el filtro de categoría del
+                // tablero entra en ESTE WHERE, y con el alias homónimo
+                // ClickHouse lo resuelve contra el agregado (ILLEGAL_AGGREGATION).
+                + "         any(categoria) AS t_categoria, "
+                + "         any(marca) AS t_marca, "
                 + "         motivo, "
                 + "         count() AS lineas, "
                 + "         sum(cantidad) AS unidades, "
@@ -572,19 +577,30 @@ public class TableroClientePosventaService extends TableroServiceBase {
      */
     private Map<String, Object> calificacionPorProducto(Filtros f) {
         List<Map<String, Object>> items = ch.queryForList(
-                "SELECT producto_id, "
-                + "       any(producto_nombre) AS producto, "
-                + "       any(categoria) AS categoria, "
-                + "       any(marca) AS marca, "
-                + "       count() AS resenas, "
-                + "       round(avg(calificacion), 2) AS nota_media, "
-                + "       countIf(calificacion <= 2) AS negativas, "
-                + "       countIf(calificacion >= 4) AS positivas, "
-                + "       countIf(compra_verificada = 1) AS verificadas, "
-                + "       countIf(estado = 'aprobada') AS aprobadas, "
-                + "       countIf(estado = 'pendiente') AS pendientes "
-                + "FROM " + RESENA + " WHERE 1 " + f.where() + " "
-                + "GROUP BY producto_id "
+                // El SELECT exterior repone los nombres del contrato: dentro, la
+                // categoría y la marca agregadas van con `t_` porque el filtro
+                // del tablero entra en el WHERE de la consulta interna y un
+                // alias homónimo lo resolvería contra el agregado
+                // (ILLEGAL_AGGREGATION, Code 184).
+                "SELECT producto_id, producto, "
+                + "       t_categoria AS categoria, t_marca AS marca, "
+                + "       resenas, nota_media, negativas, positivas, verificadas, "
+                + "       aprobadas, pendientes "
+                + "FROM ( "
+                + "  SELECT producto_id, "
+                + "         any(producto_nombre) AS producto, "
+                + "         any(categoria) AS t_categoria, "
+                + "         any(marca) AS t_marca, "
+                + "         count() AS resenas, "
+                + "         round(avg(calificacion), 2) AS nota_media, "
+                + "         countIf(calificacion <= 2) AS negativas, "
+                + "         countIf(calificacion >= 4) AS positivas, "
+                + "         countIf(compra_verificada = 1) AS verificadas, "
+                + "         countIf(estado = 'aprobada') AS aprobadas, "
+                + "         countIf(estado = 'pendiente') AS pendientes "
+                + "  FROM " + RESENA + " WHERE 1 " + f.where() + " "
+                + "  GROUP BY producto_id "
+                + ") "
                 + "ORDER BY negativas DESC, resenas DESC, nota_media ASC", f.args());
 
         long resenas = items.stream().mapToLong(i -> num(i.get("resenas"))).sum();
@@ -632,7 +648,7 @@ public class TableroClientePosventaService extends TableroServiceBase {
 
         List<Map<String, Object>> items = ch.queryForList(
                 "SELECT t.producto_variante_id AS variante_id, "
-                + "       d.sku, d.producto, d.categoria, d.marca, "
+                + "       d.sku, d.producto, d.t_categoria AS categoria, d.t_marca AS marca, "
                 + "       t.tickets, t.tickets_cerrados, "
                 + "       d.devoluciones, d.unidades, d.monto, d.unidades_reingresadas "
                 + "FROM ( "
@@ -643,8 +659,10 @@ public class TableroClientePosventaService extends TableroServiceBase {
                 + ") t "
                 + "INNER JOIN ( "
                 + "  SELECT producto_variante_id, any(sku) AS sku, "
-                + "         any(producto_nombre) AS producto, any(categoria) AS categoria, "
-                + "         any(marca) AS marca, "
+                // `t_` por lo mismo: el filtro de categoría del tablero entra
+                // en el WHERE de ESTE lado del JOIN (ILLEGAL_AGGREGATION).
+                + "         any(producto_nombre) AS producto, any(categoria) AS t_categoria, "
+                + "         any(marca) AS t_marca, "
                 + "         countDistinct(devolucion_id) AS devoluciones, "
                 + "         sum(cantidad) AS unidades, sum(monto_linea) AS monto, "
                 + "         sum(unidades_reingresadas) AS unidades_reingresadas "

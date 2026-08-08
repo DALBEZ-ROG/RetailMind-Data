@@ -307,8 +307,17 @@ public class TableroRentabilidadService extends TableroServiceBase {
                 "SELECT v.producto_variante_id AS variante_id, "
                 + "       any(v.sku) AS sku, "
                 + "       any(v.producto_nombre) AS producto, "
-                + "       any(v.categoria) AS categoria, "
-                + "       any(v.marca) AS marca, "
+                // `t_` OBLIGATORIO en estas dos: son las que el filtro del
+                // tablero usa en el WHERE de esta misma consulta. Con el alias
+                // llamado igual que la columna, ClickHouse resuelve el
+                // `categoria = ?` del WHERE contra el AGREGADO y aborta con
+                // ILLEGAL_AGGREGATION (Code 184) — la consulta entera devuelve
+                // 500 en cuanto se filtra por categoría o por marca. Es la
+                // misma convención que ya usan `t_venta_neta` y `t_margen` dos
+                // líneas más abajo; el nombre del contrato se repone en el
+                // SELECT exterior.
+                + "       any(v.categoria) AS t_categoria, "
+                + "       any(v.marca) AS t_marca, "
                 + "       sum(v.cantidad) AS unidades, "
                 + "       sum(v.venta_neta) AS t_venta_neta, "
                 + "       sum(v.margen) AS t_margen, "
@@ -327,7 +336,8 @@ public class TableroRentabilidadService extends TableroServiceBase {
         Object[] args = concat(stock.args(), venta.args());
 
         List<Map<String, Object>> items = ch.queryForList(
-                "SELECT variante_id, sku, producto, categoria, marca, unidades, "
+                "SELECT variante_id, sku, producto, "
+                + "       t_categoria AS categoria, t_marca AS marca, unidades, "
                 + "       t_venta_neta AS venta_neta, t_margen AS margen, "
                 + "       margen_pct, stock_medio, rotacion, "
                 + "       corte_rotacion, corte_margen, "
