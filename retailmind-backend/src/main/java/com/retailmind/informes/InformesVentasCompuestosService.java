@@ -1739,4 +1739,350 @@ public class InformesVentasCompuestosService extends InformeCompuestoServiceBase
             + "—su silencio es lo que los dejó sin pedidos— y el modelo NO puede "
             + "ordenarlos.";
     }
+
+    // ═════════════════════════════════════════════════════════════════════
+    // OTD-VEN-03 — Los 10 productos que más se venden («producto estrella»)
+    // ═════════════════════════════════════════════════════════════════════
+
+    /**
+     * El ranking de lo que más sale, en el período elegido.
+     *
+     * <h3>Por qué NO reutiliza el SQL de OTD-GER-10</h3>
+     * GER-10 («margen producto por producto») agrega la MISMA tabla por el
+     * MISMO grano, y la tentación de compartir el bloque es evidente. No se
+     * hace, y es una decisión, no un descuido:
+     *
+     * <ul>
+     *   <li>Los dos agregados difieren en el {@code ORDER BY} (ganancia contra
+     *       unidades), en el conjunto de columnas, en los KPI, en la salvedad y
+     *       en los DESTINATARIOS. Un método común parametrizado por todo eso
+     *       recibiría cinco argumentos para servir exactamente dos llamadas.</li>
+     *   <li>Peor: acoplaría dos departamentos. Añadir una columna a GER-10
+     *       —informe de DIRECCIÓN— se la añadiría en silencio a este, que ven
+     *       también el VENDEDOR y COMPRAS. El corte financiero de este proyecto
+     *       se decide informe a informe y no debe poder cambiarse desde otro.</li>
+     *   <li>Es además el precedente del propio código: {@code SALVEDAD_COSTO_VIGENTE}
+     *       está escrita dos veces (Gerencia e Inventario) y {@code filtrosLinea}
+     *       es privada de Gerencia. El molde compartido es
+     *       {@link InformeCompuestoServiceBase} —{@code Filtros}, {@code paginarCh},
+     *       {@code ejecutar}, {@code dimension}, la marca de agua—, no el SQL de
+     *       negocio de un departamento.</li>
+     * </ul>
+     *
+     * <h3>Este informe NO lleva margen ni costo, y es a propósito</h3>
+     * El catálogo se lo entrega a Gerente, Vendedor, Compras, Analista y
+     * Administrador. La pregunta —«qué se vende más», para reponer— se contesta
+     * con unidades, pedidos y venta; el margen es la pregunta de OTD-GER-10, que
+     * el catálogo reserva a la dirección. Seleccionar aquí la ganancia le abriría
+     * a Vendedor y a Compras una lectura de rentabilidad que hoy no tienen, y lo
+     * haría por la puerta de atrás. ClickHouse no tiene GRANT por columna: lo que
+     * no debe salir, no se selecciona.
+     *
+     * <h3>La participación se calcula ANTES del LIMIT</h3>
+     * {@code sum(t_unidades) OVER ()} va en una subconsulta, sobre el conjunto ya
+     * agregado y completo. Calculada sobre la página visible daría un porcentaje
+     * distinto según dónde estés mirando — la misma lección de OTD-VEN-06.
+     *
+     * @param desde     fecha ISO, o null
+     * @param hasta     fecha ISO, o null
+     * @param canal     web | tienda | telefono, o null = todos
+     * @param categoria nombre exacto de la categoría, o null = todas
+     */
+    public Map<String, Object> topProductos(String desde, String hasta, String canal,
+                                            String categoria, int page, int size) {
+        String fDesde = fecha(desde, "desde");
+        String fHasta = fecha(hasta, "hasta");
+        exigirRangoValido(fDesde, fHasta);
+        String fCanal = opcion(canal, CANALES, "canal");
+        String fCategoria = texto(categoria);
+
+        return ejecutar("OTD-VEN-03", () -> {
+            Filtros f = filtrosVenta(fDesde, fHasta, fCanal);
+            f.y("categoria = ?", fCategoria);
+
+            Map<String, Object> sobre = paginarCh(sqlTopProductos(f.where()),
+                    "SELECT count() FROM (" + sqlTopAgregado(f.where()) + ")",
+                    f.args(), page, size);
+
+            conResumen(sobre, kpisTopProductos(f.where(), f.args()));
+            sobre.put("salvedad",
+                    "El ranking es por UNIDADES vendidas, no por dinero: es lo que pide el "
+                    + "objetivo («qué se vende más») y lo que sirve para reponer. Un producto "
+                    + "caro que vende poco no aparece arriba aunque deje más ganancia — esa es "
+                    + "otra pregunta, y la contesta el informe de margen por producto de "
+                    + "Gerencia. Se excluyen los pedidos cancelados.");
+            return conMarcaDeAgua(sobre, TABLA);
+        });
+    }
+
+    /** Filtros de período y canal sobre la línea de venta. */
+    private Filtros filtrosVenta(String fDesde, String fHasta, String fCanal) {
+        Filtros f = new Filtros();
+        f.y("es_cancelado = 0");
+        f.y("toDate(fecha_pedido) >= toDate(?)", fDesde);
+        f.y("toDate(fecha_pedido) <= toDate(?)", fHasta);
+        f.y("canal = ?", fCanal);
+        return f;
+    }
+
+    /**
+     * El agregado base por producto.
+     *
+     * Los alias internos llevan prefijo {@code t_} porque ClickHouse resuelve
+     * los alias hacia atrás: {@code sum(cantidad) AS cantidad} y una capa
+     * exterior que vuelva a nombrar {@code cantidad} produce
+     * {@code ILLEGAL_AGGREGATION}. Los nombres del contrato se reponen en el
+     * SELECT más externo.
+     */
+    private static String sqlTopAgregado(String where) {
+        return """
+            SELECT producto_nombre          AS producto,
+                   any(sku)                 AS sku,
+                   any(categoria)           AS categoria,
+                   any(marca)               AS marca,
+                   sum(cantidad)            AS t_unidades,
+                   countDistinct(pedido_id) AS t_pedidos,
+                   sum(venta_neta)          AS t_venta
+            FROM %s.%s
+            WHERE 1 %s
+            GROUP BY producto_nombre
+            """.formatted(DWH, TABLA, where);
+    }
+
+    private static String sqlTopProductos(String where) {
+        return """
+            SELECT producto, sku, categoria, marca,
+                   t_unidades  AS unidades,
+                   t_pedidos   AS pedidos,
+                   t_venta     AS venta,
+                   precio_medio,
+                   participacion_pct
+            FROM (
+                SELECT producto, sku, categoria, marca, t_unidades, t_pedidos, t_venta,
+                       -- El precio medio SI es dinero y se queda en Decimal:
+                       -- dividir un Decimal entre un entero conserva la escala
+                       -- del operando izquierdo, que aqui son 2 decimales.
+                       round(t_venta / nullIf(t_unidades, 0), 2)      AS precio_medio,
+                       -- El porcentaje NO es dinero: va en Float64. En Decimal
+                       -- se truncaria a la escala del operando izquierdo y el
+                       -- redondeo se aplicaria dos veces (leccion de la Fase 1).
+                       round(t_unidades * 100.0
+                             / nullIf(sum(t_unidades) OVER (), 0), 2) AS participacion_pct
+                FROM (%s)
+            )
+            ORDER BY unidades DESC, venta DESC, producto
+            """.formatted(sqlTopAgregado(where));
+    }
+
+    private List<Map<String, Object>> kpisTopProductos(String where, Object[] args) {
+        Map<String, Object> t = ch.queryForMap("""
+            SELECT countDistinct(producto_nombre)      AS t_productos,
+                   countDistinct(producto_variante_id) AS t_variantes,
+                   sum(cantidad)                       AS t_unidades,
+                   sum(venta_neta)                     AS t_venta,
+                   countDistinct(pedido_id)            AS t_pedidos
+            FROM %s.%s WHERE 1 %s
+            """.formatted(DWH, TABLA, where), args);
+
+        List<Map<String, Object>> lider = ch.queryForList(
+                sqlTopAgregado(where) + " ORDER BY t_unidades DESC, t_venta DESC LIMIT 1", args);
+
+        List<Map<String, Object>> k = new ArrayList<>();
+        k.add(kpi("Productos con venta", t.get("t_productos"), "numero"));
+        k.add(kpi("Variantes con venta", t.get("t_variantes"), "numero"));
+        k.add(kpi("Unidades vendidas", t.get("t_unidades"), "numero"));
+        k.add(kpi("Venta neta", t.get("t_venta"), "moneda"));
+        k.add(kpi("Pedidos", t.get("t_pedidos"), "numero"));
+        if (!lider.isEmpty()) {
+            k.add(kpi("Más vendido", lider.get(0).get("producto"), "texto"));
+            k.add(kpi("Unidades del líder", lider.get(0).get("t_unidades"), "numero"));
+        }
+        return k;
+    }
+
+    // ═════════════════════════════════════════════════════════════════════
+    // OTD-VEN-04 — Los productos que no se venden («producto hueso»)
+    // ═════════════════════════════════════════════════════════════════════
+
+    /** Qué significa «no se vende». Lista blanca: fuera de ella → 400. */
+    private static final java.util.Set<String> ALCANCES_HUESO =
+            java.util.Set.of("nunca", "periodo");
+
+    private static final String TABLA_STOCK  = "fact_stock_mensual";
+    private static final String TABLA_KARDEX = "fact_movimiento_inventario";
+    private static final String DIM_PRODUCTO = "dim_producto";
+
+    /**
+     * El catálogo que no rota: qué hay parado y desde cuándo.
+     *
+     * <h3>«Sin venta nunca» y «sin venta en el período» NO son la misma lista</h3>
+     * Y tampoco la misma decisión: una referencia estacional fuera de temporada
+     * aparece en la segunda, y liquidarla destruye margen ya comprado. El filtro
+     * {@code alcance} las separa —{@code nunca} por defecto, que son las 387
+     * variantes del catálogo sin una sola línea vendida— y el sobre DICE en
+     * pantalla cuál se está mostrando: una lista de «productos hueso» que no
+     * declara cuál de las dos es se lee como la otra.
+     *
+     * <p>Con {@code alcance = nunca} los filtros de período y canal NO se aplican
+     * al criterio de venta: «nunca vendida en marzo por web» no es «nunca
+     * vendida», y dejar que los filtros recortaran ese criterio convertiría la
+     * lista en algo distinto de lo que su título promete. Categoría y marca sí se
+     * aplican siempre — recortan el CATÁLOGO, no el criterio.
+     *
+     * <h3>«Hoy» es el almacén, no el reloj</h3>
+     * Los días sin venta se cuentan contra la última salida registrada en el
+     * kardex, igual que en el tablero T-2 y por la misma razón: el histórico
+     * termina y el calendario sigue. Anclado a {@code now()}, dentro de tres
+     * meses todo el catálogo parecería llevar un trimestre parado.
+     *
+     * <h3>Por qué no comparte código con el bloque {@code productoHueso} de T-2</h3>
+     * Responden preguntas emparentadas pero distintas, y compartir obligaría a
+     * cambiar el tablero: T-2 ordena por CAPITAL RETENIDO —es un tablero de
+     * rentabilidad—, no limita, y su población por defecto es la del período.
+     * Este informe ordena por DÍAS SIN VENTA, arranca en «nunca» y no selecciona
+     * ni un importe. Además {@code productoHueso} es privado de
+     * {@code com.retailmind.tableros}: exponerlo sería abrir las tripas de un
+     * tablero para ahorrarse una consulta.
+     *
+     * <h3>Ni una columna de dinero</h3>
+     * El catálogo entrega este informe a COMPRAS, y aquí el corte no lo hace solo
+     * la ruta: la consulta no selecciona costo ni capital. {@code dim_producto}
+     * SÍ trae {@code costo} —por eso T-2 puede valorizar— y esta consulta
+     * simplemente no lo pide. Mismo mecanismo que OTD-COM-08.
+     *
+     * @param alcance {@code nunca} (defecto) | {@code periodo}
+     */
+    public Map<String, Object> productosHueso(String desde, String hasta, String canal,
+                                              String categoria, String marca,
+                                              String alcance, int page, int size) {
+        String fDesde = fecha(desde, "desde");
+        String fHasta = fecha(hasta, "hasta");
+        exigirRangoValido(fDesde, fHasta);
+        String fCanal = opcion(canal, CANALES, "canal");
+        String fAlcance = (alcance == null || alcance.isBlank())
+                ? "nunca" : opcion(alcance, ALCANCES_HUESO, "alcance");
+        String fCategoria = texto(categoria);
+        String fMarca = texto(marca);
+
+        return ejecutar("OTD-VEN-04", () -> {
+            // El criterio de venta: con `nunca`, SIN período ni canal.
+            Filtros venta = "periodo".equals(fAlcance)
+                    ? filtrosVenta(fDesde, fHasta, fCanal)
+                    : filtrosVenta(null, null, null);
+
+            // El recorte del CATÁLOGO, que sí aplica en los dos alcances.
+            Filtros dim = new Filtros();
+            dim.y("d.categoria = ?", fCategoria);
+            dim.y("d.marca = ?", fMarca);
+
+            // El orden de los parámetros es el orden en que los `?` aparecen en
+            // el SQL: primero el anti-join (criterio de venta), después el WHERE.
+            Object[] args = concatenar(venta.args(), dim.args());
+
+            String sql = sqlProductosHueso(venta.where(), dim.where());
+            Map<String, Object> sobre = paginarCh(sql,
+                    "SELECT count() FROM (" + sql + ")", args, page, size);
+
+            conResumen(sobre, kpisHueso(venta.where(), dim.where(), args));
+            sobre.put("alcanceHueso", fAlcance);
+            sobre.put("salvedad", ("nunca".equals(fAlcance)
+                    ? "Estás viendo las variantes que NO han vendido NUNCA, sobre toda la "
+                      + "historia del almacén. Los filtros de período y canal no se aplican a "
+                      + "ese criterio —«nunca vendida en marzo» no es «nunca vendida»—; sí se "
+                      + "aplican categoría y marca, que recortan el catálogo. Estas variantes "
+                      + "no tienen última venta, así que su columna de días va vacía. Cambia a "
+                      + "«sin venta en el período» para ver las que sí vendieron alguna vez y "
+                      + "llevan tiempo paradas."
+                    : "Estás viendo las variantes SIN VENTA EN EL PERÍODO y canal elegidos, que "
+                      + "no es lo mismo que «no vender nunca»: una referencia estacional fuera "
+                      + "de su temporada aparece en esta lista, y liquidarla destruiría margen "
+                      + "ya comprado. La columna de última venta sale del kardex sobre TODA la "
+                      + "historia y las distingue. Cambia a «sin venta nunca» para la otra "
+                      + "lista.")
+                    + " Los días sin venta se cuentan contra la última salida registrada en el "
+                    + "almacén, NO contra la fecha de hoy: el histórico termina y el calendario "
+                    + "sigue.");
+            return conMarcaDeAgua(sobre, TABLA_STOCK);
+        });
+    }
+
+    /**
+     * El catálogo COMPLETO menos lo que vendió, con su última salida y su stock.
+     *
+     * El {@code LEFT ANTI JOIN} es lo que hace que la base sea el catálogo y no
+     * el hecho: partir de las ventas dejaría fuera justamente a las variantes
+     * que nunca vendieron, que son la respuesta del objetivo.
+     *
+     * OJO con el relleno de ClickHouse: un {@code LEFT JOIN} sin pareja rellena
+     * con el DEFECTO DEL TIPO y no con NULL, así que una variante sin salidas
+     * saldría con {@code dias = 0} y, ordenando descendente, se iría al FINAL de
+     * la lista — justo al revés de lo que el informe promete. Por eso la
+     * subconsulta del kardex trae un {@code tiene_venta = 1} explícito y el NULL
+     * se fabrica a partir de él.
+     */
+    private static String sqlProductosHueso(String whereVenta, String whereDim) {
+        return """
+            SELECT d.sku                                      AS sku,
+                   d.producto_nombre                          AS producto,
+                   d.categoria                                AS categoria,
+                   d.marca                                    AS marca,
+                   s.unidades                                 AS stock_actual,
+                   if(k.tiene_venta = 1, k.ultima_venta, '')  AS ultima_venta,
+                   if(k.tiene_venta = 1, k.dias, NULL)        AS dias_sin_venta,
+                   if(k.tiene_venta = 1, 0, 1)                AS nunca_vendida
+            FROM %1$s d
+            LEFT ANTI JOIN (
+                SELECT DISTINCT producto_variante_id
+                FROM %2$s.%3$s
+                WHERE 1 %4$s
+            ) v ON v.producto_variante_id = d.producto_variante_id
+            LEFT JOIN (
+                SELECT producto_variante_id, sum(stock_cierre) AS unidades
+                FROM %2$s.%5$s
+                WHERE mes = (SELECT max(mes) FROM %2$s.%5$s)
+                GROUP BY producto_variante_id
+            ) s ON s.producto_variante_id = d.producto_variante_id
+            LEFT JOIN (
+                SELECT producto_variante_id,
+                       1                                         AS tiene_venta,
+                       formatDateTime(max(fecha), '%%d/%%m/%%Y') AS ultima_venta,
+                       dateDiff('day', max(fecha),
+                                (SELECT max(fecha) FROM %2$s.%6$s
+                                 WHERE tipo_movimiento = 'salida_venta')) AS dias
+                FROM %2$s.%6$s
+                WHERE tipo_movimiento = 'salida_venta'
+                GROUP BY producto_variante_id
+            ) k ON k.producto_variante_id = d.producto_variante_id
+            WHERE 1 %7$s
+            ORDER BY nunca_vendida DESC, k.dias DESC, d.sku
+            """.formatted(dimension(DIM_PRODUCTO), DWH, TABLA, whereVenta,
+                          TABLA_STOCK, TABLA_KARDEX, whereDim);
+    }
+
+    private List<Map<String, Object>> kpisHueso(String whereVenta, String whereDim,
+                                                Object[] args) {
+        Map<String, Object> t = ch.queryForMap(
+                "SELECT count() AS t_parados, sum(nunca_vendida) AS t_nunca, "
+                + "sum(stock_actual) AS t_unidades, max(dias_sin_venta) AS t_max_dias "
+                + "FROM (" + sqlProductosHueso(whereVenta, whereDim) + ")", args);
+
+        Integer universo = ch.queryForObject(
+                "SELECT count() FROM " + dimension(DIM_PRODUCTO), Integer.class);
+
+        List<Map<String, Object>> k = new ArrayList<>();
+        k.add(kpi("Variantes del catálogo", universo, "numero"));
+        k.add(kpi("Paradas en esta lista", t.get("t_parados"), "numero"));
+        k.add(kpi("Sin vender NUNCA", t.get("t_nunca"), "numero"));
+        k.add(kpi("Unidades inmovilizadas", t.get("t_unidades"), "numero"));
+        k.add(kpi("Más tiempo sin venta", valorOCero(t.get("t_max_dias")), "dias"));
+        return k;
+    }
+
+    /** Concatena dos juegos de parámetros en el orden en que aparecen en el SQL. */
+    private static Object[] concatenar(Object[] a, Object[] b) {
+        Object[] r = new Object[a.length + b.length];
+        System.arraycopy(a, 0, r, 0, a.length);
+        System.arraycopy(b, 0, r, a.length, b.length);
+        return r;
+    }
 }

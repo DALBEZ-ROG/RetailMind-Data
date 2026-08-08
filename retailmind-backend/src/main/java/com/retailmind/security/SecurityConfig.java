@@ -330,6 +330,26 @@ public class SecurityConfig {
                 // de fact_flujo_caja, que lleva el monto de cada intento.
                 .requestMatchers(HttpMethod.GET, "/api/informes/ventas/cobros-fallidos")
                     .hasAnyAuthority("ADMIN", "GERENTE")
+                // ── OTD-VEN-03 · Producto estrella. El reparto MÁS ANCHO de
+                // Ventas, y es el del catálogo: la pregunta («qué se vende más»,
+                // para reponer) es operativa, así que entran también VENDEDOR y
+                // COMPRAS. Lleva venta neta y precio medio pero NO margen ni
+                // costo — el margen por producto es OTD-GER-10 y ahí el catálogo
+                // sí recorta a la dirección. Que este informe no exponga ganancia
+                // lo garantiza SU CONSULTA, que no la selecciona: ClickHouse no
+                // tiene GRANT por columna y esta ruta, por sí sola, no podría.
+                .requestMatchers(HttpMethod.GET, "/api/informes/ventas/top-productos")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "VENDEDOR", "COMPRAS", "ANALISTA")
+                // ── OTD-VEN-04 · Producto hueso. Igual que el anterior menos el
+                // VENDEDOR: la decisión que sostiene —liquidar o dejar de
+                // comprar— es de compras y de dirección, no de quien vende.
+                // COMPRAS entra aquí y NO en el tablero T-2, que responde una
+                // pregunta parecida pero ordena por CAPITAL RETENIDO y lleva
+                // margen: abrirle T-2 para servir este objetivo habría roto la
+                // segregación financiera por la puerta de atrás. Este informe no
+                // selecciona ni un importe.
+                .requestMatchers(HttpMethod.GET, "/api/informes/ventas/productos-hueso")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "COMPRAS", "ANALISTA")
                 // ── Fase 4 del pipeline: los dos compuestos de posventa que
                 // cierran Ventas.
                 //

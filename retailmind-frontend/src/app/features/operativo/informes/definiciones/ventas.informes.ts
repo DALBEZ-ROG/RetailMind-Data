@@ -797,6 +797,98 @@ export const INFORMES_VENTAS: DefinicionDepartamento = {
           color: f => Number(f['activo']) ? 'ok' : 'error',
           etiqueta: v => Number(v) ? 'sí' : 'DADO DE BAJA' }
       ]
+    },
+
+    // ── OTD-VEN-03 · Producto estrella ───────────────────────────────────
+    // El reparto de roles MÁS ANCHO de Ventas, y es el del catálogo: la
+    // pregunta es «qué reponer», que es operativa. Por eso este informe NO
+    // trae margen ni costo — esa es OTD-GER-10 y el catálogo la reserva a la
+    // dirección. Lo garantiza la consulta del backend, que no los selecciona.
+    {
+      id: 'OTD-VEN-03',
+      endpoint: 'top-productos',
+      fuente: 'compuesto',
+      titulo: 'Los productos que más se venden',
+      descripcion: 'El «producto estrella»: el ranking de lo que más sale en el período '
+                 + 'elegido, por UNIDADES vendidas. Trae también los pedidos en que aparece, '
+                 + 'la venta neta, el precio medio realizado y el peso de cada producto en '
+                 + 'las unidades del período. Excluye los pedidos cancelados. Arranca en los '
+                 + '10 primeros; se puede pasar de página para ver el resto.',
+      icono: 'trending_up',
+      roles: ['ADMIN', 'GERENTE', 'VENDEDOR', 'COMPRAS', 'ANALISTA'],
+      vacio: 'No hay ventas registradas en el período elegido.',
+      filtros: [
+        { param: 'desde', etiqueta: 'Desde', tipo: 'fecha' },
+        { param: 'hasta', etiqueta: 'Hasta', tipo: 'fecha' },
+        { param: 'categoria', etiqueta: 'Categoría', tipo: 'select', opciones: [
+          { valor: '', etiqueta: 'Todas las categorías' },
+          ...CATEGORIAS.map(c => ({ valor: c, etiqueta: c }))
+        ] },
+        { param: 'canal', etiqueta: 'Canal', tipo: 'select', opciones: FILTRO_CANAL }
+      ],
+      columnas: [
+        { campo: 'producto',          titulo: 'Producto',   tipo: 'texto', recortar: 30 },
+        { campo: 'sku',               titulo: 'SKU',        tipo: 'texto' },
+        { campo: 'categoria',         titulo: 'Categoría',  tipo: 'texto' },
+        { campo: 'marca',             titulo: 'Marca',      tipo: 'texto' },
+        { campo: 'unidades',          titulo: 'Unidades',   tipo: 'numero' },
+        { campo: 'pedidos',           titulo: 'Pedidos',    tipo: 'numero' },
+        { campo: 'venta',             titulo: 'Venta neta', tipo: 'moneda', monto: true },
+        { campo: 'precio_medio',      titulo: 'Precio medio', tipo: 'moneda', monto: true },
+        { campo: 'participacion_pct', titulo: '% de unidades', tipo: 'porcentaje' }
+      ]
+    },
+
+    // ── OTD-VEN-04 · Producto hueso ──────────────────────────────────────
+    // SIN vendedor: la decisión que sostiene —liquidar o dejar de comprar— es
+    // de compras y de dirección. COMPRAS entra AQUÍ y no en el tablero T-2,
+    // que responde una pregunta parecida pero ordena por capital retenido y
+    // lleva margen. Este informe no trae ni una columna de dinero.
+    //
+    // El filtro «Criterio» no es un matiz: «sin venta nunca» y «sin venta en
+    // el período» son dos listas y dos decisiones distintas, y el sobre trae
+    // una `salvedad` que dice cuál se está viendo.
+    {
+      id: 'OTD-VEN-04',
+      endpoint: 'productos-hueso',
+      fuente: 'compuesto',
+      titulo: 'Los productos que no se venden',
+      descripcion: 'El «producto hueso»: las variantes del catálogo que no rotan, para '
+                 + 'liquidarlas o dejar de comprarlas. Ordenadas por tiempo sin vender, con '
+                 + 'las que no han vendido NUNCA primero. Los días se cuentan contra la '
+                 + 'última salida registrada en el almacén, no contra la fecha de hoy. '
+                 + 'Arranca en las 10 primeras.',
+      icono: 'trending_down',
+      roles: ['ADMIN', 'GERENTE', 'COMPRAS', 'ANALISTA'],
+      vacio: 'No hay variantes paradas con el criterio elegido.',
+      filtros: [
+        { param: 'alcance', etiqueta: 'Criterio', tipo: 'select', valorInicial: 'nunca',
+          opciones: [
+            { valor: 'nunca',   etiqueta: 'Sin venta NUNCA' },
+            { valor: 'periodo', etiqueta: 'Sin venta en el período' }
+          ] },
+        { param: 'desde', etiqueta: 'Desde', tipo: 'fecha' },
+        { param: 'hasta', etiqueta: 'Hasta', tipo: 'fecha' },
+        { param: 'categoria', etiqueta: 'Categoría', tipo: 'select', opciones: [
+          { valor: '', etiqueta: 'Todas las categorías' },
+          ...CATEGORIAS.map(c => ({ valor: c, etiqueta: c }))
+        ] },
+        { param: 'canal', etiqueta: 'Canal', tipo: 'select', opciones: FILTRO_CANAL }
+      ],
+      columnas: [
+        { campo: 'sku',            titulo: 'SKU',       tipo: 'texto' },
+        { campo: 'producto',       titulo: 'Producto',  tipo: 'texto', recortar: 30 },
+        { campo: 'categoria',      titulo: 'Categoría', tipo: 'texto' },
+        { campo: 'marca',          titulo: 'Marca',     tipo: 'texto' },
+        { campo: 'stock_actual',   titulo: 'Stock',     tipo: 'numero' },
+        { campo: 'nunca_vendida',  titulo: 'Estado',    tipo: 'chip',
+          color: f => Number(f['nunca_vendida']) ? 'error' : 'warn',
+          etiqueta: v => Number(v) ? 'nunca vendida' : 'parada' },
+        { campo: 'ultima_venta',   titulo: 'Última venta', tipo: 'texto' },
+        // Vacía en las que no vendieron nunca, y eso es lo correcto: no hay
+        // fecha desde la que contar. La columna «Estado» las identifica.
+        { campo: 'dias_sin_venta', titulo: 'Días sin vender', tipo: 'dias' }
+      ]
     }
   ]
 };

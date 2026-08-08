@@ -24,7 +24,8 @@ export type PermisoNav =
   | 'devoluciones'     // RMA / logística inversa (pipeline multi-rol)
   | 'marketing'        // cupones / promos / campañas / banners / newsletter
   | 'metas'            // metas de venta por período (OTD-VEN-15, script 48)
-  | 'informesVentas'   // informes tácticos de Ventas (OTD-VEN-01/02/08/10/15/16)
+  | 'informesVentas'   // informes tácticos de Ventas (simples 01/02/08/10/15/16
+                       // + compuestos, VEN-03 y VEN-04 incluidos)
   | 'informesInventario' // informes tácticos de Inventario (OTD-INV-01/02/03/05/06/07/08)
   | 'informesCompras'  // informes tácticos de Compras (los 12: OTD-COM-01..12)
   | 'informesLogistica' // informes tácticos de Logística (OTD-LOG-01/02/06/11)
@@ -68,13 +69,17 @@ export const ROLES_POR_PERMISO: Record<PermisoNav, readonly string[]> = {
   marketing:        ['ADMIN', 'GERENTE'],
   // Metas: fija gerencia; vendedor/analista leen el avance (script 48)
   metas:            ['ADMIN', 'GERENTE', 'VENDEDOR', 'ANALISTA'],
-  // Informes tácticos de Ventas: llevan MONTO, así que BODEGA y DESPACHO
-  // quedan fuera por segregación financiera (espeja SecurityConfig y los
-  // GRANTs: no tienen SELECT sobre pedido.total, carrito ni meta_venta).
-  // Dentro de la pantalla, OTD-VEN-10 (moderación) solo lo ve ADMIN/GERENTE, y
-  // OTD-VEN-16 (participación por canal) ADMIN/GERENTE/ANALISTA — de ahí que el
-  // ANALISTA entre a la pantalla: es el único informe de Ventas que le toca.
-  informesVentas:   ['ADMIN', 'GERENTE', 'VENDEDOR', 'ANALISTA'],
+  // Informes tácticos de Ventas: casi todos llevan MONTO, así que BODEGA y
+  // DESPACHO quedan fuera por segregación financiera (espeja SecurityConfig y
+  // los GRANTs: no tienen SELECT sobre pedido.total, carrito ni meta_venta).
+  // La lista es la UNIÓN de quien ve al menos un informe del área; dentro de la
+  // pantalla cada informe declara sus roles. OTD-VEN-10 (moderación) solo lo ve
+  // ADMIN/GERENTE y OTD-VEN-16 ADMIN/GERENTE/ANALISTA.
+  // COMPRAS entra desde el 2026-08-07 por OTD-VEN-03 (producto estrella) y
+  // OTD-VEN-04 (producto hueso), los dos que el catálogo le entrega. VEN-04 no
+  // trae ni una columna de dinero y VEN-03 no trae margen ni costo, así que su
+  // entrada no abre ninguna lectura financiera nueva.
+  informesVentas:   ['ADMIN', 'GERENTE', 'VENDEDOR', 'COMPRAS', 'ANALISTA'],
   // Informes tácticos de Inventario: al revés que Ventas, seis de los siete son
   // de CANTIDADES y BODEGA es su destinataria natural. La lista es la UNIÓN de
   // quien ve al menos un informe; dentro de la pantalla cada informe declara sus

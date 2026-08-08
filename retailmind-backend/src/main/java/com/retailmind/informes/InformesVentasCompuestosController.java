@@ -222,4 +222,61 @@ public class InformesVentasCompuestosController {
             @RequestParam(defaultValue = "25") int size) {
         return servicio.clientesEnRiesgo(nivel, buscar, page, size);
     }
+
+    /**
+     * OTD-VEN-03 — Los productos que más se venden («producto estrella»).
+     * GET /api/informes/ventas/top-productos?desde=&hasta=&canal=&categoria=
+     *     &page=&size=
+     *
+     * Destinatarios (catálogo §3): <b>Gerente, Vendedor, Compras, Analista y
+     * Administrador</b> — el reparto más ancho de Ventas, porque la pregunta
+     * («qué reponer») es operativa y no de dirección.
+     *
+     * {@code size} arranca en <b>10</b>: el objetivo pide «los 10 primeros» y
+     * ese es el informe por defecto. La paginación sigue disponible, así que
+     * quien quiera el ranking completo solo tiene que pedir más.
+     *
+     * NO devuelve margen ni costo: eso es OTD-GER-10 y el catálogo lo reserva a
+     * la dirección. Ver el javadoc del servicio.
+     */
+    @GetMapping("/top-productos")
+    public Map<String, Object> topProductos(
+            @RequestParam(required = false) String desde,
+            @RequestParam(required = false) String hasta,
+            @RequestParam(required = false) String canal,
+            @RequestParam(required = false) String categoria,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return servicio.topProductos(desde, hasta, canal, categoria, page, size);
+    }
+
+    /**
+     * OTD-VEN-04 — Los productos que no se venden («producto hueso»).
+     * GET /api/informes/ventas/productos-hueso?desde=&hasta=&canal=&categoria=
+     *     &marca=&alcance=&page=&size=
+     *
+     * Destinatarios (catálogo §3): <b>Gerente, Compras, Analista y
+     * Administrador</b>. Sin VENDEDOR: la decisión que sostiene —liquidar o
+     * dejar de comprar— es de compras y de dirección.
+     *
+     * {@code alcance} ∈ {nunca (defecto), periodo}. Son DOS listas distintas y
+     * dos decisiones distintas; el sobre declara en pantalla cuál se está
+     * viendo. {@code size} arranca en <b>10</b>, como el objetivo pide.
+     *
+     * Este informe no selecciona ni una columna de dinero, así que Compras
+     * entra sin abrir ninguna lectura financiera nueva.
+     */
+    @GetMapping("/productos-hueso")
+    public Map<String, Object> productosHueso(
+            @RequestParam(required = false) String desde,
+            @RequestParam(required = false) String hasta,
+            @RequestParam(required = false) String canal,
+            @RequestParam(required = false) String categoria,
+            @RequestParam(required = false) String marca,
+            @RequestParam(required = false) String alcance,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return servicio.productosHueso(desde, hasta, canal, categoria, marca,
+                alcance, page, size);
+    }
 }
