@@ -2,6 +2,12 @@
 
 Registro de lo que este sistema **no** hace, o hace apoyado en algo que puede romperse.
 Reestructurado el **2026-08-07** a partir del levantamiento del 2026-08-06.
+Última incorporación: **2026-08-07**. Entraron **C-13** y **C-14** (auditoría de fuentes
+de datos por pantalla y benchmark columnar, `docs/BENCHMARK_COLUMNAR.md`); el mismo día
+se cerró **A-3** retirando la escritura de `fact_eventos`, y de ese cierre salieron
+**C-15** (la tabla sigue sin identificador único) y **C-16** (`max(id)+1` en las altas
+de dimensión, la misma causa raíz vista antes de que muerda).
+Recuento vigente: **A = 0 · B = 28 · C = 15**.
 
 ## Cómo se lee este archivo
 
@@ -36,9 +42,13 @@ obliga a citar la evidencia, no la memoria.
 
 > **Vigentes: 0.**
 >
-> Las dos entradas que tenía esta sección —**A-1** (ventana horaria desviada) y **A-2**
-> (`GET /api/gerencia/metas/vigente` en HTTP 500)— se cerraron el **2026-08-07**. Están
-> en la sección **D**, con lo que se hizo y su verificación.
+> Las tres entradas que ha tenido esta sección —**A-1** (ventana horaria desviada),
+> **A-2** (`GET /api/gerencia/metas/vigente` en HTTP 500) y **A-3** (la pantalla de
+> gestión de datos borraba `fact_eventos` por una columna que no es clave)— están
+> cerradas y en la sección **D**, con lo que se hizo y su verificación.
+>
+> A-3 se cerró **retirando la escritura**, no reconstruyendo la tabla: `fact_eventos`
+> sigue sin identificador único y eso queda vivo como fragilidad **C-15**.
 
 ---
 
@@ -393,7 +403,7 @@ Cuatro límites de la misma fase (script 45), agrupados porque se defienden junt
 
 # C. FRAGILIDADES CONOCIDAS
 
-Funciona hoy. Apoyado en algo que puede romperse sin aviso. **11 entradas.**
+Funciona hoy. Apoyado en algo que puede romperse sin aviso. **15 entradas.**
 
 ### C-2 · `fecha_creacion DEFAULT now()` es el instante de INICIO de transacción
 
@@ -577,10 +587,181 @@ Funciona hoy. Apoyado en algo que puede romperse sin aviso. **11 entradas.**
   hizo el 100.0 % de los pedidos, por encima del 25 % admitido […] NO se publica»*. Al
   revertir esa venta, la corrida siguiente publicó las 21 tablas y los 49 controles
   cuadraron.
+- **Nota operativa — si se dispara el DAG EN VIVO a principios de mes**: es cuando esto
+  se manifiesta. Con el mes recién empezado y uno o dos pedidos reales, la tarea
+  `fact_alerta_cliente` **acabará en rojo** y arrastrará `validar_dwh` a
+  `upstream_failed`; en la interfaz de Airflow se verán **dos cuadros rojos sobre 22**.
+  Qué hacer:
+  - **No hace falta hacer nada para que las pantallas funcionen.** Las otras 20 tablas se
+    publican igual y todos los informes y tableros siguen sirviendo; lo único que no se
+    refresca es `/api/informes/ventas/clientes-en-riesgo`, que seguirá mostrando la
+    última publicación buena con su fecha ancla a la vista.
+  - **Si se va a proyectar la pantalla de Airflow**, conviene anticiparlo en vez de
+    explicarlo después: el rojo es el guardia funcionando, y esa es justamente la
+    historia que cuenta esta entrada.
+  - **Si se prefiere una corrida limpia**, la vía es no incluir el mes en curso: disparar
+    con el DAG tal cual **antes** de que exista el primer pedido del mes, o demostrar la
+    carga con `python -m etl.dwh.cargar --tabla <otra>` y dejar la alerta fuera de la
+    demostración. **No** se toca el umbral del 25 % para la ocasión: bajarlo desactiva la
+    protección que impide que un régimen de cartera degenerado invierta la alerta, que es
+    exactamente el hallazgo de la fase E3 (CE4.1).
+
+### C-13 · El bean único de ClickHouse apunta a la base LEGADA, y `dim_producto` existe en las dos
+
+- **Qué es**: el backend tiene **un solo** bean de ClickHouse —`jdbcTemplate` y
+  `clickHouseJdbc` son **dos nombres del mismo**— y su base por defecto es `retailmind`,
+  la **legada de analítica web**, no el almacén. El almacén solo se lee cuando la
+  consulta lo cualifica a mano con la constante `DWH`. Y **`dim_producto` es el único
+  nombre de tabla que existe en AMBAS bases**, con contenidos distintos: **1.200 filas**
+  en la legada y **1.221** en el almacén.
+- **Dónde**:
+  - `config/ClickHouseConfig.java:25` — `@Bean(name = {"jdbcTemplate", "clickHouseJdbc"})`.
+  - `application.properties:35` — `jdbc:ch://…/retailmind?compress=0`; confirmado en el
+    contenedor vivo (`CLICKHOUSE_DATASOURCE_URL=jdbc:ch://clickhouse:8123/retailmind`).
+  - `informes/InformeCompuestoServiceBase.java:72` — `protected static final String DWH =
+    "retailmind_dwh"`, el único punto que cualifica.
+- **Si no se toca**: el modo de fallo es **asimétrico, y esa es la parte que importa**.
+  Una consulta que olvide cualificar cualquier tabla del almacén salvo una revienta con
+  `UNKNOWN_TABLE` — ruidoso, se ve en la primera prueba. Pero olvidarlo en
+  **`dim_producto`** no falla: lee la tabla equivocada y devuelve **21 productos menos**,
+  con las columnas que comparten nombre, **sin un solo error**. La superficie de fallo
+  silencioso es exactamente **una tabla**.
+- **Costaría**: un segundo bean cualificado contra `retailmind_dwh` (y que la base por
+  defecto deje de ser un valor con significado), o —más barato— una prueba que recorra el
+  código buscando tablas del almacén sin prefijo, que es justo el barrido con el que se
+  verificó esta entrada.
+- **Sustentación**: **Sí** — es el ejemplo limpio de por qué dos bases con un nombre de
+  tabla en común son un riesgo de *corrección*, no de estilo, y de que el modo de fallo
+  peligroso no es el que da error.
+- **Verificado** (2026-08-07): `SELECT name FROM system.tables WHERE database='retailmind'
+  INTERSECT … 'retailmind_dwh'` → **`dim_producto` y ninguna más**. Conteos: **1.200** vs
+  **1.221**. Modo de fallo probado con `clickhouse-client --database retailmind`:
+  `SELECT count() FROM dim_producto` → **1200 sin error**;
+  `SELECT count() FROM fact_venta_linea` → `Code: 60 … (UNKNOWN_TABLE)`.
+  **Barrido del backend**: las 22 tablas de `retailmind_dwh` contrastadas contra todos los
+  `.java` de `retailmind-backend/src/main/java`, con expresión tolerante a saltos de línea
+  (`(FROM|JOIN)\s+(?![\w%$]*\.)<tabla>`) → **cero ocurrencias sin cualificar**. Los
+  informes usan `%s.%s` con `DWH`, las dimensiones pasan por
+  `InformeCompuestoServiceBase:96-98` (`dimension()`), y `analytics/` cualifica sus 18
+  lecturas como `retailmind.fact_eventos`. **Hoy no hay ninguna consulta expuesta**: por
+  eso es fragilidad y no defecto.
+
+### C-14 · «39 informes compuestos» no reconcilia con las 41 rutas, y dos objetivos del catálogo no están construidos
+
+- **Qué es**: la documentación usa **39** como si fuera a la vez el número de objetivos
+  compuestos del catálogo y el número de endpoints en producción. Son cosas distintas y
+  ninguna vale 39: las rutas reales son **41**, y de los 39 objetivos del catálogo hay
+  **2 sin ninguna implementación** con ese nombre.
+- **Dónde**: los 6 controladores `Informes*CompuestosController.java`. El conteo afirmado
+  está en `CLAUDE.md` (dos sitios), `.kiro/steering/product.md:37`,
+  `.kiro/steering/tech.md:167` y `docs/DESPLIEGUE_DISENO.md:117`.
+- **La reconciliación exacta** (2026-08-07):
+
+  | | |
+  |---|---:|
+  | Rutas `@GetMapping` en los 6 controladores compuestos | **41** |
+  | − `prevision-demanda` servida en DOS departamentos (gerencia y compras) | −1 |
+  | **Endpoints distintos** | **40** |
+  | − los 2 MODELOS estratégicos (`prevision-demanda` E2, `clientes-en-riesgo` E3) | −2 |
+  | − `costo-envio-mensual`, declarado *«fuera de los 39, servido de regalo»* en `DISENO_ETL_CLICKHOUSE.md:174-175` porque OTD-LOG-11 es SIMPLE | −1 |
+  | **Objetivos OTD del catálogo con ruta propia** | **37** |
+  | Objetivos del catálogo **sin construir**: `OTD-VEN-03` (top 10 más vendidos) y `OTD-VEN-04` (producto hueso) | **2** |
+
+- **Si no se toca**: nada deja de funcionar — los 41 endpoints responden. Lo que falla es
+  la **afirmación de completitud**: «catálogo táctico COMPLETO, 39 compuestos» invita a
+  una pregunta de sustentación («enséñemelos») cuya respuesta real son 37 más dos que no
+  existen. La pregunta de VEN-04 la contesta de hecho el bloque `producto_hueso` del
+  tablero T-2 (`TableroRentabilidadService.java:444`), pero **nada en el código lo declara
+  como OTD-VEN-04**, así que no cuenta como cobertura trazable.
+- **Costaría**: separar los dos conteos en la documentación (hecho el 2026-08-07) y, si se
+  quiere cerrar el catálogo de verdad, dos informes más — ambos sobre `fact_venta_linea`
+  y `dim_producto`, tablas ya cargadas y validadas.
+- **Sustentación**: **Sí, y conviene abrirla uno mismo**: un catálogo que se declara
+  completo y no lo está es exactamente lo que una auditoría busca. Contarlo al revés —«37
+  de 39, y estos son los dos que faltan y por qué»— es más fuerte que el 39 redondo.
+- **Verificado** (2026-08-07): `grep -oE '@GetMapping\("[^"]*"'` sobre los 6
+  `Informes*CompuestosController.java` → **41 rutas** (Compras 8, Gerencia 7, Inventario
+  3, Logística 9, Soporte 5, Ventas 9). `grep -rn "VEN-03\|VEN-04"` sobre
+  `retailmind-backend/src` y `retailmind-frontend/src` → **cero ocurrencias**. El catálogo
+  declara **69 objetivos, 30 simples** (`CATALOGO_OBJETIVOS_TACTICOS.md:31`), de donde
+  sale el 39.
+
+  **ACTUALIZACIÓN (2026-08-07)**: **OTD-VEN-03** y **OTD-VEN-04** ya están construidos
+  (`/api/informes/ventas/top-productos` y `/productos-hueso`). El catálogo queda en
+  **39 de 39** y las rutas compuestas pasan de 41 a **43**. La entrada se conserva porque
+  la lección sigue viva: **rutas y objetivos no son la misma cuenta**, y las 43 rutas
+  son 39 objetivos + 2 modelos + `costo-envio-mensual` + `prevision-demanda` duplicada.
+
+### C-15 · `fact_eventos` sigue sin identificador único de fila
+
+- **Qué es**: la tabla de la analítica web no tiene ninguna clave practicable.
+  `event_pk` reparte **50.000 valores entre 2.823.245 filas**; `(session_id,
+  event_index)` deja **253.372 pares repetidos** (hasta 5 filas por par); añadiendo
+  `timestamp_utc` **aún queda 1 colisión**. Solo la fila entera —las 15 columnas—
+  identifica.
+- **Dónde**: `retailmind.fact_eventos` (base LEGADA de ClickHouse), columna
+  `event_pk UInt64 DEFAULT rowNumberInAllBlocks()`; el DDL de origen está en
+  `retailmind/etl/carga/09_load_clickhouse.py:73`.
+- **Si no se toca**: **hoy nada**, y esa es la diferencia con A-3. Desde el 2026-08-07
+  ninguna ruta escribe en la tabla: los 8 lectores de `analytics/` agregan por
+  `session_id`, `channel` o `user_action` y ninguno direcciona una fila. El riesgo es
+  prospectivo — cualquier código futuro que tome `event_pk` por identificador repetirá
+  el defecto, y el nombre de la columna invita a ello.
+- **Costaría**: una reconstrucción de la tabla (tabla nueva + `INSERT SELECT` +
+  `EXCHANGE TABLES`) con un identificador de verdad. **Con respaldo previo**: son
+  2.823.245 filas irreproducibles en un volumen declarado `external: true`. **Trampa
+  documentada**: volver a usar `rowNumberInAllBlocks()` en la reconstrucción reproduce
+  el defecto salvo que la inserción sea de un solo hilo y un solo bloque; un `UUID` o un
+  contador monótono es más seguro.
+- **Sustentación**: **Sí** — es el ejemplo limpio de que *el nombre de una columna no es
+  una garantía*, y de una decisión de riesgo tomada a conciencia: se cortó el acceso que
+  destruía dato (barato y reversible) en vez de reescribir 2,8 millones de filas
+  irrecuperables con una sustentación encima.
+- **Verificado** (2026-08-07): `count(), uniqExact(event_pk)` → **2.823.245 / 50.000**;
+  `uniqExact((session_id, event_index))` → **2.550.854** (253.372 pares con colisión,
+  máximo 5 filas por par); con `timestamp_utc` → **2.823.244**; la fila completa →
+  **2.823.245**, sin duplicados exactos. Barrido de escritores tras el cierre de A-3:
+  **cero** rutas que escriban en la tabla.
+
+### C-16 · `insertDimensionAutoId` genera el id con `max(id) + 1` y ClickHouse no impone unicidad
+
+- **Qué es**: las altas de las cinco dimensiones genéricas de la pantalla de gestión de
+  datos calculan el identificador leyendo el máximo actual y sumando uno. No hay
+  secuencia, no hay bloqueo y **ClickHouse no tiene restricción de unicidad**: dos altas
+  concurrentes leen el mismo máximo y escriben el mismo id, sin error.
+- **Dónde**: `admin/gestion/GestionDatosService.java:118-124`
+  (`insertDimensionAutoId`), usado por `POST /api/gestion/{dim-canal|dim-region|
+  dim-dispositivo|dim-categoria|dim-fuente-trafico}`.
+- **Si no se toca**: **hoy nada**. Las cinco dimensiones tienen su clave limpia
+  —verificado— y la pantalla es de ADMIN, de uso raro y de un solo operador, así que la
+  ventana de carrera no se abre. Pero si llegara a abrirse, el resultado sería
+  exactamente el estado que acaba de costar el defecto A-3: dos filas con el mismo id,
+  y un `UPDATE`/`DELETE` por ese id actuando sobre las dos. Los catálogos tienen entre
+  3 y 9 filas: la duplicación se vería a simple vista, que es lo único que la hace
+  benigna.
+- **Costaría**: poco — un `generateUUIDv4()` como identificador, o mover el alta a una
+  tabla de PostgreSQL con secuencia (que es donde vive el resto de los catálogos del
+  sistema). También vale retirar el alta: estas cinco dimensiones no las lee **nada**
+  del backend fuera de la propia pantalla.
+- **Sustentación**: **Sí** — es la MISMA causa raíz que A-3 vista antes de que muerda:
+  un identificador que el motor no garantiza. Contar las dos juntas —una que ya costó y
+  otra que se detectó latente— es más fuerte que contar solo la que falló.
+- **Verificado** (2026-08-07): las cinco dimensiones tienen hoy la clave única
+  (`dim_canal` 3/3, `dim_region` 9/9, `dim_dispositivo` 4/4, `dim_categoria` 9/9,
+  `dim_fuente_trafico` 7/7), y las cinco altas pasan por
+  `insertDimensionAutoId`. Ninguna de las cinco tablas la lee un servicio distinto de
+  `admin/gestion` (`DimCanalRepository` y `DimCategoria` son código muerto: no se
+  inyectan en ninguna parte).
 
 ---
 
 # D. Resuelto (histórico)
+
+## Resuelto — A-3: `fact_eventos` en solo lectura (2026-08-07, sin script)
+
+| Ítem original | Resolución |
+|---------------|------------|
+| **A-3 · La pantalla de gestión de datos editaba y borraba `fact_eventos` por una columna que no es clave**: `event_pk` está declarada `UInt64 DEFAULT rowNumberInAllBlocks()` y ese contador reinicia en cada bloque de inserción — **50.000 valores distintos para 2.823.245 filas, entre 52 y 139 filas por valor**. `GET .../{eventPk}` devolvía una fila **arbitraria**, `PUT` reescribía las 52-139 y `DELETE` **las borraba**, informando de un borrado correcto de «un evento». `fact_eventos` no es reproducible (volumen `external: true`). | **RESUELTO retirando la escritura** (opción evaluada en el diagnóstico del 2026-08-07 y elegida por coste y por riesgo). **Backend**: se suprimieron los tres mappings de `GestionDatosController` (`GET/PUT/DELETE /api/gestion/fact-eventos/{eventPk}`) y los tres métodos de `GestionDatosService` (`getFactEventoById`, `updateFactEvento`, `deleteFactEvento`). **Frontend**: fuera el panel de edición, la columna «Acciones» de la tabla de eventos, los cuatro métodos del componente y los dos del servicio Angular; en su lugar, un aviso que explica por qué la tabla no se edita. En los tres archivos queda un comentario extenso con el motivo y la instrucción de NO reintroducirlo. **Se llevó por delante, de regalo, la única concatenación de un NOMBRE DE COLUMNA en SQL del archivo**: `updateFactEvento` construía `k + " = '" + v + "'"` con las claves del cuerpo de la petición, o sea con un identificador SQL de origen externo (regla de oro n.º 2). **NO se tocó la tabla**: cero `UPDATE`, `DELETE` o `ALTER` sobre `fact_eventos`. **Verificado por API** (`retailmind/verificar_ven0304.py`): los tres endpoints dan **404**; el listado paginado sigue en 200 con `totalElements = 2.823.245`; el filtro por semana coincide con ClickHouse (108.581 = 108.581); **las siete dimensiones siguen sirviendo** (dim_canal 3, dim_region 9, dim_dispositivo 4, dim_categoria 9, dim_fuente_trafico 7, dim_producto y dim_usuario paginadas); `fact_eventos` conserva **2.823.245 filas exactas**. **Verificado en navegador real** (`retailmind/verificar_pantallas.js`, Chrome headless): `/gestion-datos` carga sin errores de aplicación, sin panel de edición y con el aviso visible. **Lo que NO se hizo**: reconstruir la tabla con un identificador de verdad. Vive como **C-15**. |
 
 ## Resuelto — Defectos y fragilidad del kardex (2026-08-07, script 91)
 
