@@ -114,7 +114,7 @@ El servicio es necesario y su healthcheck es correcto. Tres problemas:
 - **El volumen está atado al nombre del directorio.** Al ser un volumen nombrado sin `name:`
   explícito, Docker lo llama `<proyecto>_clickhouse_data` → `1m6datoscs_clickhouse_data`. Renombrar
   la carpeta del proyecto, clonarla en otra ruta o pasar `-p` crea un volumen **nuevo y vacío** sin
-  un solo error: ClickHouse arranca, el DWH aparece vacío, los 39 informes compuestos y los 7
+  un solo error: ClickHouse arranca, el DWH aparece vacío, los informes compuestos y los 7
   tableros degradan en bloque y la causa parece "ClickHouse caído". El compose objetivo lo fija con
   `name:` explícito (§5.2).
 - Menor: `:latest` es una bomba de relojería para un motor con formato en disco. Los datos del

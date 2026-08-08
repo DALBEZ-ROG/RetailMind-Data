@@ -6,6 +6,18 @@ la tabla de 25 objetivos del documento TA11 original y actualiza la versión amp
 MCP contra la base real `retailmind`** (PostgreSQL, **110 tablas** en el esquema `public`, conteo
 confirmado el 2026-07-26 — eran 109 antes de que el script 48 creara `meta_venta`).
 
+> **Nota de vigencia (2026-08-07).** Este catálogo es una foto **anterior** a la construcción del
+> nivel COMPUESTO: por eso sus 39 objetivos compuestos aparecen todos como `— (ETL)` y la tabla
+> resumen cuenta «29 de 30» contando solo los simples. Entre el 2026-07-30 y el 2026-07-31 se
+> construyeron **37 de esos 39**; los dos que faltaban —**OTD-VEN-03** (producto estrella) y
+> **OTD-VEN-04** (producto hueso)— entraron el **2026-08-07**, así que el nivel compuesto está
+> **COMPLETO: 39 de 39**. Hoy hay **43 rutas** de informe compuesto, que **no** son 43
+> objetivos: las 4 de más son los 2 modelos estratégicos, `costo-envio-mensual` (declarado
+> fuera del catálogo) y `prevision-demanda`, que se sirve en dos departamentos.
+> **Las cifras de este documento siguen siendo correctas como conteo de OBJETIVOS**; lo que no
+> debe leerse aquí es el estado de implementación, que quedó congelado en la versión 5. El
+> recuento reconciliado, con su verificación, está en la ficha **C-14** de `DEUDA_TECNICA.md`.
+
 **Qué cambió en la versión 5 (2026-07-30) — solo redacción, ningún objetivo entra ni sale.** El
 diagnóstico `docs/estrategico/DIAGNOSTICO_SEGMENTO_CLIENTE.md` cerró con veredicto **(c) POBLACIÓN
 HOMOGÉNEA**: **no existe segmentación B2B/B2C en los datos ni forma honesta de derivarla**

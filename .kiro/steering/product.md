@@ -32,9 +32,15 @@ El sistema se organiza en tres niveles empresariales:
   soporte con SLA, horarios de acceso por rol, trazabilidad de autor + auditoría
   centralizada (`log_auditoria`) en los procesos críticos, novedades/incidencias de envío
   (script 44), devolución a proveedor de mercancía defectuosa (script 45) y saneamiento
-  completo de bugs Tipo 1 (scripts 43 + fix de health 2026-07-18: deuda de bugs reales = 0).
-- **Táctico (toma de decisiones — TERMINADO)**: **30 informes simples** (directo de PostgreSQL) +
-  **39 compuestos** (contra el almacén `retailmind_dwh` de ClickHouse), en los 6 departamentos.
+  completo de bugs Tipo 1 (scripts 43 + fix de health 2026-07-18). **Deuda de defectos al
+  2026-08-07: A = 1** (A-3, borrado de `fact_eventos` por una columna que no es clave); ver
+  `DEUDA_TECNICA.md`.
+- **Táctico (toma de decisiones)**: **30 informes simples** (directo de PostgreSQL) +
+  **43 rutas de informe compuesto** (contra el almacén `retailmind_dwh` de ClickHouse), en los
+  6 departamentos. Las 43 rutas **no** son 43 objetivos: son los **39 objetivos compuestos del
+  catálogo, ya COMPLETOS** (2026-08-07, con OTD-VEN-03 y OTD-VEN-04) + 2 modelos estratégicos
+  + `costo-envio-mensual` + `prevision-demanda` servida en dos departamentos. Rutas y objetivos
+  no son la misma cuenta: ficha **C-14** de `DEUDA_TECNICA.md`.
   Una sola pantalla genérica parametrizada por archivo declarativo; patrón en
   `docs/tactico/PATRON_INFORMES.md`.
 - **Estratégico (TERMINADO)**: **7 tableros de dirección** que cubren las 19 decisiones de

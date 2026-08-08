@@ -124,8 +124,9 @@ apagado todo funciona excepto analytics/recomendaciones (degradan).
 │   └── verificar_migracion.sql       #   V1-V9, diffable entre dos servidores
 ├── .env.example                      # Plantilla versionada: CLAVES sin VALORES
 ├── CLAUDE.md                         # Contexto para Claude Code (equivalente a este steering)
-├── DEUDA_TECNICA.md                  # Registro canónico de deuda por fase (re-auditado 2026-07-18:
-│                                     # cero Tipo 1 vigentes) + docs/INVENTARIO_DEUDA_CONSOLIDADO.md
+├── DEUDA_TECNICA.md                  # Registro canónico de deuda, reestructurado 2026-08-07 en
+│                                     # A/B/C/D. Vigentes: A=0, B=28, C=15
+│                                     # + docs/INVENTARIO_DEUDA_CONSOLIDADO.md
 ├── ROADMAP.md                        # Decisiones de alcance formales (p. ej. Lote/FEFO pospuesto)
 ├── .kiro/steering/                   # Steering para Kiro (este archivo)
 └── .specify/ / openspec/             # Spec Kit

@@ -164,9 +164,12 @@ dejó de tener valores por defecto para `postgres.datasource.password` y `jwt.se
   compose de Airflow se enganche como red externa. **El día que Airflow tome el relevo hay que
   poner `DWH_CRON=-` en el `.env`**, o a las 02:00 disparan los dos y dos cargas concurrentes
   compiten por el `EXCHANGE TABLES` del mismo destino.
-- Estado del catálogo (ya construido, no pendiente): **30 informes simples + 39 compuestos**,
-  7 tableros estratégicos y 2 modelos. Detalle en `CLAUDE.md` y
-  `docs/tactico/PATRON_INFORMES.md`.
+- Estado del catálogo: **30 informes simples + 43 rutas de informe compuesto**, 7 tableros
+  estratégicos y 2 modelos. Los **39 objetivos compuestos** del catálogo están COMPLETOS desde
+  el 2026-08-07 (entraron OTD-VEN-03 y OTD-VEN-04). Cuidado con el conteo: **43 rutas ≠ 43
+  objetivos** — las 4 de más son los 2 modelos, `costo-envio-mensual` y `prevision-demanda`,
+  que se sirve en dos departamentos. Detalle en `CLAUDE.md`,
+  `docs/tactico/PATRON_INFORMES.md` y la ficha **C-14** de `DEUDA_TECNICA.md`.
 
 ## Reglas de oro (obligatorias en código nuevo)
 1. **Nunca** escribir columnas GENERATED ni totales de cabecera (los ponen triggers de la BD).

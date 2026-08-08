@@ -23,8 +23,12 @@ ClickHouse o afirma que PostgreSQL corre local, está desactualizado: ignóralo.
 - **Frontend** `retailmind-frontend/`: Angular 17 standalone, diseño "Dubai", Angular Material.
   Pantallas operativas en `features/operativo/` (incluye `marketing/`); estilos compartidos
   `operativo-shared.scss`; errores con `core/services/api-error.util.ts`.
-- **ETL** `retailmind/`: Python 3.12, PocketBase → Parquet → ClickHouse. El DDL operativo vigente
-  de PostgreSQL está en `retailmind/sql/postgres/` (scripts numerados 01-45 + 99).
+- **ETL** `retailmind/`: Python 3.12. El pipeline VIGENTE es **PostgreSQL → ClickHouse**
+  (`retailmind/etl/dwh/`, orquestado por Airflow). El viejo `PocketBase → Parquet → ClickHouse`
+  ya NO existe: `pocketbase` se eliminó del compose y de ese tramo solo queda
+  `retailmind/etl/carga/`, que creó las tablas de la base LEGADA y no se vuelve a correr.
+  El DDL operativo vigente de PostgreSQL está en `retailmind/sql/postgres/` (scripts numerados
+  **01-91**, más los `99_revert_*` de las siembras).
 - **Tienda del cliente** (solo rol CLIENTE, guard + SecurityConfig): backend en paquetes
   `catalogo/`, `carrito/`, `wishlist/`, `perfil/`, `recomendaciones/` contra `pgJdbcTemplate`;
   el id público de producto es el de la VARIANTE. El checkout llama a `VentasService.crearPedido`
@@ -64,7 +68,11 @@ ClickHouse o afirma que PostgreSQL corre local, está desactualizado: ignóralo.
 
 1. **Nunca** escribir columnas GENERATED ni totales de cabecera (los ponen triggers). Tampoco
    `fecha_actualizacion` (trigger touch) ni contadores como `usos_actuales`.
-2. Validación por **lista blanca** + parámetros JdbcTemplate; nunca concatenar SQL.
+2. Validación por **lista blanca** + parámetros JdbcTemplate; nunca concatenar SQL. **La regla
+   rige para todo lo OPERATIVO y para los informes/tableros.** Dos zonas heredadas NO la cumplen
+   y no son excusa para escribir código nuevo así: `analytics/` construye su SQL pegando texto
+   (documentado en `InformeCompuestoServiceBase:64`) y `admin/gestion/GestionDatosService:86-96`
+   concatena hasta el NOMBRE de la columna (ver **A-3** en `DEUDA_TECNICA.md`).
 3. Guardias de estado/idempotencia con mensaje claro: `IllegalArgumentException` → 400,
    `IllegalStateException` → 409, `NoSuchElementException` → 404 (vía `GlobalExceptionHandler`).
 4. Errores al usuario siempre con `mensajeError()` de `api-error.util.ts`.
@@ -108,7 +116,16 @@ mvn compile   &&   ng build
 materias más una copia congelada de `retailmind` — sirve de marcha atrás, no se desinstala. Para
 inspeccionar el esquema usa el MCP `retailmind` (solo lectura), que ya apunta al contenedor.
 
-**Secretos**: NO hay contraseñas en el código ni en este archivo. `application.properties` dejó de
+**Secretos**: hay que distinguir DOS cosas, porque este archivo contiene una de ellas.
+**(a) Los secretos INTERNOS —los que nadie teclea— no están en el código ni aquí**: el
+superusuario `postgres`, los roles `retailmind_app` y `retailmind_etl`, y el `jwt.secret` se
+rotaron el 2026-08-03 y viven **fuera del índice de git** (los cuatro archivos que se enumeran
+abajo). **(b) Las credenciales de DEMOSTRACIÓN sí están escritas**, en la sección «Credenciales
+de desarrollo» de este mismo archivo y en otros ocho documentos y scripts: son deliberadas —sin
+ellas nadie puede entrar a probar el sistema— y su coste está registrado como **C-4** en
+`DEUDA_TECNICA.md` (9 archivos versionados, uno de los cuales **crea la cuenta**). Lo que no
+puede decirse es «no hay contraseñas en este archivo»: las hay, y son las de demo.
+`application.properties` dejó de
 tener valores por defecto para `postgres.datasource.password` y `jwt.secret` — la app **falla al
 arrancar** si faltan, a propósito. Fuera de Docker los toma de
 `retailmind-backend/application-local.properties` (gitignored, vía `spring.config.import` con
@@ -368,7 +385,10 @@ ahora arma el pool con `connectionTimeout=3s`, `validationTimeout=1.5s`,
 `initializationFailTimeout=-1` y propiedades del driver `connect_timeout=2.5s` /
 `socket_timeout=30s`; `checkPythonRuntime` con `waitFor(3s)`. Verificado en vivo:
 `/api/health` responde en ~3.1s acotados con `status: UP, analytics: DEGRADED` — YA SIRVE
-como healthcheck de contenedores. **Tipo 1 vigentes = 0**; la foto completa de deuda vive en
+como healthcheck de contenedores. **Tipo 1 vigentes = 0 A ESA FECHA** (2026-07-18) — hoy la
+cuenta es **A = 1**: el 2026-08-07 entró **A-3** (la pantalla de gestión de datos edita y borra
+`fact_eventos` por `event_pk`, que **no es una clave**: 50.000 valores distintos sobre 2.823.245
+filas, así que un borrado se lleva entre 52 y 139 eventos). La foto completa de deuda vive en
 `DEUDA_TECNICA.md` (raíz) + `docs/INVENTARIO_DEUDA_CONSOLIDADO.md` (re-verificado).
 
 **CONTRASTE DE CATÁLOGO Y DEMANDA (2026-07-24, scripts 67 y 68-70)**: corrige los hallazgos
@@ -725,7 +745,9 @@ script)**: última fase de carga. `dim_promocion_producto` (232), `fact_devoluci
 LOG-09 cruzando `fact_envio` de la Fase 3C con `fact_devolucion`): **0 huérfanos en todas las
 direcciones**. Con esto el modelo está COMPLETO —19 de 19 tablas— y se conectaron los 16
 informes compuestos de POSVENTA: VEN-11, VEN-14, LOG-07/08/09/10, SOP-02/03/06/07/08,
-GER-03/07/10/11 y COM-09 — **32 endpoints compuestos en producción de los 39 del catálogo**;
+GER-03/07/10/11 y COM-09 — **32 endpoints compuestos en producción**, de los **39 OBJETIVOS
+compuestos que declara el catálogo** (endpoints y objetivos NO son la misma cuenta: ver el
+recuento reconciliado al final de este bloque y la ficha **C-14** de `DEUDA_TECNICA.md`);
 los 7 que faltan son de Compras (COM-03/04/05/06/07/11/12), con sus tablas cargadas desde la
 Fase 3A y pendientes solo de conectar. Coste: 2 clases Java nuevas (Soporte y Compras) + 1
 bloque por informe en las definiciones; GER-03/10/11 salen de `fact_venta_linea` sin tabla
@@ -978,11 +1000,18 @@ solo escucha IPv4 → `unhealthy` eterno **con la página sirviéndose bien**: s
 YA ESTÁ (2026-08-06, ver el bloque «ORQUESTACIÓN DEL ETL CON AIRFLOW» al final), y con él
 **`DWH_CRON=-`** ya está puesto. El MODELO DE
 DATOS está **COMPLETO**: las **19 tablas de hechos** del DWH más `fact_prevision_demanda` y
-`fact_alerta_cliente` — **21 tablas, 66.079 filas**, cargadas y validadas (**49 controles en
-verde**). Esa es la cifra del MODELO; la base `retailmind_dwh` tiene **22 objetos** porque
-además está la bitácora `etl_ejecucion`, que NO es del modelo y por eso no se suma
-(contarla da 66.743). El **CATÁLOGO TÁCTICO también**: 30 informes simples + **39
-compuestos**. Y el **NIVEL
+`fact_alerta_cliente` — **21 tablas, 66.082 filas** (medidas el 2026-08-07), cargadas y
+validadas (**49 controles en verde**). Esa es la cifra del MODELO; la base `retailmind_dwh`
+tiene **22 objetos** porque además está la bitácora `etl_ejecucion`, que NO es del modelo y por
+eso no se suma — y que además CRECE con cada corrida del DAG, así que sumarla da un número
+distinto cada día (862 filas el 2026-08-07). El **CATÁLOGO TÁCTICO**: 30 informes simples y
+**43 rutas de informe compuesto**, que NO son 43 objetivos — el desglose reconciliado es
+**39 objetivos OTD con ruta propia + 2 modelos estratégicos + `costo-envio-mensual` (declarado
+fuera del catálogo) + `prevision-demanda` servida en dos departamentos**. Desde el 2026-08-07
+el catálogo compuesto está **COMPLETO, 39 de 39**: entraron **OTD-VEN-03**
+(`/api/informes/ventas/top-productos`) y **OTD-VEN-04** (`/productos-hueso`), los dos que
+faltaban. La lección de **C-14** sigue en pie y por eso se escribe el desglose: **rutas y
+objetivos no son la misma cuenta**. Y el **NIVEL
 ESTRATÉGICO está CERRADO**: 7 tableros, las 19 decisiones de dashboard y **los 2 modelos**
 (previsión de demanda y alerta de abandono). El diseño del pipeline vive en
 `docs/estrategico/DISENO_ETL_CLICKHOUSE.md` y el del nivel estratégico en
@@ -1085,6 +1114,87 @@ un proceso `run_etl.py` independiente que abre y cierra su propio marcador — l
 correctos y el backend ya lee de forma defensiva (`DwhActualizacionService` colapsa con
 `argMax`); (3) `airflow-init` necesita el mismo bloque de entorno que los otros dos, de ahí los
 anclas YAML `x-airflow-env` / `x-airflow-volumes`.
+
+**BENCHMARK COLUMNAR — SQL RELACIONAL vs. CLICKHOUSE (2026-08-07, sin script, sin tocar código)**:
+mide cuánto gana una base columnar en las consultas de agregación que sirven los informes, **a dos
+escalas** para enseñar la CURVA y no un número favorable. Documento:
+`docs/BENCHMARK_COLUMNAR.md`; guiones: `retailmind/benchmark/` (7 pasos numerados). Los datos se
+copian de ClickHouse a una base PostgreSQL **nueva y aislada, `retailmind_benchmark`, que queda
+PERMANENTE en el mismo contenedor `retailmind-postgres-1`** (~807 MB, esquemas `dwh` con las 21
+tablas del modelo y `web` con `fact_eventos`). **La base `retailmind` no se toca**: un guardia
+(`comun.guardia_base`) aborta si el destino de escritura no es `retailmind_benchmark`.
+**Resultado, con el matiz incómodo incluido**: a **66.082 filas PostgreSQL GANA** (0,74× y 0,69×
+en OTD-VEN-06 y OTD-INV-04), y a **2.823.245 filas ClickHouse gana 16,96×** — la relación mejora
+**24×** entre las dos escalas. Espacio: PostgreSQL ocupa **6,8×** más con los mismos datos. Si vas
+a tocar esto: (1) PostgreSQL corre con **índices cubrientes hechos a medida** para cada consulta y
+`VACUUM ANALYZE` —sin el vacuum el mapa de visibilidad está vacío y NO hay *index only scan*
+aunque el índice exista—, mientras que ClickHouse va **a pelo**: la ventaja medida es un SUELO;
+(2) la consulta de control **Q4 separa las dos causas** — de los 16,96×, un factor 3,62× es el
+modelo columnar y el 4,7× restante es que `COUNT(DISTINCT)` en PostgreSQL se resuelve **ordenando
+y volcando a disco**; (3) el arnés tenía DOS sesgos a favor de PostgreSQL que hubo que corregir y
+quedan declarados: conexión no reutilizada y **falta de `TCP_NODELAY`** (libpq lo activa,
+`http.client` no), que cargaba **43 ms fijos** a cada consulta de ClickHouse por el ACK diferido;
+(4) `uniqExact()` y nunca `uniq()` —es HyperLogLog, aproximado, y no sería la misma pregunta—, y
+`COLLATE "C"` en todo `ORDER BY` de texto en PostgreSQL, o las filas no se pueden contrastar en
+paralelo contra el orden por bytes de ClickHouse. Reproducción **~3 min desde cero**, o **113 s**
+solo el paso de medición si la base ya está cargada:
+
+```bash
+cd retailmind/benchmark && export PYTHONIOENCODING=utf-8
+py -3 00_crear_base.py --recrear && py -3 01_cargar.py    # 1 s + 21 s
+py -3 02_verificar_copia.py                               # 27 s — md5 idéntico, fila por fila
+py -3 03_indexar.py && py -3 04_medir.py --reps 11         # 8 s + 113 s  <- el paso que se enseña
+```
+
+**CIERRE DEL CATÁLOGO TÁCTICO + `fact_eventos` EN SOLO LECTURA (2026-08-07, solo código, sin
+script)**: tres cosas de coste bajo en zonas distintas. **(1) A-3 cerrado**: la pantalla
+`/gestion-datos` ya NO edita ni borra `fact_eventos`. Se retiraron los tres endpoints
+(`GET/PUT/DELETE /api/gestion/fact-eventos/{eventPk}` → **404**), sus tres métodos de
+`GestionDatosService`, y en Angular el panel de edición y la columna «Acciones»; en su lugar
+hay un aviso que explica por qué. El motivo: **`event_pk` no identifica una fila** —50.000
+valores para 2.823.245 filas, 52-139 filas por valor—, así que un clic de «borrar este evento»
+se llevaba un centenar de eventos de otras tantas sesiones e informaba de éxito. **NO se tocó
+la tabla** (cero UPDATE/DELETE/ALTER) y sigue con sus 2.823.245 filas: la reconstrucción con un
+identificador de verdad queda como fragilidad **C-15**, con respaldo y sin prisa. De regalo
+desapareció la única concatenación de un NOMBRE DE COLUMNA en SQL del archivo (`updateFactEvento`
+la tomaba de las claves del cuerpo de la petición). **(2) OTD-VEN-03**
+(`/api/informes/ventas/top-productos`, producto estrella) y **(3) OTD-VEN-04**
+(`/productos-hueso`), los dos objetivos que faltaban: **el catálogo compuesto queda en 39 de
+39**. Si vas a tocar esto: (1) **VEN-03 NO comparte SQL con OTD-GER-10** aunque agreguen la
+misma tabla por el mismo grano — difieren en `ORDER BY`, columnas, KPI y DESTINATARIOS, y
+compartir acoplaría dos departamentos: añadir una columna a GER-10 (dirección) se la añadiría
+en silencio a VEN-03, que ven VENDEDOR y COMPRAS; (2) **VEN-03 no devuelve margen ni costo y
+VEN-04 no devuelve ni un importe**, y eso lo garantiza LA CONSULTA, no la ruta — ClickHouse no
+tiene GRANT por columna, así que lo que no debe salir no se selecciona (mismo mecanismo que
+COM-08); (3) **VEN-04 no comparte código con el bloque `productoHueso` del tablero T-2** ni le
+abre T-2 a COMPRAS: T-2 ordena por capital retenido, no limita y lleva margen, así que darle
+entrada habría roto la segregación financiera por la puerta de atrás — COMPRAS entra al informe
+y sigue recibiendo **403** en `/api/tableros/rentabilidad`; (4) **`alcance` ∈ {nunca, periodo}
+son DOS listas y dos decisiones**: «sin venta nunca» (387) y «sin venta en el período» (491 en
+el primer semestre de 2026), y el sobre DICE en pantalla cuál se está viendo — con `nunca` los
+filtros de período y canal no se aplican al criterio, porque «nunca vendida en marzo» no es
+«nunca vendida»; (5) los días sin venta se anclan a la última salida del ALMACÉN y no a
+`now()`, como T-2; (6) **el LEFT JOIN de ClickHouse rellena con el DEFECTO DEL TIPO**, así que
+una variante sin salidas saldría con `dias = 0` y, ordenando descendente, se iría al FINAL — el
+NULL se fabrica desde un `tiene_venta = 1` explícito; (7) **un endpoint nuevo no basta**: el
+`roleGuard` de `/operativo/informes/ventas` y el `nav-model` son la UNIÓN de quien ve al menos
+un informe del área, y sin añadir COMPRAS ahí los dos endpoints respondían 200 a una pantalla
+que ese rol no podía abrir (lo detectó la prueba en navegador, no la de API). Verificación:
+`retailmind/verificar_ven0304.py` (**41 comprobaciones**, cifras tomadas de la RESPUESTA HTTP y
+contrastadas contra ClickHouse; matriz 24 celdas × 0 discrepancias) y
+`retailmind/verificar_pantallas.js` (**Chrome headless**: las 3 pantallas cargan sin errores de
+aplicación). DAG completo tras el cambio: **22/22 tareas y los 49 controles exactos**.
+Los dos piden las claves POR ENTORNO y **sin valor por defecto** —a diferencia de
+`validar_tableros.py`, que las trae escritas— para no engordar la lista de la deuda C-4; si
+falta la variable se plantan y dicen cuál:
+
+```bash
+export RETAILMIND_ADMIN_PASS='…'   # la del admin      (ver «Credenciales de desarrollo»)
+export RETAILMIND_STAFF_PASS='…'   # la del resto de roles
+py -3 retailmind/verificar_ven0304.py        # ~2 min: V2, V3 y la matriz de roles
+node retailmind/verificar_pantallas.js       # ~1 min: consola del navegador, necesita
+                                             # `npm i --no-save puppeteer` en el frontend
+```
 
 **Deuda técnica conocida** (tablas huérfanas, requieren bloque dedicado):
 
