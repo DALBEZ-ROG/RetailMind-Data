@@ -310,7 +310,18 @@ $fuente-compuesto: #0097a7;   // el tono oscuro de --accent-gradient, legible so
 
   strong { color: var(--text, #1f2937); font-weight: 600; }
 
-  .marca-fuente { opacity: 0.75; }
+  // OJO: `.marca-fuente` está ocupado dos veces en esta hoja. Arriba es la
+  // MARCA de forma del selector —un cuadrado de 8×8 sin contenido—, y aquí es
+  // el TEXTO de la fuente del dato («· ClickHouse retailmind_dwh»). Sin este
+  // reset, el texto heredaba la caja de 8 px y salía en una columna de una
+  // letra por línea, desbordando por debajo de la marca de agua. Defecto
+  // PREEXISTENTE, visible en los tableros y en los informes compuestos.
+  .marca-fuente {
+    display: inline;
+    width: auto;
+    height: auto;
+    opacity: 0.75;
+  }
 }
 
 /* Degradación de la analítica: aviso, NO error. El resto del sistema sigue
