@@ -30,41 +30,55 @@
     <mat-icon>cloud_off</mat-icon> {{ avisoAnalitica }}
   </div>
 
-  <!-- Filtros -->
-  <div class="op-card" *ngIf="def.filtros.length">
-    <h3><mat-icon>filter_alt</mat-icon> Filtros</h3>
-    <div class="form-grid">
-      <ng-container *ngFor="let f of def.filtros">
+  <!-- Filtros — UNA SOLA FILA: rótulo, campos y las dos herramientas de la
+       consulta. Los campos van a densidad reducida (`mat.form-field-density`,
+       no una altura escrita a mano) y sin el hueco del subscript, que aquí
+       nunca se usa porque ningún filtro del tablero lleva `mat-hint`. -->
+  <div class="op-card filtros-card" *ngIf="def.filtros.length">
+    <div class="filtros-barra">
+      <h3 class="filtros-titulo"><mat-icon>filter_alt</mat-icon> Filtros</h3>
 
-        <mat-form-field appearance="outline" *ngIf="f.tipo === 'select'">
-          <mat-label>{{ f.etiqueta }}</mat-label>
-          <mat-select [(ngModel)]="valores[f.param]" (selectionChange)="aplicarFiltros()">
-            <mat-option *ngFor="let o of f.opciones" [value]="o.valor">{{ o.etiqueta }}</mat-option>
-          </mat-select>
-        </mat-form-field>
+      <div class="filtros-campos">
+        <ng-container *ngFor="let f of def.filtros">
 
-        <mat-form-field appearance="outline" *ngIf="f.tipo === 'fecha'">
-          <mat-label>{{ f.etiqueta }}</mat-label>
-          <input matInput type="date" [(ngModel)]="valores[f.param]" (change)="aplicarFiltros()">
-        </mat-form-field>
+          <!-- El `[value]` lleva SIEMPRE el valor CRUDO del almacén, que es contra
+               lo que el backend compara por igualdad; solo la etiqueta visible se
+               traduce (`sin_zona` → «Sin zona»). Es la misma regla del §9.bis del
+               patrón: el identificador no se toca, se toca el rótulo. -->
+          <mat-form-field appearance="outline" subscriptSizing="dynamic"
+                          *ngIf="f.tipo === 'select'">
+            <mat-label>{{ f.etiqueta }}</mat-label>
+            <mat-select [(ngModel)]="valores[f.param]" (selectionChange)="aplicarFiltros()">
+              <mat-option *ngFor="let o of opcionesDe(f)" [value]="o.valor">{{ o.etiqueta }}</mat-option>
+            </mat-select>
+          </mat-form-field>
 
-        <mat-form-field appearance="outline" *ngIf="f.tipo === 'texto'">
-          <mat-label>{{ f.etiqueta }}</mat-label>
-          <input matInput [(ngModel)]="valores[f.param]"
-                 (ngModelChange)="f.debounce ? alEscribir() : null"
-                 (change)="f.debounce ? null : aplicarFiltros()">
-          <mat-icon matSuffix>search</mat-icon>
-        </mat-form-field>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic"
+                          *ngIf="f.tipo === 'fecha'">
+            <mat-label>{{ f.etiqueta }}</mat-label>
+            <input matInput type="date" [(ngModel)]="valores[f.param]" (change)="aplicarFiltros()">
+          </mat-form-field>
 
-      </ng-container>
-    </div>
-    <div class="form-actions">
-      <button class="btn-limpiar" (click)="limpiar()">
-        <mat-icon>filter_alt_off</mat-icon> Limpiar filtros
-      </button>
-      <button class="btn-limpiar" (click)="cargar()">
-        <mat-icon>refresh</mat-icon> Actualizar
-      </button>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic"
+                          *ngIf="f.tipo === 'texto'">
+            <mat-label>{{ f.etiqueta }}</mat-label>
+            <input matInput [(ngModel)]="valores[f.param]"
+                   (ngModelChange)="f.debounce ? alEscribir() : null"
+                   (change)="f.debounce ? null : aplicarFiltros()">
+            <mat-icon matSuffix>search</mat-icon>
+          </mat-form-field>
+
+        </ng-container>
+      </div>
+
+      <div class="filtros-acciones">
+        <button class="btn-limpiar" (click)="limpiar()">
+          <mat-icon>filter_alt_off</mat-icon> Limpiar filtros
+        </button>
+        <button class="btn-limpiar" (click)="cargar()">
+          <mat-icon>refresh</mat-icon> Actualizar
+        </button>
+      </div>
     </div>
   </div>
 
@@ -72,14 +86,40 @@
     <mat-icon>hourglass_top</mat-icon> Calculando el tablero…
   </div>
 
-  <!-- Tarjetas de cabecera. Cada una lleva su NOTA, que es su denominador:
-       una cifra de dirección sin su base es exactamente la clase de número
-       plausible y equivocado que este nivel persigue. -->
-  <div class="kpi-grid tablero-kpis" *ngIf="sobre?.kpis?.length">
+  <!-- Tarjetas de cabecera. La NOTA de cada una es su DENOMINADOR, y por eso no
+       se pierde al sacarla de la caja: viaja por DOS caminos a la vez. El
+       inmediato es el rótulo `title` NATIVO del icono (§18: `title` y no
+       `matTooltip`), que la enseña sin recargar la tarjeta. El permanente es el
+       pie desplegable de aquí abajo, que las lista TODAS con su etiqueta y deja
+       el texto seleccionable, buscable con Ctrl+F y alcanzable con el teclado —
+       cosas que un rótulo del navegador no da. La tarjeta se queda con la
+       etiqueta y el número, que es lo que la hace comparable con las demás:
+       todas miden lo mismo de alto porque todas llevan lo mismo dentro. -->
+  <div class="kpi-grid tablero-kpis" *ngIf="sobre?.kpis?.length"
+       [ngClass]="'cols-' + colsKpi">
     <div class="kpi-card" *ngFor="let k of sobre?.kpis">
-      <span class="kpi-label">{{ k.etiqueta }}</span>
+      <span class="kpi-label">
+        <span class="kpi-texto">{{ k.etiqueta }}</span>
+        <span class="kpi-info" *ngIf="k.nota" [attr.title]="k.nota">
+          <mat-icon>info_outline</mat-icon>
+        </span>
+      </span>
       <span class="kpi-value">{{ formatear(k.valor, k.tipo) }}</span>
-      <span class="kpi-nota" *ngIf="k.nota">{{ k.nota }}</span>
+    </div>
+  </div>
+
+  <div class="kpi-notas-pie" *ngIf="notasKpi.length">
+    <button type="button" class="kpi-notas-toggle" (click)="alternarNotas()"
+            [attr.aria-expanded]="notasAbiertas">
+      <mat-icon>{{ notasAbiertas ? 'expand_less' : 'expand_more' }}</mat-icon>
+      {{ notasAbiertas ? 'Ocultar sobre qué está calculado cada indicador'
+                       : 'Sobre qué está calculado cada indicador (' + notasKpi.length + ')' }}
+    </button>
+    <div class="kpi-notas" *ngIf="notasAbiertas">
+      <div class="kpi-nota-fila" *ngFor="let k of notasKpi">
+        <span class="nota-etiqueta">{{ k.etiqueta }}</span>
+        <span class="nota-texto">{{ k.nota }}</span>
+      </div>
     </div>
   </div>
 
@@ -101,12 +141,61 @@
     </span>
   </div>
 
-  <!-- ── BLOQUES DEL ALMACÉN ──────────────────────────────────────────── -->
-  <div class="op-card bloque-card" *ngFor="let pres of bloquesVisibles">
-    <ng-container *ngIf="bloque(pres) as b">
+  <!-- ── SELECTOR DE ELEMENTO ─────────────────────────────────────────────
+       Hasta aquí llega la zona FIJA: cabecera, marca de agua, filtros, KPI,
+       salvedades y alcance se ven siempre y NO entran en la rotación. De aquí
+       abajo se pinta UN elemento, el elegido.
+
+       Las tarjetas son las mismas del selector de informes tácticos
+       (`.informe-selector` / `.informe-chip` de informes.scss, ya en los
+       styleUrls de esta pantalla): ni una clase nueva y ningún estilo
+       duplicado. Y el origen se distingue con las TRES señales del §9.bis.25
+       del patrón —color, forma de la marca y palabra escrita—, con el MISMO
+       significado que allí: rombo cian = ClickHouse, círculo índigo =
+       PostgreSQL.
+
+       El REPARTO en filas no lo decide el ancho de cada tarjeta: lo decide
+       `colsSelector`, calculado en el componente para que las filas queden
+       parejas (7 elementos → 4 + 3, y no 5 + 2 con tres huecos a la derecha).
+       Por eso es una rejilla de columnas iguales y no un `flex-wrap`. -->
+  <div class="selector-conteo" *ngIf="tarjetas.length">
+    <span class="conteo-total">{{ tarjetas.length }} elementos</span>
+    <span class="conteo-nota">
+      Se muestra uno a la vez. Los filtros de arriba se aplican a todos, también
+      al que no está en pantalla.
+    </span>
+  </div>
+
+  <div class="informe-selector tablero-selector" *ngIf="tarjetas.length" role="tablist"
+       [ngClass]="'cols-' + colsSelector">
+    <button type="button" class="informe-chip" *ngFor="let t of tarjetas"
+            role="tab"
+            [ngClass]="t.origen === 'postgres' ? 'fuente-simple' : 'fuente-compuesto'"
+            [class.activo]="seleccion === t.id"
+            [attr.aria-selected]="seleccion === t.id"
+            (click)="seleccionar(t)"
+            [matTooltip]="tituloTarjeta(t)">
+      <mat-icon>{{ t.icono }}</mat-icon>
+      <span class="chip-texto">
+        <span class="chip-id">{{ t.clase }}</span>
+        <span class="chip-titulo">{{ t.titulo }}</span>
+      </span>
+      <span class="chip-fuente">
+        <span class="marca-fuente" aria-hidden="true"></span>
+        {{ palabraOrigen(t) }}
+      </span>
+    </button>
+  </div>
+
+  <!-- ── EL ELEMENTO ELEGIDO ──────────────────────────────────────────── -->
+  <ng-container *ngIf="actual as t">
+
+  <!-- Bloque del ALMACÉN -->
+  <div class="op-card bloque-card" *ngIf="t.origen === 'almacen'">
+    <ng-container *ngIf="bloqueActual as b">
 
       <h3>
-        <mat-icon>{{ def.icono }}</mat-icon>
+        <mat-icon>{{ t.icono }}</mat-icon>
         {{ b.titulo }}
         <span class="conteo">({{ b.filas | number }})</span>
       </h3>
@@ -127,8 +216,8 @@
         <span><strong>Sobre qué está calculado.</strong> {{ b.denominador }}</span>
       </div>
 
-      <p class="ayuda-bloque" *ngIf="pres.ayuda">
-        <mat-icon>lightbulb</mat-icon> {{ pres.ayuda }}
+      <p class="ayuda-bloque" *ngIf="t.pres?.ayuda">
+        <mat-icon>lightbulb</mat-icon> {{ t.pres?.ayuda }}
       </p>
 
       <!-- Semáforo: tarjetas grandes en vez de gráfico -->
@@ -144,39 +233,17 @@
         </div>
       </div>
 
-      <app-tablero-grafico *ngIf="b.visualizacion !== 'semaforo'"
-                           [bloque]="b" [pres]="pres"></app-tablero-grafico>
+      <app-tablero-grafico *ngIf="b.visualizacion !== 'semaforo' && t.pres"
+                           [bloque]="b" [pres]="t.pres"></app-tablero-grafico>
 
       <!-- La tabla acompaña SIEMPRE al gráfico: un gráfico sin sus cifras
            obliga a estimarlas a ojo, y de una estimación a ojo no sale una
            decisión de trimestre. -->
-      <div class="table-wrapper" *ngIf="b.items.length">
-        <table mat-table [dataSource]="filasDe(pres)">
-          <ng-container *ngFor="let col of pres.columnas" [matColumnDef]="col.campo">
-            <th mat-header-cell *matHeaderCellDef>{{ col.titulo }}</th>
-            <!-- `title` nativo y no matTooltip: una tarjeta de este tablero
-                 puede traer 80 filas por 8 columnas, y una directiva de Angular
-                 por celda multiplicada por seis bloques dejaba la pantalla sin
-                 responder. El texto completo de una celda recortada no necesita
-                 mas que el rotulo del navegador. -->
-            <td mat-cell *matCellDef="let fila"
-                [attr.title]="valorCompleto(col, fila) || null"
-                [class.celda-monto]="col.monto">
-              <span *ngIf="col.tipo === 'chip'; else plano"
-                    class="estado-chip" [ngClass]="claseChip(col, fila)">
-                {{ valor(col, fila) }}
-              </span>
-              <ng-template #plano>{{ valor(col, fila) }}</ng-template>
-            </td>
-          </ng-container>
-          <tr mat-header-row *matHeaderRowDef="columnasDe(pres)"></tr>
-          <tr mat-row *matRowDef="let fila; columns: columnasDe(pres)"></tr>
-        </table>
-      </div>
+      <ng-container *ngTemplateOutlet="tablaElemento"></ng-container>
 
-      <p class="pie-recorte" *ngIf="hayRecorte(pres)">
-        Se muestran las primeras {{ pres.topFilas }} filas del orden que fijó el cálculo,
-        de {{ b.filas | number }} en total.
+      <p class="pie-recorte" *ngIf="recorteTotal">
+        Se muestran las primeras {{ t.pres?.topFilas }} filas del orden que fijó el cálculo,
+        de {{ recorteTotal | number }} en total.
       </p>
 
       <div class="empty-state" *ngIf="!b.items.length">
@@ -187,8 +254,9 @@
     </ng-container>
   </div>
 
-  <!-- ── BLOQUES QUE NO SALEN DEL ALMACÉN ─────────────────────────────── -->
-  <div class="op-card bloque-card bloque-externo" *ngFor="let x of def.externos ?? []">
+  <!-- Bloque que NO sale del almacén: se sirve de un informe de PostgreSQL -->
+  <div class="op-card bloque-card bloque-externo" *ngIf="t.origen === 'postgres'">
+    <ng-container *ngIf="t.externo as x">
     <h3>
       <mat-icon>storage</mat-icon>
       {{ x.titulo }}
@@ -225,23 +293,12 @@
       </div>
     </div>
 
-    <p class="pie-recorte" *ngIf="x.topFilas && externo(x.id).total > x.topFilas">
+    <p class="pie-recorte" *ngIf="recorteTotal">
       Se muestran las primeras {{ x.topFilas }} filas de
-      {{ externo(x.id).total | number }} en total.
+      {{ recorteTotal | number }} en total.
     </p>
 
-    <div class="table-wrapper" *ngIf="externo(x.id).filas.length">
-      <table mat-table [dataSource]="filasExternas(x)">
-        <ng-container *ngFor="let col of x.columnas" [matColumnDef]="col.campo">
-          <th mat-header-cell *matHeaderCellDef>{{ col.titulo }}</th>
-          <td mat-cell *matCellDef="let fila"
-              [attr.title]="valorCompleto(col, fila) || null"
-              [class.celda-monto]="col.monto">{{ valor(col, fila) }}</td>
-        </ng-container>
-        <tr mat-header-row *matHeaderRowDef="columnasExternas(x)"></tr>
-        <tr mat-row *matRowDef="let fila; columns: columnasExternas(x)"></tr>
-      </table>
-    </div>
+    <ng-container *ngTemplateOutlet="tablaElemento"></ng-container>
 
     <div class="empty-state"
          *ngIf="!externo(x.id).cargando && !externo(x.id).filas.length
@@ -249,15 +306,48 @@
       <mat-icon>inbox</mat-icon>
       <p>{{ x.vacio }}</p>
     </div>
+    </ng-container>
   </div>
+
+  </ng-container>
 
   <!-- El estado vacío se calla cuando la analítica está caída: el tablero no
        está vacío porque no haya pasado nada, sino porque no se pudo preguntar. -->
-  <div class="op-card" *ngIf="!loading && !bloquesVisibles.length && !avisoAnalitica">
+  <div class="op-card" *ngIf="!loading && !tarjetas.length && !avisoAnalitica">
     <div class="empty-state">
       <mat-icon>{{ def.icono }}</mat-icon>
       <p>No hay ningún elemento que mostrar con los filtros elegidos.</p>
     </div>
   </div>
+
+  <!-- LA tabla del elemento visible, una sola vez para los dos orígenes: las
+       columnas y las filas ya vienen resueltas en campos (`colsActual`,
+       `columnasActual`, `filasActual`) y no en llamadas de plantilla, que
+       devolvían un array nuevo en cada ciclo de detección y remontaban la
+       tabla entera (§8.6 del patrón). -->
+  <ng-template #tablaElemento>
+    <div class="table-wrapper" *ngIf="filasActual.length">
+      <table mat-table [dataSource]="filasActual">
+        <ng-container *ngFor="let col of colsActual" [matColumnDef]="col.campo">
+          <th mat-header-cell *matHeaderCellDef>{{ col.titulo }}</th>
+          <!-- `title` nativo y no matTooltip: un elemento de este tablero puede
+               traer 80 filas por 8 columnas, y una directiva de Angular por
+               celda dejaba la pantalla sin responder. El texto completo de una
+               celda recortada no necesita mas que el rotulo del navegador. -->
+          <td mat-cell *matCellDef="let fila"
+              [attr.title]="valorCompleto(col, fila) || null"
+              [class.celda-monto]="col.monto">
+            <span *ngIf="col.tipo === 'chip'; else plano"
+                  class="estado-chip" [ngClass]="claseChip(col, fila)">
+              {{ valor(col, fila) }}
+            </span>
+            <ng-template #plano>{{ valor(col, fila) }}</ng-template>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="columnasActual"></tr>
+        <tr mat-row *matRowDef="let fila; columns: columnasActual"></tr>
+      </table>
+    </div>
+  </ng-template>
 
 </div>

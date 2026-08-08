@@ -1,3 +1,5 @@
+@use '@angular/material' as mat;
+
 // Estilos propios de los TABLEROS DE DIRECCIÓN (nivel estratégico).
 // Complementa operativo-shared.scss e informes.scss, de donde ya salen
 // .kpi-card, .marca-agua, .aviso-analitica, .salvedad y .aviso-alcance.
@@ -5,45 +7,348 @@
 // Criterio visual: el tablero se lee de arriba abajo y cada bloque es una
 // unidad cerrada — salvedad, denominador, gráfico y tabla. Nada de tarjetas
 // flotantes ni de gráficos sin sus cifras al lado.
+//
+// ── LA JERARQUÍA DE COLOR DE ESTA PANTALLA ───────────────────────────────
+// Sólo DOS cosas se pintan con el índigo saturado del degradado primario, y
+// las dos dicen «estás aquí»: la CABECERA del tablero y la TARJETA ELEGIDA del
+// selector. Todo lo demás —indicadores, filtros, tarjetas no elegidas— vive en
+// vidrio claro sobre el fondo, para que la mancha de color signifique algo.
+// Antes los indicadores llevaban el MISMO degradado que la cabecera, siete
+// cajas de azul lleno compitiendo con el título; ahora el número manda dentro
+// de su caja y la caja no manda en la pantalla.
+//
+// ── ESCALA DE ESPACIADO ──────────────────────────────────────────────────
+// Un solo múltiplo de 4, en cuatro pasos: 8 (dentro de un grupo), 12 (entre
+// grupos hermanos), 16 (entre zonas) y 24 (el respiro de la página, que lo da
+// el padding de `.op-page`). No hay 10, 14 ni 22 sueltos.
+$esp-1: 8px;
+$esp-2: 12px;
+$esp-3: 16px;
+
+// Reparto en columnas iguales. La CLASE la pone el componente
+// (`cols-<n>`), que es quien sabe cuántas cajas hay; aquí sólo se declara qué
+// significa cada número. Se llega hasta 6 porque ningún tablero pasa de 8
+// tarjetas ni de 6 indicadores.
+@mixin rejilla-repartida($gap) {
+  display: grid;
+  gap: $gap;
+
+  @for $i from 1 through 6 {
+    &.cols-#{$i} { grid-template-columns: repeat($i, minmax(0, 1fr)); }
+  }
+
+  // Por debajo del ancho de un portátil el reparto calculado deja de tener
+  // sentido —cuatro columnas en una tableta son cuatro columnas ilegibles— y
+  // manda el ancho mínimo de la caja.
+  @media (max-width: 1024px) {
+    &[class*='cols-'] { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+  }
+  @media (max-width: 560px) {
+    &[class*='cols-'] { grid-template-columns: minmax(0, 1fr); }
+  }
+}
 
 .tablero-page {
   .tablero-objetivo {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: $esp-1;
     flex-wrap: wrap;
     font-size: 12px;
-    color: var(--text-secondary);
-    margin-top: 4px;
+    // Esta línea vive DENTRO de la cabecera de degradado índigo, así que se
+    // pinta en blanco translúcido y no con los grises del cuerpo de la página:
+    // `--text-secondary` sobre el degradado daba un texto que había que buscar.
+    color: rgba(255, 255, 255, 0.78);
+    margin-top: 6px;
 
-    .objetivo-tag { margin-left: 0; }
+    .objetivo-tag {
+      margin-left: 0;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.16);
+      color: rgba(255, 255, 255, 0.95);
+    }
   }
 
-  .tablero-decisiones { opacity: 0.8; }
+  .tablero-decisiones { opacity: 0.85; }
+
+  // La marca de agua es una fila de flex y su tercer trozo —«· ClickHouse ·
+  // retailmind_dwh · el histórico llega hasta…»— es una frase larga en un
+  // `display: inline`. Sin permitir el salto, esa frase estiraba el contenedor
+  // de la pantalla ENTERA por encima del ancho de la ventana, y con él la
+  // tabla del bloque: a 514 px el documento medía 618 y aparecía una barra de
+  // desplazamiento horizontal. Con el salto, la pantalla cabe sin desbordar.
+  .marca-agua {
+    margin-bottom: $esp-2;
+    flex-wrap: wrap;
+    min-width: 0;
+
+    .marca-fuente { min-width: 0; }
+  }
+
+  .salvedad,
+  .aviso-alcance,
+  .aviso-analitica { margin-bottom: $esp-3; }
 }
 
-// ── Tarjetas de cabecera con su NOTA ─────────────────────────────────────
-// La nota es el denominador de la tarjeta y por eso viaja DENTRO de ella y no
-// en un tooltip: un dato de dirección sin su base es la cifra plausible que
-// este nivel persigue.
-.tablero-kpis {
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+// ── Barra de filtros: UNA sola fila ──────────────────────────────────────
+// Los dos botones son herramientas de la consulta, no de un formulario (§4 del
+// patrón), así que van al final de la MISMA fila y no en una segunda que
+// gastaba 52 px de alto en cada uno de los siete tableros.
+.filtros-card {
+  padding: 16px 20px;
+  margin-bottom: $esp-3;
 
-  .kpi-card { align-items: flex-start; }
+  // Densidad por el mecanismo de Angular Material y no por una altura escrita
+  // a mano: el campo baja de ~56 px a ~44 px y sus adornos (flecha del select,
+  // icono de la lupa, etiqueta flotante) se recolocan solos.
+  @include mat.form-field-density(-3);
+}
 
-  .kpi-nota {
+.filtros-barra {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: $esp-2;
+
+  .filtros-titulo {
+    margin: 0;
+    flex: 0 0 auto;
+    color: var(--text-secondary);
+    font-size: 13px;
+  }
+
+  // La base de 300 px es lo que mantiene los botones EN ESTA FILA. Con
+  // `flex-basis: auto` el bloque de campos declara su tamaño máximo —cinco
+  // campos de 260 son 1.348 px— y flexbox reparte en líneas ANTES de encoger,
+  // así que los botones caían abajo aunque hubiera sitio de sobra. Declarando
+  // una base pequeña que luego CRECE, la fila se arma primero y los campos se
+  // reparten después dentro del hueco que queda.
+  .filtros-campos {
+    display: flex;
+    flex: 1 1 300px;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: $esp-1 $esp-2;
+
+    // Un tope de ancho para que el tablero de UN solo filtro (T-7) no estire
+    // ese campo de lado a lado: la barra se lee igual con uno que con cinco.
+    .mat-mdc-form-field {
+      flex: 1 1 155px;
+      max-width: 260px;
+    }
+  }
+
+  .filtros-acciones {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: $esp-1;
+    margin-left: auto;
+  }
+}
+
+// ── Tarjetas de cabecera ─────────────────────────────────────────────────
+// El fondo se retira para que domine el NÚMERO: un lavado índigo del 7 % con
+// un punto de cian en la esquina —los dos de la paleta que ya existía— sobre
+// el vidrio de la página. La nota de cada indicador salió de la caja (va en el
+// `title` del icono y en el pie desplegable), y por eso TODAS miden lo mismo:
+// llevan exactamente lo mismo dentro.
+.tablero-page .tablero-kpis {
+  @include rejilla-repartida($esp-2);
+  margin-bottom: $esp-2;
+
+  .kpi-card {
+    align-items: stretch;
+    gap: $esp-1;
+    // 100 px es la altura del contenido con la etiqueta MÁS LARGA en dos
+    // líneas («Venta por la tienda en línea»); fijarla iguala también las
+    // filas entre sí cuando hay más de una.
+    min-height: 100px;
+    padding: 14px 18px 16px;
+    border-radius: var(--border-radius-sm);
+    background:
+      linear-gradient(150deg,
+        rgba(57, 73, 171, 0.085) 0%,
+        rgba(57, 73, 171, 0.035) 55%,
+        rgba(0, 188, 212, 0.06) 100%),
+      rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(57, 73, 171, 0.16);
+    box-shadow: 0 1px 3px rgba(26, 35, 126, 0.05);
+    color: var(--text-primary);
+  }
+
+  .kpi-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
     font-size: 10.5px;
-    line-height: 1.5;
-    opacity: 0.85;
-    font-weight: 500;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    line-height: 1.35;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    opacity: 1;
+  }
+
+  .kpi-texto { flex: 1 1 auto; }
+
+  // `title` NATIVO (§18). El icono es decorativo a propósito: el texto que
+  // enseña está también en el pie desplegable, que sí es alcanzable con el
+  // teclado y con Ctrl+F.
+  .kpi-info {
+    flex: 0 0 auto;
+    display: inline-flex;
+    cursor: help;
+    color: var(--primary-light);
+    opacity: 0.5;
+    transition: opacity 0.2s ease;
+
+    &:hover { opacity: 1; }
+
+    mat-icon { font-size: 15px; width: 15px; height: 15px; }
+  }
+
+  // El número se apoya en el borde inferior de la tarjeta: así todas las
+  // cifras de la fila comparten línea de base aunque una etiqueta ocupe dos
+  // líneas y la de al lado una.
+  .kpi-value {
+    margin-top: auto;
+    font-size: 27px;
+    font-weight: 800;
+    letter-spacing: -0.8px;
+    line-height: 1.05;
+    color: var(--primary);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+// ── El pie con las notas de los indicadores ──────────────────────────────
+// Cerrado por defecto: es la referencia que se consulta una vez, no algo que
+// se lea en cada visita. Abierto, lista TODAS con su etiqueta delante, que es
+// más útil que perseguirlas tarjeta por tarjeta con el ratón.
+.kpi-notas-pie { margin-bottom: $esp-3; }
+
+.kpi-notas-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px 4px 6px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--primary-light);
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  font-size: 11.5px;
+  font-weight: 600;
+
+  mat-icon { font-size: 17px; width: 17px; height: 17px; }
+
+  &:hover {
+    background: rgba(57, 73, 171, 0.07);
+    border-color: rgba(57, 73, 171, 0.16);
+  }
+
+  &:focus-visible { outline: 2px solid var(--primary-light); outline-offset: 2px; }
+}
+
+.kpi-notas {
+  margin-top: $esp-1;
+  padding: 14px 18px;
+  border-radius: var(--border-radius-sm);
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(57, 73, 171, 0.12);
+
+  .kpi-nota-fila {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 4px $esp-2;
+    padding: 7px 0;
+    font-size: 12px;
+    line-height: 1.55;
+
+    & + .kpi-nota-fila { border-top: 1px solid rgba(26, 35, 126, 0.07); }
+
+    @media (max-width: 780px) { grid-template-columns: 1fr; }
+  }
+
+  .nota-etiqueta {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    padding-top: 1px;
+  }
+
+  .nota-texto { color: var(--text-secondary); }
+}
+
+// ── Selector de elemento ─────────────────────────────────────────────────
+// NO define un lenguaje visual nuevo: las tarjetas son `.informe-chip` de
+// informes.scss, que ya está en los styleUrls de esta pantalla, con sus dos
+// modificadores de origen (`fuente-simple` = PostgreSQL, `fuente-compuesto` =
+// almacén analítico) y su estado `.activo`. Lo que cambia es el REPARTO: una
+// rejilla de columnas iguales gobernada por `cols-<n>` en vez de un
+// `flex-wrap` que llenaba la primera fila y tiraba el resto abajo.
+//
+// Se descartó que las tarjetas de la última fila se estiraran para tapar el
+// hueco: la misma tarjeta mediría distinto según cuántos bloques tenga su
+// tablero, y lo que hace que los siete se lean como uno es justamente que
+// todas midan igual. Con el reparto calculado el hueco nunca pasa de una
+// columna, que es el final normal de cualquier rejilla de tarjetas.
+.tablero-selector {
+  @include rejilla-repartida($esp-2);
+  margin-bottom: $esp-3;
+
+  .informe-chip {
+    min-width: 0;
+    // Iguala las tarjetas también ENTRE filas, no sólo dentro de una: un
+    // título de dos líneas arriba y uno de una abajo daban dos alturas.
+    min-height: 68px;
+    padding: 10px 14px;
+    gap: $esp-1;
+
+    mat-icon { flex: 0 0 auto; }
+
+    .chip-texto {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    .chip-titulo { white-space: normal; }
+
+    .chip-fuente {
+      flex: 0 0 auto;
+      margin-left: auto;
+    }
+  }
+}
+
+.selector-conteo {
+  margin-bottom: $esp-1;
+
+  .conteo-nota {
+    color: var(--text-light);
+    font-size: 11.5px;
   }
 }
 
 // ── Bloque ───────────────────────────────────────────────────────────────
+// Sin margen inferior: es el último elemento de la página y el respiro de
+// abajo lo da el padding de `.op-page`. Con los dos, el pie de la pantalla
+// tenía 46 px de aire.
 .bloque-card {
-  margin-bottom: 22px;
+  margin-bottom: 0;
 
-  h3 { display: flex; align-items: center; gap: 8px; }
+  h3 { display: flex; align-items: center; gap: $esp-1; }
+
+  .salvedad,
+  .muestra-debil,
+  .denominador,
+  .aviso-alcance,
+  .aviso-analitica { margin-bottom: $esp-2; }
 }
 
 // El denominador NO es una nota al pie: es la condición de lectura del bloque
@@ -230,3 +535,42 @@
 // El bloque servido desde PostgreSQL, marcado también en el borde de la
 // tarjeta: es la señal de que no depende del almacén analítico.
 .bloque-externo { border-left: 3px solid #7e57c2; }
+
+// El resumen que el informe de PostgreSQL adjunta a su bloque recibe el MISMO
+// tratamiento tenue que las tarjetas de cabecera. Lo que separa a los dos
+// grupos es DÓNDE están —éstas viven dentro de la tarjeta de su bloque, con su
+// «De dónde sale» encima— y no el color: dejarlas de azul lleno mientras las de
+// arriba se aclaraban las habría hecho parecer las más importantes de la
+// pantalla, que es justo lo contrario de lo que son.
+.tablero-page .kpi-externo {
+  gap: $esp-2;
+  margin-bottom: $esp-2;
+
+  .kpi-card {
+    gap: 6px;
+    min-height: 74px;
+    padding: 12px 16px;
+    border-radius: var(--border-radius-sm);
+    background:
+      linear-gradient(150deg, rgba(126, 87, 194, 0.08) 0%, rgba(126, 87, 194, 0.03) 100%),
+      rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(126, 87, 194, 0.18);
+    box-shadow: 0 1px 3px rgba(26, 35, 126, 0.05);
+    color: var(--text-primary);
+  }
+
+  .kpi-label {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    color: var(--text-secondary);
+    opacity: 1;
+  }
+
+  .kpi-value {
+    margin-top: auto;
+    font-size: 21px;
+    color: #4527a0;
+    font-variant-numeric: tabular-nums;
+  }
+}
