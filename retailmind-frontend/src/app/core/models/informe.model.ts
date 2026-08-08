@@ -63,6 +63,22 @@ export interface FiltroInforme {
   tipo: 'select' | 'fecha' | 'numero' | 'texto' | 'periodo';
   /** Opciones de `select` ('' = sin filtro / todos). */
   opciones?: { valor: string; etiqueta: string }[];
+  /**
+   * Opciones de `select` que NO se escriben a mano: se leen de los bloques que
+   * ya trajo la respuesta (solo tableros).
+   *
+   * Existe por una razón concreta: estos filtros comparan por IGUALDAD EXACTA
+   * (`transportista = ?`), así que una lista escrita a mano o traída de otra
+   * base se desincroniza y ofrece valores que devuelven cero filas **sin dar
+   * ningún error**. Tomando los valores de los propios bloques, la opción que
+   * se ofrece ES la cadena contra la que el backend va a comparar.
+   *
+   * `bloques` se enumera A MANO y nunca se infiere por nombre de campo: dos
+   * bloques del mismo tablero pueden llamar `categoria` a cosas distintas
+   * (categoría de producto y de ticket en T-3) o guardar el mismo proveedor
+   * con nombre largo y corto (T-6). Ver §8.7 de `docs/PATRON_UI.md`.
+   */
+  opcionesDe?: { bloques: string[]; campo: string; todos: string };
   valorInicial?: string;
   /** `texto`: aplica con debounce en vez de al cambiar. */
   debounce?: boolean;

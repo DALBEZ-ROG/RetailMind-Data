@@ -176,8 +176,19 @@ export const TABLEROS: DefinicionTablero[] = [
     roles: DIRECCION,
     filtros: [
       FILTRO_DESDE, FILTRO_HASTA,
-      { param: 'categoria', etiqueta: 'Categoría', tipo: 'texto', debounce: true },
-      { param: 'marca', etiqueta: 'Marca', tipo: 'texto', debounce: true },
+      {
+        param: 'categoria', etiqueta: 'Categoría', tipo: 'select', valorInicial: '',
+        opcionesDe: { bloques: ['margen_categoria'], campo: 'categoria',
+                      todos: 'Todas las categorías' }
+      },
+      {
+        param: 'marca', etiqueta: 'Marca', tipo: 'select', valorInicial: '',
+        opcionesDe: { bloques: ['matriz_margen_rotacion', 'producto_hueso'], campo: 'marca',
+                      todos: 'Todas las marcas' }
+      },
+      // Sigue siendo de escritura: NINGÚN bloque de este tablero trae la bodega
+      // (el sobre-stock que sí la lleva es un bloque de PostgreSQL y se pide
+      // solo al abrir su tarjeta). Ver §8.7 de `docs/PATRON_UI.md`.
       { param: 'bodega', etiqueta: 'Bodega (solo stock)', tipo: 'texto', debounce: true }
     ],
     bloques: [
@@ -327,9 +338,24 @@ export const TABLEROS: DefinicionTablero[] = [
     roles: ['ADMIN', 'GERENTE', 'ANALISTA', 'SOPORTE'],
     filtros: [
       FILTRO_DESDE, FILTRO_HASTA,
-      { param: 'categoria', etiqueta: 'Categoría de producto', tipo: 'texto', debounce: true },
-      { param: 'categoriaTicket', etiqueta: 'Categoría de ticket', tipo: 'texto',
-        debounce: true }
+      // OJO: los DOS se llaman «categoría» y los dos viven en un campo llamado
+      // `categoria`, pero son dominios DISTINTOS —producto (Abarrotes, Belleza…)
+      // y ticket (Facturación, Envíos…)—. Por eso cada uno enumera SUS bloques:
+      // mezclarlos ofrecería «Facturación» como categoría de producto, que
+      // devuelve cero filas sin dar error.
+      {
+        param: 'categoria', etiqueta: 'Categoría de producto', tipo: 'select', valorInicial: '',
+        opcionesDe: {
+          bloques: ['devolucion_producto', 'calificacion_producto', 'reclama_y_devuelve'],
+          campo: 'categoria', todos: 'Todas las categorías'
+        }
+      },
+      {
+        param: 'categoriaTicket', etiqueta: 'Categoría de ticket', tipo: 'select',
+        valorInicial: '',
+        opcionesDe: { bloques: ['tickets_categoria'], campo: 'categoria',
+                      todos: 'Todas las categorías de ticket' }
+      }
     ],
     bloques: [
       {
@@ -466,8 +492,17 @@ export const TABLEROS: DefinicionTablero[] = [
     roles: ['ADMIN', 'GERENTE', 'ANALISTA', 'DESPACHO', 'BODEGA'],
     filtros: [
       FILTRO_DESDE, FILTRO_HASTA,
-      { param: 'transportista', etiqueta: 'Transportista', tipo: 'texto', debounce: true },
-      { param: 'zona', etiqueta: 'Zona de envío', tipo: 'texto', debounce: true },
+      {
+        param: 'transportista', etiqueta: 'Transportista', tipo: 'select', valorInicial: '',
+        opcionesDe: { bloques: ['cumplimiento_promesa', 'dias_transito'], campo: 'transportista',
+                      todos: 'Todos los transportistas' }
+      },
+      {
+        param: 'zona', etiqueta: 'Zona de envío', tipo: 'select', valorInicial: '',
+        opcionesDe: { bloques: ['dias_transito'], campo: 'zona', todos: 'Todas las zonas' }
+      },
+      // De escritura todavía: la merma se agrupa por MOTIVO, no por bodega, así
+      // que ningún bloque de este tablero trae el nombre de la bodega.
       { param: 'bodega', etiqueta: 'Bodega (merma y origen)', tipo: 'texto', debounce: true }
     ],
     bloques: [
@@ -588,8 +623,16 @@ export const TABLEROS: DefinicionTablero[] = [
     roles: DIRECCION,
     filtros: [
       FILTRO_DESDE, FILTRO_HASTA,
-      { param: 'zona', etiqueta: 'Zona de envío', tipo: 'texto', debounce: true },
-      { param: 'transportista', etiqueta: 'Transportista', tipo: 'texto', debounce: true }
+      {
+        param: 'zona', etiqueta: 'Zona de envío', tipo: 'select', valorInicial: '',
+        opcionesDe: { bloques: ['costo_zona_mes', 'costo_por_kg'], campo: 'zona',
+                      todos: 'Todas las zonas' }
+      },
+      {
+        param: 'transportista', etiqueta: 'Transportista', tipo: 'select', valorInicial: '',
+        opcionesDe: { bloques: ['costo_por_kg'], campo: 'transportista',
+                      todos: 'Todos los transportistas' }
+      }
     ],
     bloques: [
       {
@@ -670,8 +713,20 @@ export const TABLEROS: DefinicionTablero[] = [
     roles: ['ADMIN', 'GERENTE', 'COMPRAS', 'ANALISTA'],
     filtros: [
       FILTRO_DESDE, FILTRO_HASTA,
-      { param: 'proveedor', etiqueta: 'Proveedor', tipo: 'texto', debounce: true },
-      { param: 'categoria', etiqueta: 'Categoría', tipo: 'texto', debounce: true },
+      // La fuente es `ficha_proveedor` y NO `defectuosos`: ese último guarda el
+      // nombre CORTO («El Costeno») mientras el filtro compara contra la razón
+      // social completa. Medido: con el nombre corto los 8 bloques bajan de 92
+      // filas a 1 — sin error y sin aviso.
+      {
+        param: 'proveedor', etiqueta: 'Proveedor', tipo: 'select', valorInicial: '',
+        opcionesDe: { bloques: ['ficha_proveedor'], campo: 'proveedor',
+                      todos: 'Todos los proveedores' }
+      },
+      {
+        param: 'categoria', etiqueta: 'Categoría', tipo: 'select', valorInicial: '',
+        opcionesDe: { bloques: ['evolucion_costo'], campo: 'categoria',
+                      todos: 'Todas las categorías' }
+      },
       {
         param: 'alcance', etiqueta: 'Alcance de la entrega', tipo: 'select',
         valorInicial: 'entregadas',
