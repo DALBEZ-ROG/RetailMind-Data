@@ -1,0 +1,226 @@
+{
+  "reps": 11,
+  "piso_transporte": {
+    "postgresql": {
+      "min": 0.2973000518977642,
+      "mediana": 0.3179999766871333,
+      "max": 0.4400999750941992,
+      "media": 0.3315999849953435,
+      "n": 11
+    },
+    "clickhouse": {
+      "min": 1.406199997290969,
+      "mediana": 1.7225999617949128,
+      "max": 2.064000000245869,
+      "media": 1.7139545472508126,
+      "n": 11
+    }
+  },
+  "consultas": [
+    {
+      "id": "Q1",
+      "escala": "pequena",
+      "filas": 10384,
+      "titulo": "OTD-VEN-06 — venta y margen por mes y categoria",
+      "detalle": "fact_venta_linea (10.384) LEFT JOIN dim_fecha (730); GROUP BY mes, categoria",
+      "filas_resultado": 162,
+      "identico": true,
+      "modo_comparacion": "exacto",
+      "diferencia": "",
+      "pg_defecto": {
+        "min": 6.828799960203469,
+        "mediana": 7.203300017863512,
+        "max": 7.876799907535315,
+        "media": 7.231572717004879,
+        "n": 11
+      },
+      "pg_afinado": {
+        "min": 9.867200045846403,
+        "mediana": 10.30009996611625,
+        "max": 11.434099986217916,
+        "media": 10.376972717825662,
+        "n": 11
+      },
+      "clickhouse": {
+        "min": 9.01280005928129,
+        "mediana": 9.740500012412667,
+        "max": 12.244199984706938,
+        "media": 10.06975454616953,
+        "n": 11
+      },
+      "relacion_defecto": 0.7395205593844351,
+      "relacion_afinado": 1.057450844719518,
+      "lado_servidor": {
+        "clickhouse": 6.934875,
+        "pg_defecto": 6.83,
+        "pg_afinado": 10.159
+      },
+      "plan_pg_defecto": "Incremental Sort (actual rows=162.00 loops=1)\n  Sort Key: v.mes, v.categoria COLLATE \"C\"\n  Presorted Key: v.mes\n  Full-sort Groups: 5  Sort Method: quicksort  Average Memory: 28kB  Peak Memory: 28kB\n  Buffers: shared hit=119\n  ->  GroupAggregate (actual rows=162.00 loops=1)\n        Group Key: v.mes, v.categoria\n        Buffers: shared hit=119\n        ->  Incremental Sort (actual rows=9966.00 loops=1)\n              Sort Key: v.mes, v.categoria, v.pedido_id\n              Presorted Key: v.mes, v.categoria\n              Full-sort Groups: 146  Sort Method: quicksort  Average Memory: 30kB  Peak Memory: 30kB\n              Pre-sorted Groups: 71  Sort Method: quicksort  Average Memory: 32kB  Peak Memory: 32kB\n              Buffers: shared hit=119\n              ->  Merge Left Join (actual rows=9966.00 loops=1)\n                    Merge Cond: (v.mes = d.fecha)\n                    Buffers: shared hit=119\n                    ->  Index Only Scan using ix_venta_q1 on fact_venta_linea v (actual rows=9966.00 loops=1)\n                          Index Cond: (es_cancelado = 0)\n                          Heap Fetches: 0\n                          Index Searches: 1\n                          Buffers: shared hit=114\n                    ->  Materialize (actual rows=10495.00 loops=1)\n                          Storage: Memory  Maximum Storage: 17kB\n                          Buffers: shared hit=5\n                          ->  Index Only Scan using ix_dimfecha_q1 on dim_fecha d (actual rows=548.00 loops=1)\n                                Heap Fetches: 0\n                                Index Searches: 1\n                                Buffers: shared hit=5\nPlanning:\n  Buffers: shared hit=3\nPlanning Time: 0.155 ms\nExecution Time: 6.830 ms",
+      "plan_pg_afinado": "Incremental Sort (actual rows=162.00 loops=1)\n  Sort Key: v.mes, v.categoria COLLATE \"C\"\n  Presorted Key: v.mes\n  Full-sort Groups: 5  Sort Method: quicksort  Average Memory: 28kB  Peak Memory: 28kB\n  Buffers: shared hit=475\n  ->  GroupAggregate (actual rows=162.00 loops=1)\n        Group Key: v.mes, v.categoria\n        Buffers: shared hit=475\n        ->  Gather Merge (actual rows=9966.00 loops=1)\n              Workers Planned: 6\n              Workers Launched: 6\n              Buffers: shared hit=475\n              ->  Sort (actual rows=1423.71 loops=7)\n                    Sort Key: v.mes, v.categoria, v.pedido_id\n                    Sort Method: quicksort  Memory: 1205kB\n                    Buffers: shared hit=475\n                    Worker 0:  Sort Method: quicksort  Memory: 25kB\n                    Worker 1:  Sort Method: quicksort  Memory: 25kB\n                    Worker 2:  Sort Method: quicksort  Memory: 25kB\n                    Worker 3:  Sort Method: quicksort  Memory: 25kB\n                    Worker 4:  Sort Method: quicksort  Memory: 25kB\n                    Worker 5:  Sort Method: quicksort  Memory: 80kB\n                    ->  Parallel Hash Left Join (actual rows=1423.71 loops=7)\n                          Hash Cond: (v.mes = d.fecha)\n                          Buffers: shared hit=331\n                          ->  Parallel Seq Scan on fact_venta_linea v (actual rows=4983.00 loops=2)\n                                Filter: (es_cancelado = 0)\n                                Rows Removed by Filter: 209\n                                Buffers: shared hit=324\n                          ->  Parallel Hash (actual rows=104.29 loops=7)\n                                Buckets: 1024  Batches: 1  Memory Usage: 72kB\n                                Buffers: shared hit=7\n                                ->  Parallel Seq Scan on dim_fecha d (actual rows=730.00 loops=1)\n                                      Buffers: shared hit=7\nPlanning:\n  Buffers: shared hit=3\nPlanning Time: 0.129 ms\nExecution Time: 10.159 ms"
+    },
+    {
+      "id": "Q2",
+      "escala": "pequena",
+      "filas": 35817,
+      "titulo": "OTD-INV-04 — rotacion de inventario por categoria",
+      "detalle": "fact_stock_mensual (22.528) + fact_movimiento_inventario (13.289); dos niveles de agregacion + JOIN entre agregados",
+      "filas_resultado": 10,
+      "identico": true,
+      "modo_comparacion": "exacto",
+      "diferencia": "",
+      "pg_defecto": {
+        "min": 7.424100069329143,
+        "mediana": 7.777499966323376,
+        "max": 8.013800019398332,
+        "media": 7.715772731568325,
+        "n": 11
+      },
+      "pg_afinado": {
+        "min": 21.292899968102574,
+        "mediana": 23.23269995395094,
+        "max": 25.770099950022995,
+        "media": 23.041945448229935,
+        "n": 11
+      },
+      "clickhouse": {
+        "min": 10.9226000495255,
+        "mediana": 11.275300057604909,
+        "max": 15.717400005087256,
+        "media": 11.920518188906664,
+        "n": 11
+      },
+      "relacion_defecto": 0.6897820835444327,
+      "relacion_afinado": 2.0604950498218506,
+      "lado_servidor": {
+        "clickhouse": 9.054333,
+        "pg_defecto": 8.516,
+        "pg_afinado": 22.373
+      },
+      "plan_pg_defecto": "Sort (actual rows=10.00 loops=1)\n  Sort Key: m.categoria COLLATE \"C\"\n  Sort Method: quicksort  Memory: 25kB\n  Buffers: shared hit=525\n  ->  Hash Left Join (actual rows=10.00 loops=1)\n        Hash Cond: (m.categoria = v.categoria)\n        Buffers: shared hit=525\n        ->  GroupAggregate (actual rows=10.00 loops=1)\n              Group Key: m.categoria\n              Buffers: shared hit=141\n              ->  Incremental Sort (actual rows=197.00 loops=1)\n                    Sort Key: m.categoria, m.mes DESC\n                    Presorted Key: m.categoria\n                    Full-sort Groups: 5  Sort Method: quicksort  Average Memory: 27kB  Peak Memory: 27kB\n                    Buffers: shared hit=141\n                    ->  Subquery Scan on m (actual rows=197.00 loops=1)\n                          Buffers: shared hit=141\n                          ->  GroupAggregate (actual rows=197.00 loops=1)\n                                Group Key: fact_stock_mensual.categoria, fact_stock_mensual.mes\n                                Buffers: shared hit=141\n                                ->  Incremental Sort (actual rows=22528.00 loops=1)\n                                      Sort Key: fact_stock_mensual.categoria, fact_stock_mensual.mes, fact_stock_mensual.producto_variante_id\n                                      Presorted Key: fact_stock_mensual.categoria, fact_stock_mensual.mes\n                                      Full-sort Groups: 165  Sort Method: quicksort  Average Memory: 28kB  Peak Memory: 28kB\n                                      Pre-sorted Groups: 156  Sort Method: quicksort  Average Memory: 29kB  Peak Memory: 29kB\n                                      Buffers: shared hit=141\n                                      ->  Index Only Scan using ix_stock_q2 on fact_stock_mensual (actual rows=22528.00 loops=1)\n                                            Heap Fetches: 0\n                                            Index Searches: 1\n                                            Buffers: shared hit=141\n        ->  Hash (actual rows=10.00 loops=1)\n              Buckets: 1024  Batches: 1  Memory Usage: 9kB\n              Buffers: shared hit=384\n              ->  Subquery Scan on v (actual rows=10.00 loops=1)\n                    Buffers: shared hit=384\n                    ->  HashAggregate (actual rows=10.00 loops=1)\n                          Group Key: fact_movimiento_inventario.categoria\n                          Batches: 1  Memory Usage: 32kB\n                          Buffers: shared hit=384\n                          ->  Seq Scan on fact_movimiento_inventario (actual rows=13289.00 loops=1)\n                                Buffers: shared hit=384\nPlanning Time: 0.217 ms\nExecution Time: 8.516 ms",
+      "plan_pg_afinado": "Sort (actual rows=10.00 loops=1)\n  Sort Key: m.categoria COLLATE \"C\"\n  Sort Method: quicksort  Memory: 25kB\n  Buffers: shared hit=1202\n  ->  Merge Left Join (actual rows=10.00 loops=1)\n        Merge Cond: (m.categoria = fact_movimiento_inventario.categoria)\n        Buffers: shared hit=1202\n        ->  GroupAggregate (actual rows=10.00 loops=1)\n              Group Key: m.categoria\n              Buffers: shared hit=770\n              ->  Incremental Sort (actual rows=197.00 loops=1)\n                    Sort Key: m.categoria, m.mes DESC\n                    Presorted Key: m.categoria\n                    Full-sort Groups: 5  Sort Method: quicksort  Average Memory: 27kB  Peak Memory: 27kB\n                    Buffers: shared hit=770\n                    ->  Subquery Scan on m (actual rows=197.00 loops=1)\n                          Buffers: shared hit=770\n                          ->  GroupAggregate (actual rows=197.00 loops=1)\n                                Group Key: fact_stock_mensual.categoria, fact_stock_mensual.mes\n                                Buffers: shared hit=770\n                                ->  Gather Merge (actual rows=22528.00 loops=1)\n                                      Workers Planned: 6\n                                      Workers Launched: 6\n                                      Buffers: shared hit=770\n                                      ->  Sort (actual rows=3218.29 loops=7)\n                                            Sort Key: fact_stock_mensual.categoria, fact_stock_mensual.mes, fact_stock_mensual.producto_variante_id\n                                            Sort Method: quicksort  Memory: 1739kB\n                                            Buffers: shared hit=770\n                                            Worker 0:  Sort Method: quicksort  Memory: 25kB\n                                            Worker 1:  Sort Method: quicksort  Memory: 25kB\n                                            Worker 2:  Sort Method: quicksort  Memory: 25kB\n                                            Worker 3:  Sort Method: quicksort  Memory: 25kB\n                                            Worker 4:  Sort Method: quicksort  Memory: 25kB\n                                            Worker 5:  Sort Method: quicksort  Memory: 25kB\n                                            ->  Parallel Seq Scan on fact_stock_mensual (actual rows=3218.29 loops=7)\n                                                  Buffers: shared hit=446\n        ->  Finalize GroupAggregate (actual rows=10.00 loops=1)\n              Group Key: fact_movimiento_inventario.categoria\n              Buffers: shared hit=432\n              ->  Gather Merge (actual rows=10.00 loops=1)\n                    Workers Planned: 6\n                    Workers Launched: 6\n                    Buffers: shared hit=432\n                    ->  Sort (actual rows=1.43 loops=7)\n                          Sort Key: fact_movimiento_inventario.categoria\n                          Sort Method: quicksort  Memory: 25kB\n                          Buffers: shared hit=432\n                          Worker 0:  Sort Method: quicksort  Memory: 25kB\n                          Worker 1:  Sort Method: quicksort  Memory: 25kB\n                          Worker 2:  Sort Method: quicksort  Memory: 25kB\n                          Worker 3:  Sort Method: quicksort  Memory: 25kB\n                          Worker 4:  Sort Method: quicksort  Memory: 25kB\n                          Worker 5:  Sort Method: quicksort  Memory: 25kB\n                          ->  Partial HashAggregate (actual rows=1.43 loops=7)\n                                Group Key: fact_movimiento_inventario.categoria\n                                Batches: 1  Memory Usage: 32kB\n                                Buffers: shared hit=384\n                                Worker 0:  Batches: 1  Memory Usage: 32kB\n                                Worker 1:  Batches: 1  Memory Usage: 32kB\n                                Worker 2:  Batches: 1  Memory Usage: 32kB\n                                Worker 3:  Batches: 1  Memory Usage: 32kB\n                                Worker 4:  Batches: 1  Memory Usage: 32kB\n                                Worker 5:  Batches: 1  Memory Usage: 32kB\n                                ->  Parallel Seq Scan on fact_movimiento_inventario (actual rows=1898.43 loops=7)\n                                      Buffers: shared hit=384\nPlanning Time: 0.144 ms\nExecution Time: 22.373 ms"
+    },
+    {
+      "id": "Q3",
+      "escala": "grande",
+      "filas": 2823245,
+      "titulo": "Trafico web por canal y accion (con distintos exactos)",
+      "detalle": "fact_eventos (2.823.245); 18 grupos; 2 COUNT(DISTINCT) de alta cardinalidad",
+      "filas_resultado": 18,
+      "identico": true,
+      "modo_comparacion": "exacto",
+      "diferencia": "",
+      "pg_defecto": {
+        "min": 3279.6654000412673,
+        "mediana": 3340.765899978578,
+        "max": 3386.6835000226274,
+        "media": 3344.4648636399174,
+        "n": 11
+      },
+      "pg_afinado": {
+        "min": 2279.4071999378502,
+        "mediana": 2407.4038000544533,
+        "max": 2724.2287999251857,
+        "media": 2409.4811272595757,
+        "n": 11
+      },
+      "clickhouse": {
+        "min": 167.68780001439154,
+        "mediana": 197.0277999062091,
+        "max": 353.5904000746086,
+        "media": 209.37040000518954,
+        "n": 11
+      },
+      "relacion_defecto": 16.955809797241194,
+      "relacion_afinado": 12.218599614878949,
+      "lado_servidor": {
+        "clickhouse": 192.82991,
+        "pg_defecto": 3482.331,
+        "pg_afinado": 2393.079
+      },
+      "plan_pg_defecto": "Sort (actual rows=18.00 loops=1)\n  Sort Key: channel COLLATE \"C\", user_action COLLATE \"C\"\n  Sort Method: quicksort  Memory: 26kB\n  Buffers: shared hit=36 read=26864, temp read=22817 written=22878\n  ->  GroupAggregate (actual rows=18.00 loops=1)\n        Group Key: channel, user_action\n        Buffers: shared hit=36 read=26864, temp read=22817 written=22878\n        ->  Incremental Sort (actual rows=2823245.00 loops=1)\n              Sort Key: channel, user_action, session_id\n              Presorted Key: channel, user_action\n              Full-sort Groups: 18  Sort Method: quicksort  Average Memory: 29kB  Peak Memory: 29kB\n              Pre-sorted Groups: 18  Sort Method: external merge  Average Disk: 23372kB  Peak Disk: 32880kB\n              Buffers: shared hit=36 read=26864, temp read=19952 written=20004\n              ->  Index Only Scan using ix_eventos_q34 on fact_eventos (actual rows=2823245.00 loops=1)\n                    Heap Fetches: 0\n                    Index Searches: 1\n                    Buffers: shared hit=36 read=26864\nPlanning Time: 0.128 ms\nExecution Time: 3482.331 ms",
+      "plan_pg_afinado": "Sort (actual rows=18.00 loops=1)\n  Sort Key: channel COLLATE \"C\", user_action COLLATE \"C\"\n  Sort Method: quicksort  Memory: 26kB\n  Buffers: shared hit=266 read=51056\n  ->  GroupAggregate (actual rows=18.00 loops=1)\n        Group Key: channel, user_action\n        Buffers: shared hit=266 read=51056\n        ->  Gather Merge (actual rows=2823245.00 loops=1)\n              Workers Planned: 8\n              Workers Launched: 7\n              Buffers: shared hit=266 read=51056\n              ->  Sort (actual rows=352905.62 loops=8)\n                    Sort Key: channel, user_action, session_id\n                    Sort Method: quicksort  Memory: 37330kB\n                    Buffers: shared hit=266 read=51056\n                    Worker 0:  Sort Method: quicksort  Memory: 34504kB\n                    Worker 1:  Sort Method: quicksort  Memory: 34340kB\n                    Worker 2:  Sort Method: quicksort  Memory: 34593kB\n                    Worker 3:  Sort Method: quicksort  Memory: 34345kB\n                    Worker 4:  Sort Method: quicksort  Memory: 34455kB\n                    Worker 5:  Sort Method: quicksort  Memory: 34134kB\n                    Worker 6:  Sort Method: quicksort  Memory: 34559kB\n                    ->  Parallel Seq Scan on fact_eventos (actual rows=352905.62 loops=8)\n                          Buffers: shared read=51056\nPlanning Time: 0.126 ms\nExecution Time: 2393.079 ms"
+    },
+    {
+      "id": "Q4",
+      "escala": "grande",
+      "filas": 2823245,
+      "titulo": "Control: la misma agrupacion SIN COUNT(DISTINCT)",
+      "detalle": "fact_eventos (2.823.245); 18 grupos; solo sumas y maximo",
+      "filas_resultado": 18,
+      "identico": true,
+      "modo_comparacion": "exacto",
+      "diferencia": "",
+      "pg_defecto": {
+        "min": 189.20520006213337,
+        "mediana": 192.43990001268685,
+        "max": 235.33419996965677,
+        "media": 198.05622726297852,
+        "n": 11
+      },
+      "pg_afinado": {
+        "min": 91.90510003827512,
+        "mediana": 95.77660006470978,
+        "max": 108.20970009081066,
+        "media": 97.07976365461946,
+        "n": 11
+      },
+      "clickhouse": {
+        "min": 50.351800047792494,
+        "mediana": 53.13360004220158,
+        "max": 55.45600003097206,
+        "media": 53.03037273485891,
+        "n": 11
+      },
+      "relacion_defecto": 3.6218118075914427,
+      "relacion_afinado": 1.802561843892355,
+      "lado_servidor": {
+        "clickhouse": 49.189161,
+        "pg_defecto": 217.894,
+        "pg_afinado": 98.294
+      },
+      "plan_pg_defecto": "Sort (actual rows=18.00 loops=1)\n  Sort Key: channel COLLATE \"C\", user_action COLLATE \"C\"\n  Sort Method: quicksort  Memory: 26kB\n  Buffers: shared hit=13176 read=37896\n  ->  Finalize GroupAggregate (actual rows=18.00 loops=1)\n        Group Key: channel, user_action\n        Buffers: shared hit=13176 read=37896\n        ->  Gather Merge (actual rows=54.00 loops=1)\n              Workers Planned: 2\n              Workers Launched: 2\n              Buffers: shared hit=13176 read=37896\n              ->  Sort (actual rows=18.00 loops=3)\n                    Sort Key: channel, user_action\n                    Sort Method: quicksort  Memory: 26kB\n                    Buffers: shared hit=13176 read=37896\n                    Worker 0:  Sort Method: quicksort  Memory: 26kB\n                    Worker 1:  Sort Method: quicksort  Memory: 26kB\n                    ->  Partial HashAggregate (actual rows=18.00 loops=3)\n                          Group Key: channel, user_action\n                          Batches: 1  Memory Usage: 32kB\n                          Buffers: shared hit=13160 read=37896\n                          Worker 0:  Batches: 1  Memory Usage: 32kB\n                          Worker 1:  Batches: 1  Memory Usage: 32kB\n                          ->  Parallel Seq Scan on fact_eventos (actual rows=941081.67 loops=3)\n                                Buffers: shared hit=13160 read=37896\nPlanning Time: 0.097 ms\nExecution Time: 217.894 ms",
+      "plan_pg_afinado": "Sort (actual rows=18.00 loops=1)\n  Sort Key: channel COLLATE \"C\", user_action COLLATE \"C\"\n  Sort Method: quicksort  Memory: 26kB\n  Buffers: shared hit=13498 read=37614\n  ->  Finalize GroupAggregate (actual rows=18.00 loops=1)\n        Group Key: channel, user_action\n        Buffers: shared hit=13498 read=37614\n        ->  Gather Merge (actual rows=144.00 loops=1)\n              Workers Planned: 8\n              Workers Launched: 7\n              Buffers: shared hit=13498 read=37614\n              ->  Sort (actual rows=18.00 loops=8)\n                    Sort Key: channel, user_action\n                    Sort Method: quicksort  Memory: 26kB\n                    Buffers: shared hit=13498 read=37614\n                    Worker 0:  Sort Method: quicksort  Memory: 26kB\n                    Worker 1:  Sort Method: quicksort  Memory: 26kB\n                    Worker 2:  Sort Method: quicksort  Memory: 26kB\n                    Worker 3:  Sort Method: quicksort  Memory: 26kB\n                    Worker 4:  Sort Method: quicksort  Memory: 26kB\n                    Worker 5:  Sort Method: quicksort  Memory: 26kB\n                    Worker 6:  Sort Method: quicksort  Memory: 26kB\n                    ->  Partial HashAggregate (actual rows=18.00 loops=8)\n                          Group Key: channel, user_action\n                          Batches: 1  Memory Usage: 32kB\n                          Buffers: shared hit=13442 read=37614\n                          Worker 0:  Batches: 1  Memory Usage: 32kB\n                          Worker 1:  Batches: 1  Memory Usage: 32kB\n                          Worker 2:  Batches: 1  Memory Usage: 32kB\n                          Worker 3:  Batches: 1  Memory Usage: 32kB\n                          Worker 4:  Batches: 1  Memory Usage: 32kB\n                          Worker 5:  Batches: 1  Memory Usage: 32kB\n                          Worker 6:  Batches: 1  Memory Usage: 32kB\n                          ->  Parallel Seq Scan on fact_eventos (actual rows=352905.62 loops=8)\n                                Buffers: shared hit=13442 read=37614\nPlanning Time: 0.091 ms\nExecution Time: 98.294 ms"
+    },
+    {
+      "id": "Q5",
+      "escala": "grande",
+      "filas": 1310209,
+      "titulo": "Top de productos: filtro + 1.700 grupos",
+      "detalle": "fact_eventos filtrado a 3 acciones (1.310.209 de 2.823.245 filas); GROUP BY product_id (1.700 grupos)",
+      "filas_resultado": 25,
+      "identico": true,
+      "modo_comparacion": "exacto",
+      "diferencia": "",
+      "pg_defecto": {
+        "min": 1391.9023000635207,
+        "mediana": 1411.0333999851719,
+        "max": 1427.2975999629125,
+        "media": 1410.9265181786295,
+        "n": 11
+      },
+      "pg_afinado": {
+        "min": 664.9388000369072,
+        "mediana": 711.4964000647888,
+        "max": 741.3005999987945,
+        "media": 708.1229181917893,
+        "n": 11
+      },
+      "clickhouse": {
+        "min": 81.7912999773398,
+        "mediana": 83.3207000978291,
+        "max": 88.585399906151,
+        "media": 84.99352728143673,
+        "n": 11
+      },
+      "relacion_defecto": 16.93496812110843,
+      "relacion_afinado": 8.539251341256152,
+      "lado_servidor": {
+        "clickhouse": 80.400851,
+        "pg_defecto": 1418.129,
+        "pg_afinado": 736.894
+      },
+      "plan_pg_defecto": "Limit (actual rows=25.00 loops=1)\n  Buffers: shared hit=18883, temp read=15919 written=15945\n  ->  Sort (actual rows=25.00 loops=1)\n        Sort Key: (count(*)) DESC, product_id COLLATE \"C\"\n        Sort Method: top-N heapsort  Memory: 29kB\n        Buffers: shared hit=18883, temp read=15919 written=15945\n        ->  GroupAggregate (actual rows=1700.00 loops=1)\n              Group Key: product_id\n              Buffers: shared hit=18883, temp read=15919 written=15945\n              ->  Sort (actual rows=1310209.00 loops=1)\n                    Sort Key: product_id, session_id\n                    Sort Method: external merge  Disk: 63712kB\n                    Buffers: shared hit=18883, temp read=15919 written=15945\n                    ->  Index Only Scan using ix_eventos_q5 on fact_eventos (actual rows=1310209.00 loops=1)\n                          Index Cond: (user_action = ANY ('{view,add_to_cart,purchase}'::text[]))\n                          Heap Fetches: 0\n                          Index Searches: 2\n                          Buffers: shared hit=18883\nPlanning Time: 0.099 ms\nExecution Time: 1418.129 ms",
+      "plan_pg_afinado": "Limit (actual rows=25.00 loops=1)\n  Buffers: shared hit=23287\n  ->  Sort (actual rows=25.00 loops=1)\n        Sort Key: (count(*)) DESC, product_id COLLATE \"C\"\n        Sort Method: top-N heapsort  Memory: 29kB\n        Buffers: shared hit=23287\n        ->  GroupAggregate (actual rows=1700.00 loops=1)\n              Group Key: product_id\n              Buffers: shared hit=23287\n              ->  Gather Merge (actual rows=1310209.00 loops=1)\n                    Workers Planned: 8\n                    Workers Launched: 7\n                    Buffers: shared hit=23287\n                    ->  Sort (actual rows=163776.12 loops=8)\n                          Sort Key: product_id, session_id\n                          Sort Method: quicksort  Memory: 28985kB\n                          Buffers: shared hit=23287\n                          Worker 0:  Sort Method: quicksort  Memory: 14148kB\n                          Worker 1:  Sort Method: quicksort  Memory: 13995kB\n                          Worker 2:  Sort Method: quicksort  Memory: 13461kB\n                          Worker 3:  Sort Method: quicksort  Memory: 13941kB\n                          Worker 4:  Sort Method: quicksort  Memory: 14406kB\n                          Worker 5:  Sort Method: quicksort  Memory: 13870kB\n                          Worker 6:  Sort Method: quicksort  Memory: 13676kB\n                          ->  Parallel Index Only Scan using ix_eventos_q5 on fact_eventos (actual rows=163776.12 loops=8)\n                                Index Cond: (user_action = ANY ('{view,add_to_cart,purchase}'::text[]))\n                                Heap Fetches: 0\n                                Index Searches: 2\n                                Buffers: shared hit=23231\nPlanning Time: 0.091 ms\nExecution Time: 736.894 ms"
+    }
+  ]
+}

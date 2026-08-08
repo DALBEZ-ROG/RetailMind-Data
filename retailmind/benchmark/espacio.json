@@ -1,0 +1,33 @@
+{
+  "ESCALA PEQUENA — 21 tablas del DWH (66.082 filas)": {
+    "postgresql": {
+      "tablas": 21,
+      "heap_mb": 13.75,
+      "indices_mb": 2.8515625,
+      "total_mb": 17.3046875
+    },
+    "clickhouse": {
+      "tablas": 21,
+      "comprimido_mb": 2.9538984298706055,
+      "sin_comprimir_mb": 7.555018424987793
+    },
+    "relacion_total": 5.858254070285696,
+    "relacion_sin_indices": 4.6548655366604175
+  },
+  "ESCALA GRANDE — fact_eventos (2.823.245 filas)": {
+    "postgresql": {
+      "tablas": 1,
+      "heap_mb": 398.875,
+      "indices_mb": 382.1328125,
+      "total_mb": 781.1484375
+    },
+    "clickhouse": {
+      "tablas": 1,
+      "comprimido_mb": 114.50630378723145,
+      "sin_comprimir_mb": 369.202579498291
+    },
+    "relacion_total": 6.821881517994694,
+    "relacion_sin_indices": 3.483432674075001
+  },
+  "base_benchmark_mb": 806.8493032455444
+}

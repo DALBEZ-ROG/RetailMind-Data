@@ -1,0 +1,12 @@
+{
+  "pedidos": "4083",
+  "movimientos_kardex": "13289",
+  "posiciones_inventario": "1406",
+  "stock_total": "133226",
+  "tablas": "111",
+  "politicas_rls": "95",
+  "roles_grupo": "9",
+  "usuarios": "89",
+  "facturas_venta": "3887",
+  "total_vendido": "5498570.35"
+}

@@ -1054,10 +1054,12 @@ Para DEMOSTRAR la restricción en vivo están los hermanos, que el 88 no ejecuta
 ABORTA si `esta_en_horario()` sigue en true) y **90** (restaura el 24/7 y ABORTA si algún rol
 queda con un solo minuto bloqueado). **OJO**: `grupo_horario` NO está congelado — la pantalla de
 admin (`HorariosAdminService:50/61`, INSERT/UPDATE para `grp_administrador`) puede reescribir
-esas ventanas. **Y hoy HAY una fila desviada**: `grp_analista` domingo (`grupo_horario` id 54)
-quedó en `00:00-23:30`, o sea 30 minutos bloqueados de 10.080 — la única de las 56. No lo dejó
-ningún script (el 90 aborta si eso pasa); se escribió por esa pantalla. Detalle y ficha en
-`docs/PROPUESTA_DEUDA_TECNICA.md`.
+esas ventanas, y eso ya pasó una vez: `grp_analista` domingo (`grupo_horario` id 54) apareció en
+`00:00-23:30` —30 minutos bloqueados de 10.080, la única de las 56—, escrita por esa pantalla y
+no por ningún script (el 90 aborta si eso pasa). **RESTAURADA el 2026-08-07** ejecutando el 90:
+hoy los 8 roles están en 0 minutos bloqueados de los 10.080, verificado con la misma condición
+que evalúa `esta_en_horario()`. La ficha vive en `DEUDA_TECNICA.md` (C-11, la causa; y la
+entrada A-1 en el histórico de resueltas).
 
 **ORQUESTACIÓN DEL ETL CON AIRFLOW (2026-08-06, perfil `airflow`)**: Apache Airflow 2.10.5 con el
 DAG **`retailmind_dwh`** (`retailmind/airflow/dags/retailmind_dwh.py`) = **21 tareas de carga, una

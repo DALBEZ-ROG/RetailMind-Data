@@ -36,7 +36,22 @@ public class MetasVentaService {
             "general", "ventas", "compras", "inventario",
             "logistica", "soporte", "marketing");
 
-    /** Venta facturada del mes de la meta (avance contra la meta). */
+    /**
+     * Venta facturada del mes de la meta (avance contra la meta).
+     *
+     * OJO: el bloque CIERRA EN SU PROPIA LÍNEA para que la cadena TERMINE en
+     * '\n'. Un bloque de texto de Java NO añade salto tras la última línea si
+     * el delimitador va pegado (`... venta_real"""`), y este fragmento se
+     * concatena delante de un `FROM`: sin ese salto sale
+     * `END AS venta_realFROM meta_venta m`, que es sintaxis inválida y solo
+     * revienta en tiempo de ejecución (ERROR: syntax error at or near
+     * "meta_venta"). Antes se compensaba con una LÍNEA EN BLANCO invisible en
+     * cada punto de uso — `listar()` la tenía y `vigente()` no, así que
+     * /api/gerencia/metas/vigente respondía 500 mientras /metas iba en 200.
+     * El salto vive AQUÍ, una sola vez, y no en cada concatenación.
+     * (Misma familia de trampa que `InformesComprasService:541-544`, donde el
+     * bloque recorta el espacio FINAL de cada línea.)
+     */
     private static final String VENTA_REAL_SQL = """
             CASE WHEN m.departamento IN ('general', 'ventas') THEN
                 (SELECT COALESCE(sum(fv.total), 0)
@@ -44,7 +59,8 @@ public class MetasVentaService {
                  WHERE fv.estado <> 'anulada'
                    AND fv.fecha_emision >= make_date(m.anio, m.mes, 1)
                    AND fv.fecha_emision <  make_date(m.anio, m.mes, 1) + interval '1 month')
-            END AS venta_real""";
+            END AS venta_real
+            """;
 
     private final JdbcTemplate pg;
 
@@ -59,7 +75,6 @@ public class MetasVentaService {
                        m.activo, m.fecha_creacion, m.fecha_actualizacion,
                        trim(concat(u.nombre, ' ', COALESCE(u.apellido, ''))) AS fijada_por,
                        """ + VENTA_REAL_SQL + """
-
                 FROM meta_venta m
                 LEFT JOIN usuario u ON u.id = m.fijada_por
                 ORDER BY m.anio DESC, m.mes DESC, m.departamento""");
