@@ -43,37 +43,20 @@ public class GestionDatosController {
         }
     }
 
-    @GetMapping("/fact-eventos/{eventPk}")
-    public ResponseEntity<?> getFactEventoById(@PathVariable long eventPk) {
-        try {
-            Map<String, Object> row = service.getFactEventoById(eventPk);
-            return row != null ? ResponseEntity.ok(row) : ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
-        }
-    }
-
-    @PutMapping("/fact-eventos/{eventPk}")
-    public ResponseEntity<?> updateFactEvento(@PathVariable long eventPk, @RequestBody Map<String, Object> body) {
-        try {
-            service.updateFactEvento(eventPk, body);
-            return ResponseEntity.ok(Map.of("success", true, "mensaje", "Evento actualizado"));
-        } catch (Exception e) {
-            logger.error("Error al actualizar evento {}: {}", eventPk, e.getMessage());
-            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
-        }
-    }
-
-    @DeleteMapping("/fact-eventos/{eventPk}")
-    public ResponseEntity<?> deleteFactEvento(@PathVariable long eventPk) {
-        try {
-            service.deleteFactEvento(eventPk);
-            return ResponseEntity.ok(Map.of("success", true, "mensaje", "Evento eliminado"));
-        } catch (Exception e) {
-            logger.error("Error al eliminar evento {}: {}", eventPk, e.getMessage());
-            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
-        }
-    }
+    // `fact_eventos` NO TIENE detalle, edición ni borrado, Y NO DEBE TENERLOS.
+    //
+    // Aquí estaban `GET /fact-eventos/{eventPk}`, `PUT` y `DELETE`. Se
+    // suprimieron el 2026-08-07 (deuda A-3): los tres direccionaban por
+    // `event_pk`, que NO identifica una fila —50.000 valores distintos para
+    // 2.823.245 filas, 52-139 filas por valor—, así que el DELETE borraba un
+    // centenar de eventos de otras tantas sesiones y respondía «Evento
+    // eliminado». El motivo completo y por qué NO se arregla con una clave
+    // compuesta están en `GestionDatosService`, en el hueco que dejaron.
+    //
+    // El `GET /fact-eventos/{eventPk}` además ya estaba MUERTO desde la
+    // pantalla: `editEvento(row)` usaba la fila que ya traía el listado.
+    //
+    // Queda `GET /fact-eventos` (listado paginado + filtro por semana).
 
     // ══════════════════════════════════════════════════════════════════════════
     // DIM_CANAL

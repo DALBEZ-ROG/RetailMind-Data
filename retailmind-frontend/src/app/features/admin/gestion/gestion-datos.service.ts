@@ -16,13 +16,11 @@ export class GestionDatosService {
     return this.http.get(`${this.base}/fact-eventos`, { params });
   }
 
-  updateFactEvento(eventPk: number, body: any): Observable<any> {
-    return this.http.put(`${this.base}/fact-eventos/${eventPk}`, body);
-  }
-
-  deleteFactEvento(eventPk: number): Observable<any> {
-    return this.http.delete(`${this.base}/fact-eventos/${eventPk}`);
-  }
+  // SOLO LECTURA: `fact_eventos` no tiene update ni delete (deuda A-3,
+  // 2026-08-07). `event_pk` no identifica una fila —52-139 eventos comparten
+  // cada valor—, así que las dos operaciones actuaban sobre un centenar de
+  // filas creyendo actuar sobre una. Los endpoints tampoco existen ya en el
+  // backend. Ver `GestionDatosService` (Java) para el motivo completo.
 
   // ── Dimensiones genéricas ──────────────────────────────────────────────────
   getDimension(tabla: string): Observable<any[]> {

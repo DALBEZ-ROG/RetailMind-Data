@@ -41,87 +41,21 @@
       </button>
     </div>
 
-    <!-- Formulario de edición premium -->
-    <div class="edit-panel" *ngIf="editingEvento">
-      <div class="edit-panel-header">
-        <div class="edit-header-left">
-          <mat-icon>edit</mat-icon>
-          <div class="edit-header-info">
-            <span class="edit-header-title">Editando Evento</span>
-            <span class="edit-header-sub">Session: {{ editingEvento.sessionId }}</span>
-          </div>
-        </div>
-        <button class="edit-close-btn" (click)="cancelEdit()">
-          <mat-icon>close</mat-icon>
-        </button>
-      </div>
-      <div class="edit-panel-body">
-        <div class="edit-grid">
-          <div class="edit-field">
-            <label>Acción del usuario</label>
-            <select [(ngModel)]="editForm.user_action">
-              <option value="click">click</option>
-              <option value="view">view</option>
-              <option value="add_to_cart">add_to_cart</option>
-              <option value="wishlist">wishlist</option>
-              <option value="drop">drop</option>
-              <option value="purchase">purchase</option>
-            </select>
-          </div>
-          <div class="edit-field">
-            <label>Canal</label>
-            <select [(ngModel)]="editForm.channel">
-              <option value="mobile">mobile</option>
-              <option value="web">web</option>
-              <option value="app">app</option>
-            </select>
-          </div>
-          <div class="edit-field">
-            <label>Precio</label>
-            <input type="number" [(ngModel)]="editForm.price" step="0.01">
-          </div>
-          <div class="edit-field">
-            <label>Tiempo (seg)</label>
-            <input type="number" [(ngModel)]="editForm.time_spent_sec">
-          </div>
-          <div class="edit-field">
-            <label>Duración sesión</label>
-            <input type="number" [(ngModel)]="editForm.session_length">
-          </div>
-          <div class="edit-field">
-            <label>Interacciones</label>
-            <input type="number" [(ngModel)]="editForm.interaction_count">
-          </div>
-          <div class="edit-field">
-            <label>Semana</label>
-            <input type="number" [(ngModel)]="editForm.semana" min="1" max="52">
-          </div>
-        </div>
-
-        <div class="edit-toggles">
-          <div class="toggle-field"
-               [class.activo-conversion]="editForm.is_conversion"
-               (click)="editForm.is_conversion = !editForm.is_conversion">
-            <mat-icon>{{ editForm.is_conversion ? 'check_circle' : 'radio_button_unchecked' }}</mat-icon>
-            <span class="toggle-label">Conversión</span>
-          </div>
-          <div class="toggle-field"
-               [class.activo-abandono]="editForm.drop_off_flag"
-               (click)="editForm.drop_off_flag = !editForm.drop_off_flag">
-            <mat-icon>{{ editForm.drop_off_flag ? 'cancel' : 'radio_button_unchecked' }}</mat-icon>
-            <span class="toggle-label">Abandono</span>
-          </div>
-        </div>
-
-        <div class="edit-panel-footer">
-          <div class="edit-footer-actions">
-            <button class="btn-cancel" (click)="cancelEdit()">Cancelar</button>
-            <button class="btn-save" (click)="saveEvento()">
-              <mat-icon>save</mat-icon> Guardar cambios
-            </button>
-          </div>
-        </div>
-      </div>
+    <!-- `fact_eventos` es de SOLO LECTURA (deuda A-3, 2026-08-07).
+         Aquí estaba el panel de edición. Se retiró junto con los botones de
+         editar y eliminar de la tabla: `event_pk` no identifica una fila
+         (50.000 valores para 2.823.245 filas, 52-139 filas por valor), así que
+         editar reescribía un centenar de eventos y borrar los destruía. El
+         motivo completo está en `GestionDatosService`. NO reintroducir. -->
+    <div class="aviso-solo-lectura">
+      <mat-icon>lock</mat-icon>
+      <span>
+        <strong>Tabla de solo lectura.</strong>
+        Los eventos de navegación no se editan ni se eliminan desde aquí: la columna
+        <code>event_pk</code> no identifica una fila —cada valor lo comparten entre 52 y 139
+        eventos de sesiones distintas—, y este histórico no se puede regenerar. Puedes
+        consultarlo y filtrarlo por semana.
+      </span>
     </div>
 
     <div class="table-wrapper">
@@ -158,19 +92,9 @@
           <th mat-header-cell *matHeaderCellDef>Sem</th>
           <td mat-cell *matCellDef="let r">{{ r.semana }}</td>
         </ng-container>
-        <ng-container matColumnDef="acciones">
-          <th mat-header-cell *matHeaderCellDef>Acciones</th>
-          <td mat-cell *matCellDef="let r">
-            <button mat-icon-button class="btn-edit" (click)="editEvento(r)" matTooltip="Editar">
-              <mat-icon>edit</mat-icon>
-            </button>
-            <button mat-icon-button class="btn-delete" (click)="deleteEvento(r.eventPk)" matTooltip="Eliminar">
-              <mat-icon>delete</mat-icon>
-            </button>
-          </td>
-        </ng-container>
-        <tr mat-header-row *matHeaderRowDef="['eventPk','sessionId','userAction','channel','price','isConversion','semana','acciones']"></tr>
-        <tr mat-row *matRowDef="let r; columns: ['eventPk','sessionId','userAction','channel','price','isConversion','semana','acciones']"></tr>
+        <!-- SIN columna «Acciones»: `fact_eventos` es de solo lectura (A-3). -->
+        <tr mat-header-row *matHeaderRowDef="['eventPk','sessionId','userAction','channel','price','isConversion','semana']"></tr>
+        <tr mat-row *matRowDef="let r; columns: ['eventPk','sessionId','userAction','channel','price','isConversion','semana']"></tr>
       </table>
     </div>
     <mat-paginator [length]="factTotal" [pageSize]="factSize" [pageIndex]="factPage"

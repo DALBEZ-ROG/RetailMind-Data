@@ -43,9 +43,7 @@ export class GestionDatosComponent implements OnInit {
   factLoading = false;
   factTime = 0;
 
-  // ── Edición de evento ──────────────────────────────────────────────────────
-  editingEvento: any = null;
-  editForm: any = {};
+  // `fact_eventos` es de SOLO LECTURA: no hay estado de edición (deuda A-3).
 
   // ── Dimensiones ────────────────────────────────────────────────────────────
   canales: any[] = [];
@@ -141,48 +139,21 @@ export class GestionDatosComponent implements OnInit {
     this.loadFactEventos();
   }
 
-  editEvento(row: any): void {
-    this.editingEvento = JSON.parse(JSON.stringify(row));
-    this.editForm = {
-      user_action: row.userAction,
-      channel: row.channel,
-      price: row.price,
-      time_spent_sec: row.timeSpentSec,
-      session_length: row.sessionLength,
-      interaction_count: row.interactionCount,
-      is_conversion: row.isConversion,
-      drop_off_flag: row.dropOffFlag,
-      semana: row.semana
-    };
-  }
-
-  saveEvento(): void {
-    if (!this.editingEvento) return;
-    this.service.updateFactEvento(this.editingEvento.eventPk, this.editForm).subscribe({
-      next: () => { this.msgOk('Evento actualizado correctamente'); this.editingEvento = null; this.loadFactEventos(); },
-      error: (e) => this.msgErr(e)
-    });
-  }
-
-  cancelEdit(): void { this.editingEvento = null; }
-
-  deleteEvento(eventPk: number): void {
-    // Borrado FÍSICO en ClickHouse: `ALTER TABLE retailmind.fact_eventos
-    // DELETE ... SETTINGS mutations_sync = 1` (GestionDatosService:99).
-    // No hay baja lógica ni papelera: la fila desaparece del hecho.
-    this.confirmar.eliminacion(
-      `el evento #${eventPk}`,
-      'Se borra FÍSICAMENTE de la tabla de hechos de ClickHouse (fact_eventos). No hay baja '
-      + 'lógica ni papelera: la fila desaparece y los informes de analítica que la contaban '
-      + 'cambiarán. No se puede deshacer.'
-    ).subscribe(ok => {
-      if (!ok) return;
-      this.service.deleteFactEvento(eventPk).subscribe({
-        next: () => { this.msgOk('Evento eliminado'); this.loadFactEventos(); },
-        error: (e) => this.msgErr(e)
-      });
-    });
-  }
+  // `fact_eventos` ES DE SOLO LECTURA. NO REINTRODUCIR `editEvento`,
+  // `saveEvento`, `cancelEdit` NI `deleteEvento` (suprimidos el 2026-08-07,
+  // deuda A-3).
+  //
+  // Los cuatro direccionaban por `eventPk`, que NO identifica una fila: la
+  // columna se declara `rowNumberInAllBlocks()` y ese contador reinicia en cada
+  // bloque de inserción, así que hay 50.000 valores para 2.823.245 filas y cada
+  // valor lo comparten entre 52 y 139 eventos de sesiones distintas. El diálogo
+  // de confirmación llegó a prometer que «la fila desaparece», en singular,
+  // mientras el borrado se llevaba el centenar entero — y `fact_eventos` no se
+  // puede regenerar (volumen `external: true` en el compose).
+  //
+  // No se arregla con una clave compuesta: no existe ninguna practicable. El
+  // razonamiento completo está en `GestionDatosService`, y los endpoints ya no
+  // existen en el backend, así que reponer estos métodos daría 405.
 
   // ══════════════════════════════════════════════════════════════════════════
   // DIMENSIONES

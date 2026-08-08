@@ -1,6 +1,5 @@
 package com.retailmind.admin.gestion;
 
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -56,50 +55,38 @@ public class GestionDatosService {
                 "totalPages", (int) Math.ceil((double) t / size), "number", page, "size", size);
     }
 
-    public Map<String, Object> getFactEventoById(long eventPk) {
-        List<Map<String, Object>> rows = ch.query(
-                "SELECT * FROM retailmind.fact_eventos WHERE event_pk = " + eventPk,
-                (rs, rn) -> {
-                    Map<String, Object> r = new LinkedHashMap<>();
-                    r.put("eventPk", rs.getLong("event_pk"));
-                    r.put("sessionId", rs.getString("session_id"));
-                    r.put("userId", rs.getString("user_id"));
-                    r.put("timestampUtc", rs.getString("timestamp_utc"));
-                    r.put("eventIndex", rs.getInt("event_index"));
-                    r.put("userAction", rs.getString("user_action"));
-                    r.put("productId", rs.getString("product_id"));
-                    r.put("timeSpentSec", rs.getFloat("time_spent_sec"));
-                    r.put("sessionLength", rs.getFloat("session_length"));
-                    r.put("interactionCount", rs.getInt("interaction_count"));
-                    r.put("isConversion", rs.getInt("is_conversion"));
-                    r.put("dropOffFlag", rs.getInt("drop_off_flag"));
-                    r.put("price", rs.getFloat("price"));
-                    r.put("channel", rs.getString("channel"));
-                    r.put("semana", rs.getInt("semana"));
-                    return r;
-                });
-        return rows.isEmpty() ? null : rows.get(0);
-    }
-
-    @SuppressWarnings("null")
-    public void updateFactEvento(long eventPk, Map<String, Object> fields) {
-        StringBuilder sb = new StringBuilder("ALTER TABLE retailmind.fact_eventos UPDATE ");
-        List<String> sets = new ArrayList<>();
-        fields.forEach((k, v) -> {
-            if (v instanceof String) sets.add(k + " = '" + v + "'");
-            else sets.add(k + " = " + v);
-        });
-        sb.append(String.join(", ", sets));
-        sb.append(" WHERE event_pk = ").append(eventPk);
-        sb.append(" SETTINGS mutations_sync = 1");
-        String sql = sb.toString();
-        ch.execute(sql);
-    }
-
-    public void deleteFactEvento(long eventPk) {
-        ch.execute("ALTER TABLE retailmind.fact_eventos DELETE WHERE event_pk = " + eventPk +
-                " SETTINGS mutations_sync = 1");
-    }
+    // ── `fact_eventos` ES DE SOLO LECTURA. NO REINTRODUCIR ESCRITURA. ─────────
+    //
+    // Aquí vivían `getFactEventoById`, `updateFactEvento` y `deleteFactEvento`,
+    // los tres filtrando por `WHERE event_pk = <id>`. Se suprimieron el
+    // 2026-08-07 (deuda A-3) porque `event_pk` NO IDENTIFICA UNA FILA:
+    //
+    //   * está declarada `UInt64 DEFAULT rowNumberInAllBlocks()`, y ese contador
+    //     REINICIA en cada bloque de inserción;
+    //   * medido sobre la tabla real: 50.000 valores distintos para 2.823.245
+    //     filas, con entre 52 y 139 filas compartiendo cada valor.
+    //
+    // Consecuencia: el `SELECT ... WHERE event_pk` devolvía una fila ARBITRARIA
+    // de un centenar, el `UPDATE` las reescribía todas y el `DELETE` BORRABA LAS
+    // 52-139 —de otras tantas sesiones distintas— informando de un borrado
+    // correcto de «un evento». `fact_eventos` no es reproducible: por eso su
+    // volumen va declarado `external: true` en el compose.
+    //
+    // NO se arregla con una clave compuesta: se verificó que no existe ninguna
+    // practicable. `(session_id, event_index)` deja 253.372 pares repetidos;
+    // añadiendo `timestamp_utc` aún queda 1 colisión; solo la fila entera
+    // (15 columnas) identifica. Si algún día hace falta escribir aquí, primero
+    // hay que reconstruir la tabla con un identificador de verdad —con respaldo,
+    // y sin volver a usar `rowNumberInAllBlocks()`, que reproduce el defecto—.
+    // Queda como fragilidad C-15 en `DEUDA_TECNICA.md`.
+    //
+    // Con estos tres métodos desapareció además la única concatenación de un
+    // NOMBRE DE COLUMNA en el SQL de este archivo: `updateFactEvento` construía
+    // `k + " = '" + v + "'"` con las claves del cuerpo de la petición, o sea con
+    // un identificador SQL que venía del usuario (regla de oro n.º 2).
+    //
+    // Lo que SÍ sigue: `getFactEventos` (listado paginado + filtro por semana),
+    // que es de lectura y no necesita identificar una fila.
 
     // ══════════════════════════════════════════════════════════════════════════
     // DIMENSIONES GENÉRICAS
