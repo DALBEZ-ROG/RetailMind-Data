@@ -1,7 +1,6 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -12,10 +11,41 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { environment } from '../../../../environments/environment';
 
-import { InicializacionService, InicializacionResponse } from '../../../core/services/inicializacion.service';
+import {
+  InicializacionService,
+  SemanaEstado,
+  SemanasEstado
+} from '../../../core/services/inicializacion.service';
+import { mensajeError } from '../../../core/services/api-error.util';
 
+/** Una opción del selector: la semana y por qué se puede o no generar. */
+interface OpcionSemana {
+  semana: number;
+  libre: boolean;
+  motivo: string;
+  eventosTienda: number;
+}
+
+/**
+ * Administración de la capa analítica legada por semana.
+ *
+ * ── POR QUE YA NO SE INFIERE EL NUMERO DE SEMANAS ───────────────────────────
+ * `parseSemanas` leia el `stdout` de un script Python y reconstruia la lista
+ * DIVIDIENDO el total entre la constante 108.584:
+ *
+ *   const numSemanas = Math.round(total / 108584) || 1;
+ *   for (let i = 1; i <= numSemanas; i++)
+ *       this.semanasCargadas.push({ semana: i, registros: 108584 });
+ *
+ * Sobre las 2.823.245 filas reales eso da **26 donde hay 27**, inventa 26
+ * tramos idénticos y borra del mapa las cuatro semanas de conteo irregular
+ * (23 → 108.593, 25 → 108.678, 26 → 108.592 y 27 → 19). Ademas el total salia
+ * de esa misma suma inventada, de ahi el «0 registros» cuando el script fallaba
+ * mientras el encabezado mostraba 27 semanas leidas por SQL.
+ *
+ * Ahora todo viene de `GET /api/init/semanas`, que agrupa con `GROUP BY semana`.
+ */
 @Component({
   selector: 'app-admin-etl',
   standalone: true,
@@ -38,118 +68,138 @@ import { InicializacionService, InicializacionResponse } from '../../../core/ser
 })
 export class AdminEtlComponent implements OnInit, OnDestroy {
 
-  // ── Estado de semanas ──────────────────────────────────────────────────────
-  semanasCargadas: { semana: number; registros: number }[] = [];
+  // ── Estado por semana (todo desde la base) ─────────────────────────────────
+  estado: SemanasEstado | null = null;
   loadingSemanas = false;
+  errorSemanas = '';
 
-  // ── Semanas disponibles y selección ────────────────────────────────────────
-  semanasDisponibles: number[] = [];
-  proximaSemana = 2;
-  semanaSeleccionada = 2;
+  // ── Selector ───────────────────────────────────────────────────────────────
+  opciones: OpcionSemana[] = [];
+  semanaSeleccionada: number | null = null;
 
   // ── Generación ─────────────────────────────────────────────────────────────
   ejecutando = false;
   tiempoTranscurrido = 0;
   private timerInterval: any = null;
 
-  // ── Consola ────────────────────────────────────────────────────────────────
   consoleOutput = '';
 
-  // ── Historial ──────────────────────────────────────────────────────────────
   historial: { semana: number; registros: number; duracion: number; fecha: string }[] = [];
   historialCols = ['semana', 'registros', 'duracion', 'fecha'];
 
   constructor(
     private inicializacionService: InicializacionService,
-    private snackBar: MatSnackBar,
-    private http: HttpClient
+    private snackBar: MatSnackBar
   ) {}
 
   ngOnInit(): void {
-    this.cargarEstadoSemanas();
-    this.loadSemanasDisponibles();
+    this.actualizarEstado();
   }
 
   ngOnDestroy(): void {
     this.detenerTimer();
   }
 
-  // ── Cargar semanas disponibles ─────────────────────────────────────────────
-
-  loadSemanasDisponibles(): void {
-    this.http.get<number[]>(`${environment.apiUrl}/api/funnel/semanas-disponibles`).subscribe({
-      next: (data) => {
-        this.semanasDisponibles = data;
-        const maxSemana = data.length > 0 ? Math.max(...data) : 1;
-        this.proximaSemana = maxSemana + 1;
-        this.semanaSeleccionada = this.proximaSemana;
-      },
-      error: () => {
-        this.semanasDisponibles = [];
-        this.proximaSemana = 2;
-        this.semanaSeleccionada = 2;
-      }
-    });
-  }
-
   // ── Computed ───────────────────────────────────────────────────────────────
 
+  /** Total REAL de `fact_eventos`, servido por la base. */
   get totalRegistros(): number {
-    return this.semanasCargadas.reduce((s, r) => s + r.registros, 0);
+    return this.estado?.totalRegistros ?? 0;
   }
 
-  // ── Sección 1: Estado de datos por semana ──────────────────────────────────
+  get semanasCargadas(): SemanaEstado[] {
+    return this.estado?.semanas ?? [];
+  }
+
+  get numeroSemanas(): number {
+    return this.estado?.semanasCargadas ?? 0;
+  }
+
+  get eventosTienda(): number {
+    return this.estado?.eventosTienda ?? 0;
+  }
+
+  get hayLibres(): boolean {
+    return (this.estado?.libres?.length ?? 0) > 0;
+  }
+
+  get opcionSeleccionada(): OpcionSemana | undefined {
+    return this.opciones.find(o => o.semana === this.semanaSeleccionada);
+  }
+
+  get puedeGenerar(): boolean {
+    return !this.ejecutando && !!this.opcionSeleccionada?.libre;
+  }
+
+  // ── Carga de estado ────────────────────────────────────────────────────────
 
   actualizarEstado(): void {
-    this.cargarEstadoSemanas();
-    this.loadSemanasDisponibles();
-  }
-
-  cargarEstadoSemanas(): void {
     this.loadingSemanas = true;
-    this.inicializacionService.verificarClickhouse().subscribe({
-      next: (res) => {
+    this.errorSemanas = '';
+
+    this.inicializacionService.semanas().subscribe({
+      next: (est) => {
         this.loadingSemanas = false;
-        this.parseSemanas(res.output);
+        this.estado = est;
+        if (!est.disponible) {
+          this.errorSemanas = est.error || 'La analítica no está disponible.';
+        }
+        this.construirOpciones(est);
       },
-      error: () => {
+      error: (err) => {
         this.loadingSemanas = false;
-        this.semanasCargadas = [];
+        this.estado = null;
+        this.opciones = [];
+        this.errorSemanas = mensajeError(err, 'No se pudo leer el estado de las semanas.');
       }
     });
   }
 
-  private parseSemanas(output: string): void {
-    this.semanasCargadas = [];
-    const lines = output.split('\n');
-    for (const line of lines) {
-      const match = line.match(/fact_eventos\s+([\d,]+)/);
-      if (match) {
-        const total = parseInt(match[1].replace(/,/g, ''), 10);
-        if (total > 0) {
-          const numSemanas = Math.round(total / 108584) || 1;
-          for (let i = 1; i <= numSemanas; i++) {
-            this.semanasCargadas.push({ semana: i, registros: 108584 });
-          }
-        }
-      }
+  /**
+   * El selector enumera TODO el rango admitido (2-52) y dice de cada semana si
+   * está libre y por qué no lo está. Antes solo listaba las ya cargadas y
+   * proponía `max + 1`, de modo que un hueco intermedio era invisible y la
+   * razón del rechazo solo aparecía cuando Python ya había abortado.
+   */
+  private construirOpciones(est: SemanasEstado): void {
+    const porSemana = new Map<number, SemanaEstado>();
+    for (const s of est.semanas) porSemana.set(s.semana, s);
+
+    this.opciones = [];
+    for (let s = 2; s <= 52; s++) {
+      const ocupada = porSemana.get(s);
+      this.opciones.push({
+        semana: s,
+        libre: !ocupada,
+        motivo: ocupada ? ocupada.motivo : 'Sin registros: disponible para generar',
+        eventosTienda: ocupada?.eventosTienda ?? 0
+      });
     }
+
+    // Preselección: la primera libre. Nunca una ocupada.
+    this.semanaSeleccionada = est.proximaLibre ?? null;
   }
 
-  // ── Sección 2: Generar nueva semana ────────────────────────────────────────
+  // ── Generación ─────────────────────────────────────────────────────────────
 
   generarSemana(): void {
-    if (this.semanaSeleccionada < 2 || this.semanaSeleccionada > 52) {
-      this.snackBar.open('La semana debe estar entre 2 y 52', 'Cerrar', { duration: 3000 });
+    const opcion = this.opcionSeleccionada;
+    if (!opcion) {
+      this.snackBar.open('Elige una semana', 'Cerrar', { duration: 3000 });
+      return;
+    }
+    if (!opcion.libre) {
+      this.snackBar.open(`Semana ${opcion.semana} no disponible: ${opcion.motivo}`,
+                         'Cerrar', { duration: 6000 });
       return;
     }
 
     this.ejecutando = true;
     this.tiempoTranscurrido = 0;
-    this.consoleOutput += `\n>>> Generando datos para semana ${this.semanaSeleccionada}...\n`;
+    this.consoleOutput += `\n>>> Generando datos para semana ${opcion.semana}...\n`;
     this.iniciarTimer();
 
-    this.inicializacionService.generarSemana(this.semanaSeleccionada).subscribe({
+    this.inicializacionService.generarSemana(opcion.semana).subscribe({
       next: (res) => {
         this.detenerTimer();
         this.ejecutando = false;
@@ -158,23 +208,24 @@ export class AdminEtlComponent implements OnInit, OnDestroy {
 
         if (res.success) {
           this.historial.unshift({
-            semana: this.semanaSeleccionada,
-            registros: res.registrosCargados || 108584,
+            semana: opcion.semana,
+            registros: res.registrosCargados || 0,
             duracion: res.duracionSegundos,
             fecha: new Date().toISOString()
           });
-          this.snackBar.open(`Semana ${this.semanaSeleccionada} generada exitosamente`, 'OK', { duration: 3000 });
-          this.actualizarEstado();
+          this.snackBar.open(`Semana ${opcion.semana} generada`, 'OK', { duration: 3000 });
         } else {
           this.snackBar.open(res.mensaje, 'Cerrar', { duration: 5000 });
         }
+        this.actualizarEstado();
       },
       error: (err) => {
         this.detenerTimer();
         this.ejecutando = false;
-        const msg = err.error?.mensaje || err.message || 'Error de conexion';
-        this.consoleOutput += `\n❌ Error: ${msg}\n`;
+        const msg = mensajeError(err, 'No se pudo generar la semana.');
+        this.consoleOutput += `\n❌ ${msg}\n`;
         this.snackBar.open(msg, 'Cerrar', { duration: 5000 });
+        this.actualizarEstado();
       }
     });
   }
@@ -182,9 +233,7 @@ export class AdminEtlComponent implements OnInit, OnDestroy {
   // ── Timer ──────────────────────────────────────────────────────────────────
 
   private iniciarTimer(): void {
-    this.timerInterval = setInterval(() => {
-      this.tiempoTranscurrido++;
-    }, 1000);
+    this.timerInterval = setInterval(() => this.tiempoTranscurrido++, 1000);
   }
 
   private detenerTimer(): void {

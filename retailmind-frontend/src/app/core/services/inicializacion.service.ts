@@ -11,30 +11,78 @@ export interface InicializacionResponse {
   registrosCargados: number;
 }
 
+/** Conteo real de una de las 13 tablas auxiliares de la base legada. */
+export interface DimensionEstado {
+  tabla: string;
+  filas: number;
+}
+
+/** Foto del estado de la capa legada. Cada campo sale de una consulta real. */
+export interface EstadoLegado {
+  base: string;
+  clickhouseConectado: boolean;
+  clickhouseVersion: string | null;
+  errorConexion: string | null;
+  factEventos: number;
+  factEventosConDatos: boolean;
+  semanasDistintas: number;
+  dimensiones: DimensionEstado[];
+  dimensionesConDatos: number;
+  dimensionesTotales: number;
+  parquetExiste: boolean;
+  parquetRuta: string;
+  parquetBytes: number;
+  parquetFecha: number;
+}
+
+/** Una semana de `fact_eventos` con su conteo real y su procedencia. */
+export interface SemanaEstado {
+  semana: number;
+  filas: number;
+  eventosTienda: number;
+  estado: 'ocupada' | 'tienda';
+  motivo: string;
+}
+
+export interface SemanasEstado {
+  disponible: boolean;
+  error?: string;
+  semanas: SemanaEstado[];
+  totalRegistros: number;
+  semanasCargadas: number;
+  eventosTienda: number;
+  libres: number[];
+  proximaLibre: number | null;
+}
+
+/**
+ * Capa legada de ClickHouse (base `retailmind`).
+ *
+ * NO REINTRODUCIR `resetSistema()`, `cargaCompleta()`, `cargarClickhouse()` ni
+ * `extraerPocketbase()`: sus endpoints se suprimieron el 2026-08-08 porque
+ * disparaban `DROP TABLE` y `TRUNCATE` sobre `fact_eventos` y sus dimensiones,
+ * 2.823.245 filas irreproducibles. El motivo completo esta en el javadoc de
+ * `InicializacionController`.
+ */
 @Injectable({ providedIn: 'root' })
 export class InicializacionService {
   private readonly base = `${environment.apiUrl}/api/init`;
 
   constructor(private http: HttpClient) {}
 
-  extraerPocketbase(): Observable<InicializacionResponse> {
-    return this.http.post<InicializacionResponse>(`${this.base}/extraer-pocketbase`, {});
+  /** Estado REAL: conexion, filas, dimensiones y parquet en disco. */
+  estado(): Observable<EstadoLegado> {
+    return this.http.get<EstadoLegado>(`${this.base}/estado`);
   }
 
-  cargarClickhouse(): Observable<InicializacionResponse> {
-    return this.http.post<InicializacionResponse>(`${this.base}/cargar-clickhouse`, {});
+  /** Semanas con su conteo real (`GROUP BY semana`) y cuales quedan libres. */
+  semanas(): Observable<SemanasEstado> {
+    return this.http.get<SemanasEstado>(`${this.base}/semanas`);
   }
 
+  /** Diagnostico de solo lectura: vuelca la salida cruda del verificador. */
   verificarClickhouse(): Observable<InicializacionResponse> {
     return this.http.post<InicializacionResponse>(`${this.base}/verificar-clickhouse`, {});
-  }
-
-  resetSistema(): Observable<InicializacionResponse> {
-    return this.http.post<InicializacionResponse>(`${this.base}/reset-sistema`, {});
-  }
-
-  cargaCompleta(): Observable<InicializacionResponse> {
-    return this.http.post<InicializacionResponse>(`${this.base}/carga-completa`, {});
   }
 
   generarSemana(semana: number): Observable<InicializacionResponse> {

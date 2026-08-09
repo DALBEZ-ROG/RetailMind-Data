@@ -1,8 +1,19 @@
+<!--
+  Analítica web (base LEGADA de ClickHouse).
+
+  Los KPIs heredan el VIDRIO de los tableros de dirección: lavado índigo del
+  7 %, punto de cian en la esquina y borde tenue. NO reintroducir el chip de
+  color por tarjeta: eran seis tonos ajenos al sistema que no encodaban nada
+  (verde/rojo insinuaban estado sobre métricas que sólo son recuentos).
+
+  Cada gráfico lleva su PREGUNTA como subtítulo. Si un bloque no responde una,
+  no va.
+-->
 <div class="page-container">
-  <!-- Encabezado rediseñado -->
+
   <div class="dashboard-header">
     <div class="header-top">
-      <h1 class="page-title">Dashboard</h1>
+      <h1 class="page-title">Analítica web</h1>
     </div>
     <div class="header-bottom">
       <span class="welcome-text" *ngIf="currentUser">
@@ -15,22 +26,20 @@
     </div>
   </div>
 
-  <!-- Performance + Refresh -->
   <div class="performance-bar">
     <mat-chip *ngIf="responseTimeMs !== null" class="perf-chip">
       <mat-icon>bolt</mat-icon> Tiempo de respuesta: {{ responseTimeMs }}ms
     </mat-chip>
-    <button mat-stroked-button color="primary" [disabled]="refreshingViews" (click)="refrescarVistas()" class="refresh-btn">
+    <button mat-stroked-button color="primary" [disabled]="refreshingViews"
+            (click)="refrescarVistas()" class="refresh-btn">
       <mat-icon>refresh</mat-icon> Refrescar vistas
     </button>
   </div>
 
-  <!-- Loading -->
   <div *ngIf="loading" class="spinner-container">
     <mat-spinner diameter="64"></mat-spinner>
   </div>
 
-  <!-- Error state -->
   <mat-card *ngIf="hasError && !loading" class="error-card">
     <mat-card-content class="error-content">
       <mat-icon class="error-icon">cloud_off</mat-icon>
@@ -42,51 +51,120 @@
   </mat-card>
 
   <ng-container *ngIf="!loading && !hasError">
-    <!-- KPI Cards -->
+
+    <!-- ═══ Indicadores — vidrio heredado de los tableros ═══ -->
     <div class="kpi-grid">
-      <mat-card *ngFor="let card of kpiCards; let i = index" class="kpi-card"
-                [class.kpi-sesiones]="i === 0"
-                [class.kpi-usuarios]="i === 1"
-                [class.kpi-conversiones]="i === 2"
-                [class.kpi-tasa]="i === 3"
-                [class.kpi-abandonos]="i === 4"
-                [class.kpi-eventos]="i === 5"
-                [class.kpi-semanas]="i === 6"
-                [class.kpi-promedio]="i === 7"
-                [matTooltip]="card.tooltip" matTooltipShowDelay="500">
-        <mat-card-content>
-          <div class="kpi-inner">
-            <div class="kpi-header">
-              <p class="kpi-label">{{ card.title }}</p>
-              <div class="kpi-icon" [style.background]="card.color">
-                <mat-icon>{{ card.icon }}</mat-icon>
-              </div>
-            </div>
-            <p class="kpi-value">{{ card.value }}</p>
+      <div *ngFor="let card of kpiCards" class="kpi-card">
+        <div class="kpi-label">
+          <span class="kpi-texto">{{ card.title }}</span>
+          <span class="kpi-info" [title]="card.tooltip">
+            <mat-icon>info_outline</mat-icon>
+          </span>
+        </div>
+        <div class="kpi-value">{{ card.value }}</div>
+      </div>
+    </div>
+
+    <!-- Aviso cuando la analítica no responde: los KPIs de arriba salen del
+         resumen, que tiene su propio repliegue; los gráficos necesitan las
+         series y sin ellas se ocultan en vez de pintarse vacíos. -->
+    <div class="aviso-series" *ngIf="!series">
+      <mat-icon>cloud_off</mat-icon>
+      <span>Las series por semana no están disponibles. Los indicadores de arriba siguen siendo válidos.</span>
+    </div>
+
+    <ng-container *ngIf="series">
+
+      <!-- ═══ La dimensión que faltaba: el tiempo ═══ -->
+      <div class="charts-grid charts-grid--2">
+
+        <mat-card class="chart-card">
+          <div class="chart-head">
+            <h3 class="chart-title">Volumen por semana</h3>
+            <p class="chart-question">
+              ¿Cómo se reparten los {{ resumen.totalEventos | number }} eventos entre
+              las {{ totalSemanas }} semanas cargadas?
+            </p>
           </div>
-        </mat-card-content>
-      </mat-card>
-    </div>
+          <div class="chart-box"><canvas #volumenCanvas></canvas></div>
+        </mat-card>
 
-    <!-- Charts -->
-    <div class="charts-grid">
-      <mat-card class="chart-card">
-        <mat-card-header><mat-card-title>Sesiones por Canal</mat-card-title></mat-card-header>
-        <mat-card-content><canvas #barCanvas></canvas></mat-card-content>
-      </mat-card>
-      <mat-card class="chart-card">
-        <mat-card-header><mat-card-title>Distribucion por Dispositivo</mat-card-title></mat-card-header>
-        <mat-card-content class="donut-content"><canvas #donutCanvas></canvas></mat-card-content>
-      </mat-card>
-      <mat-card class="chart-card chart-card--wide">
-        <mat-card-header><mat-card-title>Tasa de Conversion</mat-card-title></mat-card-header>
-        <mat-card-content><canvas #lineCanvas></canvas></mat-card-content>
-      </mat-card>
-    </div>
+        <mat-card class="chart-card">
+          <div class="chart-head">
+            <h3 class="chart-title">Conversión por semana</h3>
+            <p class="chart-question">¿Se mantiene estable la tasa de conversión?</p>
+            <p class="chart-salvedad" *ngIf="avisoSemanas">
+              <mat-icon>info_outline</mat-icon>
+              <span>{{ avisoSemanas }}</span>
+            </p>
+          </div>
+          <div class="chart-box"><canvas #conversionCanvas></canvas></div>
+        </mat-card>
 
-    <!-- Tabla sesiones -->
+      </div>
+
+      <!-- ═══ De qué están hechos los eventos ═══ -->
+      <div class="charts-grid charts-grid--2">
+
+        <mat-card class="chart-card">
+          <div class="chart-head">
+            <h3 class="chart-title">Tipo de interacción</h3>
+            <p class="chart-question">¿En qué se va la actividad de los usuarios?</p>
+          </div>
+          <div class="chart-box chart-box--media"><canvas #accionesCanvas></canvas></div>
+        </mat-card>
+
+        <mat-card class="chart-card">
+          <div class="chart-head">
+            <h3 class="chart-title">Duración del evento</h3>
+            <p class="chart-question">¿Son interacciones rápidas o largas?</p>
+          </div>
+          <div class="chart-box chart-box--media"><canvas #duracionCanvas></canvas></div>
+        </mat-card>
+
+      </div>
+
+      <!-- ═══ De dónde vienen ═══ -->
+      <div class="charts-grid charts-grid--3">
+
+        <mat-card class="chart-card">
+          <div class="chart-head">
+            <h3 class="chart-title">Por canal</h3>
+            <p class="chart-question">¿Hay un canal dominante?</p>
+          </div>
+          <div class="chart-box chart-box--corta"><canvas #canalCanvas></canvas></div>
+        </mat-card>
+
+        <mat-card class="chart-card">
+          <div class="chart-head">
+            <h3 class="chart-title">Por dispositivo</h3>
+            <p class="chart-question">¿Se concentra el tráfico en algún dispositivo?</p>
+          </div>
+          <div class="chart-box chart-box--corta"><canvas #dispositivoCanvas></canvas></div>
+        </mat-card>
+
+        <mat-card class="chart-card">
+          <div class="chart-head">
+            <h3 class="chart-title">Por región</h3>
+            <p class="chart-question">¿Hay concentración geográfica?</p>
+          </div>
+          <div class="chart-box chart-box--alta"><canvas #regionCanvas></canvas></div>
+        </mat-card>
+
+      </div>
+
+      <p class="nota-medida">
+        Los tres desgloses de arriba cuentan <strong>eventos</strong> y no sesiones:
+        un mismo <code>session_id</code> reúne varios usuarios y canales, de modo que
+        contarlo por canal sumaría el 231&nbsp;% de las sesiones que existen. Medido en
+        eventos, cada fila tiene un solo canal, un solo dispositivo y una sola región.
+      </p>
+
+    </ng-container>
+
+    <!-- ═══ Últimas sesiones ═══ -->
     <mat-card class="table-card">
-      <mat-card-header><mat-card-title>Ultimas Sesiones</mat-card-title></mat-card-header>
+      <mat-card-header><mat-card-title>Últimas sesiones</mat-card-title></mat-card-header>
       <mat-card-content>
         <div *ngIf="loadingTable" class="spinner-container"><mat-spinner diameter="40"></mat-spinner></div>
         <div *ngIf="!loadingTable" class="table-wrapper">
@@ -95,9 +173,13 @@
               <th mat-header-cell *matHeaderCellDef>Session ID</th>
               <td mat-cell *matCellDef="let row">{{ row.sessionId }}</td>
             </ng-container>
+            <!-- `userId` y `channel` PLANOS: el endpoint devuelve la forma de
+                 ClickHouse. La plantilla leía `row.usuario?.userId` y
+                 `row.canal?.channelName`, que son el modelo LEGADO de
+                 PostgreSQL, y por eso las dos columnas pintaban «-». -->
             <ng-container matColumnDef="usuario">
               <th mat-header-cell *matHeaderCellDef>Usuario</th>
-              <td mat-cell *matCellDef="let row">{{ row.usuario?.userId ?? '-' }}</td>
+              <td mat-cell *matCellDef="let row">{{ row.userId ?? '-' }}</td>
             </ng-container>
             <ng-container matColumnDef="timestampUtc">
               <th mat-header-cell *matHeaderCellDef>Fecha</th>
@@ -105,7 +187,7 @@
             </ng-container>
             <ng-container matColumnDef="canal">
               <th mat-header-cell *matHeaderCellDef>Canal</th>
-              <td mat-cell *matCellDef="let row">{{ row.canal?.channelName ?? '-' }}</td>
+              <td mat-cell *matCellDef="let row">{{ row.channel ?? '-' }}</td>
             </ng-container>
             <ng-container matColumnDef="interactionCount">
               <th mat-header-cell *matHeaderCellDef>Interacciones</th>

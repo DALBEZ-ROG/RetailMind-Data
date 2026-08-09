@@ -1,3 +1,9 @@
+<!--
+  Estado por semana de la capa legada.
+  Las cifras salen de `GET /api/init/semanas` (GROUP BY semana), NUNCA de
+  dividir el total entre 108.584: ese calculo daba 26 donde hay 27 y ocultaba
+  las semanas de conteo irregular (23, 25, 26 y 27).
+-->
 <div class="page-container">
   <h1 class="page-title"><mat-icon>sync</mat-icon> Administración ETL</h1>
 
@@ -7,7 +13,10 @@
     <div>
       <h3 style="color:white;margin:0;font-size:18px;font-weight:700">Estado de Datos por Semana</h3>
       <p style="color:rgba(255,255,255,0.7);margin:4px 0 0;font-size:13px">
-        {{ semanasDisponibles.length }} semanas cargadas • {{ totalRegistros | number }} registros totales
+        {{ numeroSemanas }} semanas cargadas • {{ totalRegistros | number }} registros totales
+        <span *ngIf="eventosTienda > 0">
+          • {{ eventosTienda | number }} eventos de la tienda real
+        </span>
       </p>
     </div>
   </div>
@@ -18,9 +27,14 @@
     </button>
   </div>
 
-  <div *ngIf="semanasCargadas.length === 0 && !loadingSemanas" class="empty-state">
+  <div *ngIf="errorSemanas" class="aviso-error">
+    <mat-icon>error_outline</mat-icon>
+    <span>{{ errorSemanas }}</span>
+  </div>
+
+  <div *ngIf="semanasCargadas.length === 0 && !loadingSemanas && !errorSemanas" class="empty-state">
     <mat-icon>inbox</mat-icon>
-    <p>Sin datos cargados. Ejecute la carga inicial desde Inicialización.</p>
+    <p>Sin datos cargados en <code>fact_eventos</code>.</p>
   </div>
 
   <div class="table-wrapper" *ngIf="semanasCargadas.length > 0">
@@ -29,6 +43,7 @@
         <tr>
           <th>Semana</th>
           <th>Registros</th>
+          <th>Origen</th>
         </tr>
       </thead>
       <tbody>
@@ -39,7 +54,18 @@
               Semana {{ row.semana }}
             </span>
           </td>
-          <td><span class="registros-valor">{{ row.registros | number }}</span></td>
+          <td><span class="registros-valor">{{ row.filas | number }}</span></td>
+          <td>
+            <span class="origen-chip" [class.origen-tienda]="row.estado === 'tienda'"
+                  [matTooltip]="row.motivo">
+              <mat-icon style="font-size:13px;width:13px;height:13px">
+                {{ row.estado === 'tienda' ? 'storefront' : 'inventory_2' }}
+              </mat-icon>
+              {{ row.estado === 'tienda'
+                  ? (row.eventosTienda | number) + ' de la tienda real'
+                  : 'Carga histórica' }}
+            </span>
+          </td>
         </tr>
       </tbody>
     </table>
@@ -50,31 +76,67 @@
     <mat-card-header>
       <mat-icon mat-card-avatar>auto_awesome</mat-icon>
       <mat-card-title>Generar Nueva Semana de Datos</mat-card-title>
-      <mat-card-subtitle>Genera 108,584 registros sintéticos para la semana indicada</mat-card-subtitle>
+      <mat-card-subtitle>
+        Inserta 108.584 registros sintéticos en una semana <strong>vacía</strong>.
+        No modifica ni borra nada de lo ya cargado.
+      </mat-card-subtitle>
     </mat-card-header>
     <mat-card-content>
+
+      <div class="aviso-ocupadas" *ngIf="estado && !hayLibres">
+        <mat-icon>block</mat-icon>
+        <span>No queda ninguna semana libre en el rango 2-52.</span>
+      </div>
+
       <div class="generate-form">
         <mat-select class="semana-select"
                     [(ngModel)]="semanaSeleccionada"
                     placeholder="Seleccionar semana">
-          <mat-option [value]="proximaSemana" class="opcion-siguiente">
-            ⚡ Semana {{ proximaSemana }} (siguiente)
-          </mat-option>
-          <mat-divider></mat-divider>
-          <mat-option *ngFor="let s of semanasDisponibles" [value]="s">
-            Semana {{ s }} (ya cargada)
+          <mat-option *ngFor="let o of opciones" [value]="o.semana" [disabled]="!o.libre">
+            <span class="opcion-fila">
+              <mat-icon class="opcion-icono"
+                        [class.libre]="o.libre"
+                        [class.tienda]="!o.libre && o.eventosTienda > 0">
+                {{ o.libre ? 'check_circle' : (o.eventosTienda > 0 ? 'storefront' : 'lock') }}
+              </mat-icon>
+              <span>Semana {{ o.semana }}</span>
+              <span class="opcion-motivo">
+                {{ o.libre
+                    ? 'libre'
+                    : (o.eventosTienda > 0
+                        ? 'ocupada · ' + o.eventosTienda + ' evento(s) de la tienda real'
+                        : 'ocupada · ya tiene datos') }}
+              </span>
+            </span>
           </mat-option>
         </mat-select>
 
         <button class="btn-aplicar" style="height:48px"
                 (click)="generarSemana()"
-                [disabled]="ejecutando || semanaSeleccionada < 2 || semanaSeleccionada > 52">
+                [disabled]="!puedeGenerar">
           <mat-icon>{{ ejecutando ? 'hourglass_top' : 'auto_awesome' }}</mat-icon>
-          {{ ejecutando ? 'GENERANDO...' : 'GENERAR DATOS SEMANA ' + semanaSeleccionada }}
+          {{ ejecutando
+              ? 'GENERANDO...'
+              : (semanaSeleccionada ? 'GENERAR DATOS SEMANA ' + semanaSeleccionada : 'ELIGE UNA SEMANA') }}
         </button>
       </div>
 
-      <!-- Barra de progreso -->
+      <!-- Por qué una semana concreta no se puede generar -->
+      <div class="motivo-seleccion" *ngIf="opcionSeleccionada && !opcionSeleccionada.libre">
+        <mat-icon>info_outline</mat-icon>
+        <span>
+          <strong>Semana {{ opcionSeleccionada.semana }} no disponible.</strong>
+          {{ opcionSeleccionada.motivo }}.
+        </span>
+      </div>
+
+      <p class="nota-tienda">
+        Las semanas marcadas con <mat-icon class="inline-icon">storefront</mat-icon> contienen
+        eventos escritos por la <strong>tienda real</strong> (<code>sess_shop_…</code>).
+        Generar encima los volvería indistinguibles de los sintéticos, así que quedan
+        bloqueadas.
+      </p>
+
       <div class="progress-section" *ngIf="ejecutando">
         <mat-progress-bar mode="indeterminate" color="accent"></mat-progress-bar>
         <span class="timer">⏱️ {{ tiempoTranscurrido }}s</span>

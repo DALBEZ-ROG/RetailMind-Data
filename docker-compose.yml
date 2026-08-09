@@ -284,6 +284,19 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       # --- ETL invocado DESDE el backend (boton y @Scheduled) ---
       ETL_SCRIPTS_PATH: /etl
+      # INIT_SCRIPTS_PATH es la que faltaba, y su ausencia era un fallo
+      # SILENCIOSO: `application.properties` declara
+      # `init.scripts.path=${INIT_SCRIPTS_PATH:/app}`, asi que sin ella caia
+      # en `/app`, donde solo hay `app.jar`. `InicializacionController` es la
+      # UNICA clase que lee esa propiedad —`EtlService` usa
+      # `etl.scripts.path`, que si estaba—, de modo que la pantalla
+      # `/inicializacion` fallaba con
+      #   python: can't open file '/app/etl/carga/10_verify_clickhouse.py'
+      # mientras el archivo estaba en /etl/etl/carga/. Los indicadores se
+      # apagaban con ClickHouse sano y con sus 2,8 M de filas intactas.
+      # Mismo valor que ETL_SCRIPTS_PATH: ambas apuntan a la raiz del paquete
+      # ETL, que es lo que monta el volumen `./retailmind:/etl` de abajo.
+      INIT_SCRIPTS_PATH: /etl
       DWH_ETL_PATH: /etl
       DWH_PYTHON_PATH: python    # ← lo que faltaba: en la imagen NO
       ETL_PYTHON_PATH: python    #   existe `py`, solo `python`

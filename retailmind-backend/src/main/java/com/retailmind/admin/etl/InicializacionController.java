@@ -4,17 +4,59 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
 import java.time.Instant;
+import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.retailmind.dto.InicializacionResponseDTO;
 
+/**
+ * Administracion de la capa analitica LEGADA (base `retailmind` de ClickHouse).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * NO REINTRODUCIR: aqui vivian TRES endpoints que se suprimieron el 2026-08-08
+ * porque destruian datos IRREPRODUCIBLES.
+ *
+ *   · POST /reset-sistema      → `etl/carga/11_reset_clickhouse.py`
+ *         Hacia `DROP TABLE IF EXISTS` sobre `fact_eventos` y las 7
+ *         dimensiones del nucleo. Detras de un dialogo que solo pedia teclear
+ *         «CONFIRMAR».
+ *   · POST /cargar-clickhouse  → `etl/carga/09_load_clickhouse.py`
+ *         Hace `TRUNCATE TABLE` de cada dimension y las repuebla desde
+ *         `data/stage/datos.parquet`, un volcado de mayo de 2026. Sobre la
+ *         base de hoy eso no es «cargar»: es sustituir.
+ *   · POST /extraer-pocketbase → `etl/extraccion/08_extract_pocketbase.py`
+ *         Primer paso de esa misma cadena. Exige un PocketBase en
+ *         `host.docker.internal:8090` que ya no existe (el servicio se
+ *         elimino del compose), asi que no puede completarse de ningun modo.
+ *   · POST /carga-completa     → los tres anteriores en secuencia.
+ *
+ * MOTIVO: `fact_eventos` tiene 2.823.245 filas acumuladas durante un semestre
+ * a ~108.584 por semana. No se pueden volver a generar: el 96,2 % lo produjo
+ * un script con semilla no fijada. Por eso su volumen va declarado
+ * `external: true` en el compose y ningun `down` puede llevar `-v`.
+ *
+ * Hasta hoy los cuatro fallaban por un defecto de configuracion
+ * (`INIT_SCRIPTS_PATH` sin definir hacia que `init.scripts.path` cayera en
+ * `/app`, donde no hay scripts). Es decir: lo unico que protegia el dato era
+ * un error. Al corregir esa variable los botones habrian quedado ARMADOS, asi
+ * que se retiran ANTES.
+ *
+ * Los scripts NO se borraron del repositorio —siguen en `retailmind/etl/`
+ * como historial del pipeline PocketBase → Parquet → ClickHouse—; lo que
+ * desaparece es la via para dispararlos desde la interfaz.
+ * ─────────────────────────────────────────────────────────────────────────────
+ *
+ * Lo que queda es de SOLO LECTURA, salvo `/generar-semana`, que unicamente
+ * INSERTA en una semana vacia y aborta si la semana ya tiene una sola fila.
+ */
 @RestController
 @RequestMapping("/api/init")
 public class InicializacionController {
@@ -27,45 +69,63 @@ public class InicializacionController {
     @Value("${init.scripts.path}")
     private String scriptsPath;
 
+    private final EstadoLegadoService estadoService;
+
+    public InicializacionController(EstadoLegadoService estadoService) {
+        this.estadoService = estadoService;
+    }
+
+    // ── Estado: se CONSULTA la base, no se deduce de un proceso ──────────────
+
     /**
-     * POST /api/init/extraer-pocketbase
-     * Ejecuta etl/08_extract_pocketbase.py
+     * GET /api/init/estado
+     * Estado real de la capa legada: conexion a ClickHouse, filas de
+     * `fact_eventos`, conteo de las 13 tablas auxiliares y existencia del
+     * parquet en disco. Cada indicador de la pantalla sale de aqui.
      */
-    @PostMapping("/extraer-pocketbase")
-    public ResponseEntity<InicializacionResponseDTO> extraerPocketbase() {
-        logger.info("Iniciando extraccion desde Pocketbase");
-        InicializacionResponseDTO result = ejecutarScript(
-                "etl/extraccion/08_extract_pocketbase.py", "Extraccion desde Pocketbase");
-        return ResponseEntity.ok(result);
+    @GetMapping("/estado")
+    public ResponseEntity<Map<String, Object>> estado() {
+        return ResponseEntity.ok(estadoService.estado());
     }
 
     /**
-     * POST /api/init/cargar-clickhouse
-     * Ejecuta etl/09_load_clickhouse.py
+     * GET /api/init/semanas
+     * Semanas con su conteo real (`GROUP BY semana`), cuantos eventos de la
+     * tienda viva contiene cada una y cuales quedan libres para el generador.
      */
-    @PostMapping("/cargar-clickhouse")
-    public ResponseEntity<InicializacionResponseDTO> cargarClickhouse() {
-        logger.info("Iniciando carga a ClickHouse");
-        InicializacionResponseDTO result = ejecutarScript(
-                "etl/carga/09_load_clickhouse.py", "Carga a ClickHouse");
-        return ResponseEntity.ok(result);
+    @GetMapping("/semanas")
+    public ResponseEntity<Map<String, Object>> semanas() {
+        return ResponseEntity.ok(estadoService.semanas());
     }
+
+    // ── Diagnostico de solo lectura ──────────────────────────────────────────
 
     /**
      * POST /api/init/verificar-clickhouse
-     * Ejecuta etl/10_verify_clickhouse.py
+     * Ejecuta `etl/carga/10_verify_clickhouse.py`, que solo hace SELECT y
+     * vuelca conteos por tabla. Se conserva porque es el unico punto donde se
+     * ve la salida cruda del pipeline antiguo; los INDICADORES ya no dependen
+     * de el (los sirve `/estado`).
      */
     @PostMapping("/verificar-clickhouse")
     public ResponseEntity<InicializacionResponseDTO> verificarClickhouse() {
-        logger.info("Verificando datos en ClickHouse");
+        logger.info("Verificando datos en ClickHouse (solo lectura)");
         InicializacionResponseDTO result = ejecutarScript(
                 "etl/carga/10_verify_clickhouse.py", "Verificacion ClickHouse");
         return ResponseEntity.ok(result);
     }
 
+    // ── Generacion de semanas sinteticas ─────────────────────────────────────
+
     /**
      * POST /api/init/generar-semana?semana=N
-     * Genera 108,584 registros sintéticos para la semana indicada.
+     * Genera 108.584 registros sinteticos para la semana indicada.
+     *
+     * El script solo INSERTA, y aborta por su cuenta si la semana ya tiene
+     * filas (`verificar_semana_existe`, con `count() > 0`). Ese guardia se
+     * deja intacto: es conservador y eso es lo correcto. Aqui se le añade una
+     * comprobacion PREVIA que rechaza ademas las semanas que contienen eventos
+     * de la TIENDA REAL, para dar el motivo exacto antes de arrancar Python.
      */
     @PostMapping("/generar-semana")
     public ResponseEntity<InicializacionResponseDTO> generarSemana(
@@ -74,94 +134,30 @@ public class InicializacionController {
             return ResponseEntity.badRequest().body(new InicializacionResponseDTO(
                     false, "La semana debe estar entre 2 y 52.", "", 0, 0));
         }
+
+        // Rechazo temprano y explicito. `EventoTiendaService` escribe los
+        // eventos de la tienda con la semana ISO de hoy, asi que una semana
+        // puede estar ocupada por 19 filas reales —ya paso con la 27— y
+        // generar 108.584 sinteticos encima las volveria indistinguibles.
+        Map<String, Object> est = estadoService.semanas();
+        if (Boolean.TRUE.equals(est.get("disponible"))) {
+            @SuppressWarnings("unchecked")
+            var filas = (java.util.List<Map<String, Object>>) est.get("semanas");
+            for (Map<String, Object> f : filas) {
+                if ((Integer) f.get("semana") == semana) {
+                    return ResponseEntity.badRequest().body(new InicializacionResponseDTO(
+                            false,
+                            "La semana " + semana + " no esta libre. " + f.get("motivo") + ".",
+                            "", 0, 0));
+                }
+            }
+        }
+
         logger.info("Generando datos sinteticos para semana {}", semana);
         InicializacionResponseDTO result = ejecutarScript(
                 "etl/sinteticos/12_generate_synthetic.py --semana " + semana,
                 "Generacion semana " + semana);
         return ResponseEntity.ok(result);
-    }
-
-    /**
-     * POST /api/init/reset-sistema
-     * Ejecuta etl/11_reset_clickhouse.py - Solo ADMIN
-     */
-    @PostMapping("/reset-sistema")
-    public ResponseEntity<InicializacionResponseDTO> resetSistema() {
-        logger.warn("RESET DE SISTEMA solicitado");
-        InicializacionResponseDTO result = ejecutarScript(
-                "etl/carga/11_reset_clickhouse.py", "Reset del sistema");
-        if (result.isSuccess()) {
-            result.setMensaje("⚠️ Sistema reseteado. Todos los datos de ClickHouse han sido eliminados.");
-        }
-        return ResponseEntity.ok(result);
-    }
-
-    /**
-     * POST /api/init/crear-tienda
-     * Ejecuta etl/13_create_shop_tables.py - Crea tablas de tienda y pobla catalogo
-     */
-    @PostMapping("/crear-tienda")
-    public ResponseEntity<InicializacionResponseDTO> crearTienda() {
-        logger.info("Creando tablas de tienda y poblando catalogo");
-        InicializacionResponseDTO result = ejecutarScript(
-                "etl/extraccion/13_create_shop_tables.py", "Creacion de tienda");
-        return ResponseEntity.ok(result);
-    }
-
-    /**
-     * POST /api/init/carga-completa
-     * Ejecuta los 3 pasos en secuencia:
-     * 08_extract_pocketbase → 09_load_clickhouse → 10_verify_clickhouse
-     */
-    @PostMapping("/carga-completa")
-    public ResponseEntity<InicializacionResponseDTO> cargaCompleta() {
-        logger.info("Iniciando carga completa (3 pasos)");
-        long inicio = Instant.now().getEpochSecond();
-        StringBuilder outputTotal = new StringBuilder();
-        long registrosTotal = 0;
-
-        // Paso 1: Extraer de Pocketbase
-        outputTotal.append("=== PASO 1: Extraccion desde Pocketbase ===\n");
-        InicializacionResponseDTO paso1 = ejecutarScript(
-                "etl/extraccion/08_extract_pocketbase.py", "Extraccion Pocketbase");
-        outputTotal.append(paso1.getOutput()).append("\n");
-
-        if (!paso1.isSuccess()) {
-            long dur = Instant.now().getEpochSecond() - inicio;
-            return ResponseEntity.ok(new InicializacionResponseDTO(
-                    false, "Fallo en Paso 1: Extraccion desde Pocketbase",
-                    outputTotal.toString(), dur, 0));
-        }
-
-        // Paso 2: Cargar a ClickHouse
-        outputTotal.append("=== PASO 2: Carga a ClickHouse ===\n");
-        InicializacionResponseDTO paso2 = ejecutarScript(
-                "etl/carga/09_load_clickhouse.py", "Carga ClickHouse");
-        outputTotal.append(paso2.getOutput()).append("\n");
-        registrosTotal = paso2.getRegistrosCargados();
-
-        if (!paso2.isSuccess()) {
-            long dur = Instant.now().getEpochSecond() - inicio;
-            return ResponseEntity.ok(new InicializacionResponseDTO(
-                    false, "Fallo en Paso 2: Carga a ClickHouse",
-                    outputTotal.toString(), dur, 0));
-        }
-
-        // Paso 3: Verificar
-        outputTotal.append("=== PASO 3: Verificacion ===\n");
-        InicializacionResponseDTO paso3 = ejecutarScript(
-                "etl/carga/10_verify_clickhouse.py", "Verificacion");
-        outputTotal.append(paso3.getOutput()).append("\n");
-
-        long dur = Instant.now().getEpochSecond() - inicio;
-        boolean ok = paso3.isSuccess();
-        logger.info("Carga completa finalizada: {} ({}s)", ok ? "EXITO" : "ERROR", dur);
-
-        return ResponseEntity.ok(new InicializacionResponseDTO(
-                ok,
-                ok ? "Carga completa ejecutada exitosamente (3/3 pasos)."
-                   : "Carga completa finalizo con advertencias en verificacion.",
-                outputTotal.toString(), dur, registrosTotal));
     }
 
     // ── Utilidad: ejecutar script Python ─────────────────────────────────────
@@ -213,33 +209,18 @@ public class InicializacionController {
             // Intentar extraer registros cargados del output
             long registros = extraerRegistros(output.toString());
 
-            // Sanitizar output si contiene errores de tabla inexistente
-            String outputFinal = sanitizarOutput(output.toString());
-
             return new InicializacionResponseDTO(ok,
                     ok ? descripcion + " completado exitosamente."
                        : descripcion + " finalizo con errores (codigo " + exitCode + ").",
-                    outputFinal, dur, registros);
+                    output.toString(), dur, registros);
 
         } catch (Exception e) {
             long dur = Instant.now().getEpochSecond() - inicio;
             logger.error("Excepcion al ejecutar {}: {}", descripcion, e.getMessage(), e);
             return new InicializacionResponseDTO(false,
                     "Error al ejecutar " + descripcion + ": " + e.getMessage(),
-                    sanitizarOutput(output.toString()), dur, 0);
+                    output.toString(), dur, 0);
         }
-    }
-
-    /**
-     * Reemplaza mensajes técnicos de ClickHouse por mensajes amigables.
-     */
-    private String sanitizarOutput(String output) {
-        if (output.contains("UNKNOWN_TABLE") || output.contains("Unknown table expression identifier")
-                || output.contains("Table retailmind.") && output.contains("does not exist")) {
-            return "⚠️  Tabla no encontrada - El sistema está vacío.\n" +
-                   "Ejecute CARGA COMPLETA DESDE POCKETBASE para inicializar.\n";
-        }
-        return output;
     }
 
     /**

@@ -6,11 +6,38 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatDividerModule } from '@angular/material/divider';
-import { MatDialogModule, MatDialog } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { InicializacionService, InicializacionResponse } from '../../../core/services/inicializacion.service';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import {
+  InicializacionService,
+  EstadoLegado,
+  SemanasEstado
+} from '../../../core/services/inicializacion.service';
+import { mensajeError } from '../../../core/services/api-error.util';
 
+/**
+ * Estado de la capa analitica LEGADA (base `retailmind` de ClickHouse).
+ *
+ * ── NO REINTRODUCIR ─────────────────────────────────────────────────────────
+ * Esta pantalla tenia una «Zona de Peligro» con «RESETEAR SISTEMA COMPLETO»
+ * (que ejecutaba `DROP TABLE` sobre `fact_eventos` y las 7 dimensiones) y una
+ * «Carga Inicial» con «CARGA COMPLETA DESDE POCKETBASE» (cuyo segundo paso
+ * hacia `TRUNCATE` de las dimensiones desde un parquet de mayo). Se retiraron
+ * el 2026-08-08 junto con sus endpoints: el dato son 2.823.245 filas
+ * acumuladas durante un semestre y NO se pueden regenerar.
+ *
+ * ── POR QUE YA NO SE PARSEA EL `stdout` ─────────────────────────────────────
+ * Los cuatro indicadores anteriores no consultaban nada. Salian de una sola
+ * llamada POST y se deducian aqui con expresiones regulares sobre la salida de
+ * un proceso Python:
+ *
+ *   estadoClickhouse = res.success            // el CODIGO DE SALIDA, no la base
+ *   estadoPocketbase = true                   // una CONSTANTE
+ *   estadoParquet    = output.includes('fact_eventos')   // no miraba el disco
+ *
+ * Con el proceso caido los cuatro se apagaban aunque ClickHouse tuviera sus
+ * 2,8 M de filas, y el de Pocketbase se pintaba verde sin servicio y sin red.
+ * Ahora cada cifra viene de `GET /api/init/estado`, que las consulta.
+ */
 @Component({
   selector: 'app-inicializacion',
   standalone: true,
@@ -22,41 +49,27 @@ import { InicializacionService, InicializacionResponse } from '../../../core/ser
     MatIconModule,
     MatProgressBarModule,
     MatDividerModule,
-    MatDialogModule,
-    MatFormFieldModule,
-    MatInputModule
+    MatTooltipModule
   ],
   templateUrl: './inicializacion.component.html',
   styleUrl: './inicializacion.component.scss'
 })
 export class InicializacionComponent implements OnInit, OnDestroy {
 
-  // Estado del sistema
-  estadoPocketbase = false;
-  estadoClickhouse = false;
-  estadoParquet = false;
-  estadoTablas = false;
+  // ── Estado real ────────────────────────────────────────────────────────────
+  estado: EstadoLegado | null = null;
+  semanas: SemanasEstado | null = null;
   verificando = false;
-  sistemaVacio = false;
+  errorEstado = '';
 
-  // Ejecución
+  // ── Diagnostico (script de solo lectura) ───────────────────────────────────
   ejecutando = false;
-  ejecutandoPaso: string | null = null;
-  progreso = 0;
   tiempoTranscurrido = 0;
   private timerInterval: any = null;
 
-  // Consola
   consolaOutput = '';
 
-  // Reset
-  mostrarDialogReset = false;
-  confirmacionTexto = '';
-
-  constructor(
-    private inicializacionService: InicializacionService,
-    private dialog: MatDialog
-  ) {}
+  constructor(private inicializacionService: InicializacionService) {}
 
   ngOnInit(): void {
     this.verificarEstado();
@@ -66,147 +79,83 @@ export class InicializacionComponent implements OnInit, OnDestroy {
     this.detenerTimer();
   }
 
-  // ── Sección 1: Estado del sistema ──────────────────────────────────────────
+  // ── Estado del sistema ─────────────────────────────────────────────────────
 
   verificarEstado(): void {
     this.verificando = true;
-    this.inicializacionService.verificarClickhouse().subscribe({
-      next: (res) => {
+    this.errorEstado = '';
+
+    this.inicializacionService.estado().subscribe({
+      next: (est) => {
+        this.estado = est;
         this.verificando = false;
-        this.consolaOutput += res.output + '\n';
-        this.parseEstado(res);
-        this.detectarSistemaVacio(res.output);
       },
       error: (err) => {
+        this.estado = null;
         this.verificando = false;
-        this.consolaOutput += `Error al verificar: ${err.message}\n`;
-        this.estadoPocketbase = false;
-        this.estadoClickhouse = false;
-        this.estadoParquet = false;
-        this.estadoTablas = false;
-        this.sistemaVacio = true;
+        this.errorEstado = mensajeError(err, 'No se pudo leer el estado de la capa analitica.');
       }
     });
-  }
 
-  private parseEstado(res: InicializacionResponse): void {
-    const output = res.output || '';
-    this.estadoClickhouse = res.success;
-    this.estadoPocketbase = true;
-    this.estadoParquet = output.includes('fact_eventos') && !output.includes('ERROR');
-    this.estadoTablas = output.includes('fact_eventos') &&
-                        !output.includes('0') || output.match(/fact_eventos\s+\d{2,}/) !== null;
-    const match = output.match(/fact_eventos\s+(\d[\d,]*)/);
-    if (match) {
-      const count = parseInt(match[1].replace(/,/g, ''), 10);
-      this.estadoTablas = count > 0;
-    }
-  }
-
-  // ── Sección 2: Carga inicial ───────────────────────────────────────────────
-
-  ejecutarCargaCompleta(): void {
-    this.iniciarEjecucion('carga-completa');
-    this.inicializacionService.cargaCompleta().subscribe({
-      next: (res) => this.finalizarEjecucion(res),
-      error: (err) => this.finalizarConError(err)
+    this.inicializacionService.semanas().subscribe({
+      next: (sem) => (this.semanas = sem),
+      error: () => (this.semanas = null)
     });
   }
 
-  ejecutarPaso1(): void {
-    this.iniciarEjecucion('extraer');
-    this.inicializacionService.extraerPocketbase().subscribe({
-      next: (res) => this.finalizarEjecucion(res),
-      error: (err) => this.finalizarConError(err)
-    });
+  // ── Indicadores derivados (siempre de una cifra real) ──────────────────────
+
+  get clickhouseOk(): boolean {
+    return !!this.estado?.clickhouseConectado;
   }
 
-  ejecutarPaso2(): void {
-    this.iniciarEjecucion('cargar');
-    this.inicializacionService.cargarClickhouse().subscribe({
-      next: (res) => this.finalizarEjecucion(res),
-      error: (err) => this.finalizarConError(err)
-    });
+  get factEventosOk(): boolean {
+    return !!this.estado?.factEventosConDatos;
   }
 
-  ejecutarPaso3(): void {
-    this.iniciarEjecucion('verificar');
+  get dimensionesOk(): boolean {
+    return !!this.estado && this.estado.dimensionesConDatos === this.estado.dimensionesTotales;
+  }
+
+  get semanasOk(): boolean {
+    return !!this.estado && this.estado.semanasDistintas > 0;
+  }
+
+  /** Tamaño legible del parquet, para el bloque de historial. */
+  get parquetTamano(): string {
+    const b = this.estado?.parquetBytes ?? 0;
+    if (!b) return '—';
+    return (b / 1024 / 1024).toFixed(2) + ' MB';
+  }
+
+  // ── Diagnostico de solo lectura ────────────────────────────────────────────
+
+  ejecutarDiagnostico(): void {
+    this.ejecutando = true;
+    this.tiempoTranscurrido = 0;
+    this.consolaOutput += `\n>>> Ejecutando verificador de solo lectura...\n`;
+    this.iniciarTimer();
+
     this.inicializacionService.verificarClickhouse().subscribe({
-      next: (res) => this.finalizarEjecucion(res),
-      error: (err) => this.finalizarConError(err)
-    });
-  }
-
-  // ── Sección 4: Reset ──────────────────────────────────────────────────────
-
-  abrirDialogReset(): void {
-    this.mostrarDialogReset = true;
-    this.confirmacionTexto = '';
-  }
-
-  cerrarDialogReset(): void {
-    this.mostrarDialogReset = false;
-    this.confirmacionTexto = '';
-  }
-
-  get puedeResetear(): boolean {
-    return this.confirmacionTexto === 'CONFIRMAR';
-  }
-
-  ejecutarReset(): void {
-    if (!this.puedeResetear) return;
-    this.cerrarDialogReset();
-    this.iniciarEjecucion('reset');
-    this.inicializacionService.resetSistema().subscribe({
       next: (res) => {
-        this.finalizarEjecucion(res);
-        this.estadoTablas = false;
-        this.estadoParquet = false;
+        this.detenerTimer();
+        this.ejecutando = false;
+        this.consolaOutput += res.output + '\n';
+        this.consolaOutput += `\n${res.success ? '✅' : '❌'} ${res.mensaje} (${res.duracionSegundos}s)\n`;
+        this.verificarEstado();
       },
-      error: (err) => this.finalizarConError(err)
+      error: (err) => {
+        this.detenerTimer();
+        this.ejecutando = false;
+        this.consolaOutput += `\n❌ ${mensajeError(err, 'No se pudo ejecutar el verificador.')}\n`;
+      }
     });
   }
 
   // ── Utilidades ─────────────────────────────────────────────────────────────
 
-  private iniciarEjecucion(paso: string): void {
-    this.ejecutando = true;
-    this.ejecutandoPaso = paso;
-    this.progreso = 0;
-    this.tiempoTranscurrido = 0;
-    this.consolaOutput += `\n>>> Iniciando: ${paso} ...\n`;
-    this.iniciarTimer();
-  }
-
-  private finalizarEjecucion(res: InicializacionResponse): void {
-    this.detenerTimer();
-    this.ejecutando = false;
-    this.ejecutandoPaso = null;
-    this.progreso = 100;
-    this.consolaOutput += res.output + '\n';
-    this.consolaOutput += `\n${res.success ? '✅' : '❌'} ${res.mensaje} (${res.duracionSegundos}s)\n`;
-    this.detectarSistemaVacio(res.output);
-  }
-
-  private detectarSistemaVacio(output: string): void {
-    this.sistemaVacio = output.includes('sistema está vacío') ||
-                        output.includes('Tabla no encontrada');
-  }
-
-  private finalizarConError(err: any): void {
-    this.detenerTimer();
-    this.ejecutando = false;
-    this.ejecutandoPaso = null;
-    this.consolaOutput += `\n❌ Error de conexión: ${err.message || err.statusText}\n`;
-  }
-
   private iniciarTimer(): void {
-    this.timerInterval = setInterval(() => {
-      this.tiempoTranscurrido++;
-      if (this.progreso < 90) {
-        this.progreso += 2;
-      }
-    }, 1000);
+    this.timerInterval = setInterval(() => this.tiempoTranscurrido++, 1000);
   }
 
   private detenerTimer(): void {

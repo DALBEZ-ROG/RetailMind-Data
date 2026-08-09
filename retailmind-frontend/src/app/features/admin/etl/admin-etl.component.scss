@@ -107,9 +107,91 @@
   margin-bottom: 16px;
 }
 
-.opcion-siguiente {
-  font-weight: 700 !important;
-  color: #1a237e !important;
+// ── Origen de cada semana y disponibilidad del generador ───────────────────
+// El selector distingue libre / ocupada / ocupada-por-la-tienda, porque
+// generar sobre una semana con eventos reales los vuelve indistinguibles.
+
+.origen-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  background: #eceff1;
+  color: #546e7a;
+
+  &.origen-tienda {
+    background: #fff3e0;
+    color: #e65100;
+  }
+}
+
+.opcion-fila {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.opcion-icono {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  color: #bdbdbd;
+
+  &.libre  { color: #43a047; }
+  &.tienda { color: #ef6c00; }
+}
+
+.opcion-motivo {
+  margin-left: auto;
+  font-size: 0.74rem;
+  color: var(--text-light, #90a4ae);
+  white-space: nowrap;
+}
+
+.motivo-seleccion,
+.aviso-ocupadas,
+.aviso-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: var(--border-radius-sm, 6px);
+  font-size: 0.85rem;
+  margin-bottom: 16px;
+
+  mat-icon { font-size: 20px; width: 20px; height: 20px; flex-shrink: 0; }
+}
+
+.motivo-seleccion { background: #fff3e0; color: #e65100; margin-top: 4px; }
+.aviso-ocupadas   { background: #eceff1; color: #546e7a; }
+.aviso-error      { background: #fdecea; color: #b71c1c; }
+
+.nota-tienda {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 12px 0 0;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--text-light, #78909c);
+
+  code {
+    background: #eceff1;
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+  .inline-icon {
+    font-size: 15px;
+    width: 15px;
+    height: 15px;
+    vertical-align: middle;
+    color: #ef6c00;
+  }
 }
 
 .progress-section {
