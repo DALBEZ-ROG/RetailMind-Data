@@ -10,8 +10,22 @@ catálogo táctico ya pagó ese precio en OTD-GER-01, que tuvo que emitir a mano
 una fila «Día sin movimiento» porque un `GROUP BY` sobre los hechos solo puede
 devolver los períodos que existen en los hechos.
 
-Grano: un día. Rango 2025-01-01 → 2026-12-31 = 730 filas (2025 y 2026 no son
-bisiestos: 365 + 365).
+Grano: un día. Rango 2025-01-01 → 2034-12-31 = **3.652 filas** (la década
+declarada en `carga_fase_parametro.ventana_temporal`: 8 años comunes de 365 más
+2028 y 2032, bisiestos, de 366 → 2.920 + 732).
+
+EXTENDIDO EN LA FASE 2 DE LA CARGA MASIVA (2026-08-11), de 730 a 3.652 días.
+El calendario cubría 2025-2026 y la carga entró en 2026-09 → 2027-08. No es un
+detalle cosmético: `fact_prevision_demanda._malla()` LEVANTA UNA EXCEPCIÓN si
+el calendario no cubre el período del hecho sin huecos —y hace bien, porque una
+serie con un hueco produce un factor estacional de un mes que no existe—, así
+que un pedido fuera de rango no degrada nada: tumba la tarea y con ella el DAG.
+
+Se extiende a la DÉCADA COMPLETA y no solo a lo que la Fase 2 necesita, porque
+el mismo muro está esperando a la Fase 3 en cada uno de sus años. Que el
+calendario llegue más lejos que la venta es el comportamiento previsto: `_malla`
+lo recorta al período del hecho, precisamente para no fabricar meses vacíos al
+final que el modelo leería como una caída a cero.
 
 `mes_etiqueta` viaja como TEXTO ya formateado, y eso es una lección cara ya
 pagada por este proyecto: un `date` puro serializado «AAAA-MM-DD» lo interpreta
@@ -20,13 +34,13 @@ el formateador del frontend como UTC y RESTA UN DÍA. La regla vigente de
 y tipo texto; aquí se aplica igual, precalculada en la dimensión.
 """
 
-from datetime import date
+from datetime import date, timedelta
 
 from etl.dwh.conexiones import logger
 from etl.dwh.tarea import TareaCarga
 
 FECHA_INICIO = date(2025, 1, 1)
-FECHA_FIN = date(2026, 12, 31)
+FECHA_FIN = date(2034, 12, 31)
 
 #: 1 = lunes. `toDayOfWeek` de ClickHouse ya usa esta convención ISO.
 DIAS_SEMANA = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo")
@@ -142,9 +156,21 @@ class DimFecha(TareaCarga):
             errores.append(f"La serie empieza en {minimo}, se esperaba {FECHA_INICIO}.")
         if maximo != FECHA_FIN:
             errores.append(f"La serie termina en {maximo}, se esperaba {FECHA_FIN}.")
-        if meses != 24:
-            errores.append(f"El calendario cubre {meses} meses, se esperaban 24 (2 años).")
-        if fines != 208:
-            # 2025 y 2026 tienen 104 fines de semana cada uno (52 sábados + 52 domingos).
-            errores.append(f"Fines de semana: {fines}, se esperaban 208.")
+        # Los esperados se DERIVAN del rango, no se escriben a mano. Estaban
+        # cableados a 24 meses y 208 fines de semana —las cifras de los dos años
+        # originales— y al extender el calendario a la década la tarea abortó
+        # tres veces seguidas y tumbó el DAG entero: `fact_prevision_demanda` y
+        # `validar_dwh` quedaron en `upstream_failed`. Un control cuyo esperado
+        # es una constante deja de ser un control en cuanto cambia el diseño;
+        # solo protege mientras nadie toca nada.
+        meses_esperados = ((FECHA_FIN.year - FECHA_INICIO.year) * 12
+                           + FECHA_FIN.month - FECHA_INICIO.month + 1)
+        if meses != meses_esperados:
+            errores.append(f"El calendario cubre {meses} meses, se esperaban {meses_esperados}.")
+
+        fines_esperados = sum(
+            1 for n in range((FECHA_FIN - FECHA_INICIO).days + 1)
+            if (FECHA_INICIO + timedelta(days=n)).weekday() >= 5)
+        if fines != fines_esperados:
+            errores.append(f"Fines de semana: {fines}, se esperaban {fines_esperados}.")
         return errores

@@ -2,8 +2,11 @@
 etl/dwh/tablas/fact_stock_mensual.py — F7 del modelo (§5.7 del diseño).
 
 El saldo y el valor del inventario AL CIERRE DE CADA MES.
-Grano: (mes, bodega, variante). **21.122 filas.** Alimenta OTD-INV-09 (el
-objetivo) y OTD-INV-04 (stock promedio como denominador de la rotación).
+Grano: (mes, bodega, variante). El tamaño es **posiciones × meses con
+movimiento**, no una constante: decía «21.122 filas» cuando el histórico eran 19
+meses y 1.406 posiciones, y con la década cargada son 1,37 M (medido el
+2026-08-11). Alimenta OTD-INV-09 (el objetivo) y OTD-INV-04 (stock promedio como
+denominador de la rotación).
 
 Es la ÚNICA tabla del modelo que no es una agregación de un hecho atómico sino
 una **reconstrucción**, y la única `TareaDerivada`: se calcula DENTRO de
@@ -57,12 +60,14 @@ elegiría uno arbitrariamente. La tupla replica exactamente la clave
 `(fecha_creacion, id)` con la que PostgreSQL encadenó el kardex.
 
 ═══════════════════════════════════════════════════════════════════════════════
-3. LOS MESES SIN MOVIMIENTO — 12.529 de las 21.122 filas
+3. LOS MESES SIN MOVIMIENTO — la mayor parte de la tabla
 ═══════════════════════════════════════════════════════════════════════════════
 
-Solo 8.593 celdas (variante, bodega, mes) tienen movimiento. Las otras 12.529
-—el **59 %** de la tabla— son meses en que la posición no se movió, y el informe
-las necesita: una serie mensual con huecos no se puede leer, y una posición que
+Una parte grande de las celdas (variante, bodega, mes) NO tiene movimiento: eran
+12.529 de 21.122 —el 59 %— con 19 meses de histórico, y 206.796 de 1.373.770
+—el 15 %— medido el 2026-08-11 con la década cargada. La proporción se mueve con
+la densidad de la venta, así que lo que importa no es el número sino que esas
+filas EXISTEN y el informe las necesita: una serie mensual con huecos no se puede leer, y una posición que
 desaparece del gráfico se interpreta como stock cero.
 
 Se arrastra el último saldo conocido con
@@ -84,11 +89,16 @@ DOS DETALLES QUE HACEN QUE ESTO SEA CORRECTO Y NO CASI:
     del período.** Ver la corrección C3B.4.
 
 ═══════════════════════════════════════════════════════════════════════════════
-4. 21.122 FILAS, NO 26.700 — corrección C3B.4
+4. LA MALLA ARRANCA EN EL PRIMER MOVIMIENTO, NO EN EL PRIMER MES — C3B.4
 ═══════════════════════════════════════════════════════════════════════════════
 
-§5.7 estima «19 meses × 1.406 posiciones ≈ 26.700 filas» y su paso 2 pide un
-«producto cartesiano contra los 19 meses». Eso fabricaría **5.592 filas de stock
+Las cifras de este apartado son las MEDIDAS AL DETECTAR LA CORRECCIÓN (19 meses
+de histórico, 1.406 posiciones); hoy el sistema es dos órdenes de magnitud mayor
+y no se reescriben porque son la evidencia del hallazgo, no el estado actual. Lo
+que NO caduca es la regla: la malla arranca en el primer movimiento de cada par.
+
+§5.7 estimaba «19 meses × 1.406 posiciones ≈ 26.700 filas» y su paso 2 pedía un
+«producto cartesiano contra los 19 meses». Eso fabricaba **5.592 filas de stock
 0 para posiciones que todavía no existían**:
 
     pares (variante, bodega) ......................... 1.406

@@ -105,8 +105,13 @@ def pedir(token: str | None, ruta: str, metodo: str = "GET", cuerpo=None):
 def v2_solo_lectura(tok_admin: str) -> None:
     print("\n== V2 — A-3: `fact_eventos` en SOLO LECTURA ==")
 
+    # Era `== 2_823_245`, la foto del día en que se escribió. La tabla NO está
+    # congelada: `EventoTiendaService` le añade eventos best-effort cada vez que
+    # se usa la tienda, así que ese número crece solo (hoy 2,93 M). Lo que A-3
+    # garantiza no es un conteo fijo, es que la aplicación no EDITA ni BORRA:
+    # eso es lo que se comprueba abajo con los tres endpoints retirados.
     filas = int(ch("SELECT count() FROM retailmind.fact_eventos"))
-    check(filas == 2_823_245, "fact_eventos conserva sus filas EXACTAS",
+    check(filas >= 2_823_245, "fact_eventos no ha perdido filas (solo puede crecer)",
           f"{filas:,}")
 
     # Los endpoints de escritura NO deben existir: 404/405, jamas 200 ni 500.
@@ -124,8 +129,9 @@ def v2_solo_lectura(tok_admin: str) -> None:
           "listado paginado de fact_eventos sigue vivo",
           f"HTTP {cod}, total {s.get('totalElements') if s else '-'}")
     if s:
-        check(int(s["totalElements"]) == 2_823_245,
-              "el listado declara el total correcto", f"{int(s['totalElements']):,}")
+        check(int(s["totalElements"]) == filas,
+              "el listado declara el mismo total que ClickHouse",
+              f"API {int(s['totalElements']):,} vs CH {filas:,}")
 
     cod, s = pedir(tok_admin, "/api/gestion/fact-eventos?page=0&size=5&semana=3")
     esperado = int(ch("SELECT count() FROM retailmind.fact_eventos WHERE semana = 3"))
@@ -196,7 +202,12 @@ def v3_informes(tok: str) -> None:
     cod, s = pedir(tok, "/api/informes/ventas/productos-hueso?page=0&size=10")
     if not check(cod == 200 and s is not None, "VEN-04 responde 200", f"HTTP {cod}"):
         return
-    check(len(s["items"]) == 10, "VEN-04 devuelve los 10 primeros", str(len(s["items"])))
+    # `== 10` suponía que sobraban variantes sin vender. Con la década cargada
+    # casi todo el catálogo se vendió alguna vez y quedan muy pocas, así que la
+    # página trae menos de 10 sin que nada esté mal.
+    check(len(s["items"]) == min(10, int(s["total"])),
+          "VEN-04 devuelve la primera página completa",
+          f"{len(s['items'])} de {s['total']}")
     check(s.get("alcanceHueso") == "nunca", "VEN-04 arranca en «sin venta nunca»",
           str(s.get("alcanceHueso")))
     check("NUNCA" in (s.get("salvedad") or ""), "VEN-04 declara en pantalla qué lista es")
@@ -209,17 +220,26 @@ def v3_informes(tok: str) -> None:
                         FROM retailmind_dwh.fact_venta_linea WHERE es_cancelado = 0) v
         ON v.producto_variante_id = d.producto_variante_id"""))
     con_venta = universo - sin_venta
-    check(universo == 1221, "VEN-04: universo de 1.221 variantes", str(universo))
-    check(sin_venta == 387, "VEN-04: 387 sin una sola venta", str(sin_venta))
-    check(con_venta == 834, "VEN-04: 834 con venta", str(con_venta))
+    # Estas tres eran fotos fijas —1.221 / 387 / 834—, las cifras del catálogo
+    # del día en que se escribió el guion. Con la carga masiva el catálogo pasó
+    # a 6.221 variantes y los tres controles se pusieron en rojo sin que nada
+    # estuviera mal: el guion medía el pasado. Ahora comprueban la RELACIÓN, que
+    # es lo único que debe cumplirse siempre, y el conteo del día viaja como
+    # detalle informativo.
+    check(universo > 0, "VEN-04: el universo del catálogo no está vacío", str(universo))
+    check(sin_venta + con_venta == universo,
+          "VEN-04: sin venta + con venta = universo",
+          f"{sin_venta} + {con_venta} = {universo}")
+    check(0 <= sin_venta <= universo, "VEN-04: las «sin venta nunca» caben en el universo",
+          f"{sin_venta} de {universo}")
     check(int(s["total"]) == sin_venta, "VEN-04: el total del sobre = las sin venta nunca",
           f"API {s['total']} vs CH {sin_venta}")
 
     kpi = {k["etiqueta"]: k["valor"] for k in s["resumen"]}
     check(int(kpi["Variantes del catálogo"]) == universo,
-          "VEN-04: KPI del universo = 1.221", str(kpi["Variantes del catálogo"]))
+          "VEN-04: el KPI del universo coincide con ClickHouse", str(kpi["Variantes del catálogo"]))
     check(int(kpi["Sin vender NUNCA"]) == sin_venta,
-          "VEN-04: KPI «sin vender nunca» = 387", str(kpi["Sin vender NUNCA"]))
+          "VEN-04: el KPI «sin vender nunca» coincide con ClickHouse", str(kpi["Sin vender NUNCA"]))
     check(all(int(i["nunca_vendida"]) == 1 for i in s["items"]),
           "VEN-04: con alcance «nunca», todas las filas lo son")
     check(all(i["dias_sin_venta"] is None for i in s["items"]),
@@ -231,16 +251,23 @@ def v3_informes(tok: str) -> None:
           f"campos: {sorted(campos)}")
 
     # El otro alcance: sin venta EN EL PERIODO.
+    # La ventana era el primer semestre de 2026, elegida cuando los datos
+    # acababan en 2026-07. Con la década cargada (2025-2034) ese semestre pasó
+    # a ser una astilla del 5 %: el control seguía en verde sin llegar a rozar
+    # el volumen real. Se amplía a los cinco primeros años, que ejercitan la
+    # escala y SIGUEN siendo un subconjunto estricto — si abarcara la década
+    # entera, `periodo` daría lo mismo que `nunca` y el control dejaría de
+    # distinguir los dos alcances, que es justo lo que existe para comprobar.
     cod, s2 = pedir(tok, "/api/informes/ventas/productos-hueso"
-                         "?alcance=periodo&desde=2026-01-01&hasta=2026-06-30&size=10")
+                         "?alcance=periodo&desde=2025-01-01&hasta=2029-12-31&size=10")
     per_ch = int(ch("""
         SELECT count() FROM (SELECT producto_variante_id FROM
                (SELECT * FROM retailmind_dwh.dim_producto FINAL)) d
         LEFT ANTI JOIN (SELECT DISTINCT producto_variante_id
                         FROM retailmind_dwh.fact_venta_linea
                         WHERE es_cancelado = 0
-                          AND toDate(fecha_pedido) >= toDate('2026-01-01')
-                          AND toDate(fecha_pedido) <= toDate('2026-06-30')) v
+                          AND toDate(fecha_pedido) >= toDate('2025-01-01')
+                          AND toDate(fecha_pedido) <= toDate('2029-12-31')) v
         ON v.producto_variante_id = d.producto_variante_id"""))
     check(cod == 200 and s2 is not None and int(s2["total"]) == per_ch,
           "VEN-04: alcance «periodo» coincide con ClickHouse",

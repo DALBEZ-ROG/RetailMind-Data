@@ -16,12 +16,34 @@ import { DefinicionTablero } from '../../../../core/models/tablero.model';
 
 const DIRECCION = ['ADMIN', 'GERENTE', 'ANALISTA'] as const;
 
-/** El rango arranca cubriendo TODO el histórico: es una vista de dirección. */
+/**
+ * El rango arranca VACÍO, y eso significa «todo el histórico».
+ *
+ * Antes traía `2025-01-01` y `2026-12-31` escritos a mano, y la intención era
+ * exactamente ésta: cuando se escribieron, el histórico ERA ese rango. Al
+ * crecer los datos a una década (2025-2034) esas dos constantes dejaron de
+ * describir el histórico y pasaron a RECORTARLO, sin avisar: el tablero abría
+ * mostrando el 20 % de la información con aspecto de estar completa. Un filtro
+ * por defecto que caduca es peor que uno ausente, porque no falla — miente.
+ *
+ * Se dejan en blanco a propósito. El backend omite la condición cuando el
+ * filtro no llega (`InformeServiceBase.fecha()` devuelve `null` y `Filtros.y()`
+ * no añade el `WHERE`), así que el tablero sirve la serie entera y el usuario
+ * acota si quiere. El sobre del backend sigue declarando `primerMesConDato` /
+ * `ultimoMesConDato`, de modo que la pantalla dice qué periodo está viendo.
+ *
+ * Y no sale caro, que era la duda razonable: medido contra la década completa
+ * frente a la ventana de dos años que había, los siete tableros NO se degradan
+ * —T-2 pasa de 1.495 ms a 1.066 ms, T-3 de 1.185 a 678—. ClickHouse agrega por
+ * mes sobre un almacén columnar: los meses de más apenas cuestan, y el recorte
+ * no estaba ahorrando nada. La decisión no se toma por elegancia: se toma
+ * porque el número dice que no hay que pagar por ella.
+ */
 const FILTRO_DESDE = {
-  param: 'desde', etiqueta: 'Desde', tipo: 'fecha' as const, valorInicial: '2025-01-01'
+  param: 'desde', etiqueta: 'Desde', tipo: 'fecha' as const, valorInicial: ''
 };
 const FILTRO_HASTA = {
-  param: 'hasta', etiqueta: 'Hasta', tipo: 'fecha' as const, valorInicial: '2026-12-31'
+  param: 'hasta', etiqueta: 'Hasta', tipo: 'fecha' as const, valorInicial: ''
 };
 
 export const TABLEROS: DefinicionTablero[] = [

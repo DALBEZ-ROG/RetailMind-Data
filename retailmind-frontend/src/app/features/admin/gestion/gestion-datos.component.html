@@ -43,16 +43,27 @@
 
     <!-- `fact_eventos` es de SOLO LECTURA (deuda A-3, 2026-08-07).
          Aquí estaba el panel de edición. Se retiró junto con los botones de
-         editar y eliminar de la tabla: `event_pk` no identifica una fila
-         (50.000 valores para 2.823.245 filas, 52-139 filas por valor), así que
-         editar reescribía un centenar de eventos y borrar los destruía. El
-         motivo completo está en `GestionDatosService`. NO reintroducir. -->
+         editar y eliminar de la tabla: `event_pk` NO identifica una fila —hay
+         50.000 valores distintos para varios millones de eventos, así que cada
+         valor lo comparten decenas de filas—, y por eso editar reescribía un
+         centenar de eventos de sesiones ajenas y borrar los destruía. El motivo
+         completo está en `GestionDatosService`. NO reintroducir.
+
+         La proporción exacta NO se escribe aquí, y es deliberado: la tabla NO
+         está congelada. `EventoTiendaService` le añade eventos best-effort cada
+         vez que se usa la tienda, así que cualquier cifra que se fije caduca
+         sola. Ya pasó: este comentario decía «2.823.245 filas, 52-139 por
+         valor» y el texto que se MOSTRABA EN PANTALLA hablaba de «entre 52 y
+         139»; medido el 2026-08-11 eran 2.931.829 filas y de 54 a 142 por
+         valor. Lo que no cambia —y es lo único que justifica la decisión— es
+         que `event_pk` no es una clave. Si hace falta el número, se consulta;
+         no se congela en una plantilla. -->
     <div class="aviso-solo-lectura">
       <mat-icon>lock</mat-icon>
       <span>
         <strong>Tabla de solo lectura.</strong>
         Los eventos de navegación no se editan ni se eliminan desde aquí: la columna
-        <code>event_pk</code> no identifica una fila —cada valor lo comparten entre 52 y 139
+        <code>event_pk</code> no identifica una fila —cada valor lo comparten decenas de
         eventos de sesiones distintas—, y este histórico no se puede regenerar. Puedes
         consultarlo y filtrarlo por semana.
       </span>

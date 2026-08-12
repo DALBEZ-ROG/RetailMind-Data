@@ -5,8 +5,14 @@
   ejecutaba DROP TABLE sobre fact_eventos y las 7 dimensiones) ni la «Carga
   Inicial» («CARGA COMPLETA DESDE POCKETBASE», cuyo paso 2 hacia TRUNCATE de
   las dimensiones desde un parquet de mayo). Se retiraron el 2026-08-08 con
-  sus endpoints: son 2.823.245 filas irreproducibles. Detalle en el javadoc
-  de InicializacionController.
+  sus endpoints: ese histórico son MILLONES de filas IRREPRODUCIBLES —el
+  origen que las generaba ya no existe—, y ninguna pantalla debe poder
+  borrarlas. Detalle en el javadoc de InicializacionController.
+
+  No se escribe el conteo a propósito: la tabla sigue creciendo con el uso de
+  la tienda (`EventoTiendaService` inserta best-effort), así que un número fijo
+  aquí caduca solo. Este comentario decía «2.823.245» y el 2026-08-11 ya eran
+  2.931.829. Lo que no caduca es que son irreproducibles.
 
   Tampoco vuelve el indicador «Pocketbase conectado»: era la constante `true`
   en el componente y el servicio ya no existe en el compose.

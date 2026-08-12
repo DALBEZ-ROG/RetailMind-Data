@@ -47,7 +47,7 @@
           <mat-hint *ngIf="esGestion && !form.clienteId">Elige primero el cliente</mat-hint>
         </mat-form-field>
         <!-- Producto del reclamo (script 50): búsqueda en servidor con debounce,
-             el catálogo tiene ~1.221 variantes y no se carga completo -->
+             el catálogo tiene miles de variantes y no se carga completo -->
         <mat-form-field appearance="outline">
           <mat-label>Producto relacionado (opcional)</mat-label>
           <input matInput [(ngModel)]="productoBusqueda"

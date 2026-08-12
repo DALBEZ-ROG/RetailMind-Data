@@ -2,12 +2,16 @@
 
 Registro de lo que este sistema **no** hace, o hace apoyado en algo que puede romperse.
 Reestructurado el **2026-08-07** a partir del levantamiento del 2026-08-06.
-Última incorporación: **2026-08-07**. Entraron **C-13** y **C-14** (auditoría de fuentes
-de datos por pantalla y benchmark columnar, `docs/BENCHMARK_COLUMNAR.md`); el mismo día
-se cerró **A-3** retirando la escritura de `fact_eventos`, y de ese cierre salieron
-**C-15** (la tabla sigue sin identificador único) y **C-16** (`max(id)+1` en las altas
-de dimensión, la misma causa raíz vista antes de que muerda).
-Recuento vigente: **A = 0 · B = 28 · C = 15**.
+Última incorporación: **2026-08-11**. Entraron **C-17** (la serie de la década es
+demasiado regular y el modelo de previsión no supera al ingenuo) y **C-18** (constantes
+de configuración dimensionadas para el volumen anterior).
+Recuento vigente: **A = 0 · B = 28 · C = 17**.
+
+> **Las cifras del sistema cambiaron el 2026-08-10/11** con la carga masiva a 2.999.991
+> pedidos en una década (2025-2034). Toda entrada anterior a esa fecha que cite conteos
+> —4.083 pedidos, 1.406 posiciones, 66.082 filas del DWH— describe el estado PREVIO; el
+> defecto que documenta sigue vigente salvo que se diga lo contrario, pero su magnitud
+> hay que releerla contra las cifras de hoy, que están en `CLAUDE.md`.
 
 ## Cómo se lee este archivo
 
@@ -756,6 +760,50 @@ Funciona hoy. Apoyado en algo que puede romperse sin aviso. **15 entradas.**
 ---
 
 # D. Resuelto (histórico)
+
+### C-17 · La serie de la década es demasiado regular, y el modelo de previsión no supera al ingenuo
+
+**Qué pasa.** Tras la carga masiva, cada mes de los diez años vale casi exactamente
+`300.000 × w_mes/Σw`. Medido sobre el almacén: el **coeficiente de variación interanual
+del total mensual está entre 0,19 % y 0,68 %** — cada enero de los diez años difiere
+menos del 1 % del siguiente.
+
+**Qué rompe.** El ingenuo estacional («mismo mes del año anterior × crecimiento») saca un
+**MAPE del 0,40 %** contra una serie así. El modelo de previsión saca **0,83 %** y por
+tanto NO lo supera: publica en `modo=linea_base` con 6.237 series. La tabla se publica y
+los 49 controles cuadran, así que no es un defecto que se vea; es una limitación del
+DATO que hace que el modelo no pueda demostrar su valor.
+
+**Por qué no se arregla parcheando el modelo.** El modelo acierta: contra una serie
+determinista, la línea base ES la mejor predicción. Lo que falta es variación interanual
+—tendencia de crecimiento, choques puntuales, ruido de mes—, y eso se añade regenerando
+bloques de la carga (el método está en `100_fase3_carga.sql`), no tocando el estimador.
+
+**Lo que NO es.** No confundir con el problema de COBERTURA de banda, que sí era del
+estimador y se cerró el 2026-08-11: la banda suponía ruido de Poisson puro
+(`varianza = media`) mientras la demanda es Poisson COMPUESTO —la línea lleva
+`cantidad ∈ {1,2,3,4}`, índice de dispersión teórico 2,56 y medido **2,53**—. Corregido
+con `INDICE_DISPERSION` en `prevision_demanda.py`; la cobertura pasó de 59,7 % a 78,4 %.
+
+### C-18 · Constantes dimensionadas para el volumen anterior
+
+Tres topes se escribieron cuando el sistema tenía 4.083 pedidos y 18 meses, y a escala de
+década dejaron de servir. Los tres corregidos el 2026-08-11, pero la CLASE de problema
+sigue viva: son constantes que no fallan cuando el volumen crece, **se quedan cortas en
+silencio**.
+
+| constante | dónde | qué pasaba |
+|---|---|---|
+| `max_partitions_per_insert_block` (100) | ClickHouse | la década son 120 particiones mensuales; el INSERT moría con un HTTP 500 que solo se explicaba en el `err.log` del motor |
+| `shm_size` (64 MB, defecto de Docker) | `docker-compose.yml` | las consultas paralelas sobre tablas de millones de filas agotaban `/dev/shm`; el error NOMBRA a PostgreSQL y no tiene que ver con el disco |
+| `execution_timeout` (5 min) | DAG `retailmind_dwh` | `fact_movimiento_inventario` pasa de 5 min; la tarea moría por reloj, no por error, dejando la tabla con la versión anterior |
+
+**Y una cuarta de la misma familia, la más cara porque la ve el usuario**: los tableros
+arrancaban con `desde=2025-01-01` / `hasta=2026-12-31` escritos a mano en
+`tableros.ts`. Cuando se escribieron ERAN «todo el histórico»; con la década cargada
+recortaban al 20 % **con aspecto de estar completo**. Un filtro por defecto que caduca no
+falla: miente. Corregido dejándolo vacío (el backend omite la condición y sirve la serie
+entera, y medido no cuesta más).
 
 ## Resuelto — A-3: `fact_eventos` en solo lectura (2026-08-07, sin script)
 

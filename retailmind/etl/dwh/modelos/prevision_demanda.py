@@ -156,6 +156,31 @@ MESES_MINIMOS = 12
 #: encogido de factores, que por estar encogido cuenta como uno y no como once.
 _PARAMETROS_EFECTIVOS = 3
 
+#: ÍNDICE DE DISPERSIÓN de la demanda mensual (varianza / media).
+#:
+#: El ruido de conteo se venía tratando como POISSON PURO —varianza = media—, y
+#: eso es cierto si cada venta mueve UNA unidad. Aquí no: una línea de pedido
+#: lleva `cantidad ∈ {1,2,3,4}` con frecuencias 43,18 / 28,86 / 13,89 / 14,01 %,
+#: así que la demanda es un POISSON COMPUESTO y su índice vale
+#:
+#:     E[c²] / E[c] = 5,078 / 1,987 = 2,56
+#:
+#: Medido sobre el almacén con la década cargada —residuo de cada variante
+#: frente a su valor esperado (cuota × total del mes), 6.220 variantes— sale
+#: **2,53**. La teoría y el dato coinciden, así que no es un parche: es el
+#: parámetro que faltaba.
+#:
+#: Lo que costaba omitirlo: la banda construía una desviación de √25,65 = 5,06
+#: unidades donde la real es √(2,53 × 25,65) = 8,06 — un factor 1,59 de más
+#: estrechez. Una banda del 80 % encogida 1,59 veces cubre P(|Z| < 0,806) =
+#: 58,0 %, y la cobertura MEDIDA era 59,7 %. El criterio §5.1.6 no se toca ni
+#: se relaja: se corrige el estimador para que la banda que dice 80 % cumpla
+#: el 80 %, que es exactamente lo que ese criterio existe para vigilar.
+#:
+#: OJO si cambia la cesta: este valor depende de la distribución de `cantidad`
+#: por línea. Si un día se venden cajas de 12, hay que volver a medirlo.
+INDICE_DISPERSION = 2.53
+
 #: Nivel de confianza de la banda publicada.
 NIVEL_CONFIANZA = 80.0
 
@@ -212,7 +237,7 @@ def semiancho(valor: float, sd_relativa: float, cuantil: float,
     llegar a 1 ó 2», que es lo que en realidad se sabe.
     """
     varianza = ((valor * sd_relativa) ** 2
-                + max(valor, 1.0)
+                + INDICE_DISPERSION * max(valor, 1.0)
                 + (valor ** 2) * max(varianza_relativa_extra, 0.0))
     return cuantil * math.sqrt(varianza)
 

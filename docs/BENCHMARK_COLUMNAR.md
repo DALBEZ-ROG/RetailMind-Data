@@ -3,6 +3,39 @@
 **Fecha de ejecución**: 2026-08-07 · **Base de pruebas**: `retailmind_benchmark`
 (PostgreSQL, permanente) · **Guiones**: `retailmind/benchmark/`
 
+> ## ⚠ VIGENCIA DE ESTAS CIFRAS — nota del 2026-08-11
+>
+> **Todo lo que sigue describe el almacén tal como estaba el 2026-08-07, y ese
+> almacén ya no existe.** Las mediciones NO se han rehecho.
+>
+> | | al medir (2026-08-07) | hoy (2026-08-11) |
+> |---|---|---|
+> | Modelo del DWH | **66.082** filas | **32,60 M** filas |
+> | `fact_eventos` (escala grande) | 2.823.245 filas | sin cambio |
+> | Pedidos en la capa operativa | 4.083 | **2.999.991** |
+> | Base `retailmind` | ~250 MB | **13 GB** |
+>
+> Entre medias entraron las cuatro fases de la carga masiva (ver `CLAUDE.md`),
+> que llevaron la capa operativa a 3 millones de pedidos en una década.
+>
+> **Qué sigue siendo válido y qué no:**
+>
+> * **La CURVA sigue siendo válida, y es la conclusión del documento.** El
+>   experimento no afirma «ClickHouse gana 16,96×»: afirma que la ventaja es
+>   función del volumen, y lo demuestra con dos escalas. Eso no caduca.
+> * **El punto «a 66.082 filas PostgreSQL gana 0,74×» ya no describe a
+>   RetailMind.** Ese punto era el extremo pequeño de la curva, y el sistema se
+>   ha ido al otro extremo: hoy el modelo del DWH tiene **493 veces** las filas
+>   que tenía al medirlo, y está por encima incluso de `fact_eventos`, que era
+>   la escala grande del experimento. Leerlo hoy como «para RetailMind da igual
+>   el motor» sería exactamente la lectura equivocada.
+> * **Los tiempos absolutos de las cuatro consultas no son reproducibles** sin
+>   volver a cargar `retailmind_benchmark`, que conserva la copia de 2026-08-07.
+>
+> No se rehace aquí a propósito: rehacerlo es un experimento con su propio
+> método (§7) y mezclarlo con una nota de vigencia solo produciría un documento
+> que no se sabe de cuándo habla.
+
 ---
 
 ## 1. La pregunta

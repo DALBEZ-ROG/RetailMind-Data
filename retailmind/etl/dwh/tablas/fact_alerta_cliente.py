@@ -158,8 +158,18 @@ class FactAlertaCliente(TareaModelo):
             sparkline_desde           Date,
             vendedores                Array(String),
             lift_backtest             Decimal(6,2),
-            casos_positivos_backtest  UInt16,
-            evaluados_backtest        UInt16,
+            -- UInt32 y no UInt16 desde la Fase 2 de la carga masiva.
+            -- `evaluados_backtest` cuenta CLIENTE x ORIGEN del backtest, así que
+            -- crece con la cartera: con 69 clientes evaluables cabía de sobra;
+            -- con 49.312 en la ventana y tres orígenes rodantes son ~148.000 y
+            -- desborda los 65.535. El driver no dice «desbordamiento»: dice
+            -- «Unable to create Python array. This is usually caused by trying
+            -- to insert None», que es el MISMO mensaje engañoso que costó la
+            -- Fase 0 con `categoria_id` y `proveedor_id`. Dos veces la misma
+            -- trampa: la primera con ids, la segunda con un CONTADOR — que en
+            -- la Fase 1 se dio por seguro precisamente por no ser un id.
+            casos_positivos_backtest  UInt32,
+            evaluados_backtest        UInt32,
             precision_backtest        Decimal(6,2),
             tasa_base_backtest        Decimal(6,2),
             p_valor_backtest          Decimal(6,4),

@@ -281,9 +281,20 @@ with DAG(
         # completa tarda ~6 s, sigue siendo cuestion de segundos.
         "retries": 1,
         "retry_delay": pendulum.duration(seconds=30),
-        # Una corrida entera son ~6 s. Un minuto por tabla es margen de sobra
-        # y evita que una tarea colgada bloquee el DAG indefinidamente.
-        "execution_timeout": pendulum.duration(minutes=5),
+        # ESTE VALOR ENVEJECIO CON LOS DATOS. Cuando se escribio, una corrida
+        # entera duraba ~6 s y cinco minutos por tabla eran margen absurdo. Con
+        # la decada cargada —7,93 M movimientos de kardex, 7,62 M lineas de
+        # venta— `fact_movimiento_inventario` pasa de los cinco minutos y la
+        # tarea moria con `Process timed out`: NO por un error del dato, sino
+        # por el reloj. Y ese modo de fallo es especialmente malo, porque la
+        # tabla publicada se queda con la version anterior y el DAG solo dice
+        # «failed» sin que nada apunte al volumen.
+        #
+        # Treinta minutos por tarea: la mas lenta medida ronda los cinco, asi
+        # que hay un factor 6 de holgura para el crecimiento y para una maquina
+        # cargada, y sigue cortando de verdad una tarea colgada —el DAG entero
+        # cabe de sobra en la ventana nocturna de las 02:00—.
+        "execution_timeout": pendulum.duration(minutes=30),
         "depends_on_past": False,
     },
     doc_md=__doc__,

@@ -237,7 +237,7 @@ CONTROLES += [
         nombre="fact_pedido",
         fase=2,
         tabla="fact_pedido",
-        descripcion="Las cifras de §9.3: 4.083 pedidos, 3.924 vivos, $5.498.570,35, canal y cupón",
+        descripcion="Pedidos, vivos, importe, canal y cupón — contrastados contra PostgreSQL",
         columnas=("filas", "no_cancelados", "total_todos", "total_no_cancelados",
                   "web", "tienda", "telefono",
                   "web_vivos", "tienda_vivos", "telefono_vivos",
@@ -293,7 +293,7 @@ CONTROLES += [
         nombre="pedidos_mes",
         fase=2,
         tabla="fact_pedido",
-        descripcion="Pedidos NO cancelados y total por mes (3.924 / $5.498.570,35 en 19 meses)",
+        descripcion="Pedidos NO cancelados y total, mes a mes, en todo el período cargado",
         clave=("mes",),
         columnas=("mes", "pedidos", "total"),
         # Hasta la Fase 1 este control se resolvía colapsando el grano de
@@ -676,7 +676,7 @@ CONTROLES += [
         nombre="fact_movimiento_inventario",
         fase=3,
         tabla="fact_movimiento_inventario",
-        descripcion="13.287 movimientos · 1.406 pares · 9 tipos · la invariante del kardex",
+        descripcion="Movimientos, pares (variante, bodega), tipos y la invariante del kardex",
         columnas=("filas", "pares", "unidades_entrada", "unidades_salida",
                   "suma_con_signo", "tipos", "sin_costo", "ajustes_reales",
                   "naturaleza_ajuste", "saldos_negativos"),
@@ -739,7 +739,7 @@ CONTROLES += [
         nombre="kardex_mes",
         fase=3,
         tabla="fact_movimiento_inventario",
-        descripcion="Serie mensual de entradas y salidas del almacén (19 meses)",
+        descripcion="Serie mensual de entradas y salidas del almacén, en todo el período",
         clave=("mes",),
         columnas=("mes", "movimientos", "entradas", "salidas"),
         sql_pg=f"""
@@ -796,7 +796,7 @@ CONTROLES += [
         nombre="fact_stock_mensual",
         fase=3,
         tabla="fact_stock_mensual",
-        descripcion="21.122 filas (NO 26.700: C3B.4) · 1.406 pares × 19 meses desde su alta",
+        descripcion="La malla arranca en el PRIMER movimiento de cada par, no en el primer mes (C3B.4)",
         columnas=("filas", "pares", "meses", "con_movimiento", "arrastradas",
                   "entradas", "salidas", "negativos"),
         # `filas` se calcula en PostgreSQL con la definición de C3B.4 —desde el
@@ -952,7 +952,7 @@ CONTROLES += [
         nombre="fact_envio",
         fase=3,
         tabla="fact_envio",
-        descripcion="2.872 envíos · 2.727 entregados · 2.723 pares promesa · 2.848 con tarifa",
+        descripcion="Envíos, entregados, pares con promesa medible y envíos tarifados",
         columnas=("filas", "pedidos", "con_estimada", "con_real", "promesa_medible",
                   "a_tiempo", "suma_transito", "costo_total", "sin_tarifa",
                   "transportistas", "estados", "novedades"),
@@ -1314,10 +1314,17 @@ CONTROLES += [
                   "rechazadas", "variantes"),
         # `suma_monto` cruza esta tabla con `fact_devolucion`: es el MISMO
         # dinero visto por línea y por cabecera. La fórmula se escribe aquí de
-        # nuevo (cantidad × precio_unitario) para poder contradecir al ETL.
+        # nuevo para poder contradecir al ETL — pero durante meses se escribió
+        # MAL en los dos sitios (`cantidad × precio_unitario`, sin restar el
+        # descuento que sí resta `fn_recalcular_total_devolucion`), y una
+        # re-derivación que repite el error del original no contradice nada:
+        # confirma. Con las 275 líneas sembradas nunca se notó, porque solo 16
+        # caen sobre pedidos con descuento; con la posventa de la década la
+        # brecha se abrió a $10.814,27.
         sql_pg="""
             SELECT count(*), count(DISTINCT dd.devolucion_id), SUM(dd.cantidad),
-                   ROUND(SUM(dd.cantidad * pd.precio_unitario), 2),
+                   SUM(ROUND(dd.cantidad * (pd.precio_unitario
+                        - (pd.monto_descuento / pd.cantidad)), 2)),
                    count(*) FILTER (WHERE dd.resultado_inspeccion IS NOT NULL),
                    count(*) FILTER (WHERE dd.resultado_inspeccion = 'apto_reventa'),
                    COALESCE(SUM(dd.cantidad) FILTER

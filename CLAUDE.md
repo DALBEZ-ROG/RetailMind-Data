@@ -217,6 +217,86 @@ parar sin perder nada: `docker compose stop` o, como mucho, `docker compose down
   (script 85), LOGIN + BYPASSRLS + solo lectura por cuatro capas. Contraseña en `retailmind/.env`
   como `ETL_PG_*` / `ETL_CH_*`.
 
+## LA CARGA MASIVA: 3.000.000 DE PEDIDOS EN UNA DÉCADA (2026-08-10/11, fases 0-3)
+
+**Las cifras del sistema HOY** (y son las que mandan sobre cualquier número
+anterior de este archivo, que describe el estado previo a la carga):
+
+| | antes de la carga | HOY |
+|---|---|---|
+| pedidos | 4.083 | **2.999.991** |
+| líneas de pedido | 10.384 | **7.622.429** |
+| hitos de historial | 24.610 | **20.215.644** |
+| movimientos de kardex | 23.289 | **7.930.685** |
+| posiciones de inventario | 1.406 | **11.406** (todas cuadradas) |
+| facturas de venta | 3.887 | **2.855.377** |
+| clientes · variantes | 72 · 1.221 | **50.072 · 6.221** |
+| base `retailmind` | ~250 MB | **13 GB** |
+| modelo del DWH | 66.082 filas | **32,60 M filas / 1,92 GiB** |
+| ventana temporal | 2025-01 → 2026-07 | **2025-01 → 2034-12** |
+| ticket medio | $1.400,06 | **$182,16** |
+
+**Los 49 controles del ETL cuadran EXACTAMENTE.**
+
+### Las cuatro fases, su método y sus tramos
+
+| fase | qué cargó | ventana | tramo de ids | scripts |
+|---|---|---|---|---|
+| **0** maestros | 5.000 variantes, 50.000 clientes, 100 vendedores, 19 proveedores, stock inicial | — | `900.000.000` (y `60.000` en `categoria`/`proveedor`) | 92-96, `99_revert_fase0` |
+| **1** piloto | 10.000 pedidos | 2025 | `1.000.000.000` | 97, `99_revert_fase1` |
+| **2** volumen | 300.000 pedidos | 2026-09 → 2027-08 | `1.100.000.000` | 98, `99_revert_fase2` |
+| **3** la década | 2.685.908 pedidos en **10 bloques** (redensifica 2025 y 2026-01/08, y llena 2027-09 → 2034-12) | 2025-2034 | `1.2e9` … `2.1e9`, 100 M por bloque | 100, `99_revert_fase3` (por bloque) |
+
+**PROCEDENCIA POR TRAMO DE IDs RESERVADO**, no por columna ni por marcador de
+texto: `DELETE ... WHERE id >= base AND id < base + 100.000.000` toca un bloque
+y ninguno más. El techo real NO es el `bigint` de PostgreSQL: es el **UInt32**
+del almacén (4.294.967.295), que reciben `pedido_id`, `cliente_id`,
+`producto_variante_id`, `documento_id` (=`pago.id`), `contraparte_id`,
+`orden_compra_id` y `envio_id`. El id más alto escrito queda al **49 %** del
+techo. Y el tramo de claves primarias **NO reserva las claves ÚNICAS de
+negocio**: los números de documento van en su propia banda (`90`=Fase 0,
+`91`=Fase 1, `92`=Fase 2, `9BB`=Fase 3 por bloque) con secuencia POR DÍA.
+
+**EL MÉTODO DE STOCK, que es lo que hace que todo esto escale**: reposición
+previa por posición con **neto CERO**. Cada unidad vendida se compra antes en
+la misma posición, con orden, recepción, factura y CxP detrás. Consecuencias:
+`inventario.stock_actual` NO se escribe nunca (426.722 unidades antes y
+después), ninguna fila preexistente cambia, y la reversión es un DELETE y no
+una migración. Es O(1) por línea, sin reencadenado global.
+
+El grupo de reposición es **(posición, bimestre, último eslabón ajeno
+anterior)**. Ese tercer componente es el que permite REDENSIFICAR: al insertar
+en mitad de una cadena viva, lo insertado solo es inocuo si suma cero **entre
+dos eslabones consecutivos**; sin ese corte, la entrada queda delante de un
+movimiento existente y sus ventas detrás, dejando obsoleto el saldo guardado de
+todo lo que venga después.
+
+Si vas a tocar esto: (1) `fecha_creacion` SIEMPRE explícita en el kardex —el
+trigger valida la FILA, no el ENLACE (C-2)—; (2) la cadena se verifica
+**FUSIONADA** (lo existente MÁS lo planeado) leyendo por `(fecha_creacion, id)`,
+y comprobar solo las filas nuevas marca roturas que no lo son; (3) el generador
+determinista lleva **sal por bloque**, porque `i` reempieza en cada bloque y al
+redensificar una ventana ya ocupada dos pedidos con el mismo `i` caían en el
+mismo microsegundo; (4) el sorteo por índice solo escala si el índice se puede
+USAR: con el total leído como COLUMNA dentro del LATERAL el paso pasa de 12 s a
+más de 3:24 sin terminar.
+
+**Topes de infraestructura que solo aparecen a esta escala** (los tres
+corregidos): `max_partitions_per_insert_block` de ClickHouse (la década son 120
+particiones mensuales contra un tope de 100); `/dev/shm` de 64 MB por defecto en
+Docker, que agota la memoria compartida de las consultas paralelas y da un error
+que NOMBRA a PostgreSQL pero no tiene que ver con el disco (`shm_size: 2gb` en
+el compose); y el `execution_timeout` de 5 min del DAG, que se quedó corto para
+`fact_movimiento_inventario` y mataba la tarea por reloj, no por error.
+
+**LIMITACIÓN DECLARADA — la serie es demasiado regular.** El CV interanual del
+total mensual es de **0,19 % a 0,68 %**: cada enero de los diez años difiere
+menos del 1 % del siguiente. Por eso el ingenuo estacional saca un MAPE del
+0,40 % y el modelo de previsión (0,83 %) no lo supera, y publica en
+`modo=linea_base`. Falta variación interanual —tendencia, choques, ruido de
+mes—; se corrige regenerando bloques, no parcheando el modelo.
+
+
 ## Qué está hecho / qué falta
 
 **Hecho**: catálogo maestro; ciclo de compra con compuertas ENFORZADAS en backend

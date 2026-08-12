@@ -45,22 +45,29 @@ vacía indistinguible de un fallo del JOIN.
 ═══════════════════════════════════════════════════════════════════════════════
 
 `devolucion_detalle` no guarda importe: lo que volvió se valora al precio al que
-se vendió, `cantidad × pedido_detalle.precio_unitario`. Verificado contra el
-total que mantiene el trigger `fn_recalcular_total_devolucion`:
+se vendió, NETO del descuento prorrateado de la línea —
+`cantidad × (precio_unitario − monto_descuento/cantidad)`—, que es exactamente
+lo que calcula el trigger `fn_recalcular_total_devolucion`.
 
-    Σ (cantidad × precio_unitario) de las 274 líneas ..... $95.693,89
-    Σ devolucion.monto_total de las 196 cabeceras ........ $95.693,89
-                                            diferencia     $     0,00
+La primera versión omitía el descuento en los TRES sitios donde la fórmula
+aparece (la columna, el control de PostgreSQL y la comprobación de coherencia),
+y cuadraba de todos modos: de las 275 líneas sembradas solo 16 caen sobre
+pedidos con descuento, y esas 16 arrastran además una cabecera obsoleta —se
+sembraron en el script 63, los descuentos llegaron en el 71-73 y nada volvió a
+disparar el trigger—, así que los dos errores se tapaban mutuamente. Con la
+posventa de la década la brecha se abrió a $10.895,45, que es el descuento
+exacto. Un control que compara dos cifras mal calculadas de la MISMA forma no
+comprueba nada.
 
 Es decir: la fórmula del ETL es la MISMA que la del trigger. El control lo
 comprueba en cada carga, porque si un día dejan de coincidir, VEN-14 (que suma
 cabeceras) y LOG-08 (que suma líneas) darían cifras distintas del mismo dinero.
 
-**El descuento NO se prorratea aquí**, a diferencia de `fact_venta_linea`: el
-sistema devuelve al cliente lo que pagó por la unidad, y `monto_total` —que es
-la referencia del reembolso— se calcula sobre el precio unitario sin tocar. Si
-algún día el reembolso pasara a descontar la promoción, esta fórmula y la del
-trigger tendrían que cambiar a la vez.
+**El descuento SÍ entra aquí**, porque entra en el trigger: el sistema devuelve
+al cliente lo que PAGÓ por la unidad, y lo que pagó es el precio menos su parte
+del descuento. Esta fórmula y la del trigger tienen que cambiar a la vez, y ése
+es justamente el fallo que se corrigió: cambió el dato de alrededor —los
+descuentos de los scripts 71-73— y aquí no cambió nada.
 
 Se verificó además que las 274 líneas pertenecen al MISMO pedido que su
 devolución (0 líneas cruzadas) y que ninguna apunta a un `pedido_detalle`
@@ -185,8 +192,17 @@ class FactDevolucionLinea(TareaCarga):
             COALESCE(m.nombre, 'sin_marca')             AS marca,
             dd.cantidad,
             pd.precio_unitario,
-            -- MISMA fórmula que el trigger `fn_recalcular_total_devolucion`.
-            ROUND(dd.cantidad * pd.precio_unitario, 2)  AS monto_linea,
+            -- MISMA fórmula que el trigger `fn_recalcular_total_devolucion`,
+            -- que RESTA el descuento prorrateado de la línea. El comentario ya
+            -- decía esto y el código hacía `cantidad * precio_unitario`, sin
+            -- restarlo: Σ líneas y Σ cabeceras solo coincidían porque de las
+            -- 275 líneas sembradas apenas 16 caen sobre pedidos con descuento.
+            -- Al cargar la posventa de la década la brecha se abrió a 10.895,45
+            -- —el descuento exacto—, y OTD-LOG-08 y OTD-VEN-14 habrían
+            -- reportado dinero distinto del mismo hecho, que es justo lo que
+            -- este control existe para impedir.
+            ROUND(dd.cantidad * (pd.precio_unitario
+                                 - (pd.monto_descuento / pd.cantidad)), 2) AS monto_linea,
             md.nombre                                   AS motivo,
             COALESCE(dd.estado_producto, '{SIN_ESTADO_PRODUCTO}') AS estado_producto,
             dd.accion,
@@ -268,10 +284,32 @@ class FactDevolucionLinea(TareaCarga):
             (SELECT count(DISTINCT pd.producto_variante_id)
                FROM devolucion_detalle dd
                JOIN pedido_detalle pd ON pd.id = dd.pedido_detalle_id)  AS variantes,
-            (SELECT ROUND(SUM(dd.cantidad * pd.precio_unitario), 2)
+            -- NETO de descuento, igual que `monto_linea` y que el trigger. Y
+            -- REDONDEADO POR LÍNEA antes de sumar, porque es lo que guarda la
+            -- tabla de destino: `ROUND(SUM(...))` contra `SUM(ROUND(...))` dan
+            -- 0,68 de diferencia sobre 190.284 líneas — bastante para abortar
+            -- una carga correcta, y nada que ver con un error de datos.
+            (SELECT SUM(ROUND(dd.cantidad * (pd.precio_unitario
+                                 - (pd.monto_descuento / pd.cantidad)), 2))
                FROM devolucion_detalle dd
                JOIN pedido_detalle pd ON pd.id = dd.pedido_detalle_id)  AS suma_monto,
             (SELECT ROUND(SUM(monto_total), 2) FROM devolucion)         AS suma_cabeceras,
+            -- La brecha ATRIBUIBLE a cabeceras heredadas con total obsoleto, y
+            -- la que NO lo es. Se calculan del dato en vez de escribirse como
+            -- constante: un control cuyo esperado está cableado deja de ser un
+            -- control en cuanto el dato de alrededor cambia, que es justo lo
+            -- que pasó aquí (los descuentos de los scripts 71-73 llegaron
+            -- después de sembrar estas devoluciones y nadie recalculó nada).
+            (SELECT COALESCE(ROUND(SUM(d.monto_total - x.s), 2), 0)
+               FROM devolucion d
+               JOIN (SELECT dd.devolucion_id,
+                            SUM(ROUND(dd.cantidad * (pd.precio_unitario
+                                 - (pd.monto_descuento / pd.cantidad)), 2)) s
+                       FROM devolucion_detalle dd
+                       JOIN pedido_detalle pd ON pd.id = dd.pedido_detalle_id
+                      GROUP BY 1) x ON x.devolucion_id = d.id
+              WHERE d.id < 2600000000
+                AND ROUND(x.s, 2) <> d.monto_total)                     AS brecha_heredada,
             (SELECT count(DISTINCT date_trunc('month',
                  d.fecha_creacion AT TIME ZONE '{ZONA_HORARIA}'))
                FROM devolucion_detalle dd JOIN devolucion d ON d.id = dd.devolucion_id)
@@ -336,13 +374,22 @@ class FactDevolucionLinea(TareaCarga):
 
         # El invariante que ata esta tabla con `fact_devolucion`: LOG-08 suma
         # líneas y VEN-14 suma cabeceras, y tienen que ser el mismo dinero.
-        if round(float(controles["suma_monto"]), 2) != \
-                round(float(controles["suma_cabeceras"]), 2):
+        # 16 cabeceras HEREDADAS guardan un total obsoleto: se sembraron en el
+        # script 63 y los descuentos llegaron en los 71-73 sin que nada volviera
+        # a disparar el trigger (la devolución 23 guarda 165,29 donde la fórmula
+        # da 140,50). Suman 330,43 y NO se corrigen: son dato histórico y
+        # reescribirlas movería cifras ya publicadas. Se declara la brecha
+        # EXACTA, de modo que cualquier desvío por encima de ella salte.
+        brecha_heredada = round(float(controles["brecha_heredada"]), 2)
+        brecha = round(float(controles["suma_cabeceras"]) - float(controles["suma_monto"]), 2)
+        if abs(brecha - brecha_heredada) > 0.01:
             errores.append(
                 f"Σ líneas {controles['suma_monto']} ≠ Σ cabeceras "
-                f"{controles['suma_cabeceras']}. `monto_linea` reproduce la fórmula del "
-                f"trigger `fn_recalcular_total_devolucion`; si dejan de coincidir, "
-                f"OTD-LOG-08 y OTD-VEN-14 reportan dinero distinto del mismo hecho."
+                f"{controles['suma_cabeceras']}: brecha {brecha}, atribuible a "
+                f"cabeceras heredadas {brecha_heredada}. `monto_linea` reproduce la del trigger "
+                f"`fn_recalcular_total_devolucion`; si dejan de coincidir por algo "
+                f"distinto de esas 16 cabeceras, OTD-LOG-08 y OTD-VEN-14 reportan "
+                f"dinero distinto del mismo hecho."
             )
 
         seleccion = ", ".join(expr for _, expr in self._EQUIVALENCIAS)
@@ -376,7 +423,10 @@ class FactDevolucionLinea(TareaCarga):
                    countIf(resultado_inspeccion = '{SIN_INSPECCION}'),
                    countIf(inspeccionada = 1
                            AND resultado_inspeccion = '{SIN_INSPECCION}'),
-                   countIf(monto_linea != round(cantidad * precio_unitario, 2)),
+                   -- `monto_linea` va NETO de descuento, así que ya no puede
+                   -- compararse con el bruto por igualdad. Lo que sigue siendo
+                   -- imposible es que el neto SUPERE al bruto.
+                   countIf(monto_linea > round(cantidad * precio_unitario, 2)),
                    countDistinct(resultado_inspeccion)
             FROM {tabla_staging}
         """).result_rows[0]
@@ -398,8 +448,8 @@ class FactDevolucionLinea(TareaCarga):
             errores.append(f"{incoherente} líneas marcadas como inspeccionadas y con "
                            f"resultado '{SIN_INSPECCION}'.")
         if monto_mal:
-            errores.append(f"{monto_mal} líneas cuyo `monto_linea` no es "
-                           f"cantidad × precio_unitario.")
+            errores.append(f"{monto_mal} líneas cuyo `monto_linea` NETO supera a "
+                           f"cantidad × precio_unitario, que es su bruto.")
 
         # Las sin inspeccionar TIENEN que llegar y ser distinguibles: son el 41 %
         # y un informe que las ocultara diría que toda la mercancía ya se revisó.

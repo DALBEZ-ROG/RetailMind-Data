@@ -401,10 +401,41 @@ class FactDevolucion(TareaCarga):
                  OR h.f_recibida < h.f_en_transito
                  OR h.f_inspeccionada < h.f_recibida
                  OR d.fecha_reembolso < d.fecha_creacion)              AS hitos_hacia_atras,
-            -- Σ de las líneas contra el total que mantiene el trigger.
-            (SELECT ROUND(SUM(dd.cantidad * pd.precio_unitario), 2)
+            -- Σ de las líneas contra el total que mantiene el trigger, CON LA
+            -- FÓRMULA DEL TRIGGER. Decía comparar contra el trigger y usaba
+            -- `cantidad * precio_unitario`, que NO resta el descuento de la
+            -- línea; `fn_recalcular_total_devolucion` sí lo resta:
+            --     SUM(cantidad * (precio_unitario - monto_descuento/cantidad))
+            -- El control pasaba por casualidad: de las 275 líneas de las 197
+            -- devoluciones sembradas, solo 16 caen sobre pedidos con descuento.
+            -- Al cargar la posventa de la década el sesgo se hizo visible —
+            -- 10.168.161,15 contra 10.157.265,70, y la diferencia de 10.895,45
+            -- era EXACTAMENTE el descuento—, así que el control denunciaba al
+            -- trigger por su propio error de fórmula.
+            (SELECT ROUND(SUM(dd.cantidad *
+                              (pd.precio_unitario - (pd.monto_descuento / pd.cantidad))), 2)
                FROM devolucion_detalle dd
                JOIN pedido_detalle pd ON pd.id = dd.pedido_detalle_id) AS suma_lineas,
+            -- Comparar SUMAS deja que dos errores de signo contrario se
+            -- cancelen. Se cuenta la discrepancia fila a fila, que es más
+            -- estricto, y se separa la parte heredada de la nueva.
+            (SELECT count(*) FROM devolucion d
+               JOIN (SELECT dd.devolucion_id,
+                            SUM(dd.cantidad *
+                                (pd.precio_unitario - (pd.monto_descuento / pd.cantidad))) s
+                       FROM devolucion_detalle dd
+                       JOIN pedido_detalle pd ON pd.id = dd.pedido_detalle_id
+                      GROUP BY 1) x ON x.devolucion_id = d.id
+              WHERE ROUND(x.s, 2) <> d.monto_total)                    AS totales_discrepantes,
+            (SELECT count(*) FROM devolucion d
+               JOIN (SELECT dd.devolucion_id,
+                            SUM(dd.cantidad *
+                                (pd.precio_unitario - (pd.monto_descuento / pd.cantidad))) s
+                       FROM devolucion_detalle dd
+                       JOIN pedido_detalle pd ON pd.id = dd.pedido_detalle_id
+                      GROUP BY 1) x ON x.devolucion_id = d.id
+              WHERE ROUND(x.s, 2) <> d.monto_total
+                AND d.id >= 2600000000)                                AS discrepantes_nuevas,
             (SELECT SUM(cantidad) FROM devolucion_detalle)             AS unidades_totales,
             (SELECT count(*) FROM devolucion WHERE ticket_soporte_id IS NOT NULL)
                                                                        AS con_ticket,
@@ -480,10 +511,27 @@ class FactDevolucion(TareaCarga):
         # El trigger `fn_recalcular_total_devolucion` mantiene `monto_total`: si
         # deja de cuadrar con las líneas, el monto devuelto de VEN-14 y el
         # detalle de LOG-08 dejan de ser la misma cifra.
-        if round(float(controles["suma_lineas"]), 2) != round(float(controles["suma_monto"]), 2):
+        # El veredicto es la discrepancia FILA A FILA de lo que esta fase
+        # escribió. Cero tolerancia ahí.
+        if int(controles["discrepantes_nuevas"]):
             errores.append(
-                f"Σ líneas {controles['suma_lineas']} ≠ Σ monto_total "
-                f"{controles['suma_monto']}. El trigger de total dejó de cuadrar."
+                f"{controles['discrepantes_nuevas']} devoluciones tienen un "
+                f"monto_total distinto de la suma de sus líneas. El trigger de "
+                f"total dejó de cuadrar."
+            )
+        # Y 16 devoluciones HEREDADAS que no cuadran, y que no son un fallo de
+        # carga sino una foto vieja: se sembraron en el script 63 y los
+        # descuentos llegaron después, en los 71-73, sin que nada volviera a
+        # disparar el trigger. Su total quedó calculado a precio sin descuento
+        # (la 23 guarda 165,29 donde la fórmula da 140,50). Se declaran y se
+        # vigilan: si aparece una decimoséptima, es que algo nuevo se rompió.
+        _LEGADAS_DESCUADRADAS = 16
+        heredadas = int(controles["totales_discrepantes"]) - int(controles["discrepantes_nuevas"])
+        if heredadas > _LEGADAS_DESCUADRADAS:
+            errores.append(
+                f"{heredadas} devoluciones heredadas descuadran, y solo "
+                f"{_LEGADAS_DESCUADRADAS} están declaradas (total sembrado antes "
+                f"de que los scripts 71-73 aplicaran los descuentos)."
             )
         # C4.1 en forma de control: las dos cifras del reembolso son distintas y
         # tienen que SEGUIR siéndolo de forma explicable.

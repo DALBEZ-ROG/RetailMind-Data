@@ -171,6 +171,14 @@ services:
   postgres:
     image: postgres:18            # FIJA, no `:latest`: un dump de 18 no
                                   # restaura en 17
+    # Docker da 64 MB de /dev/shm por defecto, y PostgreSQL usa memoria
+    # COMPARTIDA para los workers de consulta paralela. Con 300.000 pedidos
+    # nunca se rozaba; con los 3.000.000 de la decada el ETL murio con
+    # «could not resize shared memory segment ... No space left on device»,
+    # un error que NOMBRA a PostgreSQL pero al que el disco de la maquina —88 GB
+    # libres— no tenia nada que ver. No se apaga el paralelismo: se le da al
+    # motor el sitio que el paralelismo necesita.
+    shm_size: 2gb
     environment:
       POSTGRES_DB: retailmind
       POSTGRES_USER: postgres

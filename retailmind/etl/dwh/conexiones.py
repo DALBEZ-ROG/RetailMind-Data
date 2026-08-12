@@ -133,6 +133,17 @@ def get_ch_client(database: str | None = None):
         password=CH_PASSWORD,
         connect_timeout=10,
         send_receive_timeout=300,
+        settings={
+            # Las tablas de hechos particionan por MES. Con dos años de datos
+            # eran 24 particiones y el tope por defecto de ClickHouse —100 por
+            # bloque de INSERT— ni se rozaba. Con la DÉCADA cargada son 120, y
+            # el INSERT muere con «Too many partitions for single INSERT block»
+            # y un HTTP 500 que en el log del ETL solo se ve como
+            # `response code 500`: hubo que ir al `err.log` del motor para leer
+            # la causa. Se sube el tope; no se reparticiona, porque la partición
+            # mensual es lo que hace baratos los informes por mes.
+            "max_partitions_per_insert_block": 1000,
+        },
     )
 
 

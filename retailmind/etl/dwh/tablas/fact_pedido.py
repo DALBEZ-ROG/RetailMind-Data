@@ -1,7 +1,9 @@
 """
 etl/dwh/tablas/fact_pedido.py — F1 del modelo (§5.1 del diseño).
 
-La venta vista POR DOCUMENTO. Grano: un pedido. 4.083 filas.
+La venta vista POR DOCUMENTO. Grano: **una fila por pedido** — el conteo es el
+de `pedido` y por eso no se escribe aquí (decía «4.083 filas», que era el tamaño
+del sistema antes de la carga masiva; hoy son 3,00 M).
 Es la tabla más solicitada del modelo — 8 informes: OTD-VEN-05, VEN-07, VEN-13,
 VEN-14 (denominador), LOG-12, GER-02 (devengado), GER-05 y GER-11.
 
