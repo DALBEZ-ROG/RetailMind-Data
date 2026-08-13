@@ -1,0 +1,192 @@
+// Estilos PROPIOS del Panorama del Negocio.
+//
+// Lo que NO está aquí es lo importante: `.kpi-card`, `.marca-agua`,
+// `.aviso-analitica`, `.salvedad`, `.section-header` y la rejilla `cols-n`
+// vienen de `tableros.scss` / `operativo-shared.scss`, que el componente carga
+// tal cual. Se comparte el CÓDIGO, no una copia parecida: si mañana cambia el
+// vidrio de un indicador, cambia también aquí sin tocar este archivo.
+//
+// Espaciado: los mismos tres pasos de la casa — 8 (dentro de un grupo),
+// 12 (entre hermanos) y 16 (entre zonas).
+$esp-1: 8px;
+$esp-2: 12px;
+$esp-3: 16px;
+
+.panorama-page {
+
+  // ── La franja del almacén ──────────────────────────────────────────────
+  // Va antes que las cifras porque dice si las cifras valen. El estado se lee
+  // por TRES señales y nunca sólo por el color (§9.bis.25): el ICONO
+  // (verified / error_outline), la PALABRA («Almacén validado» / «con
+  // incidencias») y el MENSAJE que devuelve el propio validador.
+  .almacen-franja {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: $esp-3;
+    margin-bottom: $esp-3;
+    padding: 14px 18px;
+    border-radius: var(--border-radius-sm);
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(57, 73, 171, 0.16);
+    // El filo de color es la CUARTA señal, y la única puramente cromática:
+    // redundante a propósito, nunca portadora única.
+    border-left-width: 4px;
+    box-shadow: 0 1px 3px rgba(26, 35, 126, 0.05);
+  }
+
+  .almacen-ok     { border-left-color: #2e7d32; }
+  .almacen-alerta { border-left-color: #c62828; }
+
+  .almacen-estado {
+    display: flex;
+    align-items: center;
+    gap: $esp-1;
+
+    mat-icon { font-size: 26px; width: 26px; height: 26px; }
+  }
+
+  .almacen-ok     .almacen-estado mat-icon { color: #2e7d32; }
+  .almacen-alerta .almacen-estado mat-icon { color: #c62828; }
+
+  .almacen-estado-texto {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.3;
+
+    strong { font-size: 13px; color: var(--text-primary); }
+    span   { font-size: 11.5px; color: var(--text-secondary); }
+  }
+
+  .almacen-cifras {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $esp-3 24px;
+  }
+
+  .almacen-dato {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    cursor: help;   // lleva `title` nativo
+  }
+
+  .almacen-label {
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+  }
+
+  .almacen-valor {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--primary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  // ── El espere ──────────────────────────────────────────────────────────
+  .panorama-cargando {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: $esp-2;
+    padding: 56px 0;
+    color: var(--text-secondary);
+    font-size: 13px;
+  }
+
+  // ── Las tarjetas de gráfico ────────────────────────────────────────────
+  // Cada una es una unidad cerrada: título, PREGUNTA, salvedad, base y dibujo.
+  // La pregunta es lo que justifica que el gráfico exista, así que se pinta
+  // antes que el gráfico y con más peso que el denominador.
+  .grafico-card {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: $esp-3;
+
+    h3 { margin-bottom: 2px; }
+  }
+
+  .grafico-pregunta {
+    margin: 0 0 $esp-1;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--primary-light);
+  }
+
+  .grafico-base {
+    margin: 0 0 $esp-2;
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--text-secondary);
+  }
+
+  // Chart.js necesita un contenedor con ALTURA REAL: con `maintainAspectRatio`
+  // en false mide el padre, y un padre que se ajusta al contenido mide cero.
+  // De ahí que la altura viva aquí y no en el canvas.
+  .grafico-caja {
+    position: relative;
+    width: 100%;
+    height: 270px;
+
+    // OBLIGATORIO, y no es cosmético. Chart.js escribe el ancho del canvas en
+    // PÍXELES al crearlo y no siempre lo reajusta cuando el contenedor encoge
+    // (medido: contenedor 700 px con el canvas todavía en 2.053). Sin este
+    // tope, ese canvas rezagado ENSANCHA LA PÁGINA y aparece una barra de
+    // desplazamiento horizontal en cuanto se estrecha la ventana. Es la misma
+    // regla que ya lleva `.chart-box` de la analítica legada; omitirla fue el
+    // defecto que destapó la prueba de ancho reducido.
+    canvas { max-width: 100%; }
+  }
+
+  .grafico-caja.alto-alto { height: 330px; }
+
+  // Dos columnas iguales; a pantalla estrecha caen a una sola.
+  .grafico-par {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: $esp-3;
+  }
+
+  .ancho-total { width: 100%; }
+
+  // ── El pie de salvedades ───────────────────────────────────────────────
+  .salvedades-pie {
+    ul {
+      margin: 0;
+      padding-left: 18px;
+      font-size: 12px;
+      line-height: 1.55;
+      color: var(--text-secondary);
+    }
+
+    li + li { margin-top: 6px; }
+
+    .fuentes {
+      margin: $esp-2 0 0;
+      font-size: 11px;
+      color: var(--text-secondary);
+      opacity: 0.85;
+      font-family: var(--font-mono, monospace);
+      word-break: break-word;
+    }
+  }
+
+  // ── Ancho reducido ─────────────────────────────────────────────────────
+  // Degradar es apilar, no encoger: dos gráficos de 380 px uno al lado del
+  // otro no se leen, y las cifras del almacén en una fila de cuatro se parten
+  // por la mitad.
+  @media (max-width: 1100px) {
+    .grafico-par { grid-template-columns: minmax(0, 1fr); }
+  }
+
+  @media (max-width: 760px) {
+    .almacen-franja  { flex-direction: column; align-items: flex-start; }
+    .almacen-cifras  { gap: $esp-2 18px; }
+    .grafico-caja    { height: 230px; }
+    .grafico-caja.alto-alto { height: 260px; }
+  }
+}

@@ -349,6 +349,22 @@ export const routes: Routes = [
       import('./features/operativo/informes/informes-departamento.component')
         .then(m => m.InformesDepartamentoComponent)
   },
+  // ── PANORAMA DEL NEGOCIO — la foto de conjunto ─────────────────────────
+  //    Va ANTES de los tableros porque es la pantalla que se abre primero:
+  //    responde «¿de qué tamaño es este comercio y está sano?», que es la
+  //    pregunta previa a cualquiera de las siete que responden los tableros.
+  //
+  //    Los MISMOS tres roles que ya leen el almacén en T-1 y T-2: no se abre
+  //    ningún permiso nuevo. Lleva dinero (venta, margen, flete), así que
+  //    BODEGA y DESPACHO quedan fuera, igual que en SecurityConfig — que es
+  //    quien realmente decide, porque ClickHouse no tiene GRANT por columna.
+  {
+    path: 'operativo/panorama',
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'ANALISTA'])],
+    loadComponent: () =>
+      import('./features/operativo/panorama/panorama.component')
+        .then(m => m.PanoramaComponent)
+  },
   // ── Tableros de DIRECCIÓN (nivel estratégico, fase E1-A:
   //    docs/estrategico/DISENO_NIVEL_ESTRATEGICO.md §4).
   //    UNA sola pantalla genérica parametrizada por `data.tablero`; los bloques

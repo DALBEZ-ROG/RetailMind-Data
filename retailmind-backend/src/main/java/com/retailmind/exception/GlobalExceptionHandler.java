@@ -65,15 +65,64 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
     }
 
+    /**
+     * Prefijos de los mensajes que escriben NUESTROS PROPIOS guardianes de
+     * integridad del kardex ({@code fn_validar_ecuacion_kardex} del script 91 y
+     * {@code fn_kardex_apendice} del 108). Están redactados PARA EL USUARIO —en
+     * español, nombrando el SKU y la bodega— así que se dejan pasar tal cual en
+     * vez de taparlos con el texto genérico.
+     */
+    private static final String[] MENSAJES_DE_GUARDIA = {
+        "Kardex descuadrado:", "Kardex desencadenado:"
+    };
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiErrorDTO> handleDataIntegrity(DataIntegrityViolationException ex,
                                                             HttpServletRequest request) {
         logger.error("Violacion de integridad: {} - {}", request.getRequestURI(), ex.getMessage());
+
+        // Un guardián nuestro ya explicó QUÉ pasó y con qué cifras. Sustituirlo
+        // por «los datos enviados no cumplen las reglas de la base de datos»
+        // convierte un diagnóstico accionable en un mensaje que no dice nada, y
+        // deja al usuario sin saber sobre qué producto ni en qué bodega.
+        String propio = mensajeDeGuardia(ex);
+        if (propio != null) {
+            ApiErrorDTO error = new ApiErrorDTO(
+                    409, "Conflict", propio, request.getRequestURI());
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+        }
+
         ApiErrorDTO error = new ApiErrorDTO(
                 400, "Bad Request",
                 "Los datos enviados no cumplen las reglas de la base de datos (referencia inexistente, duplicado o valor fuera de rango).",
                 request.getRequestURI());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    /**
+     * Devuelve el mensaje del guardián de kardex si la causa raíz es uno de
+     * ellos, o {@code null} para cualquier otra violación de integridad —que
+     * sigue saliendo con el texto genérico de siempre, porque un mensaje crudo
+     * de PostgreSQL sobre una FK o un UNIQUE no le sirve de nada al usuario y
+     * además destapa nombres de tablas y columnas.
+     */
+    private static String mensajeDeGuardia(DataIntegrityViolationException ex) {
+        Throwable causa = ex.getMostSpecificCause();
+        String texto = causa != null ? causa.getMessage() : null;
+        if (texto == null) {
+            return null;
+        }
+        for (String prefijo : MENSAJES_DE_GUARDIA) {
+            int i = texto.indexOf(prefijo);
+            if (i >= 0) {
+                // El driver antepone «ERROR: » y añade la posición y el detalle
+                // detrás; se recorta a la primera línea, que es la frase.
+                String limpio = texto.substring(i);
+                int corte = limpio.indexOf('\n');
+                return corte > 0 ? limpio.substring(0, corte).trim() : limpio.trim();
+            }
+        }
+        return null;
     }
 
     /**

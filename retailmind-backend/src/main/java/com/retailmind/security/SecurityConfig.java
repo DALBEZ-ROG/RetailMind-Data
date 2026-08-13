@@ -703,6 +703,21 @@ public class SecurityConfig {
                 // enumerada arriba— se rechaza de plano en vez de caer en
                 // anyRequest().authenticated(), que la abriria a los nueve roles.
                 .requestMatchers("/api/tableros/**").denyAll()
+                // ── PANORAMA DEL NEGOCIO (la foto de conjunto) ───────────────
+                // NO es un octavo tablero, y por eso no cuelga de /api/tableros:
+                // no acota un ambito ni se filtra, es la decada entera.
+                //
+                // Los MISMOS tres roles que ya leen el almacen en T-1 y T-2. No
+                // se abre NINGUN permiso nuevo. La pantalla lleva dinero (venta,
+                // margen, flete), asi que BODEGA y DESPACHO quedan fuera por la
+                // misma razon y por el mismo mecanismo que en los tableros: la
+                // RUTA, porque ClickHouse no tiene GRANT por columna.
+                .requestMatchers(HttpMethod.GET, "/api/panorama")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "ANALISTA")
+                // Solo consulta, igual que informes y tableros: cualquier metodo
+                // distinto de GET se rechaza de plano en vez de caer en
+                // anyRequest().authenticated(), que lo abriria a los nueve roles.
+                .requestMatchers("/api/panorama/**").denyAll()
                 // Perfil (ficha básica) — usuario autenticado (cualquier rol)
                 .requestMatchers("/api/perfil/**").authenticated()
                 // Todo lo demas requiere autenticacion

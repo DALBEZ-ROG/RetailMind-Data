@@ -31,6 +31,9 @@ export type PermisoNav =
   | 'informesLogistica' // informes tácticos de Logística (OTD-LOG-01/02/06/11)
   | 'informesSoporte'  // informes tácticos de Soporte (OTD-SOP-01/04/05)
   | 'informesGerencia' // informes tácticos de Gerencia (OTD-GER-01/04/06/08/09)
+  | 'panorama'           // foto de conjunto del comercio sobre el almacén.
+                         // NO es un permiso nuevo: son los MISMOS tres roles
+                         // que ya leen el almacén en tableroOmnicanal.
   | 'tableroOmnicanal'    // T-1, tablero de dirección (OE-06)
   | 'tableroRentabilidad' // T-2, tablero de dirección (OE-07)
   | 'tableroPosventa'     // T-3, tablero de dirección (OE-08)
@@ -111,6 +114,9 @@ export const ROLES_POR_PERMISO: Record<PermisoNav, readonly string[]> = {
   // DESPACHO quedan fuera. En ClickHouse el corte NO lo respalda el motor (no
   // hay GRANT por columna): lo hace la ruta, enumerada por nombre en
   // SecurityConfig, que es quien realmente decide.
+  // Idéntico a tableroOmnicanal, y eso es deliberado: la pantalla lee las
+  // mismas tablas del almacén y lleva dinero, así que su corte es el mismo.
+  panorama:            ['ADMIN', 'GERENTE', 'ANALISTA'],
   tableroOmnicanal:    ['ADMIN', 'GERENTE', 'ANALISTA'],
   tableroRentabilidad: ['ADMIN', 'GERENTE', 'ANALISTA'],
   // T-3 suma SOPORTE, y solo él: entra por el bloque de tickets y
@@ -350,6 +356,26 @@ export const DASHBOARD_AREAS: AreaNav[] = [
       { titulo: 'Informes de Gerencia',
         descripcion: 'Foto del día, cupones y marketing vigentes, auditoría y accesos al sistema',
         icono: 'flag', ruta: '/operativo/informes/gerencia', permiso: 'informesGerencia' }
+    ]
+  },
+  {
+    // PANORAMA DEL NEGOCIO — la foto de conjunto. Va en su propia sección y
+    // ANTES de los tableros a propósito: es la pantalla que se abre primero.
+    // Un tablero responde «¿qué hago con mi ámbito?»; esta responde la pregunta
+    // anterior, «¿de qué tamaño es este comercio y está sano?». Meterla dentro
+    // de «Tableros de Dirección» la haría parecer el octavo, que es justo lo
+    // que no es: no acota ámbito y no se filtra.
+    id: 'panorama',
+    titulo: 'Panorama del Negocio',
+    descripcion: 'La década completa en seis cifras y seis preguntas, sobre el almacén analítico',
+    icono: 'insights',
+    acento: '#1a237e',
+    gradiente: 'linear-gradient(135deg, #1a237e, #3949ab)',
+    acciones: [
+      { titulo: 'Panorama del Negocio',
+        descripcion: 'Venta, margen, entregas y almacén: la foto de conjunto de 2025 a 2034',
+        icono: 'insights', ruta: '/operativo/panorama',
+        permiso: 'panorama' }
     ]
   },
   {

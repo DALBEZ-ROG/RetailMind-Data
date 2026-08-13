@@ -307,6 +307,21 @@
       </a>
     </ng-container>
 
+    <!-- PANORAMA DEL NEGOCIO. Sección propia y ANTES de los tableros: es la
+         pantalla que se abre primero. Un tablero responde «¿qué hago con mi
+         ámbito?»; ésta responde la pregunta anterior, «¿de qué tamaño es este
+         comercio y está sano?». Mismos tres roles que el almacén; lleva dinero
+         ⇒ sin BODEGA ni DESPACHO. -->
+    <ng-container *ngIf="canPanorama">
+      <div class="sidebar-section-label">Panorama</div>
+
+      <a class="nav-item" *ngIf="canPanorama"
+         routerLink="/operativo/panorama" routerLinkActive="active">
+        <mat-icon>insights</mat-icon>
+        <span>Panorama del Negocio</span>
+      </a>
+    </ng-container>
+
     <!-- Tableros de DIRECCIÓN (nivel estratégico, fase E1-A). Sección propia y
          no dentro de «Informes Tácticos»: un informe responde «¿cómo va mi
          área?» y un tablero responde «¿qué hago con el negocio?». Los tres

@@ -1,0 +1,158 @@
+<div class="op-page tablero-page panorama-page">
+
+  <div class="section-header">
+    <h2><mat-icon>insights</mat-icon> Panorama del Negocio</h2>
+    <p>
+      La foto de conjunto del comercio sobre el almacén analítico: una década de
+      operación (2025-2034) en seis cifras y seis preguntas.
+    </p>
+    <p class="tablero-objetivo">
+      <span class="objetivo-tag">Conjunto</span>
+      Sin filtros a propósito — para acotar por período, canal o categoría están
+      los siete Tableros de Dirección.
+    </p>
+  </div>
+
+  <!-- De cuándo es el dato: la carga MÁS REZAGADA de las seis tablas, no la
+       más reciente. La pantalla es tan fresca como su fuente más atrasada. -->
+  <div class="marca-agua tablero-marca" *ngIf="datos?.datosAl">
+    <mat-icon>update</mat-icon>
+    <span>Datos al <strong>{{ datos?.datosAl }}</strong></span>
+    <span class="marca-fuente" *ngIf="datos?.fuente">· {{ datos?.fuente }}</span>
+  </div>
+
+  <!-- Degradación: el almacén no responde. NO es un error de la aplicación. -->
+  <div class="aviso-analitica" *ngIf="datos && !datos.analiticaDisponible">
+    <mat-icon>cloud_off</mat-icon> {{ datos.avisoAnalitica }}
+  </div>
+
+  <div class="panorama-cargando" *ngIf="cargando">
+    <mat-spinner diameter="40"></mat-spinner>
+    <span>Consultando el almacén…</span>
+  </div>
+
+  <ng-container *ngIf="!cargando && datos?.analiticaDisponible">
+
+    <!-- ── LA FRANJA DEL ALMACÉN ──────────────────────────────────────────
+         Va ARRIBA del todo, antes de las cifras, porque es lo que dice si las
+         cifras de abajo se pueden creer. El estado se lee por TRES señales y
+         no sólo por el color: el icono, la palabra y el texto del mensaje. -->
+    <div class="almacen-franja"
+         [class.almacen-ok]="almacenSano"
+         [class.almacen-alerta]="!almacenSano"
+         *ngIf="almacen">
+      <div class="almacen-estado">
+        <mat-icon>{{ almacenSano ? 'verified' : 'error_outline' }}</mat-icon>
+        <div class="almacen-estado-texto">
+          <strong>{{ almacenSano ? 'Almacén validado' : 'Almacén con incidencias' }}</strong>
+          <span>{{ almacen.mensajeValidacion }}</span>
+        </div>
+      </div>
+      <div class="almacen-cifras">
+        <div class="almacen-dato" title="Momento en que arrancó la última ejecución del ETL (DAG retailmind_dwh)">
+          <span class="almacen-label">Última corrida del ETL</span>
+          <span class="almacen-valor">{{ almacen.ultimaCorrida || '—' }}</span>
+        </div>
+        <div class="almacen-dato" title="Tablas del modelo publicadas en la última corrida de cada una">
+          <span class="almacen-label">Tablas publicadas</span>
+          <span class="almacen-valor">{{ almacen.tablasPublicadas }}</span>
+        </div>
+        <div class="almacen-dato" title="Suma de filas escritas en la última corrida de cada tabla del modelo">
+          <span class="almacen-label">Filas en el almacén</span>
+          <span class="almacen-valor">{{ filasPublicadas }}</span>
+        </div>
+        <div class="almacen-dato" title="Tablas cuya última corrida no terminó en éxito">
+          <span class="almacen-label">Tablas con fallo</span>
+          <span class="almacen-valor">{{ almacen.tablasConFallo }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── LOS SEIS INDICADORES ───────────────────────────────────────────
+         Tamaño (venta, pedidos, clientes), economía unitaria (ticket, margen) y
+         calidad de la operación (entregas a tiempo). Cada uno con su
+         denominador en el `title` NATIVO del icono (§18). -->
+    <div class="tablero-kpis cols-6">
+      <div class="kpi-card" *ngFor="let k of kpis">
+        <div class="kpi-label">
+          <span class="kpi-texto">{{ k.etiqueta }}</span>
+          <span class="kpi-info" [title]="k.nota"><mat-icon>info_outline</mat-icon></span>
+        </div>
+        <div class="kpi-value" [title]="k.exacto">{{ k.valor }}</div>
+      </div>
+    </div>
+
+    <!-- ── G1 · la historia, a todo el ancho ─────────────────────────────── -->
+    <div class="op-card grafico-card ancho-total" *ngIf="bloque('venta_mensual') as b">
+      <h3><mat-icon>show_chart</mat-icon> {{ b.titulo }}</h3>
+      <p class="grafico-pregunta">{{ pregunta(b.id) }}</p>
+      <p class="grafico-base">{{ b.denominador }} · {{ b.filas }} meses</p>
+      <div class="grafico-caja alto-alto"><canvas #cvVenta></canvas></div>
+    </div>
+
+    <!-- ── G2 y G3 · dos columnas ────────────────────────────────────────── -->
+    <div class="grafico-par">
+      <div class="op-card grafico-card" *ngIf="bloque('flujos_dinero') as b">
+        <h3><mat-icon>account_balance</mat-icon> {{ b.titulo }}</h3>
+        <p class="grafico-pregunta">{{ pregunta(b.id) }}</p>
+        <p class="grafico-base">{{ b.denominador }}</p>
+        <div class="grafico-caja"><canvas #cvFlujos></canvas></div>
+      </div>
+
+      <div class="op-card grafico-card" *ngIf="bloque('categorias') as b">
+        <h3><mat-icon>category</mat-icon> {{ b.titulo }}</h3>
+        <p class="grafico-pregunta">{{ pregunta(b.id) }}</p>
+        <p class="grafico-base">{{ b.denominador }}</p>
+        <div class="grafico-caja"><canvas #cvCategorias></canvas></div>
+      </div>
+    </div>
+
+    <!-- ── G4 y G5 · las dos series de porcentaje ─────────────────────────
+         Son las únicas cuyo eje no arranca en cero, y lo declaran. -->
+    <div class="grafico-par">
+      <div class="op-card grafico-card" *ngIf="bloque('margen_mensual') as b">
+        <h3><mat-icon>trending_up</mat-icon> {{ b.titulo }}</h3>
+        <p class="grafico-pregunta">{{ pregunta(b.id) }}</p>
+        <p class="salvedad" *ngIf="b.salvedad">
+          <mat-icon>info</mat-icon> {{ b.salvedad }}
+        </p>
+        <p class="grafico-base">
+          {{ b.denominador }} · eje acotado al rango real, no a 0-100 %
+        </p>
+        <div class="grafico-caja"><canvas #cvMargen></canvas></div>
+      </div>
+
+      <div class="op-card grafico-card" *ngIf="bloque('puntualidad_mensual') as b">
+        <h3><mat-icon>schedule</mat-icon> {{ b.titulo }}</h3>
+        <p class="grafico-pregunta">{{ pregunta(b.id) }}</p>
+        <p class="salvedad" *ngIf="b.salvedad">
+          <mat-icon>info</mat-icon> {{ b.salvedad }}
+        </p>
+        <p class="grafico-base">
+          {{ b.denominador }} · eje acotado al rango real, no a 0-100 %
+        </p>
+        <div class="grafico-caja"><canvas #cvPuntualidad></canvas></div>
+      </div>
+    </div>
+
+    <!-- ── G6 · el pulso físico, a todo el ancho ─────────────────────────── -->
+    <div class="op-card grafico-card ancho-total" *ngIf="bloque('kardex_mensual') as b">
+      <h3><mat-icon>inventory</mat-icon> {{ b.titulo }}</h3>
+      <p class="grafico-pregunta">{{ pregunta(b.id) }}</p>
+      <p class="grafico-base">{{ b.denominador }} · {{ b.filas }} meses</p>
+      <div class="grafico-caja"><canvas #cvKardex></canvas></div>
+    </div>
+
+    <!-- Las salvedades de la pantalla entera, al pie: cómo hay que leerla. -->
+    <div class="op-card salvedades-pie" *ngIf="datos?.salvedades?.length">
+      <h3><mat-icon>rule</mat-icon> Cómo hay que leer esta pantalla</h3>
+      <ul>
+        <li *ngFor="let s of datos?.salvedades">{{ s }}</li>
+      </ul>
+      <p class="fuentes" *ngIf="datos?.tablasFuente?.length">
+        Tablas del almacén que la sostienen: {{ datos?.tablasFuente?.join(' · ') }}
+      </p>
+    </div>
+
+  </ng-container>
+</div>

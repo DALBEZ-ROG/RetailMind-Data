@@ -84,6 +84,7 @@ export class AppComponent {
     '/operativo/informes/logistica': 'Informes de Logística',
     '/operativo/informes/soporte': 'Informes de Soporte',
     '/operativo/informes/gerencia': 'Informes de Gerencia',
+    '/operativo/panorama': 'Panorama del Negocio',
     '/operativo/tableros/omnicanal': 'Tablero Omnicanal',
     '/operativo/tableros/rentabilidad': 'Tablero de Rentabilidad y Rotación',
     '/operativo/tableros/cliente-posventa': 'Tablero de Cliente y Posventa',
@@ -165,6 +166,7 @@ export class AppComponent {
   get canInformesSoporte(): boolean { return this.nav.can('informesSoporte'); }
   get canInformesGerencia(): boolean { return this.nav.can('informesGerencia'); }
   // Tableros de dirección (nivel estratégico, fase E1-A)
+  get canPanorama(): boolean { return this.nav.can('panorama'); }
   get canTableroOmnicanal(): boolean { return this.nav.can('tableroOmnicanal'); }
   get canTableroRentabilidad(): boolean { return this.nav.can('tableroRentabilidad'); }
   get canTableroPosventa(): boolean { return this.nav.can('tableroPosventa'); }
