@@ -37,6 +37,12 @@ export class DespachosComponent implements OnInit {
 
   pedidos: PedidoVentaRow[] = [];
   pedidosEnTransito: PedidoVentaRow[] = [];
+
+  /** Tope de opciones por cola: el servidor no da más de 200 por página. */
+  readonly TOPE_COLA = 200;
+  /** Totales reales de cada cola, para declarar cuándo la lista se recortó. */
+  totalPreparados = 0;
+  totalEnTransito = 0;
   transportistas: CatalogoRef[] = [];
   metodosEnvio: CatalogoRef[] = [];
 
@@ -65,12 +71,25 @@ export class DespachosComponent implements OnInit {
     this.referencias.metodosEnvio().subscribe(m => this.metodosEnvio = m);
   }
 
+  /**
+   * Las DOS colas de la pantalla, cada una pedida al servidor por su estado.
+   *
+   * Antes salían de filtrar en el navegador la lista completa de pedidos. Con
+   * 2.999.993 esa descarga tumbaba el backend, y una vez paginada habría
+   * filtrado solo la página visible: el 88 % de los pedidos está 'entregado',
+   * así que las primeras 200 filas no traen ni un 'preparado' y las dos colas
+   * habrían salido VACÍAS sin un solo error. El estado se filtra en SQL.
+   */
   cargarPedidos(): void {
-    this.ventas.pedidos().subscribe(p => {
-      // Despachables: PREPARADOS por bodega (compuerta del backend)
-      this.pedidos = p.filter(x => x.estado === 'preparado');
-      // Entregables: en tránsito
-      this.pedidosEnTransito = p.filter(x => x.estado === 'despachado');
+    // Despachables: PREPARADOS por bodega (compuerta del backend)
+    this.ventas.pedidos({ estado: 'preparado', size: this.TOPE_COLA }).subscribe(pg => {
+      this.pedidos = pg.items;
+      this.totalPreparados = pg.total;
+    });
+    // Entregables: en tránsito
+    this.ventas.pedidos({ estado: 'despachado', size: this.TOPE_COLA }).subscribe(pg => {
+      this.pedidosEnTransito = pg.items;
+      this.totalEnTransito = pg.total;
     });
   }
 

@@ -151,6 +151,14 @@ export interface FacturaVentaRow {
 export interface PaginaFacturasVenta {
   items: FacturaVentaRow[]; total: number; page: number; size: number;
 }
+/**
+ * Sobre del listado de pedidos. Dejó de ser un array porque el endpoint
+ * devolvía los 2.999.993 pedidos y tumbaba el backend con OutOfMemoryError.
+ * `total` es el conteo REAL del conjunto filtrado, no el de la página.
+ */
+export interface PaginaPedidosVenta {
+  items: PedidoVentaRow[]; total: number; page: number; size: number;
+}
 export interface EnvioDetalle {
   id: number; numero: string; numero_guia: string; estado: string;
   fecha_despacho: string; direccion_entrega: string; transportista: string;

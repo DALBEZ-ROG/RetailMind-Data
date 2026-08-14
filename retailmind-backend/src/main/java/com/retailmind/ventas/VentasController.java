@@ -57,8 +57,25 @@ public class VentasController {
                 servicio.crearPedido(r.clienteId(), r.bodegaId(), canal, r.items()));
     }
 
+    /**
+     * Listado paginado de pedidos: sobre {@code {items, total, page, size}}.
+     *
+     * Devolvía la tabla entera y con 2.999.993 pedidos eso tumbaba el SERVIDOR
+     * (OutOfMemoryError en el hilo del conector de Tomcat, no solo un 500). El
+     * tope de {@code size} lo impone Paginacion y no se puede sobrepasar desde
+     * la petición.
+     */
     @GetMapping("/pedidos")
-    public List<Map<String, Object>> pedidos() { return servicio.listarPedidos(); }
+    public Map<String, Object> pedidos(
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) String estado,
+            @RequestParam(required = false) String canal,
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) Boolean facturables,
+            @RequestParam(required = false) Boolean conTotal) {
+        return servicio.listarPedidos(page, size, estado, canal, q, facturables, conTotal);
+    }
 
     @GetMapping("/pedidos/{id}")
     public Map<String, Object> pedido(@PathVariable long id) { return servicio.obtenerPedido(id); }

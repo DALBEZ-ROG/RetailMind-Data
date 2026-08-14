@@ -201,7 +201,7 @@
               </div>
               <div class="ti-col-fila" *ngFor="let c of columnasEditor">
                 <span class="ti-col-nombre">{{ c.columna }}</span>
-                <span *ngFor="let p of ['SELECT','INSERT','UPDATE']"
+                <span *ngFor="let p of privilegiosColumna"
                       [class.ti-cubierta]="c.cubierta[p]">
                   <mat-slide-toggle
                       [checked]="c.estado[p]"
@@ -314,7 +314,7 @@
         <div class="form-grid">
           <mat-form-field appearance="outline">
             <mat-label>Rol de grupo</mat-label>
-            <mat-select [(ngModel)]="filtroUsuarioRol">
+            <mat-select [(ngModel)]="filtroUsuarioRol" (ngModelChange)="filtrarUsuarios()">
               <mat-option value="">— Todos —</mat-option>
               <mat-option *ngFor="let r of rolesGrupo" [value]="r" [title]="r">
                 {{ r | rolGrupo }} <span class="cod-motor">{{ r }}</span>

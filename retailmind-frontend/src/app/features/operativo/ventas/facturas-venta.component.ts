@@ -30,6 +30,14 @@ export class FacturasVentaComponent implements OnInit {
 
   // Emisión: solo pedidos PAGADOS sin factura (compuerta del backend)
   pedidos: PedidoVentaRow[] = [];
+
+  /**
+   * Cuántos facturables se ofrecen en el desplegable. El servidor no entrega
+   * más de 200 por página, y meter 15.172 opciones en un `mat-select` sería
+   * cambiar un problema de memoria por otro de render.
+   */
+  readonly TOPE_SELECTOR = 200;
+
   pedidoId: number | null = null;
   factura: FacturaVenta | null = null;
   procesando = false;
@@ -59,10 +67,24 @@ export class FacturasVentaComponent implements OnInit {
     });
   }
 
+  /**
+   * Selector de pedidos FACTURABLES.
+   *
+   * El filtro (estado en pagado/en_preparacion/despachado/entregado y sin
+   * factura) lo aplica ahora el SERVIDOR con `facturables=true`: es la misma
+   * regla, movida de sitio. Aplicarla aquí sobre una página exigiría antes
+   * descargar los 2.999.993 pedidos —que es lo que tumbaba el backend— y, con
+   * el listado paginado, filtrar solo la página visible habría dejado el
+   * selector casi siempre VACÍO sin dar ningún error: los 15.172 facturables
+   * no están en las primeras 200 filas de tres millones.
+   */
   cargarPedidos(): void {
-    this.ventas.pedidos().subscribe(p => this.pedidos = p.filter(x =>
-      ['pagado', 'en_preparacion', 'despachado', 'entregado'].includes(x.estado)
-      && !x.tiene_factura));
+    // Sin conteo: contar los facturables exige recorrer los 2.999.993 pedidos
+    // con un NOT EXISTS contra `factura_venta`, y bajo RLS eso son ~9 s para
+    // un número que aquí solo serviría de rótulo. El selector se declara como
+    // «los N más recientes» y no promete un total.
+    this.ventas.pedidos({ facturables: true, size: this.TOPE_SELECTOR, conTotal: false })
+      .subscribe(pg => this.pedidos = pg.items);
   }
 
   cargarFacturas(): void {

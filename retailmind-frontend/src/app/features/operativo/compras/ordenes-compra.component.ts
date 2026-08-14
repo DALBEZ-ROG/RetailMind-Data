@@ -9,6 +9,8 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatPaginatorModule } from '@angular/material/paginator';
+import { PaginaLocal } from '../../../core/services/pagina-local.util';
 import { ComprasService } from '../../../core/services/compras.service';
 import { ReferenciasService } from '../../../core/services/referencias.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -26,13 +28,15 @@ interface LineaOrden { varianteId: number | null; cantidad: number; precioUnitar
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule, MatTooltipModule,
-    SelectBuscableComponent],
+    MatPaginatorModule, SelectBuscableComponent],
   templateUrl: './ordenes-compra.component.html',
   styleUrl: '../operativo-shared.scss'
 })
 export class OrdenesCompraComponent implements OnInit {
 
   ordenes: OrdenCompraRow[] = [];
+  /** La PÁGINA que se pinta. Sin esto el DOM recibía las 134.588 órdenes. */
+  readonly pag = new PaginaLocal<OrdenCompraRow>();
   proveedores: ProveedorRef[] = [];
   bodegas: BodegaRef[] = [];
   variantes: VarianteRef[] = [];
@@ -66,14 +70,21 @@ export class OrdenesCompraComponent implements OnInit {
     return this.auth.hasRole('BODEGA');
   }
 
+  // Las columnas dependen del ROL, que no cambia durante la sesión, así que se
+  // resuelven UNA vez y se guardan. Devolviéndolas a pelo, el getter entregaba
+  // un array NUEVO en cada ciclo de detección de cambios y `MatTable` rehacía
+  // las celdas sin que nada hubiera cambiado (trampa §8.6 de `PATRON_UI.md`).
+  private _columnas?: string[];
+  private _columnasDetalle?: string[];
+
   get columnas(): string[] {
-    return this.esBodega
+    return this._columnas ??= this.esBodega
       ? ['numero', 'proveedor', 'bodega', 'estado', 'acciones']
       : ['numero', 'proveedor', 'bodega', 'estado', 'total', 'acciones'];
   }
 
   get columnasDetalle(): string[] {
-    return this.esBodega
+    return this._columnasDetalle ??= this.esBodega
       ? ['sku', 'producto', 'cantidad', 'recibida']
       : ['sku', 'producto', 'cantidad', 'recibida', 'precio', 'subtotal'];
   }
@@ -92,7 +103,7 @@ export class OrdenesCompraComponent implements OnInit {
   cargarOrdenes(): void {
     this.loading = true;
     this.compras.ordenes().subscribe({
-      next: data => { this.ordenes = data; this.loading = false; },
+      next: data => { this.ordenes = data; this.pag.fijar(data); this.loading = false; },
       error: () => this.loading = false
     });
   }

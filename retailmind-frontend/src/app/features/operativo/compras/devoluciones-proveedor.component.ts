@@ -9,6 +9,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatPaginatorModule } from '@angular/material/paginator';
+import { PaginaLocal } from '../../../core/services/pagina-local.util';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ComprasService } from '../../../core/services/compras.service';
 import { ReferenciasService } from '../../../core/services/referencias.service';
@@ -28,7 +30,7 @@ import { ProveedorRef } from '../../../core/models/operativo.model';
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatCheckboxModule, MatFormFieldModule, MatInputModule, MatSelectModule,
-    MatTooltipModule, MatSnackBarModule],
+    MatTooltipModule, MatSnackBarModule, MatPaginatorModule],
   templateUrl: './devoluciones-proveedor.component.html',
   styleUrl: '../operativo-shared.scss'
 })
@@ -38,6 +40,12 @@ export class DevolucionesProveedorComponent implements OnInit {
   readonly estadosDev = ['registrada', 'enviada', 'resuelta', 'cerrada'];
 
   items: any[] = [];
+  /**
+   * La página que se pinta. El pool trae 27.831 ítems defectuosos y cada fila
+   * lleva su propia casilla, o sea un componente por fila: pintarlas todas
+   * dejaba la pestaña sin responder.
+   */
+  readonly pag = new PaginaLocal<any>();
   filtroItem: string | null = 'pendiente';
   seleccion = new Set<number>();
 
@@ -87,7 +95,9 @@ export class DevolucionesProveedorComponent implements OnInit {
   cargarItems(): void {
     this.loading = true;
     this.compras.itemsDefectuosos(this.filtroItem).subscribe({
-      next: it => { this.items = it; this.loading = false; this.seleccion.clear(); },
+      next: it => {
+        this.items = it; this.pag.fijar(it); this.loading = false; this.seleccion.clear();
+      },
       error: e => {
         this.loading = false;
         this.snackBar.open(mensajeError(e, 'No se pudieron cargar los ítems defectuosos'), 'Cerrar', { duration: 4000 });

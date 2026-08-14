@@ -90,28 +90,28 @@
 
     <!-- Filtros de la bandeja (solo personal) -->
     <div *ngIf="esStaff" style="display:flex; flex-wrap:wrap; gap:12px; align-items:baseline; margin: 8px 0 4px;">
-      <mat-button-toggle-group [(ngModel)]="filtroBandeja">
+      <mat-button-toggle-group [(ngModel)]="filtroBandeja" (ngModelChange)="aplicarFiltros()">
         <mat-button-toggle value="todos">Todos</mat-button-toggle>
         <mat-button-toggle value="sin_asignar">Sin asignar</mat-button-toggle>
         <mat-button-toggle value="mios">Asignados a mí</mat-button-toggle>
       </mat-button-toggle-group>
       <mat-form-field appearance="outline" style="width: 170px;">
         <mat-label>Estado</mat-label>
-        <mat-select [(ngModel)]="filtroEstado">
+        <mat-select [(ngModel)]="filtroEstado" (ngModelChange)="aplicarFiltros()">
           <mat-option value="">Todos</mat-option>
           <mat-option *ngFor="let e of estadosFiltro" [value]="e">{{ e.replaceAll('_',' ') }}</mat-option>
         </mat-select>
       </mat-form-field>
       <mat-form-field appearance="outline" style="width: 190px;">
         <mat-label>Categoría</mat-label>
-        <mat-select [(ngModel)]="filtroCategoria">
+        <mat-select [(ngModel)]="filtroCategoria" (ngModelChange)="aplicarFiltros()">
           <mat-option value="">Todas</mat-option>
           <mat-option *ngFor="let c of categoriasEnBandeja" [value]="c">{{ c }}</mat-option>
         </mat-select>
       </mat-form-field>
       <mat-form-field appearance="outline" style="width: 150px;">
         <mat-label>Prioridad</mat-label>
-        <mat-select [(ngModel)]="filtroPrioridad">
+        <mat-select [(ngModel)]="filtroPrioridad" (ngModelChange)="aplicarFiltros()">
           <mat-option value="">Todas</mat-option>
           <mat-option *ngFor="let p of prioridades" [value]="p">{{ p }}</mat-option>
         </mat-select>
@@ -119,7 +119,7 @@
     </div>
 
     <div class="table-wrapper" *ngIf="ticketsFiltrados.length; else vacio">
-      <table mat-table [dataSource]="ticketsFiltrados">
+      <table mat-table [dataSource]="pag.filas">
         <ng-container matColumnDef="numero">
           <th mat-header-cell *matHeaderCellDef>Ticket</th>
           <td mat-cell *matCellDef="let t">
@@ -200,6 +200,9 @@
             [class.fila-seleccionada]="detalle?.id === t.id"></tr>
       </table>
     </div>
+    <mat-paginator *ngIf="pag.total" [length]="pag.total" [pageIndex]="pag.pagina"
+                   [pageSize]="pag.tam" [pageSizeOptions]="pag.opciones"
+                   (page)="pag.alPaginar($event)" showFirstLastButtons></mat-paginator>
     <ng-template #vacio>
       <div class="empty-state" *ngIf="!loading">
         <mat-icon>support_agent</mat-icon>

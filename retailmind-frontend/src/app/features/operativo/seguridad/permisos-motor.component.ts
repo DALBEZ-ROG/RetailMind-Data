@@ -119,6 +119,14 @@ export class PermisosMotorComponent implements OnInit {
 
   // ── Editor de rol (interruptores) ───────────────────────────────────────
   readonly privilegios = PRIVILEGIOS_EDITOR;
+
+  /**
+   * Los tres privilegios que se administran POR COLUMNA. Estaba escrito como
+   * literal dentro del `*ngFor` de la plantilla, anidado bajo el de columnas:
+   * ahí el array se reconstruía por columna y por ciclo de detección de
+   * cambios (§8.6). Como campo es siempre el mismo.
+   */
+  readonly privilegiosColumna = ['SELECT', 'INSERT', 'UPDATE'];
   rolesPropios: RolPersonalizado[] = [];
   rolEditor = '';
   filtroTablaEditor = '';
@@ -163,6 +171,7 @@ export class PermisosMotorComponent implements OnInit {
         this.objetos = r.objetos;
         this.politicas = r.politicas;
         this.rolesPropios = r.propios;
+        this.componerDerivadas();
         this.loading = false;
         this.cargarPermisos();
         this.cargarEditor();
@@ -237,19 +246,32 @@ export class PermisosMotorComponent implements OnInit {
 
   get roles(): RolMotor[] { return this.mapa?.roles ?? []; }
 
+  // Estas tres listas alimentan desplegables y una `mat-table`. Calculadas a
+  // pelo dentro del getter devolvían un array NUEVO en cada ciclo de detección
+  // de cambios, así que Angular rehacía las opciones y las filas sin que nada
+  // hubiera cambiado (trampa §8.6 de `PATRON_UI.md`). Se recalculan cuando
+  // cambia su ENTRADA —el mapa cargado o el filtro— y no cuando se mira.
+
   /** Los 9 grupos, para los desplegables. */
-  get rolesGrupo(): string[] {
-    return this.roles.filter(r => r.clase === 'grupo').map(r => r.rol_motor);
-  }
+  rolesGrupo: string[] = [];
 
   /** Destinatarios administrables: los 9 MENOS el del propio administrador. */
-  get rolesAdministrables(): string[] {
-    return this.rolesGrupo.filter(r => r !== 'grp_administrador');
+  rolesAdministrables: string[] = [];
+
+  usuarios: UsuarioDeRol[] = [];
+
+  /** Rehace las vistas derivadas del mapa. Se llama al cargarlo. */
+  private componerDerivadas(): void {
+    this.rolesGrupo = this.roles.filter(r => r.clase === 'grupo').map(r => r.rol_motor);
+    this.rolesAdministrables = this.rolesGrupo.filter(r => r !== 'grp_administrador');
+    this._rolesEditables = undefined;
+    this.filtrarUsuarios();
   }
 
-  get usuarios(): UsuarioDeRol[] {
+  /** Rehace la tabla de usuarios por rol. Se llama al cambiar el filtro. */
+  filtrarUsuarios(): void {
     const todos = this.mapa?.usuarios ?? [];
-    return this.filtroUsuarioRol
+    this.usuarios = this.filtroUsuarioRol
       ? todos.filter(u => u.rol_motor === this.filtroUsuarioRol)
       : todos;
   }
@@ -475,8 +497,9 @@ export class PermisosMotorComponent implements OnInit {
   }
 
   /** grp_administrador no se edita (R1): ni siquiera se ofrece. */
+  private _rolesEditables?: string[];
   get rolesEditables(): string[] {
-    return this.rolesGrupo.filter(r => r !== 'grp_administrador');
+    return this._rolesEditables ??= this.rolesGrupo.filter(r => r !== 'grp_administrador');
   }
 
   cargarRolesPropios(): void {

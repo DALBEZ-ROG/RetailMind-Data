@@ -366,35 +366,144 @@ public class VentasService {
         return Map.of("id", id);
     }
 
+    /** Estados que admite el filtro. Fuera de esta lista → 400, nunca al SQL. */
+    private static final java.util.Set<String> ESTADOS_PEDIDO = java.util.Set.of(
+            "pendiente", "confirmado", "pagado", "facturado", "en_preparacion",
+            "preparado", "despachado", "entregado", "devuelto", "no_entregado", "cancelado");
+
+    private static final java.util.Set<String> CANALES_PEDIDO =
+            java.util.Set.of("web", "tienda", "telefono");
+
+    // Cabecera con dinero y sin dinero. La segregación financiera es la de
+    // siempre: BODEGA/DESPACHO no tienen SELECT sobre pedido.total en el motor,
+    // así que su consulta ni lo nombra.
+    // OJO: aquí NO se proyecta `tiene_factura`.
+    //
+    // Era un `EXISTS (SELECT 1 FROM factura_venta ...)` en la lista del SELECT, y
+    // bajo RLS eso no es una búsqueda por índice: la política de `factura_venta`
+    // lleva una función que no es «leakproof», así que PostgreSQL no puede
+    // empujar la correlación `fv.pedido_id = p.id` por debajo del filtro de
+    // seguridad y resuelve el subplan recorriendo las 2.855.378 facturas
+    // ENTERAS — medido: 2.878.568 buffers y 4,3 s por petición, aunque la página
+    // sean 25 filas. El índice `idx_factura_venta_pedido` existe y no se puede
+    // usar. Su único consumidor era el selector de pedidos facturables, y esa
+    // regla vive ahora en el WHERE (`facturables=true`), donde sí se resuelve
+    // como anti-join sobre el conjunto ya acotado.
+    private static final String SEL_PEDIDOS_COMPLETO = """
+            SELECT p.id, p.numero, ep.codigo AS estado, p.canal, p.total, p.fecha_pedido,
+                   c.nombre || ' ' || COALESCE(c.apellido,'') AS cliente,
+                   t.nombre AS transportista
+            """;
+
+    private static final String SEL_PEDIDOS_LOGISTICO = """
+            SELECT p.id, p.numero, ep.codigo AS estado, p.canal, p.fecha_pedido,
+                   c.nombre || ' ' || COALESCE(c.apellido,'') AS cliente,
+                   t.nombre AS transportista
+            """;
+
+    private static final String JOIN_BASE = """
+            FROM pedido p
+            JOIN estado_pedido ep ON ep.id = p.estado_pedido_id
+            """;
+
+    /** Solo hace falta para PINTAR la fila y para buscar por nombre de cliente. */
+    private static final String JOIN_CLIENTE = " JOIN cliente c ON c.id = p.cliente_id\n";
+
+    /** LEFT JOIN: nunca cambia el número de filas, así que el conteo lo omite. */
+    private static final String JOIN_TRANSPORTISTA =
+            " LEFT JOIN transportista t ON t.id = p.transportista_id\n";
+
+    private static final String W_FACTURABLES = """
+             AND ep.codigo IN ('pagado', 'en_preparacion', 'despachado', 'entregado')
+             AND NOT EXISTS (SELECT 1 FROM factura_venta fv WHERE fv.pedido_id = p.id)
+            """;
+
+    /**
+     * Listado de pedidos, PAGINADO EN EL SERVIDOR.
+     *
+     * <h3>Por qué dejó de devolver una lista</h3>
+     * Devolvía {@code List<Map>} con la tabla entera. Con 2.999.993 pedidos eso
+     * no era un endpoint lento: el montón subía a 2,03 GiB, saltaba
+     * {@code OutOfMemoryError: Java heap space} y moría el hilo
+     * {@code http-nio-8080-Poller} de Tomcat, con lo que el backend COMPLETO
+     * dejaba de responder hasta reiniciar el contenedor. Ahora devuelve el sobre
+     * {@code {items, total, page, size}} y jamás más de
+     * {@link com.retailmind.comun.Paginacion#MAX_PAGINA} filas, aunque se pidan.
+     *
+     * <h3>Los filtros van AQUÍ y no en la pantalla</h3>
+     * Las pantallas de facturación y despacho no listan pedidos: eligen UNO
+     * entre los que cumplen una condición («facturable», «preparado»). Antes se
+     * traían la tabla completa y filtraban en el navegador; con el listado
+     * paginado ese filtro habría mirado solo la página visible y habría dado un
+     * resultado plausible y FALSO. Por eso el filtro se evalúa contra el
+     * conjunto completo, en SQL, y `total` cuenta ese mismo conjunto.
+     *
+     * @param facturables atajo del predicado exacto que aplicaba la pantalla de
+     *                    facturas: estado en (pagado, en_preparacion, despachado,
+     *                    entregado) y sin factura. Es la MISMA regla, movida de
+     *                    sitio, no una regla nueva.
+     */
     @Transactional(readOnly = true)
-    public List<Map<String, Object>> listarPedidos() {
-        // Segregación financiera: BODEGA/DESPACHO listan pedidos SIN montos
-        // (sus grants de columna ya no incluyen total; su trabajo no lo necesita)
-        if (esRolLogistico()) {
-            return pg.queryForList("""
-                    SELECT p.id, p.numero, ep.codigo AS estado, p.canal, p.fecha_pedido,
-                           c.nombre || ' ' || COALESCE(c.apellido,'') AS cliente,
-                           t.nombre AS transportista,
-                           EXISTS (SELECT 1 FROM factura_venta fv
-                                   WHERE fv.pedido_id = p.id) AS tiene_factura
-                    FROM pedido p
-                    JOIN estado_pedido ep ON ep.id = p.estado_pedido_id
-                    JOIN cliente c ON c.id = p.cliente_id
-                    LEFT JOIN transportista t ON t.id = p.transportista_id
-                    ORDER BY p.id DESC""");
+    public Map<String, Object> listarPedidos(Integer page, Integer size, String estado,
+                                             String canal, String q, Boolean facturables,
+                                             Boolean conTotal) {
+        String est = filtroDeLista(estado, ESTADOS_PEDIDO, "estado");
+        String can = filtroDeLista(canal, CANALES_PEDIDO, "canal");
+        String busq = (q == null || q.isBlank()) ? null : q.trim();
+        boolean soloFacturables = Boolean.TRUE.equals(facturables);
+
+        // El WHERE se arma SOLO con los filtros presentes. Las piezas son
+        // constantes del código y los valores viajan como parámetros ligados:
+        // aquí no se concatena nada que venga del usuario. Además evita el plan
+        // genérico que producen las guardas `(? IS NULL OR ...)` cuando no hay
+        // filtro, que es justo el caso normal de esta pantalla.
+        StringBuilder w = new StringBuilder(" WHERE 1 = 1\n");
+        List<Object> args = new java.util.ArrayList<>();
+        if (est != null) { w.append(" AND ep.codigo = ?\n"); args.add(est); }
+        if (can != null) { w.append(" AND p.canal = ?\n"); args.add(can); }
+        if (busq != null) {
+            w.append(" AND (p.numero ILIKE ?"
+                   + " OR (c.nombre || ' ' || COALESCE(c.apellido,'')) ILIKE ?)\n");
+            args.add("%" + busq + "%");
+            args.add("%" + busq + "%");
         }
-        // tiene_factura permite a los selectores ofrecer solo pedidos válidos
-        return pg.queryForList("""
-                SELECT p.id, p.numero, ep.codigo AS estado, p.canal, p.total, p.fecha_pedido,
-                       c.nombre || ' ' || COALESCE(c.apellido,'') AS cliente,
-                       t.nombre AS transportista,
-                       EXISTS (SELECT 1 FROM factura_venta fv
-                               WHERE fv.pedido_id = p.id) AS tiene_factura
-                FROM pedido p
-                JOIN estado_pedido ep ON ep.id = p.estado_pedido_id
-                JOIN cliente c ON c.id = p.cliente_id
-                LEFT JOIN transportista t ON t.id = p.transportista_id
-                ORDER BY p.id DESC""");
+        if (soloFacturables) { w.append(W_FACTURABLES); }
+
+        String where = w.toString();
+        Object[] a = args.toArray();
+
+        String select = esRolLogistico() ? SEL_PEDIDOS_LOGISTICO : SEL_PEDIDOS_COMPLETO;
+        String sqlItems = select + JOIN_BASE + JOIN_CLIENTE + JOIN_TRANSPORTISTA + where
+                        + " ORDER BY p.id DESC";
+
+        int pag = com.retailmind.comun.Paginacion.pagina(page);
+        int tam = com.retailmind.comun.Paginacion.tamano(size);
+
+        if (Boolean.FALSE.equals(conTotal)) {
+            return com.retailmind.comun.Paginacion.paginarSinTotal(pg, sqlItems, a, pag, tam);
+        }
+
+        // El conteo NO arrastra los joins que solo sirven para pintar la fila.
+        // Medido bajo `grp_administrador` con RLS: el conteo de facturables pasa
+        // de 57,7 s con `cliente` y `transportista` colgando a 8,8 s sin ellos.
+        String sqlCount = "SELECT count(*) " + JOIN_BASE
+                        + (busq != null ? JOIN_CLIENTE : "") + where;
+
+        return com.retailmind.comun.Paginacion.paginar(pg, sqlItems, sqlCount, a, pag, tam);
+    }
+
+    /** Valida un filtro contra su lista blanca: fuera de ella, 400 legible. */
+    private static String filtroDeLista(String valor, java.util.Set<String> permitidos,
+                                        String nombre) {
+        if (valor == null || valor.isBlank()) {
+            return null;
+        }
+        String v = valor.trim();
+        if (!permitidos.contains(v)) {
+            throw new IllegalArgumentException("Valor no admitido para el filtro «" + nombre
+                    + "»: " + v);
+        }
+        return v;
     }
 
     // ── Pago del cliente (pago + transaccion_pago) ───────────────────────

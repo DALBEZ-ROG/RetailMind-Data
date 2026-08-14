@@ -14,7 +14,8 @@
             {{ p.numero }} — {{ p.cliente }}{{ p.transportista ? ' · ' + p.transportista : '' }}
           </mat-option>
         </mat-select>
-        <mat-hint>Solo pedidos PREPARADOS por bodega</mat-hint>
+        <mat-hint>Solo pedidos PREPARADOS por bodega<span *ngIf="totalPreparados > TOPE_COLA">
+          — {{ TOPE_COLA }} más recientes de {{ totalPreparados | number }}</span></mat-hint>
       </mat-form-field>
       <mat-form-field appearance="outline">
         <mat-label>Observación</mat-label>
@@ -89,7 +90,8 @@
             {{ p.numero }} — {{ p.cliente }}{{ p.transportista ? ' · ' + p.transportista : '' }}
           </mat-option>
         </mat-select>
-        <mat-hint>Solo pedidos despachados pendientes de entrega</mat-hint>
+        <mat-hint>Solo pedidos despachados pendientes de entrega<span *ngIf="totalEnTransito > TOPE_COLA">
+          — {{ TOPE_COLA }} más recientes de {{ totalEnTransito | number }}</span></mat-hint>
       </mat-form-field>
       <mat-form-field appearance="outline">
         <mat-label>Observación de la entrega</mat-label>

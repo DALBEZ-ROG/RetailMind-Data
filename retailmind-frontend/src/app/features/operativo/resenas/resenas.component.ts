@@ -10,6 +10,8 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatPaginatorModule } from '@angular/material/paginator';
+import { PaginaLocal } from '../../../core/services/pagina-local.util';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { ResenasService } from '../../../core/services/resenas.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -69,7 +71,8 @@ const TRANSICIONES_REPORTE: Record<string, string[]> = {
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule, MatTooltipModule,
-    MatDialogModule, SelectBuscableComponent, AccionesRegistroComponent, CodigoLegiblePipe],
+    MatDialogModule, MatPaginatorModule, SelectBuscableComponent, AccionesRegistroComponent,
+    CodigoLegiblePipe],
   templateUrl: './resenas.component.html',
   styleUrl: '../operativo-shared.scss'
 })
@@ -78,6 +81,9 @@ export class ResenasComponent implements OnInit {
   // ── Moderación (personal) ──────────────────────────────────────────────
   private todasResenas: ResenaRow[] = [];
   resenas: ResenaRow[] = [];
+  /** Páginas visibles: sin esto el DOM recibía las 263.077 reseñas. */
+  readonly pag = new PaginaLocal<ResenaRow>();
+  readonly pagReportes = new PaginaLocal<ReporteResenaRow>();
   filtroEstado = 'todos';
   filtroTexto = '';
   filtroCalificacion: number | 'todos' = 'todos';
@@ -188,6 +194,7 @@ export class ResenasComponent implements OnInit {
           || (r.titulo ?? '').toLowerCase().includes(q)
           || (r.comentario ?? '').toLowerCase().includes(q);
     });
+    this.pag.fijar(this.resenas);
     this.resenaSeleccionada = this.resenas
       .find(r => r.id === this.resenaSeleccionada?.id) ?? null;
   }
@@ -206,6 +213,7 @@ export class ResenasComponent implements OnInit {
       if (this.filtroMotivo !== 'todos' && r.motivo !== this.filtroMotivo) return false;
       return true;
     });
+    this.pagReportes.fijar(this.reportes);
     this.reporteSeleccionado = this.reportes
       .find(r => r.id === this.reporteSeleccionado?.id) ?? null;
   }

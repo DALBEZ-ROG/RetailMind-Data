@@ -12,6 +12,8 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatPaginatorModule } from '@angular/material/paginator';
+import { PaginaLocal } from '../../../core/services/pagina-local.util';
 import { Subject, debounceTime, distinctUntilChanged, switchMap, of } from 'rxjs';
 import { SoporteService } from '../../../core/services/soporte.service';
 import { ReferenciasService } from '../../../core/services/referencias.service';
@@ -45,7 +47,8 @@ const TRANSICIONES: Record<string, string[]> = {
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatAutocompleteModule,
-    MatCheckboxModule, MatSnackBarModule, MatTooltipModule, MatButtonToggleModule, CodigoLegiblePipe],
+    MatCheckboxModule, MatSnackBarModule, MatTooltipModule, MatButtonToggleModule,
+    MatPaginatorModule, CodigoLegiblePipe],
   templateUrl: './tickets.component.html',
   styleUrl: '../operativo-shared.scss'
 })
@@ -97,8 +100,11 @@ export class TicketsComponent implements OnInit {
   /** Asignar a terceros: gestión (el agente se auto-asigna con "tomar"). */
   get puedeAsignar(): boolean { return this.esGestion; }
 
+  // El ROL no cambia durante la sesión: las columnas se resuelven una vez. Como
+  // getter devolvía un array nuevo por ciclo de detección de cambios (§8.6).
+  private _columnas?: string[];
   get columnas(): string[] {
-    return this.esCliente
+    return this._columnas ??= this.esCliente
       ? ['numero', 'categoria', 'estado', 'mensajes', 'fecha', 'acciones']
       : ['numero', 'cliente', 'categoria', 'prioridad', 'sla', 'estado', 'asignado', 'acciones'];
   }
@@ -108,19 +114,31 @@ export class TicketsComponent implements OnInit {
     return this.detalle ? (TRANSICIONES[this.detalle.estado] || []) : [];
   }
 
-  /** Bandeja con los filtros aplicados (client-side sobre la lista cargada). */
-  get ticketsFiltrados(): TicketRow[] {
-    return this.tickets.filter(t =>
+  /**
+   * Bandeja con los filtros aplicados (client-side sobre la lista cargada).
+   *
+   * Es un CAMPO y se recalcula en `aplicarFiltros()`. Como getter recorría los
+   * 179.851 tickets en CADA ciclo de detección de cambios y devolvía un array
+   * nuevo, así que `MatTable` rehacía la tabla entera una y otra vez: es la
+   * trampa §8.6 de `PATRON_UI.md` sobre el listado más grande del sistema.
+   */
+  ticketsFiltrados: TicketRow[] = [];
+
+  /** La página que se pinta; el resto de la bandeja no llega al DOM. */
+  readonly pag = new PaginaLocal<TicketRow>();
+
+  /** Categorías presentes, recalculadas al cargar y no por ciclo. */
+  categoriasEnBandeja: string[] = [];
+
+  aplicarFiltros(): void {
+    this.ticketsFiltrados = this.tickets.filter(t =>
       (this.filtroBandeja === 'todos'
         || (this.filtroBandeja === 'sin_asignar' && !t.asignado_usuario_id)
         || (this.filtroBandeja === 'mios' && t.asignado_a_mi))
       && (!this.filtroEstado || t.estado === this.filtroEstado)
       && (!this.filtroCategoria || t.categoria === this.filtroCategoria)
       && (!this.filtroPrioridad || t.prioridad === this.filtroPrioridad));
-  }
-
-  get categoriasEnBandeja(): string[] {
-    return [...new Set(this.tickets.map(t => t.categoria).filter((c): c is string => !!c))].sort();
+    this.pag.fijar(this.ticketsFiltrados);
   }
 
   ngOnInit(): void {
@@ -147,7 +165,13 @@ export class TicketsComponent implements OnInit {
   cargar(): void {
     this.loading = true;
     this.soporte.tickets().subscribe({
-      next: data => { this.tickets = data; this.loading = false; },
+      next: data => {
+        this.tickets = data;
+        this.categoriasEnBandeja =
+          [...new Set(data.map(t => t.categoria).filter((c): c is string => !!c))].sort();
+        this.aplicarFiltros();
+        this.loading = false;
+      },
       error: () => this.loading = false
     });
   }

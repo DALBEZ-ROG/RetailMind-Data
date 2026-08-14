@@ -58,7 +58,9 @@ export class KardexComponent implements OnInit {
   consultar(): void {
     this.loading = true;
     this.inventario.kardex(this.varianteId, this.bodegaId).subscribe({
-      next: data => { this.movimientos = data; this.pagina = 0; this.loading = false; },
+      next: data => {
+        this.movimientos = data; this.pagina = 0; this.recortarPagina(); this.loading = false;
+      },
       error: e => {
         this.loading = false;
         this.snackBar.open(mensajeError(e, 'No se pudo consultar el kardex'), 'Cerrar', { duration: 5000 });
@@ -66,14 +68,22 @@ export class KardexComponent implements OnInit {
     });
   }
 
-  get movimientosPagina(): KardexRow[] {
+  /**
+   * La página visible. Campo y no getter: desde un getter el array se
+   * reconstruía en cada ciclo de detección de cambios y `MatTable` rehacía las
+   * celdas sin que nada hubiera cambiado (trampa §8.6 de `PATRON_UI.md`).
+   */
+  movimientosPagina: KardexRow[] = [];
+
+  private recortarPagina(): void {
     const inicio = this.pagina * this.tamPagina;
-    return this.movimientos.slice(inicio, inicio + this.tamPagina);
+    this.movimientosPagina = this.movimientos.slice(inicio, inicio + this.tamPagina);
   }
 
   alPaginar(e: PageEvent): void {
     this.pagina = e.pageIndex;
     this.tamPagina = e.pageSize;
+    this.recortarPagina();
   }
 
   limpiar(): void {

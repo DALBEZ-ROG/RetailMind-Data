@@ -9,6 +9,8 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatPaginatorModule } from '@angular/material/paginator';
+import { PaginaLocal } from '../../../core/services/pagina-local.util';
 import { Observable } from 'rxjs';
 import { DevolucionesService } from '../../../core/services/devoluciones.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -32,7 +34,8 @@ import { CodigoLegiblePipe } from '../../../core/pipes/etiquetas.pipe';
   selector: 'app-devoluciones',
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
-    MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule, MatTooltipModule, CodigoLegiblePipe],
+    MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule, MatTooltipModule,
+    MatPaginatorModule, CodigoLegiblePipe],
   templateUrl: './devoluciones.component.html',
   styleUrl: '../operativo-shared.scss'
 })
@@ -72,17 +75,25 @@ export class DevolucionesComponent implements OnInit {
     return !(this.auth.hasRole('BODEGA') || this.auth.hasRole('DESPACHO'));
   }
 
+  // El ROL no cambia durante la sesión: se resuelven una vez. Como getter
+  // devolvían un array nuevo por ciclo de detección de cambios (§8.6).
+  private _columnas?: string[];
+  private _columnasItems?: string[];
+
   get columnas(): string[] {
-    return this.veMontos
+    return this._columnas ??= this.veMontos
       ? ['numero', 'pedido', 'cliente', 'motivo', 'monto', 'estado', 'fecha', 'acciones']
       : ['numero', 'pedido', 'cliente', 'motivo', 'estado', 'fecha', 'acciones'];
   }
 
   get columnasItems(): string[] {
-    return this.veMontos
+    return this._columnasItems ??= this.veMontos
       ? ['sku', 'producto', 'cantidad', 'precio', 'inspeccion']
       : ['sku', 'producto', 'cantidad', 'inspeccion'];
   }
+
+  /** La página que se pinta: sin esto el DOM recibía las 145.734 devoluciones. */
+  readonly pag = new PaginaLocal<DevolucionRow>();
 
   ngOnInit(): void {
     this.cargar();
@@ -94,7 +105,7 @@ export class DevolucionesComponent implements OnInit {
   cargar(): void {
     this.loading = true;
     this.rma.listar(this.filtroEstado || undefined).subscribe({
-      next: d => { this.devoluciones = d; this.loading = false; },
+      next: d => { this.devoluciones = d; this.pag.fijar(d); this.loading = false; },
       error: e => {
         this.loading = false;
         this.snackBar.open(mensajeError(e, 'No se pudieron cargar las devoluciones'), 'Cerrar', { duration: 5000 });

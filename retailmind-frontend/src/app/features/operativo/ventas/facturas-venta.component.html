@@ -14,7 +14,14 @@
             {{ p.numero }} — {{ p.cliente }} ({{ p.total | currency:'USD' }} · {{ p.estado | codigoLegible }})
           </mat-option>
         </mat-select>
-        <mat-hint>Solo pedidos pagados y aún sin factura</mat-hint>
+        <!-- Que la lista está recortada se DICE: una lista truncada en silencio
+             se lee como «no queda nada por facturar», justo lo contrario. -->
+        <mat-hint *ngIf="pedidos.length < TOPE_SELECTOR">
+          Solo pedidos pagados y aún sin factura ({{ pedidos.length | number }})
+        </mat-hint>
+        <mat-hint *ngIf="pedidos.length >= TOPE_SELECTOR">
+          Solo pedidos pagados y aún sin factura — los {{ TOPE_SELECTOR }} más recientes
+        </mat-hint>
       </mat-form-field>
     </div>
     <div class="form-actions">

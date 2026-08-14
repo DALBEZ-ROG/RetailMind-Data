@@ -110,6 +110,10 @@ interface KpiCard {
 })
 export class DashboardComponent implements OnInit, OnDestroy {
 
+  /** Cierra la puerta a los `next` que llegan después de salir de la pantalla. */
+  private destruido = false;
+  private temporizadorPintado?: ReturnType<typeof setTimeout>;
+
   @ViewChild('volumenCanvas')    volumenCanvas?:    ElementRef<HTMLCanvasElement>;
   @ViewChild('conversionCanvas') conversionCanvas?: ElementRef<HTMLCanvasElement>;
   @ViewChild('accionesCanvas')   accionesCanvas?:   ElementRef<HTMLCanvasElement>;
@@ -215,6 +219,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.destruido = true;
+    clearTimeout(this.temporizadorPintado);
     this.destruirGraficos();
   }
 
@@ -328,8 +334,17 @@ export class DashboardComponent implements OnInit, OnDestroy {
    * antes de que Chart.js mida el contenedor.
    */
   private pintarGraficos(): void {
-    if (this.loading || !this.series) return;
-    setTimeout(() => {
+    if (this.destruido || this.loading || !this.series) return;
+    clearTimeout(this.temporizadorPintado);
+    this.temporizadorPintado = setTimeout(() => {
+      // La pantalla puede haberse abandonado entre que se programó el pintado y
+      // que le toca correr: las peticiones de analítica tardan segundos y no se
+      // cancelan al salir, así que su `next` sigue llegando a un componente ya
+      // destruido. Sin esta guarda se creaban SIETE gráficos sobre canvas que
+      // ya no están en el documento, y como `ngOnDestroy` ya pasó, nadie los
+      // destruye nunca: cada visita interrumpida dejaba siete instancias de
+      // Chart.js vivas con sus observadores y sus datos.
+      if (this.destruido) return;
       this.destruirGraficos();
       const s = this.series!;
       this.graficoVolumenSemanal(s.semanal);

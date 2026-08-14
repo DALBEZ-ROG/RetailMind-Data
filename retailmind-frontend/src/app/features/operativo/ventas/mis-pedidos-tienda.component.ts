@@ -10,6 +10,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { VentasService } from '../../../core/services/ventas.service';
 import { DevolucionesService } from '../../../core/services/devoluciones.service';
 import { mensajeError } from '../../../core/services/api-error.util';
@@ -31,13 +32,23 @@ import { CodigoLegiblePipe } from '../../../core/pipes/etiquetas.pipe';
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink, MatTableModule, MatIconModule,
     MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule,
-    MatSnackBarModule, MatTooltipModule, CodigoLegiblePipe],
+    MatSnackBarModule, MatTooltipModule, MatPaginatorModule, CodigoLegiblePipe],
   templateUrl: './mis-pedidos-tienda.component.html',
   styleUrl: '../operativo-shared.scss'
 })
 export class MisPedidosTiendaComponent implements OnInit {
 
   pedidos: PedidoVentaRow[] = [];
+  total = 0;
+  pagina = 0;
+  tamPagina = 25;
+  readonly tamanos = [25, 50, 100];
+
+  alPaginar(e: PageEvent): void {
+    this.pagina = e.pageIndex;
+    this.tamPagina = e.pageSize;
+    this.cargar();
+  }
   detalle: PedidoVentaDetalle | null = null;
   seguimiento: SeguimientoRow[] = [];
   novedades: NovedadEnvioRow[] = [];
@@ -66,8 +77,12 @@ export class MisPedidosTiendaComponent implements OnInit {
 
   cargar(): void {
     this.loading = true;
-    this.ventas.pedidos().subscribe({
-      next: data => { this.pedidos = data; this.loading = false; },
+    // El endpoint pagina en servidor. Aquí RLS ya recorta a los pedidos del
+    // propio cliente, así que son pocos, pero se pagina igual: el tope del
+    // servidor se aplica siempre y sin paginador la pantalla solo vería los
+    // primeros 25 sin decirlo.
+    this.ventas.pedidos({ page: this.pagina, size: this.tamPagina }).subscribe({
+      next: pg => { this.pedidos = pg.items; this.total = pg.total; this.loading = false; },
       error: e => {
         this.loading = false;
         this.snackBar.open(mensajeError(e, 'No se pudieron cargar tus pedidos'), 'Cerrar', { duration: 5000 });

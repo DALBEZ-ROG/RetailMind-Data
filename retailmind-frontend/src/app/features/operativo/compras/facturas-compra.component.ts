@@ -9,6 +9,8 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatPaginatorModule } from '@angular/material/paginator';
+import { PaginaLocal } from '../../../core/services/pagina-local.util';
 import { ComprasService } from '../../../core/services/compras.service';
 import { ReferenciasService } from '../../../core/services/referencias.service';
 import { NavPermissionsService } from '../../../core/navigation/nav-permissions.service';
@@ -21,7 +23,8 @@ import {
   selector: 'app-facturas-compra',
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
-    MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule, MatTooltipModule],
+    MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule, MatTooltipModule,
+    MatPaginatorModule],
   templateUrl: './facturas-compra.component.html',
   styleUrl: '../operativo-shared.scss'
 })
@@ -29,6 +32,16 @@ export class FacturasCompraComponent implements OnInit {
 
   ordenes: OrdenCompraRow[] = [];
   cuentas: CuentaPorPagarRow[] = [];
+  /** La página que se pinta: sin esto el DOM recibía las 134.558 cuentas. */
+  readonly pag = new PaginaLocal<CuentaPorPagarRow>();
+
+  /**
+   * Estaba escrito como literal DENTRO de `matRowDef`, y una expresión de
+   * plantilla se reevalúa en cada ciclo de detección de cambios: el array era
+   * nuevo cada vez y `MatTable` rehacía las celdas (§8.6).
+   */
+  readonly columnasCuentas =
+    ['factura', 'proveedor', 'monto', 'saldo', 'vence', 'estado', 'acciones'];
   metodosPago: CatalogoRef[] = [];
 
   ordenId: number | null = null;
@@ -59,7 +72,7 @@ export class FacturasCompraComponent implements OnInit {
 
   cargarCuentas(): void {
     if (!this.puedeVerCuentas) return;
-    this.compras.cuentasPorPagar().subscribe(c => this.cuentas = c);
+    this.compras.cuentasPorPagar().subscribe(c => { this.cuentas = c; this.pag.fijar(c); });
   }
 
   /** Facturables: recibidas COMPLETAS y sin factura previa (compuertas del backend). */

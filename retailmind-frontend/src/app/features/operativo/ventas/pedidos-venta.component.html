@@ -68,8 +68,8 @@
   </div>
 
   <div class="op-card">
-    <h3><mat-icon>list_alt</mat-icon> Pedidos registrados ({{ pedidos.length }})</h3>
-    <div class="table-wrapper" *ngIf="pedidos.length; else vacio">
+    <h3><mat-icon>list_alt</mat-icon> Pedidos registrados ({{ total | number }})</h3>
+    <div class="table-wrapper" *ngIf="total; else vacio">
       <table mat-table [dataSource]="pedidosPagina">
         <ng-container matColumnDef="numero">
           <th mat-header-cell *matHeaderCellDef>Número</th>
@@ -119,7 +119,7 @@
             [class.fila-seleccionada]="detallePedido?.id === p.id"></tr>
       </table>
     </div>
-    <mat-paginator *ngIf="pedidos.length" [length]="pedidos.length" [pageIndex]="pagina"
+    <mat-paginator *ngIf="total" [length]="total" [pageIndex]="pagina"
                    [pageSize]="tamPagina" [pageSizeOptions]="tamanos"
                    (page)="alPaginar($event)" showFirstLastButtons></mat-paginator>
     <ng-template #vacio>

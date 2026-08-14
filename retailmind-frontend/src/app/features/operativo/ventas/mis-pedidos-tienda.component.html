@@ -5,11 +5,11 @@
   </div>
 
   <div class="op-card">
-    <h3><mat-icon>list_alt</mat-icon> Pedidos ({{ pedidos.length }})</h3>
+    <h3><mat-icon>list_alt</mat-icon> Pedidos ({{ total | number }})</h3>
     <div class="form-actions">
       <button class="btn-limpiar" (click)="cargar()"><mat-icon>refresh</mat-icon> Actualizar</button>
     </div>
-    <div class="table-wrapper" *ngIf="pedidos.length; else vacio">
+    <div class="table-wrapper" *ngIf="total; else vacio">
       <table mat-table [dataSource]="pedidos">
         <ng-container matColumnDef="numero">
           <th mat-header-cell *matHeaderCellDef>Número</th>
@@ -45,6 +45,9 @@
             [class.fila-seleccionada]="detalle?.id === p.id"></tr>
       </table>
     </div>
+    <mat-paginator *ngIf="total" [length]="total" [pageIndex]="pagina"
+                   [pageSize]="tamPagina" [pageSizeOptions]="tamanos"
+                   (page)="alPaginar($event)" showFirstLastButtons></mat-paginator>
     <ng-template #vacio>
       <div class="empty-state" *ngIf="!loading"><mat-icon>shopping_basket</mat-icon><p>Aún no tienes pedidos registrados.</p></div>
     </ng-template>

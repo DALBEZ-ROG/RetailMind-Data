@@ -81,7 +81,7 @@
   <div class="op-card">
     <h3><mat-icon>list_alt</mat-icon> Órdenes emitidas ({{ ordenes.length }})</h3>
     <div class="table-wrapper" *ngIf="ordenes.length; else vacio">
-      <table mat-table [dataSource]="ordenes">
+      <table mat-table [dataSource]="pag.filas">
         <ng-container matColumnDef="numero">
           <th mat-header-cell *matHeaderCellDef>Número</th>
           <td mat-cell *matCellDef="let o"><strong>{{ o.numero }}</strong></td>
@@ -124,6 +124,9 @@
             [class.fila-seleccionada]="detalleOrden?.id === o.id"></tr>
       </table>
     </div>
+    <mat-paginator *ngIf="pag.total" [length]="pag.total" [pageIndex]="pag.pagina"
+                   [pageSize]="pag.tam" [pageSizeOptions]="pag.opciones"
+                   (page)="pag.alPaginar($event)" showFirstLastButtons></mat-paginator>
     <ng-template #vacio>
       <div class="empty-state" *ngIf="!loading"><mat-icon>shopping_cart</mat-icon><p>No hay órdenes de compra.</p></div>
     </ng-template>

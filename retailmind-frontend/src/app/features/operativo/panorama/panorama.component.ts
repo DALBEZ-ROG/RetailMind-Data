@@ -101,6 +101,9 @@ export class PanoramaComponent implements OnInit, AfterViewInit, OnDestroy {
   /** Listener de `resize` propio — ver `escucharRedimensionado()`. */
   private alRedimensionar?: () => void;
   private temporizadorResize?: ReturnType<typeof setTimeout>;
+  private temporizadorPintado?: ReturnType<typeof setTimeout>;
+  /** Cierra la puerta a los `next` que llegan después de salir de la pantalla. */
+  private destruido = false;
 
   cargando = true;
   datos: Panorama | null = null;
@@ -137,11 +140,13 @@ export class PanoramaComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.destruido = true;
     if (this.alRedimensionar) {
       window.removeEventListener('resize', this.alRedimensionar);
       this.alRedimensionar = undefined;
     }
     clearTimeout(this.temporizadorResize);
+    clearTimeout(this.temporizadorPintado);
     this.destruir();
   }
 
@@ -259,8 +264,15 @@ export class PanoramaComponent implements OnInit, AfterViewInit, OnDestroy {
    * sale de un píxel de alto.
    */
   private pintar(): void {
-    if (!this.vistaLista || this.cargando || !this.datos) return;
-    setTimeout(() => {
+    if (this.destruido || !this.vistaLista || this.cargando || !this.datos) return;
+    clearTimeout(this.temporizadorPintado);
+    this.temporizadorPintado = setTimeout(() => {
+      // Se puede haber salido de la pantalla entre que se programó el pintado y
+      // que corre: la petición del panorama tarda segundos y no se cancela al
+      // salir. Sin esta guarda se creaban SEIS gráficos sobre canvas ya
+      // desprendidos del documento y, con `ngOnDestroy` pasado, no los destruía
+      // nadie.
+      if (this.destruido) return;
       this.destruir();
       this.serieVenta();
       this.barrasFlujos();

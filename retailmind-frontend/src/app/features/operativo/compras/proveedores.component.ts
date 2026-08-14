@@ -10,6 +10,8 @@ import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatPaginatorModule } from '@angular/material/paginator';
+import { PaginaLocal } from '../../../core/services/pagina-local.util';
 import { Subject, debounceTime, distinctUntilChanged, switchMap, of } from 'rxjs';
 import { ComprasService } from '../../../core/services/compras.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -31,7 +33,7 @@ import {
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatAutocompleteModule, MatCheckboxModule,
-    MatSnackBarModule, MatTooltipModule],
+    MatSnackBarModule, MatTooltipModule, MatPaginatorModule],
   templateUrl: './proveedores.component.html',
   styleUrl: '../operativo-shared.scss'
 })
@@ -42,6 +44,8 @@ export class ProveedoresComponent implements OnInit {
 
   seleccionado: ProveedorFichaRow | null = null;
   productos: ProductoProveedorRow[] = [];
+  /** Página del catálogo del proveedor (el conjunto llega a 6.107 filas). */
+  readonly pag = new PaginaLocal<ProductoProveedorRow>();
 
   showForm = false;
   editandoId: number | null = null;
@@ -106,7 +110,7 @@ export class ProveedoresComponent implements OnInit {
   private cargarProductos(): void {
     if (!this.seleccionado) return;
     this.compras.productosDeProveedor(this.seleccionado.id).subscribe({
-      next: data => this.productos = data,
+      next: data => { this.productos = data; this.pag.fijar(data); },
       error: e => this.snackBar.open(mensajeError(e, 'No se pudo cargar el catálogo del proveedor'),
         'Cerrar', { duration: 4000 })
     });

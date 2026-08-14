@@ -20,7 +20,7 @@
       <button class="btn-limpiar" (click)="cargar()"><mat-icon>refresh</mat-icon> Actualizar</button>
     </div>
     <div class="table-wrapper" *ngIf="devoluciones.length; else vacio">
-      <table mat-table [dataSource]="devoluciones">
+      <table mat-table [dataSource]="pag.filas">
         <ng-container matColumnDef="numero">
           <th mat-header-cell *matHeaderCellDef>Número</th>
           <td mat-cell *matCellDef="let d"><strong>{{ d.numero }}</strong></td>
@@ -66,6 +66,9 @@
             [class.fila-seleccionada]="detalle?.id === d.id"></tr>
       </table>
     </div>
+    <mat-paginator *ngIf="pag.total" [length]="pag.total" [pageIndex]="pag.pagina"
+                   [pageSize]="pag.tam" [pageSizeOptions]="pag.opciones"
+                   (page)="pag.alPaginar($event)" showFirstLastButtons></mat-paginator>
     <ng-template #vacio>
       <div class="empty-state" *ngIf="!loading">
         <mat-icon>assignment_return</mat-icon><p>No hay devoluciones con ese filtro.</p>

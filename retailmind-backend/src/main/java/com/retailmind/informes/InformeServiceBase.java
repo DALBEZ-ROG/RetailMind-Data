@@ -134,25 +134,11 @@ public abstract class InformeServiceBase {
      */
     protected Map<String, Object> paginar(String sqlItems, String sqlCount, Object[] args,
                                           int page, int size) {
-        int limit = Math.min(Math.max(size, 1), MAX_PAGINA);
-        int offset = Math.max(page, 0) * limit;
-
-        Integer total = pg.queryForObject(sqlCount, Integer.class, args);
-
-        Object[] pageArgs = new Object[args.length + 2];
-        System.arraycopy(args, 0, pageArgs, 0, args.length);
-        pageArgs[args.length] = limit;
-        pageArgs[args.length + 1] = offset;
-
-        List<Map<String, Object>> items =
-                pg.queryForList(sqlItems + " LIMIT ? OFFSET ?", pageArgs);
-
-        Map<String, Object> res = new HashMap<>();
-        res.put("items", items);
-        res.put("total", total == null ? 0 : total);
-        res.put("page", Math.max(page, 0));
-        res.put("size", limit);
-        return res;
+        // La implementación vive en com.retailmind.comun.Paginacion desde que
+        // hubo que paginar FUERA de los informes (ventas/pedidos tumbaba el
+        // servidor con OutOfMemoryError). Se delega en vez de duplicar para que
+        // el tope y la forma del sobre no puedan separarse con el tiempo.
+        return com.retailmind.comun.Paginacion.paginar(pg, sqlItems, sqlCount, args, page, size);
     }
 
     /** Sobre sin paginar (informes de pocas filas por naturaleza: metas, ranking de equipo). */

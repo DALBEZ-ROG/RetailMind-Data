@@ -36,7 +36,6 @@ interface LineaPedido { varianteId: number | null; cantidad: number; }
 })
 export class PedidosVentaComponent implements OnInit {
 
-  pedidos: PedidoVentaRow[] = [];
   clientes: ClienteRef[] = [];
   bodegas: BodegaRef[] = [];
   variantes: VarianteRef[] = [];
@@ -140,22 +139,42 @@ export class PedidosVentaComponent implements OnInit {
     }
   }
 
-  cargarPedidos(): void {
+  /**
+   * Pide UNA página al servidor.
+   *
+   * Antes se traía los 2.999.993 pedidos y recortaba en el navegador; eso no
+   * era lento, tumbaba el backend con OutOfMemoryError. Ahora el recorte es del
+   * servidor y `total` viene del conteo real, así que el paginador sigue
+   * sabiendo cuántas páginas hay.
+   */
+  cargarPedidos(conTotal = true): void {
     this.loading = true;
-    this.ventas.pedidos().subscribe({
-      next: data => { this.pedidos = data; this.pagina = 0; this.loading = false; },
+    this.ventas.pedidos({ page: this.pagina, size: this.tamPagina, conTotal }).subscribe({
+      next: pg => {
+        this.pedidosPagina = pg.items;
+        // total = -1 significa «no se recontó»: se conserva el que ya había.
+        if (pg.total >= 0) { this.total = pg.total; }
+        this.loading = false;
+      },
       error: () => this.loading = false
     });
   }
 
-  get pedidosPagina(): PedidoVentaRow[] {
-    const inicio = this.pagina * this.tamPagina;
-    return this.pedidos.slice(inicio, inicio + this.tamPagina);
-  }
+  /** La página visible, tal cual la devolvió el servidor. */
+  pedidosPagina: PedidoVentaRow[] = [];
 
+  /** Conteo REAL del conjunto, no de la página: lo usa el paginador. */
+  total = 0;
+
+  /**
+   * Cambiar de página NO recuenta: el conjunto es el mismo y el conteo sobre
+   * `pedido` cuesta segundos por RLS. El total se recalcula al entrar y tras
+   * cualquier acción que cree o cambie un pedido.
+   */
   alPaginar(e: PageEvent): void {
     this.pagina = e.pageIndex;
     this.tamPagina = e.pageSize;
+    this.cargarPedidos(false);
   }
 
   agregarLinea(): void { this.lineas.push({ varianteId: null, cantidad: 1 }); }

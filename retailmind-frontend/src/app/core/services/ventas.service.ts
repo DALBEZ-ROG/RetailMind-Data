@@ -5,7 +5,7 @@ import { environment } from '../../../environments/environment';
 import { HttpParams } from '@angular/common/http';
 import {
   ItemPedidoReq, PedidoVentaRow, PedidoVentaDetalle,
-  FacturaVenta, PaginaFacturasVenta, PagoClienteRes, EnvioDetalle,
+  FacturaVenta, PaginaFacturasVenta, PaginaPedidosVenta, PagoClienteRes, EnvioDetalle,
   SeguimientoRow, PreparacionRow, DetalleLogistico, NovedadesEnvioRes
 } from '../models/operativo.model';
 
@@ -19,7 +19,32 @@ export class VentasService {
       Observable<PedidoVentaDetalle> {
     return this.http.post<PedidoVentaDetalle>(`${this.base}/pedidos`, body);
   }
-  pedidos(): Observable<PedidoVentaRow[]> { return this.http.get<PedidoVentaRow[]>(`${this.base}/pedidos`); }
+  /**
+   * Listado de pedidos, PAGINADO EN EL SERVIDOR.
+   *
+   * Los filtros (`estado`, `canal`, `q`, `facturables`) se resuelven en el
+   * backend contra el conjunto COMPLETO. Filtrarlos aquí sobre la página
+   * recibida daría un resultado plausible y falso: las pantallas de facturación
+   * y despacho buscan pedidos que casi nunca están en la primera página de
+   * 2.999.993.
+   */
+  pedidos(opts: {
+    page?: number; size?: number; estado?: string;
+    canal?: string; q?: string; facturables?: boolean; conTotal?: boolean;
+  } = {}): Observable<PaginaPedidosVenta> {
+    let params = new HttpParams();
+    if (opts.page != null)   { params = params.set('page', opts.page); }
+    if (opts.size != null)   { params = params.set('size', opts.size); }
+    if (opts.estado)         { params = params.set('estado', opts.estado); }
+    if (opts.canal)          { params = params.set('canal', opts.canal); }
+    if (opts.q)              { params = params.set('q', opts.q); }
+    if (opts.facturables)    { params = params.set('facturables', true); }
+    // `conTotal: false` devuelve total = -1 y ahorra el conteo, que sobre
+    // `pedido` cuesta segundos por las políticas RLS. Se usa al cambiar de
+    // página, donde el total no ha podido cambiar.
+    if (opts.conTotal === false) { params = params.set('conTotal', false); }
+    return this.http.get<PaginaPedidosVenta>(`${this.base}/pedidos`, { params });
+  }
   pedido(id: number): Observable<PedidoVentaDetalle> {
     return this.http.get<PedidoVentaDetalle>(`${this.base}/pedidos/${id}`);
   }
