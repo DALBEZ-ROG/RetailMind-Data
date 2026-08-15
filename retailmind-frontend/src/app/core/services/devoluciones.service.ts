@@ -4,7 +4,7 @@ import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
   CatalogoRef, DevolucionRow, DevolucionRma, ElegibilidadDevolucion,
-  ItemDevolucionReq
+  ItemDevolucionReq, Pagina
 } from '../models/operativo.model';
 
 /** RMA / logística inversa: un método por transición (/api/devoluciones). */
@@ -14,9 +14,19 @@ export class DevolucionesService {
 
   constructor(private http: HttpClient) {}
 
-  listar(estado?: string): Observable<DevolucionRow[]> {
-    const params = estado ? new HttpParams().set('estado', estado) : undefined;
-    return this.http.get<DevolucionRow[]>(this.base, { params });
+  /**
+   * Bandeja RMA PAGINADA EN EL SERVIDOR. Devolvía las 145.734 devoluciones
+   * (49,53 MB); el filtro por `estado` ya se resolvía en SQL y sigue igual, así
+   * que `total` es el conteo del conjunto FILTRADO.
+   */
+  listar(opts: { estado?: string; page?: number; size?: number; conTotal?: boolean } = {}):
+      Observable<Pagina<DevolucionRow>> {
+    let params = new HttpParams();
+    if (opts.estado)       { params = params.set('estado', opts.estado); }
+    if (opts.page != null) { params = params.set('page', opts.page); }
+    if (opts.size != null) { params = params.set('size', opts.size); }
+    if (opts.conTotal === false) { params = params.set('conTotal', false); }
+    return this.http.get<Pagina<DevolucionRow>>(this.base, { params });
   }
   detalle(id: number): Observable<DevolucionRma> {
     return this.http.get<DevolucionRma>(`${this.base}/${id}`);

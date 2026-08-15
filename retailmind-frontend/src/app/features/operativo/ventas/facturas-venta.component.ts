@@ -45,6 +45,14 @@ export class FacturasVentaComponent implements OnInit {
   // Listado de facturas emitidas (búsqueda + paginación server-side)
   facturas: FacturaVentaRow[] = [];
   total = 0;
+
+  /** Ver `pedidos-venta`: el conteo de 2.855.378 facturas viene acotado. */
+  totalEsMinimo = false;
+
+  get etiquetaTotal(): string {
+    const n = this.total.toLocaleString('es-EC');
+    return this.totalEsMinimo ? `más de ${n}` : n;
+  }
   pagina = 0;
   tamPagina = 25;
   readonly tamanos = [25, 50, 100];
@@ -93,6 +101,7 @@ export class FacturasVentaComponent implements OnInit {
       next: pg => {
         this.facturas = pg.items;
         this.total = pg.total;
+        this.totalEsMinimo = !!pg.totalEsMinimo;
         this.loading = false;
       },
       error: e => {

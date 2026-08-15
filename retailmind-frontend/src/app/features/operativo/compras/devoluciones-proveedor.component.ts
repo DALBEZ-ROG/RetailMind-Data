@@ -9,8 +9,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { MatPaginatorModule } from '@angular/material/paginator';
-import { PaginaLocal } from '../../../core/services/pagina-local.util';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
+import { PaginaServidor } from '../../../core/services/pagina-servidor.util';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ComprasService } from '../../../core/services/compras.service';
 import { ReferenciasService } from '../../../core/services/referencias.service';
@@ -39,13 +39,17 @@ export class DevolucionesProveedorComponent implements OnInit {
   readonly estadosItem = ['pendiente', 'en_devolucion', 'resuelto'];
   readonly estadosDev = ['registrada', 'enviada', 'resuelta', 'cerrada'];
 
-  items: any[] = [];
   /**
-   * La página que se pinta. El pool trae 27.831 ítems defectuosos y cada fila
-   * lleva su propia casilla, o sea un componente por fila: pintarlas todas
-   * dejaba la pestaña sin responder.
+   * La página que devuelve el SERVIDOR. El pool trae 27.831 ítems defectuosos
+   * (12,66 MB) y cada fila lleva su propia casilla, o sea un componente por
+   * fila. El filtro por `estado` ya viajaba al endpoint, así que no había
+   * criterio que mudar a SQL.
+   *
+   * `seleccion` sobrevive al cambio de página a propósito: COMPRAS puede
+   * agrupar ítems de varias páginas en una misma devolución, y el backend
+   * valida cada id que recibe.
    */
-  readonly pag = new PaginaLocal<any>();
+  readonly pag = new PaginaServidor<any>();
   filtroItem: string | null = 'pendiente';
   seleccion = new Set<number>();
 
@@ -92,17 +96,41 @@ export class DevolucionesProveedorComponent implements OnInit {
     }
   }
 
-  cargarItems(): void {
+  /** Cambiar de filtro vuelve a la primera página y RECUENTA. */
+  filtrarItems(): void {
+    this.pag.reiniciar();
+    this.cargarItems();
+  }
+
+  /**
+   * @param conTotal false SOLO al cambiar de página. Se aprovecha para
+   *                 distinguir los dos casos: una recarga de verdad (alta,
+   *                 transición, cambio de filtro) limpia la selección como
+   *                 hacía antes; pasar de página la CONSERVA, que es lo que
+   *                 permite agrupar ítems de varias páginas.
+   */
+  cargarItems(conTotal = true): void {
+    if (conTotal) { this.seleccion.clear(); }
     this.loading = true;
-    this.compras.itemsDefectuosos(this.filtroItem).subscribe({
-      next: it => {
-        this.items = it; this.pag.fijar(it); this.loading = false; this.seleccion.clear();
+    this.compras.itemsDefectuosos({
+      estado: this.filtroItem, page: this.pag.pagina, size: this.pag.tam, conTotal
+    }).subscribe({
+      next: pg => {
+        this.pag.aplicar(pg);
+        this.loading = false;
+        if (this.pag.ajustarTrasBorrado()) { this.cargarItems(conTotal); }
       },
       error: e => {
         this.loading = false;
         this.snackBar.open(mensajeError(e, 'No se pudieron cargar los ítems defectuosos'), 'Cerrar', { duration: 4000 });
       }
     });
+  }
+
+  /** Cambiar de página NO recuenta ni pierde la selección acumulada. */
+  alPaginarItems(e: PageEvent): void {
+    this.pag.alPaginar(e);
+    this.cargarItems(false);
   }
 
   cargarDevoluciones(): void {

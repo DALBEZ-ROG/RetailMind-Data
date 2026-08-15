@@ -22,6 +22,44 @@ public class FactEventoRepository {
 
     // ── Conteos para Dashboard ───────────────────────────────────────────────
 
+    /**
+     * Los SEIS escalares de la portada del dashboard, en UNA sola pasada.
+     *
+     * Estaban como seis consultas sueltas ({@code countTotalEventos},
+     * {@code countDistinctSesiones}, …), cada una con su viaje a ClickHouse y su
+     * recorrido de `fact_eventos` (2.931.837 filas). Medido servidor adentro:
+     * 0,002 + 0,036 + 0,026 + 0,011 + 0,007 + 0,005 = <b>87 ms</b> en seis
+     * viajes; la misma información en una pasada, <b>55 ms</b> en uno.
+     *
+     * Los seis valores son idénticos —verificado uno a uno—: `count()` es el
+     * mismo, los tres `uniqExact` también, y los dos conteos con WHERE se
+     * convierten en `countIf`, que es la misma cuenta sin recorrer aparte.
+     */
+    public record ResumenEscalares(long eventos, long sesiones, long usuarios,
+                                   long conversiones, long abandonos, int semanas) {}
+
+    public ResumenEscalares resumenEscalares() {
+        return clickHouseJdbc.queryForObject("""
+                SELECT count()                        AS eventos,
+                       uniqExact(session_id)          AS sesiones,
+                       uniqExact(user_id)             AS usuarios,
+                       countIf(is_conversion  = 1)    AS conversiones,
+                       countIf(drop_off_flag  = 1)    AS abandonos,
+                       uniqExact(semana)              AS semanas
+                FROM fact_eventos""",
+                (rs, n) -> new ResumenEscalares(
+                        rs.getLong("eventos"), rs.getLong("sesiones"), rs.getLong("usuarios"),
+                        rs.getLong("conversiones"), rs.getLong("abandonos"),
+                        rs.getInt("semanas")));
+    }
+
+    /*
+     * Los SEIS métodos de aquí abajo siguen existiendo por si alguien necesita
+     * un escalar suelto, pero el dashboard YA NO los usa: pedirlos los seis
+     * costaba seis viajes a ClickHouse y seis recorridos de la tabla. Si hacen
+     * falta varios a la vez, {@link #resumenEscalares()} los da en una pasada.
+     */
+
     public long countTotalEventos() {
         Long result = clickHouseJdbc.queryForObject("SELECT count() FROM fact_eventos", Long.class);
         return result != null ? result : 0L;
@@ -108,7 +146,61 @@ public class FactEventoRepository {
         return result != null ? result : 0L;
     }
 
+    /**
+     * `session_id` que cierra la ventana pedida, leído por el ORDEN DE LA TABLA.
+     *
+     * `fact_eventos` es una MergeTree con {@code ORDER BY (session_id,
+     * event_index)}, así que esto es una lectura por la clave de orden, sin
+     * agregación: 3 ms para la primera página y 17 ms para la última.
+     * Devuelve null si el desplazamiento cae más allá del final.
+     */
+    private String cotaSessionId(int offset, int limit) {
+        List<String> fila = clickHouseJdbc.query(
+                "SELECT session_id FROM fact_eventos ORDER BY session_id LIMIT 1 OFFSET ?",
+                (rs, n) -> rs.getString(1), Math.max(offset + limit - 1, 0));
+        return fila.isEmpty() ? null : fila.get(0);
+    }
+
+    /**
+     * Página de la tabla de sesiones del dashboard.
+     *
+     * <h3>Dos arreglos, y el primero es de CORRECCIÓN</h3>
+     *
+     * <b>1. El orden no era determinista.</b> Ordenaba solo por `session_id`, y
+     * cada sesión aporta varias filas —el GROUP BY incluye `timestamp_utc`, que
+     * es distinto por evento—, así que los empates los rompía el orden en que
+     * ClickHouse devolviera los bloques. Comprobado: la MISMA consulta con el
+     * MISMO desplazamiento daba tres resultados distintos en tres ejecuciones
+     * seguidas. Con LIMIT/OFFSET eso significa que al pasar de página se podían
+     * repetir filas y perder otras. Ahora desempata por
+     * {@code (session_id, timestamp_utc, user_id)}, que es la clave completa del
+     * GROUP BY y por tanto un orden total: tres ejecuciones, el mismo resultado.
+     *
+     * <b>2. Se acota el recorrido.</b> Agregaba los 2.931.837 eventos para
+     * quedarse con 20 filas: 544 ms. Como las filas y los grupos van AMBOS
+     * ordenados por `session_id` y los grupos nunca son más que las filas, el
+     * `session_id` de la fila que ocupa la posición {@code offset+limit-1}
+     * acota por arriba a todos los grupos de la ventana pedida; filtrar por él
+     * no puede dejar fuera ninguna fila del resultado. Verificado comparando
+     * las dos formas en las páginas 0, 20, 500, 100.000 y la última: idénticas.
+     *
+     * Medido: 544 → <b>10 ms</b> en la primera página, 708 → 141 ms en la
+     * página 100.000 y sin cambio en la última (ahí la cota es la tabla
+     * entera). Nunca es peor.
+     *
+     * <h3>Lo que este método NO arregla, y queda dicho</h3>
+     * El listado se llama «sesiones» pero devuelve un EVENTO por fila: el
+     * GROUP BY incluye `timestamp_utc` y produce 2.931.837 grupos para 474.645
+     * sesiones, de modo que `count() AS event_index` vale 1 siempre y
+     * `totalElements` (474.645) no cuadra con las filas que se pueden paginar.
+     * Es anterior a este cambio y decidir si la tabla lista sesiones o eventos
+     * es una decisión de producto, no de rendimiento: no se toca aquí.
+     */
     public List<FactEvento> findSesionesPaginadas(int offset, int limit) {
+        String cota = cotaSessionId(offset, limit);
+        if (cota == null) {
+            return List.of();
+        }
         return clickHouseJdbc.query(
                 "SELECT session_id, user_id, timestamp_utc, " +
                 "       max(session_length) AS session_length, " +
@@ -123,8 +215,9 @@ public class FactEventoRepository {
                 "       avg(price) AS price, " +
                 "       any(semana) AS semana " +
                 "FROM fact_eventos " +
+                "WHERE session_id <= ? " +
                 "GROUP BY session_id, user_id, timestamp_utc " +
-                "ORDER BY session_id " +
+                "ORDER BY session_id, timestamp_utc, user_id " +
                 "LIMIT ? OFFSET ?",
                 (rs, rowNum) -> {
                     FactEvento fe = new FactEvento();
@@ -144,7 +237,7 @@ public class FactEventoRepository {
                     fe.setSemana(rs.getInt("semana"));
                     return fe;
                 },
-                limit, offset
+                cota, limit, offset
         );
     }
 

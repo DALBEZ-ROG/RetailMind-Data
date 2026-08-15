@@ -9,8 +9,8 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { MatPaginatorModule } from '@angular/material/paginator';
-import { PaginaLocal } from '../../../core/services/pagina-local.util';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
+import { PaginaServidor } from '../../../core/services/pagina-servidor.util';
 import { Observable } from 'rxjs';
 import { DevolucionesService } from '../../../core/services/devoluciones.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -45,7 +45,6 @@ export class DevolucionesComponent implements OnInit {
     'recibida', 'inspeccionada', 'reembolsada', 'cerrada'];
   readonly metodosReembolso = ['transferencia', 'tarjeta', 'credito_tienda', 'efectivo'];
 
-  devoluciones: DevolucionRow[] = [];
   filtroEstado: string | null = null;
   detalle: DevolucionRma | null = null;
   transportistas: CatalogoRef[] = [];
@@ -92,8 +91,14 @@ export class DevolucionesComponent implements OnInit {
       : ['sku', 'producto', 'cantidad', 'inspeccion'];
   }
 
-  /** La página que se pinta: sin esto el DOM recibía las 145.734 devoluciones. */
-  readonly pag = new PaginaLocal<DevolucionRow>();
+  /**
+   * La página que devuelve el SERVIDOR. Antes llegaban las 145.734
+   * devoluciones (49,53 MB) y el recorte era del navegador. El único filtro de
+   * la pantalla —`estado`— ya viajaba al endpoint, así que aquí no había ningún
+   * criterio que mudar a SQL: sigue en el mismo sitio y ahora `pag.total` es el
+   * conteo del conjunto FILTRADO (25.634 cerradas de 145.734).
+   */
+  readonly pag = new PaginaServidor<DevolucionRow>();
 
   ngOnInit(): void {
     this.cargar();
@@ -102,15 +107,34 @@ export class DevolucionesComponent implements OnInit {
     }
   }
 
-  cargar(): void {
+  /** Cambiar de filtro vuelve a la primera página y RECUENTA. */
+  filtrar(): void {
+    this.pag.reiniciar();
+    this.cargar();
+  }
+
+  cargar(conTotal = true): void {
     this.loading = true;
-    this.rma.listar(this.filtroEstado || undefined).subscribe({
-      next: d => { this.devoluciones = d; this.pag.fijar(d); this.loading = false; },
+    this.rma.listar({
+      estado: this.filtroEstado || undefined,
+      page: this.pag.pagina, size: this.pag.tam, conTotal
+    }).subscribe({
+      next: pg => {
+        this.pag.aplicar(pg);
+        this.loading = false;
+        if (this.pag.ajustarTrasBorrado()) { this.cargar(conTotal); }
+      },
       error: e => {
         this.loading = false;
         this.snackBar.open(mensajeError(e, 'No se pudieron cargar las devoluciones'), 'Cerrar', { duration: 5000 });
       }
     });
+  }
+
+  /** Cambiar de página NO recuenta: el conjunto es el mismo. */
+  alPaginar(e: PageEvent): void {
+    this.pag.alPaginar(e);
+    this.cargar(false);
   }
 
   ver(id: number): void {

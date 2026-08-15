@@ -39,11 +39,11 @@
 
   <!-- Pool de ítems defectuosos -->
   <div class="op-card">
-    <h3><mat-icon>inventory</mat-icon> Ítems defectuosos ({{ items.length }})</h3>
+    <h3><mat-icon>inventory</mat-icon> Ítems defectuosos ({{ pag.total }})</h3>
     <div class="form-grid">
       <mat-form-field appearance="outline">
         <mat-label>Filtrar por estado</mat-label>
-        <mat-select [(ngModel)]="filtroItem" (selectionChange)="cargarItems()">
+        <mat-select [(ngModel)]="filtroItem" (selectionChange)="filtrarItems()">
           <mat-option [value]="null">Todos</mat-option>
           <mat-option *ngFor="let e of estadosItem" [value]="e">{{ e }}</mat-option>
         </mat-select>
@@ -66,10 +66,10 @@
       <button class="btn-aplicar" (click)="crear()" [disabled]="procesando || !seleccion.size">
         <mat-icon>playlist_add</mat-icon> Crear devolución con {{ seleccion.size }} ítem/s
       </button>
-      <button class="btn-limpiar" (click)="cargarItems()"><mat-icon>refresh</mat-icon> Actualizar</button>
+      <button class="btn-limpiar" (click)="filtrarItems()"><mat-icon>refresh</mat-icon> Actualizar</button>
     </div>
 
-    <div class="table-wrapper" *ngIf="items.length; else sinItems">
+    <div class="table-wrapper" *ngIf="pag.filas.length; else sinItems">
       <table mat-table [dataSource]="pag.filas">
         <ng-container matColumnDef="sel">
           <th mat-header-cell *matHeaderCellDef></th>
@@ -145,7 +145,7 @@
     </div>
     <mat-paginator *ngIf="pag.total" [length]="pag.total" [pageIndex]="pag.pagina"
                    [pageSize]="pag.tam" [pageSizeOptions]="pag.opciones"
-                   (page)="pag.alPaginar($event)" showFirstLastButtons></mat-paginator>
+                   (page)="alPaginarItems($event)" showFirstLastButtons></mat-paginator>
     <ng-template #sinItems>
       <div class="empty-state" *ngIf="!loading">
         <mat-icon>inventory</mat-icon><p>No hay ítems defectuosos con ese filtro.</p>

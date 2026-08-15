@@ -73,8 +73,23 @@ public class SoporteController {
     }
 
     // ── Tickets ──────────────────────────────────────────────────────────
+    /**
+     * Bandeja de tickets PAGINADA, con SUS CUATRO FILTROS EN SQL. Devolvía los
+     * 179.851 tickets (78,98 MB) y la pantalla filtraba el array completo en el
+     * navegador; sobre una página, «cerrado» —que el orden manda al final de
+     * 179.851 filas— habría devuelto siempre cero sin dar error.
+     */
     @GetMapping("/tickets")
-    public List<Map<String, Object>> tickets() { return servicio.listarTickets(); }
+    public Map<String, Object> tickets(
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) String bandeja,
+            @RequestParam(required = false) String estado,
+            @RequestParam(required = false) String categoria,
+            @RequestParam(required = false) String prioridad,
+            @RequestParam(required = false) Boolean conTotal) {
+        return servicio.listarTickets(page, size, bandeja, estado, categoria, prioridad, conTotal);
+    }
 
     @GetMapping("/tickets/{id}")
     public Map<String, Object> ticket(@PathVariable long id) {

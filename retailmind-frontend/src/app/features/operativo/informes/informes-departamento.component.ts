@@ -75,6 +75,21 @@ export class InformesDepartamentoComponent implements OnInit {
   resumen: KpiInforme[] = [];
   columnas: string[] = [];
   total = 0;
+
+  /**
+   * `total` es un MÍNIMO porque el servidor cortó el conteo en su tope. Solo
+   * pasa en los informes que abarcan millones de filas sin filtrar (hoy
+   * OTD-VEN-01 sobre los 2.999.993 pedidos): contarlos bajo RLS cuesta 4,5 s
+   * en cada apertura. En cuanto se pone un filtro el conteo vuelve a ser
+   * exacto y esta bandera se apaga sola.
+   */
+  totalEsMinimo = false;
+
+  /** Lo que se pinta junto al nombre del informe. */
+  get etiquetaTotal(): string {
+    const n = this.total.toLocaleString('es-EC');
+    return this.totalEsMinimo ? `más de ${n}` : n;
+  }
   pagina = 0;
   tamPagina = 25;
   readonly tamanos = [25, 50, 100];
@@ -230,6 +245,7 @@ export class InformesDepartamentoComponent implements OnInit {
       next: sobre => {
         this.filas = sobre.items ?? [];
         this.total = sobre.total ?? this.filas.length;
+        this.totalEsMinimo = !!sobre['totalEsMinimo'];
         this.resumen = sobre.resumen ?? [];
         if (sobre.alcance === 'propio') {
           // El informe puede traer su propio texto: en OTD-VEN-19 el recorte es

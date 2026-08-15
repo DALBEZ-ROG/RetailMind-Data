@@ -18,10 +18,25 @@
  * cambios: `MatTable` ve una identidad nueva, vuelve a tirar y a levantar las
  * celdas de la página, y se repinta sin parar (trampa §8.6 de `PATRON_UI.md`).
  *
- * <h3>Lo que NO resuelve</h3>
- * La descarga sigue siendo íntegra: el endpoint devuelve las 134.588 filas
- * (27,18 MB medidos) y esto solo evita pintarlas. Acotar la CONSULTA es cosa
- * del backend y queda fuera de esta sesión.
+ * <h3>Lo que NO resuelve, y por qué casi todas las pantallas dejaron de usarlo</h3>
+ * La descarga seguía siendo íntegra: el endpoint devolvía las 134.588 filas
+ * (27,18 MB medidos) y esto solo evitaba pintarlas. Esos ocho endpoints pasaron
+ * a paginar EN EL SERVIDOR con {@code comun.Paginacion}, y sus pantallas usan
+ * ahora {@link PaginaServidor}.
+ *
+ * <h3>Dónde SIGUE sirviendo, y por qué</h3>
+ * En los dos listados que caben de sobra en el navegador y no justifican un
+ * viaje por página:
+ * <ul>
+ *   <li>{@code resenas.component.pagReportes} — `reporte_resena` tiene
+ *       **1 fila** (27 ms, 0,00 MB medidos).</li>
+ *   <li>{@code proveedores.component.pag} — el catálogo de UN proveedor son
+ *       como mucho **605 filas** (6.107 repartidas entre 30 proveedores), y se
+ *       pide solo al abrir su ficha.</li>
+ * </ul>
+ * La regla para elegir uno u otro es el tamaño del conjunto que viaja, no la
+ * comodidad: si la pantalla filtra, el filtro tiene que mirar TODO lo que
+ * cuenta, y con esta clase eso obliga a haberlo descargado entero.
  */
 export class PaginaLocal<T> {
 

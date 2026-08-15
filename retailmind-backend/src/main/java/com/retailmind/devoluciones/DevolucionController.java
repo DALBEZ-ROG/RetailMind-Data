@@ -44,9 +44,17 @@ public class DevolucionController {
 
     // ── Consultas ────────────────────────────────────────────────────────
 
+    /**
+     * Bandeja RMA PAGINADA: sobre {@code {items, total, page, size}}. Devolvía
+     * las 145.734 devoluciones (49,53 MB). El filtro por `estado` ya viajaba al
+     * servidor y sigue igual: `total` cuenta el conjunto FILTRADO.
+     */
     @GetMapping
-    public List<Map<String, Object>> listar(@RequestParam(required = false) String estado) {
-        return servicio.listar(estado);
+    public Map<String, Object> listar(@RequestParam(required = false) String estado,
+                                      @RequestParam(required = false) Integer page,
+                                      @RequestParam(required = false) Integer size,
+                                      @RequestParam(required = false) Boolean conTotal) {
+        return servicio.listar(estado, page, size, conTotal);
     }
 
     @GetMapping("/motivos-ref")

@@ -36,9 +36,17 @@ public class DevolucionProveedorController {
     }
 
     // Pool de ítems defectuosos (BODEGA los identifica, COMPRAS los agrupa)
+    /**
+     * Pool de ítems defectuosos PAGINADO: devolvía los 27.831 (12,66 MB) y la
+     * pantalla pintaba una casilla por fila. El filtro por `estado` ya viajaba
+     * al servidor y no cambia.
+     */
     @GetMapping("/items-defectuosos")
-    public List<Map<String, Object>> items(@RequestParam(required = false) String estado) {
-        return servicio.listarItems(estado);
+    public Map<String, Object> items(@RequestParam(required = false) String estado,
+                                     @RequestParam(required = false) Integer page,
+                                     @RequestParam(required = false) Integer size,
+                                     @RequestParam(required = false) Boolean conTotal) {
+        return servicio.listarItems(estado, page, size, conTotal);
     }
 
     /** Líneas de recepciones confirmadas (referencia del marcado posterior). */

@@ -8,6 +8,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { forkJoin } from 'rxjs';
 import { ComprasService } from '../../../core/services/compras.service';
 import { ReferenciasService } from '../../../core/services/referencias.service';
 import { mensajeError } from '../../../core/services/api-error.util';
@@ -45,11 +46,30 @@ export class RecepcionesComponent implements OnInit {
   constructor(private compras: ComprasService, private referencias: ReferenciasService,
               private snackBar: MatSnackBar) {}
 
-  ngOnInit(): void {
-    // Solo ordenes aprobadas por Gerencia (confirmada) o con recepcion parcial:
-    // el backend rechaza recibir una orden no aprobada (compuerta CU-O-12)
-    this.compras.ordenes().subscribe(o =>
-      this.ordenes = o.filter(x => ['confirmada', 'recibida_parcial'].includes(x.estado)));
+  ngOnInit(): void { this.cargarRecibibles(); }
+
+  /**
+   * Solo órdenes aprobadas por Gerencia (confirmada) o con recepción parcial:
+   * el backend rechaza recibir una orden no aprobada (compuerta CU-O-12).
+   *
+   * **El filtro se movió a SQL** (`recibibles=true`). Antes se descargaban las
+   * 134.588 órdenes y se filtraban aquí; al paginar el endpoint ese `filter`
+   * habría mirado solo las 25 primeras y el selector habría salido VACÍO sin
+   * error alguno: las 79 recibibles son las de id más bajo y el listado va por
+   * `id DESC`. Se piden 200 (el tope de `Paginacion`) y `total` dice cuántas
+   * hay de verdad.
+   *
+   * @param incluirOrdenId conserva en el selector la orden recién recibida
+   *                       aunque ya no cumpla el predicado — es el
+   *                       `|| x.id === this.ordenId` de antes, en SQL.
+   */
+  totalRecibibles = 0;
+
+  private cargarRecibibles(incluirOrdenId?: number | null): void {
+    this.compras.ordenes({ recibibles: true, incluirOrdenId, size: 200 }).subscribe(pg => {
+      this.ordenes = pg.items;
+      this.totalRecibibles = pg.total;
+    });
   }
 
   cargarOrden(): void {
@@ -100,9 +120,7 @@ export class RecepcionesComponent implements OnInit {
           { duration: 3500, panelClass: ['snack-success'] });
         this.verificarStock();
         this.cargarOrden();
-        this.compras.ordenes().subscribe(o =>
-          this.ordenes = o.filter(x =>
-            ['confirmada', 'recibida_parcial'].includes(x.estado) || x.id === this.ordenId));
+        this.cargarRecibibles(this.ordenId);
       },
       error: e => {
         this.procesando = false;
@@ -112,13 +130,21 @@ export class RecepcionesComponent implements OnInit {
     });
   }
 
-  /** Consulta el inventario en la bodega de la orden para evidenciar que el stock subió. */
+  /**
+   * Consulta el inventario para evidenciar que el stock subió.
+   *
+   * **El filtro se movió a SQL.** Antes se pedía `/api/referencias/stock` SIN
+   * argumentos —las 11.406 posiciones del inventario, 2,17 MB— y se filtraba
+   * aquí por las variantes de la recepción. El endpoint ya aceptaba
+   * `varianteId`, así que ahora se pide una consulta por variante de la orden
+   * (unas pocas líneas) y no llega ni una fila de más.
+   */
   private verificarStock(): void {
     if (!this.orden) return;
     this.stockDespues = [];
-    const varianteIds = new Set(this.lineas.map(l => l.varianteId));
-    this.referencias.stock().subscribe(rows => {
-      this.stockDespues = rows.filter(r => varianteIds.has(r.producto_variante_id));
-    });
+    const varianteIds = [...new Set(this.lineas.map(l => l.varianteId))];
+    if (!varianteIds.length) return;
+    forkJoin(varianteIds.map(id => this.referencias.stock(id)))
+      .subscribe(listas => this.stockDespues = listas.flat());
   }
 }

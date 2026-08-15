@@ -90,8 +90,21 @@ export class MisPedidosTiendaComponent implements OnInit {
     });
   }
 
+  /**
+   * Devoluciones del cliente. El endpoint pasó a devolver el sobre paginado
+   * (antes mandaba las 145.734 filas de la tabla; a un cliente RLS solo le
+   * llegaban las suyas, pero la firma cambió igual). Se piden las 200 del tope,
+   * y el rótulo muestra `totalDevoluciones` —el conteo REAL del servidor— para
+   * que un recorte se vea en pantalla en vez de mentir por omisión: hoy el
+   * cliente con más devoluciones tiene 58.
+   */
+  totalDevoluciones = 0;
+
   cargarDevoluciones(): void {
-    this.rma.listar().subscribe(d => this.devoluciones = d);
+    this.rma.listar({ size: 200 }).subscribe(pg => {
+      this.devoluciones = pg.items;
+      this.totalDevoluciones = pg.total;
+    });
   }
 
   verPedido(id: number): void {

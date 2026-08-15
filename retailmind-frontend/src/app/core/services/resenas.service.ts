@@ -1,9 +1,10 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
-  ResenaRow, ResenaPublica, ReporteResenaRow, PreguntaProductoRow, ProductoResenaRef
+  ResenaRow, ResenaPublica, ReporteResenaRow, PreguntaProductoRow, ProductoResenaRef,
+  Pagina
 } from '../models/operativo.model';
 
 @Injectable({ providedIn: 'root' })
@@ -13,8 +14,30 @@ export class ResenasService {
   constructor(private http: HttpClient) {}
 
   // Reseñas
-  resenas(estado?: string): Observable<ResenaRow[]> {
-    return this.http.get<ResenaRow[]>(this.base, { params: estado ? { estado } : {} });
+  /**
+   * Bandeja de moderación PAGINADA EN EL SERVIDOR (antes: las 263.077 reseñas,
+   * 82,07 MB — el listado más grande del sistema).
+   *
+   * Los CUATRO criterios —estado, calificación, reportadas y el buscador de
+   * texto— viajan al backend. Aplicarlos aquí sobre la página recibida daría
+   * un «sin resultados» perfectamente creíble en cuanto se busque algo que no
+   * esté entre las 25 primeras.
+   */
+  resenas(opts: {
+    estado?: string; calificacion?: number; reportadas?: string; q?: string;
+    page?: number; size?: number; conTotal?: boolean;
+  } = {}): Observable<Pagina<ResenaRow>> {
+    let params = new HttpParams();
+    if (opts.estado && opts.estado !== 'todos') { params = params.set('estado', opts.estado); }
+    if (opts.calificacion != null) { params = params.set('calificacion', opts.calificacion); }
+    if (opts.reportadas && opts.reportadas !== 'todos') {
+      params = params.set('reportadas', opts.reportadas);
+    }
+    if (opts.q)             { params = params.set('q', opts.q); }
+    if (opts.page != null)  { params = params.set('page', opts.page); }
+    if (opts.size != null)  { params = params.set('size', opts.size); }
+    if (opts.conTotal === false) { params = params.set('conTotal', false); }
+    return this.http.get<Pagina<ResenaRow>>(this.base, { params });
   }
   resenasProducto(productoId: number): Observable<ResenaPublica[]> {
     return this.http.get<ResenaPublica[]>(`${this.base}/producto/${productoId}`);

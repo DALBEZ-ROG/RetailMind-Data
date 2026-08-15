@@ -15,7 +15,7 @@
 
     <div *ngIf="showForm" style="margin-top: 20px;">
       <div class="form-grid">
-        <app-select-buscable label="Cliente" [opciones]="clientesOpc"
+        <app-select-buscable label="Cliente" [buscador]="buscarCliente"
                              [(value)]="clienteId"></app-select-buscable>
         <mat-form-field appearance="outline">
           <mat-label>Bodega que despacha</mat-label>
@@ -68,7 +68,7 @@
   </div>
 
   <div class="op-card">
-    <h3><mat-icon>list_alt</mat-icon> Pedidos registrados ({{ total | number }})</h3>
+    <h3><mat-icon>list_alt</mat-icon> Pedidos registrados ({{ etiquetaTotal }})</h3>
     <div class="table-wrapper" *ngIf="total; else vacio">
       <table mat-table [dataSource]="pedidosPagina">
         <ng-container matColumnDef="numero">

@@ -9,8 +9,8 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { MatPaginatorModule } from '@angular/material/paginator';
-import { PaginaLocal } from '../../../core/services/pagina-local.util';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
+import { PaginaServidor } from '../../../core/services/pagina-servidor.util';
 import { ComprasService } from '../../../core/services/compras.service';
 import { ReferenciasService } from '../../../core/services/referencias.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -34,9 +34,15 @@ interface LineaOrden { varianteId: number | null; cantidad: number; precioUnitar
 })
 export class OrdenesCompraComponent implements OnInit {
 
-  ordenes: OrdenCompraRow[] = [];
-  /** La PÁGINA que se pinta. Sin esto el DOM recibía las 134.588 órdenes. */
-  readonly pag = new PaginaLocal<OrdenCompraRow>();
+  /**
+   * La PÁGINA que devuelve el servidor. Antes llegaban las 134.588 órdenes
+   * (27,18 MB) y el recorte era del navegador. Esta pantalla no ofrece ningún
+   * filtro ni buscador sobre el listado, así que no hay criterio que mudar a
+   * SQL: el único que existía vivía en la pantalla de FACTURAS, que se traía
+   * este mismo endpoint para quedarse con las órdenes facturables, y ese sí se
+   * movió (`facturables=true`).
+   */
+  readonly pag = new PaginaServidor<OrdenCompraRow>();
   proveedores: ProveedorRef[] = [];
   bodegas: BodegaRef[] = [];
   variantes: VarianteRef[] = [];
@@ -100,12 +106,18 @@ export class OrdenesCompraComponent implements OnInit {
     });
   }
 
-  cargarOrdenes(): void {
+  cargarOrdenes(conTotal = true): void {
     this.loading = true;
-    this.compras.ordenes().subscribe({
-      next: data => { this.ordenes = data; this.pag.fijar(data); this.loading = false; },
+    this.compras.ordenes({ page: this.pag.pagina, size: this.pag.tam, conTotal }).subscribe({
+      next: pg => { this.pag.aplicar(pg); this.loading = false; },
       error: () => this.loading = false
     });
+  }
+
+  /** Cambiar de página NO recuenta: el conjunto es el mismo. */
+  alPaginar(e: PageEvent): void {
+    this.pag.alPaginar(e);
+    this.cargarOrdenes(false);
   }
 
   agregarLinea(): void { this.lineas.push({ varianteId: null, cantidad: 1, precioUnitario: 0 }); }

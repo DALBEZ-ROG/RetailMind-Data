@@ -83,8 +83,66 @@ public class DevolucionService {
 
     // ── Consultas ────────────────────────────────────────────────────────
 
+    /** Columnas del CLIENTE: sin nombre de cliente (es él) y con sus montos. */
+    private static final String SEL_RMA_CLIENTE = """
+            SELECT d.id, d.numero, d.estado, d.monto_total, d.monto_reembolsado,
+                   d.guia_retorno, d.fecha_creacion, d.ticket_soporte_id,
+                   md.nombre AS motivo, p.numero AS numero_pedido,
+                   t.nombre AS transportista
+            """;
+
+    /** Segregación financiera: BODEGA/DESPACHO mueven paquetes, no leen montos
+     *  (sus grants de columna sobre `devolucion` lo espejan). */
+    private static final String SEL_RMA_LOGISTICO = """
+            SELECT d.id, d.numero, d.estado,
+                   d.guia_retorno, d.fecha_creacion, d.ticket_soporte_id,
+                   md.nombre AS motivo, p.numero AS numero_pedido,
+                   c.nombre || ' ' || COALESCE(c.apellido,'') AS cliente,
+                   t.nombre AS transportista
+            """;
+
+    private static final String SEL_RMA_COMPLETO = """
+            SELECT d.id, d.numero, d.estado, d.monto_total, d.monto_reembolsado,
+                   d.guia_retorno, d.fecha_creacion, d.ticket_soporte_id,
+                   md.nombre AS motivo, p.numero AS numero_pedido,
+                   c.nombre || ' ' || COALESCE(c.apellido,'') AS cliente,
+                   t.nombre AS transportista
+            """;
+
+    private static final String JOIN_RMA = """
+            FROM devolucion d
+            JOIN motivo_devolucion md ON md.id = d.motivo_devolucion_id
+            JOIN pedido p ON p.id = d.pedido_id
+            LEFT JOIN cliente c ON c.id = d.cliente_id
+            LEFT JOIN transportista t ON t.id = d.transportista_id
+            """;
+
+    /** El cliente no une `cliente` (RLS ya lo aísla y no lo pinta). */
+    private static final String JOIN_RMA_CLIENTE = """
+            FROM devolucion d
+            JOIN motivo_devolucion md ON md.id = d.motivo_devolucion_id
+            JOIN pedido p ON p.id = d.pedido_id
+            LEFT JOIN transportista t ON t.id = d.transportista_id
+            """;
+
+    /**
+     * Bandeja RMA PAGINADA EN EL SERVIDOR.
+     *
+     * <h3>Qué cambió y qué no</h3>
+     * Devolvía las 145.734 devoluciones (49,53 MB medidos) y la pantalla las
+     * recortaba en el navegador. El filtro por `estado` YA se resolvía aquí, en
+     * SQL, así que no había ningún criterio que mudar: lo único que cambia es
+     * que el recorte lo hace {@code comun.Paginacion} y `total` cuenta el
+     * conjunto FILTRADO (25.634 cerradas de 145.734, verificado en pantalla).
+     *
+     * <h3>El desempate ya estaba</h3>
+     * El ORDER BY termina en `d.id DESC`, que es único: la paginación no puede
+     * repetir ni saltarse filas. El primer criterio (terminales al final) se
+     * conserva tal cual — es la prioridad de trabajo de la bandeja.
+     */
     @Transactional(readOnly = true)
-    public List<Map<String, Object>> listar(String estado) {
+    public Map<String, Object> listar(String estado, Integer page, Integer size,
+                                      Boolean conTotal) {
         String filtro = null;
         if (estado != null && !estado.isBlank()) {
             if (!ESTADOS.contains(estado)) {
@@ -93,51 +151,34 @@ public class DevolucionService {
             }
             filtro = estado;
         }
-        if (esCliente()) {
-            return pg.queryForList("""
-                    SELECT d.id, d.numero, d.estado, d.monto_total, d.monto_reembolsado,
-                           d.guia_retorno, d.fecha_creacion, d.ticket_soporte_id,
-                           md.nombre AS motivo, p.numero AS numero_pedido,
-                           t.nombre AS transportista
-                    FROM devolucion d
-                    JOIN motivo_devolucion md ON md.id = d.motivo_devolucion_id
-                    JOIN pedido p ON p.id = d.pedido_id
-                    LEFT JOIN transportista t ON t.id = d.transportista_id
-                    WHERE d.cliente_id = ? AND (?::text IS NULL OR d.estado = ?::text)
-                    ORDER BY d.id DESC""", clienteActualId(), filtro, filtro);
+
+        // El WHERE se arma SOLO con lo presente: piezas constantes del código y
+        // valores como parámetros ligados. Nada del usuario se concatena.
+        StringBuilder w = new StringBuilder(" WHERE 1 = 1\n");
+        List<Object> args = new java.util.ArrayList<>();
+        boolean cliente = esCliente();
+        if (cliente) { w.append(" AND d.cliente_id = ?\n"); args.add(clienteActualId()); }
+        if (filtro != null) { w.append(" AND d.estado = ?\n"); args.add(filtro); }
+        String where = w.toString();
+        Object[] a = args.toArray();
+
+        String select = cliente ? SEL_RMA_CLIENTE
+                                : (esRolLogistico() ? SEL_RMA_LOGISTICO : SEL_RMA_COMPLETO);
+        String join = cliente ? JOIN_RMA_CLIENTE : JOIN_RMA;
+        String orden = cliente ? " ORDER BY d.id DESC"
+                : " ORDER BY CASE d.estado WHEN 'cerrada' THEN 1 WHEN 'rechazada' THEN 1 ELSE 0 END,"
+                + " d.id DESC";
+
+        int pag = com.retailmind.comun.Paginacion.pagina(page);
+        int tam = com.retailmind.comun.Paginacion.tamano(size);
+        String sqlItems = select + join + where + orden;
+
+        if (Boolean.FALSE.equals(conTotal)) {
+            return com.retailmind.comun.Paginacion.paginarSinTotal(pg, sqlItems, a, pag, tam);
         }
-        // Segregación financiera: BODEGA/DESPACHO mueven paquetes e inspeccionan;
-        // no leen montos (sus grants de columna sobre devolucion lo espejan)
-        if (esRolLogistico()) {
-            return pg.queryForList("""
-                    SELECT d.id, d.numero, d.estado,
-                           d.guia_retorno, d.fecha_creacion, d.ticket_soporte_id,
-                           md.nombre AS motivo, p.numero AS numero_pedido,
-                           c.nombre || ' ' || COALESCE(c.apellido,'') AS cliente,
-                           t.nombre AS transportista
-                    FROM devolucion d
-                    JOIN motivo_devolucion md ON md.id = d.motivo_devolucion_id
-                    JOIN pedido p ON p.id = d.pedido_id
-                    LEFT JOIN cliente c ON c.id = d.cliente_id
-                    LEFT JOIN transportista t ON t.id = d.transportista_id
-                    WHERE (?::text IS NULL OR d.estado = ?::text)
-                    ORDER BY CASE d.estado WHEN 'cerrada' THEN 1 WHEN 'rechazada' THEN 1 ELSE 0 END,
-                             d.id DESC""", filtro, filtro);
-        }
-        return pg.queryForList("""
-                SELECT d.id, d.numero, d.estado, d.monto_total, d.monto_reembolsado,
-                       d.guia_retorno, d.fecha_creacion, d.ticket_soporte_id,
-                       md.nombre AS motivo, p.numero AS numero_pedido,
-                       c.nombre || ' ' || COALESCE(c.apellido,'') AS cliente,
-                       t.nombre AS transportista
-                FROM devolucion d
-                JOIN motivo_devolucion md ON md.id = d.motivo_devolucion_id
-                JOIN pedido p ON p.id = d.pedido_id
-                LEFT JOIN cliente c ON c.id = d.cliente_id
-                LEFT JOIN transportista t ON t.id = d.transportista_id
-                WHERE (?::text IS NULL OR d.estado = ?::text)
-                ORDER BY CASE d.estado WHEN 'cerrada' THEN 1 WHEN 'rechazada' THEN 1 ELSE 0 END,
-                         d.id DESC""", filtro, filtro);
+        // El conteo no arrastra los joins que solo sirven para pintar la fila.
+        String sqlCount = "SELECT count(*) FROM devolucion d" + where;
+        return com.retailmind.comun.Paginacion.paginar(pg, sqlItems, sqlCount, a, pag, tam);
     }
 
     @Transactional(readOnly = true)

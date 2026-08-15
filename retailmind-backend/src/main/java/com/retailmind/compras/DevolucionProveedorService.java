@@ -64,40 +64,70 @@ public class DevolucionProveedorService {
 
     // ── 1) Pool de ítems defectuosos ─────────────────────────────────────
 
+    private static final String SEL_ITEMS = """
+            SELECT it.id, it.cantidad, it.origen, it.estado, it.nota, it.costo_unitario,
+                   it.fecha_creacion, it.proveedor_id,
+                   pv.sku, pr.nombre AS producto, b.nombre AS bodega,
+                   prov.razon_social AS proveedor,
+                   u.nombre || ' ' || COALESCE(u.apellido, '') AS registrado_por,
+                   d.numero  AS numero_rma,
+                   rm.numero AS numero_recepcion,
+                   dp.numero AS numero_devolucion_proveedor
+            FROM item_defectuoso it
+            JOIN producto_variante pv ON pv.id = it.producto_variante_id
+            JOIN producto pr ON pr.id = pv.producto_id
+            JOIN bodega b ON b.id = it.bodega_id
+            LEFT JOIN proveedor prov ON prov.id = it.proveedor_id
+            LEFT JOIN usuario u ON u.id = it.registrado_por
+            LEFT JOIN devolucion_detalle dd ON dd.id = it.devolucion_detalle_id
+            LEFT JOIN devolucion d ON d.id = dd.devolucion_id
+            LEFT JOIN recepcion_detalle rd ON rd.id = it.recepcion_detalle_id
+            LEFT JOIN recepcion_mercancia rm ON rm.id = rd.recepcion_mercancia_id
+            LEFT JOIN devolucion_proveedor_detalle dpd ON dpd.item_defectuoso_id = it.id
+            LEFT JOIN devolucion_proveedor dp ON dp.id = dpd.devolucion_proveedor_id
+            """;
+
+    /**
+     * Pool de ítems defectuosos, PAGINADO EN EL SERVIDOR.
+     *
+     * Devolvía los 27.831 ítems (12,66 MB medidos) y la pantalla les pintaba a
+     * cada uno su casilla de selección. El filtro por `estado` ya se resolvía
+     * aquí, en SQL, y sigue igual: `total` cuenta el conjunto FILTRADO
+     * (27.803 pendientes, 25 resueltos, 3 en devolución).
+     *
+     * OJO con la selección múltiple: `seleccion` es un Set de ids que ahora
+     * sobrevive al cambio de página. Eso es deliberado —COMPRAS agrupa ítems de
+     * varias páginas en una misma devolución— y el backend valida cada id.
+     */
     @Transactional(readOnly = true)
-    public List<Map<String, Object>> listarItems(String estado) {
-        String filtro = null;
+    public Map<String, Object> listarItems(String estado, Integer page, Integer size,
+                                           Boolean conTotal) {
+        StringBuilder w = new StringBuilder(" WHERE 1 = 1\n");
+        List<Object> args = new java.util.ArrayList<>();
         if (estado != null && !estado.isBlank()) {
             if (!ESTADOS_ITEM.contains(estado)) {
                 throw new IllegalArgumentException("Estado de ítem inválido: '" + estado
                         + "'. Válidos: " + String.join(", ", ESTADOS_ITEM.stream().sorted().toList()));
             }
-            filtro = estado;
+            w.append(" AND it.estado = ?\n");
+            args.add(estado);
         }
-        return pg.queryForList("""
-                SELECT it.id, it.cantidad, it.origen, it.estado, it.nota, it.costo_unitario,
-                       it.fecha_creacion, it.proveedor_id,
-                       pv.sku, pr.nombre AS producto, b.nombre AS bodega,
-                       prov.razon_social AS proveedor,
-                       u.nombre || ' ' || COALESCE(u.apellido, '') AS registrado_por,
-                       d.numero  AS numero_rma,
-                       rm.numero AS numero_recepcion,
-                       dp.numero AS numero_devolucion_proveedor
-                FROM item_defectuoso it
-                JOIN producto_variante pv ON pv.id = it.producto_variante_id
-                JOIN producto pr ON pr.id = pv.producto_id
-                JOIN bodega b ON b.id = it.bodega_id
-                LEFT JOIN proveedor prov ON prov.id = it.proveedor_id
-                LEFT JOIN usuario u ON u.id = it.registrado_por
-                LEFT JOIN devolucion_detalle dd ON dd.id = it.devolucion_detalle_id
-                LEFT JOIN devolucion d ON d.id = dd.devolucion_id
-                LEFT JOIN recepcion_detalle rd ON rd.id = it.recepcion_detalle_id
-                LEFT JOIN recepcion_mercancia rm ON rm.id = rd.recepcion_mercancia_id
-                LEFT JOIN devolucion_proveedor_detalle dpd ON dpd.item_defectuoso_id = it.id
-                LEFT JOIN devolucion_proveedor dp ON dp.id = dpd.devolucion_proveedor_id
-                WHERE (?::text IS NULL OR it.estado = ?::text)
-                ORDER BY CASE it.estado WHEN 'pendiente' THEN 0 WHEN 'en_devolucion' THEN 1 ELSE 2 END,
-                         it.id DESC""", filtro, filtro);
+        String where = w.toString();
+        Object[] a = args.toArray();
+
+        String sqlItems = SEL_ITEMS + where
+                + " ORDER BY CASE it.estado WHEN 'pendiente' THEN 0"
+                + " WHEN 'en_devolucion' THEN 1 ELSE 2 END, it.id DESC";
+
+        int pag = com.retailmind.comun.Paginacion.pagina(page);
+        int tam = com.retailmind.comun.Paginacion.tamano(size);
+
+        if (Boolean.FALSE.equals(conTotal)) {
+            return com.retailmind.comun.Paginacion.paginarSinTotal(pg, sqlItems, a, pag, tam);
+        }
+        // El conteo no arrastra los ocho joins que solo sirven para pintar.
+        String sqlCount = "SELECT count(*) FROM item_defectuoso it" + where;
+        return com.retailmind.comun.Paginacion.paginar(pg, sqlItems, sqlCount, a, pag, tam);
     }
 
     /**

@@ -57,10 +57,36 @@ public class MetasVentaService {
                 (SELECT COALESCE(sum(fv.total), 0)
                  FROM factura_venta fv
                  WHERE fv.estado <> 'anulada'
-                   AND fv.fecha_emision >= make_date(m.anio, m.mes, 1)
-                   AND fv.fecha_emision <  make_date(m.anio, m.mes, 1) + interval '1 month')
+                   AND fv.fecha_emision >=  make_date(m.anio, m.mes, 1)::timestamptz
+                   AND fv.fecha_emision <  (make_date(m.anio, m.mes, 1)
+                                            + interval '1 month')::timestamptz)
             END AS venta_real
             """;
+
+    /*
+     * LOS DOS CASTEOS A timestamptz DE ARRIBA NO SON COSMÉTICOS.
+     *
+     * `fecha_emision` es timestamptz y `make_date(...)` devuelve date, así que
+     * el operador era `timestamptz_ge_date`, con `proleakproof = false`. Como
+     * `factura_venta` tiene RLS (`pol_horario`), PostgreSQL no deja evaluar un
+     * qual no-leakproof del usuario ANTES del qual de seguridad —que es
+     * justamente lo que hace un `Index Cond`—, así que el índice
+     * `idx_factura_venta_fecha` quedaba inservible y la subconsulta recorría
+     * las 2.855.378 facturas ENTERAS. Y no una vez: esta subconsulta es
+     * CORRELACIONADA y se ejecuta por cada meta de 'general'/'ventas', que hoy
+     * son 38.
+     *
+     * Medido bajo grp_administrador, UNA sola fila de meta:
+     *     antes    25.734 ms
+     *     después     139 ms      (mismo valor: 1.900.217,38)
+     * o sea el listado completo pasaba de ~16 min a ~5 s. `/api/gerencia/metas`
+     * no era «lento»: era una pantalla que no llegaba a abrirse nunca.
+     *
+     * `timestamptz_ge` y `timestamptz_lt` sí son leakproof, y con ellos el plan
+     * usa el índice. La frontera superior se castea DESPUÉS de sumar el mes
+     * porque `date + interval` da `timestamp` (sin zona), que sería otra
+     * comparación cruzada.
+     */
 
     private final JdbcTemplate pg;
 
@@ -68,16 +94,61 @@ public class MetasVentaService {
         this.pg = pg;
     }
 
+    /**
+     * Listado de metas con su avance.
+     *
+     * <h3>Por qué NO usa {@link #VENTA_REAL_SQL}, que es la forma obvia</h3>
+     * Esa subconsulta es CORRELACIONADA: se ejecuta una vez por meta de
+     * 'general'/'ventas', y hoy son 38 que cubren solo 19 meses distintos — o
+     * sea que la mitad del trabajo es repetido. Aun con el predicado ya
+     * corregido a leakproof, medido bajo grp_administrador: <b>7.761 ms</b>.
+     *
+     * Aquí se da UNA sola pasada: se agrupa `factura_venta` por mes en el rango
+     * que cubren las metas y se cruza por mes. Medido: <b>774 ms</b>, mismo
+     * importe al céntimo (160.701.002,86).
+     *
+     * <h3>Las dos fronteras se resuelven APARTE y viajan ligadas</h3>
+     * Calcularlas dentro, con un CTE tipo {@code WITH r AS (SELECT min(...))},
+     * parece más limpio y cuesta 3.458 ms: el rango deja de ser constante, el
+     * predicado no puede bajar a {@code Index Cond} y el índice no se usa. Es
+     * la misma trampa que documenta {@code InformesGerenciaService.fotoDia}.
+     * Por eso se resuelven en una consulta previa —que no toca
+     * `factura_venta`— y se pasan como parámetros.
+     *
+     * Con `idx_factura_venta_fecha_cubriente` el plan es
+     * {@code Parallel Index Only Scan} con {@code Heap Fetches: 0}.
+     */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> listar() {
+        // Rango que cubren las metas. Si no hay ninguna, no hay nada que sumar.
+        Map<String, Object> r = pg.queryForMap("""
+                SELECT min(make_date(anio, mes, 1))::timestamptz::text                    AS desde,
+                       (max(make_date(anio, mes, 1)) + interval '1 month')::timestamptz::text AS hasta
+                FROM meta_venta""");
+        String desde = (String) r.get("desde");
+        String hasta = (String) r.get("hasta");
+        if (desde == null || hasta == null) {
+            return List.of();
+        }
         return pg.queryForList("""
+                WITH venta_mes AS (
+                    SELECT date_trunc('month', fv.fecha_emision) AS mes,
+                           sum(fv.total)                         AS total
+                    FROM factura_venta fv
+                    WHERE fv.estado <> 'anulada'
+                      AND fv.fecha_emision >= ?::timestamptz
+                      AND fv.fecha_emision <  ?::timestamptz
+                    GROUP BY 1)
                 SELECT m.id, m.anio, m.mes, m.departamento, m.monto_meta, m.notas,
                        m.activo, m.fecha_creacion, m.fecha_actualizacion,
                        trim(concat(u.nombre, ' ', COALESCE(u.apellido, ''))) AS fijada_por,
-                       """ + VENTA_REAL_SQL + """
+                       CASE WHEN m.departamento IN ('general', 'ventas')
+                            THEN COALESCE(vm.total, 0) END AS venta_real
                 FROM meta_venta m
                 LEFT JOIN usuario u ON u.id = m.fijada_por
-                ORDER BY m.anio DESC, m.mes DESC, m.departamento""");
+                LEFT JOIN venta_mes vm
+                       ON vm.mes = make_date(m.anio, m.mes, 1)::timestamptz
+                ORDER BY m.anio DESC, m.mes DESC, m.departamento""", desde, hasta);
     }
 
     /** Meta VIGENTE (activa) de un período y departamento, con su avance. */

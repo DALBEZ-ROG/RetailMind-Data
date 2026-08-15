@@ -134,16 +134,43 @@ public class InformesLogisticaService extends InformeServiceBase {
                     SELECT count(*) AS lineas, COALESCE(sum(pd.cantidad), 0) AS unidades
                     FROM pedido_detalle pd WHERE pd.pedido_id = p.id) ag ON true
                 """;
+        /*
+         * EL TRAMO SE ACOTA POR ID, NO POR CÓDIGO, Y ESO VALE 15 SEGUNDOS.
+         *
+         * Estaba como `WHERE ep.codigo IN ('facturado','en_preparacion',
+         * 'preparado')`: el predicado cae sobre una columna de `estado_pedido`,
+         * así que `pedido` (3,0 M) se recorre entero y RLS evalúa
+         * `esta_en_horario()` fila a fila. Este informe era el MÁS LENTO del
+         * sistema: 15.163 ms para devolver 48 filas.
+         *
+         * Comparando por `p.estado_pedido_id` contra un ARRAY de ids resueltos
+         * con subconsultas escalares (InitPlan, una vez), el operador es
+         * `int4eq` —leakproof— y baja a `Index Cond` sobre `idx_pedido_estado`.
+         * Los códigos siguen siendo la fuente de verdad: se traducen a id antes
+         * de tocar `pedido`, no dentro del recorrido.
+         *
+         * El filtro OPCIONAL de estado se traduce igual, y se añade solo si
+         * viene: la guarda `(? IS NULL OR ...)` es opaca para el índice.
+         */
         final String filtro = """
-                WHERE ep.codigo IN ('facturado', 'en_preparacion', 'preparado')
-                  AND (?::varchar IS NULL OR ep.codigo = ?::varchar)
+                WHERE p.estado_pedido_id = ANY (ARRAY[
+                        (SELECT id FROM estado_pedido WHERE codigo = 'facturado'),
+                        (SELECT id FROM estado_pedido WHERE codigo = 'en_preparacion'),
+                        (SELECT id FROM estado_pedido WHERE codigo = 'preparado')])
+                """
+                + (est == null ? ""
+                   : "  AND p.estado_pedido_id = (SELECT id FROM estado_pedido"
+                     + " WHERE codigo = ?)\n")
+                + """
                   AND (?::varchar IS NULL OR p.canal = ?::varchar)
                   AND (?::varchar IS NULL OR t.nombre ILIKE '%' || ?::varchar || '%')
                   AND (?::varchar IS NULL OR p.numero ILIKE '%' || ?::varchar || '%'
                        OR c.nombre ILIKE '%' || ?::varchar || '%'
                        OR c.apellido ILIKE '%' || ?::varchar || '%')
                 """;
-        Object[] args = { est, est, can, can, tr, tr, q, q, q, q };
+        Object[] args = est == null
+                ? new Object[] { can, can, tr, tr, q, q, q, q }
+                : new Object[] { est, can, can, tr, tr, q, q, q, q };
 
         Map<String, Object> res = paginar("""
                 SELECT p.id, p.numero, ep.codigo AS estado, p.canal, p.fecha_pedido,
@@ -218,18 +245,21 @@ public class InformesLogisticaService extends InformeServiceBase {
                     FROM novedad_envio n
                     WHERE n.envio_id = e.id AND n.estado = 'abierta') nv ON true
                 """;
+        // `envio` (2,11 M) NO tiene índice por `fecha_despacho`, y la corrección
+        // gana igual: 3.773 ms → 96,8 ms. Con el predicado leakproof el motor
+        // descarta por fecha primero y solo llama a esta_en_horario() sobre las
+        // supervivientes, en vez de sobre los 2,11 M.
+        String[] ts = instantesDelDia(d, h);
         final String filtro = """
                 WHERE (?::varchar IS NULL OR e.estado = ?::varchar)
                   AND (?::varchar IS NULL OR t.nombre ILIKE '%' || ?::varchar || '%')
-                  AND (?::date IS NULL OR e.fecha_despacho >= ?::date)
-                  AND (?::date IS NULL OR e.fecha_despacho <  (?::date + 1))
                   AND (?::varchar IS NULL OR e.numero ILIKE '%' || ?::varchar || '%'
                        OR e.numero_guia ILIKE '%' || ?::varchar || '%'
                        OR p.numero ILIKE '%' || ?::varchar || '%'
                        OR c.nombre ILIKE '%' || ?::varchar || '%'
                        OR c.apellido ILIKE '%' || ?::varchar || '%')
-                """;
-        Object[] args = { est, est, tr, tr, d, d, h, h, q, q, q, q, q, q };
+                """ + filtroDia("e.fecha_despacho", ts);
+        Object[] args = conLimites(new Object[] { est, est, tr, tr, q, q, q, q, q, q }, ts);
 
         Map<String, Object> res = paginar("""
                 SELECT e.id, e.numero, e.estado, e.numero_guia,
@@ -327,18 +357,18 @@ public class InformesLogisticaService extends InformeServiceBase {
                                AS rechazadas
                     FROM devolucion_detalle dd WHERE dd.devolucion_id = dv.id) ag ON true
                 """;
+        // `devolucion` (145.734) tampoco tiene índice por fecha: 1.047 → 25,4 ms.
+        String[] ts = instantesDelDia(d, h);
         final String filtro = """
                 WHERE (?::varchar IS NULL OR dv.estado = ?::varchar)
                   AND (?::varchar IS NULL OR m.codigo = ?::varchar)
-                  AND (?::date IS NULL OR dv.fecha_creacion >= ?::date)
-                  AND (?::date IS NULL OR dv.fecha_creacion <  (?::date + 1))
                   AND (?::varchar IS NULL OR dv.numero ILIKE '%' || ?::varchar || '%'
                        OR dv.guia_retorno ILIKE '%' || ?::varchar || '%'
                        OR p.numero ILIKE '%' || ?::varchar || '%'
                        OR c.nombre ILIKE '%' || ?::varchar || '%'
                        OR c.apellido ILIKE '%' || ?::varchar || '%')
-                """;
-        Object[] args = { est, est, mot, mot, d, d, h, h, q, q, q, q, q, q };
+                """ + filtroDia("dv.fecha_creacion", ts);
+        Object[] args = conLimites(new Object[] { est, est, mot, mot, q, q, q, q, q, q }, ts);
 
         Map<String, Object> res = paginar("""
                 SELECT dv.id, dv.numero, dv.estado, m.nombre AS motivo,
@@ -410,6 +440,7 @@ public class InformesLogisticaService extends InformeServiceBase {
         String d = fecha(desde, "desde");
         String h = fecha(hasta, "hasta");
         exigirRangoValido(d, h);
+        String[] ts = instantesDelDia(d, h);
 
         final String base = """
                 WITH env AS (
@@ -432,13 +463,12 @@ public class InformesLogisticaService extends InformeServiceBase {
                         ORDER BY (z2.ciudad_id IS NOT NULL) DESC,
                                  (z2.provincia_id IS NOT NULL) DESC, z2.id
                         LIMIT 1) z ON true
-                    WHERE (?::date IS NULL OR e.fecha_despacho >= ?::date)
-                      AND (?::date IS NULL OR e.fecha_despacho <  (?::date + 1))
-                      AND (?::varchar IS NULL OR t.nombre ILIKE '%' || ?::varchar || '%')
+                    WHERE (?::varchar IS NULL OR t.nombre ILIKE '%' || ?::varchar || '%')
                       AND (?::varchar IS NULL OR z.nombre ILIKE '%' || ?::varchar || '%')
+                """ + filtroDia("e.fecha_despacho", ts) + """
                 )
                 """;
-        Object[] args = { d, d, h, h, tr, tr, z, z };
+        Object[] args = conLimites(new Object[] { tr, tr, z, z }, ts);
 
         List<Map<String, Object>> items = pg.queryForList(base + """
                 SELECT zona, transportista,

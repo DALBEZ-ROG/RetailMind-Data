@@ -41,11 +41,24 @@ public class ResenasController {
 
     // ── Reseñas ──────────────────────────────────────────────────────────
 
-    /** Bandeja de moderación (personal), con filtro opcional por estado. */
+    /**
+     * Bandeja de moderación PAGINADA, con sus CUATRO criterios en SQL.
+     *
+     * Devolvía las 263.077 reseñas —82,07 MB, el listado más grande del
+     * sistema— y la pantalla filtraba ese array en el navegador. El buscador de
+     * texto es el caso más claro: sobre una página, escribir el nombre de un
+     * producto que no esté entre las 25 primeras habría dicho «sin resultados».
+     */
     @GetMapping
-    public List<Map<String, Object>> resenas(
-            @RequestParam(required = false) String estado) {
-        return servicio.listarResenas(estado);
+    public Map<String, Object> resenas(
+            @RequestParam(required = false) String estado,
+            @RequestParam(required = false) Integer calificacion,
+            @RequestParam(required = false) String reportadas,
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) Boolean conTotal) {
+        return servicio.listarResenas(estado, calificacion, reportadas, q, page, size, conTotal);
     }
 
     /** Listado público: solo reseñas aprobadas del producto. */

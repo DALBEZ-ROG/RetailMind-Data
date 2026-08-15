@@ -15,7 +15,7 @@
             {{ o.numero }} — {{ o.proveedor }} ({{ o.total | currency:'USD' }})
           </mat-option>
         </mat-select>
-        <mat-hint>Solo órdenes aprobadas y recibidas completas, sin factura previa</mat-hint>
+        <mat-hint>Solo órdenes aprobadas y recibidas completas, sin factura previa ({{ totalFacturables }} de todo el histórico)</mat-hint>
       </mat-form-field>
     </div>
     <div class="form-actions">
@@ -42,8 +42,8 @@
   </div>
 
   <div class="op-card" *ngIf="puedeVerCuentas; else sinAccesoCuentas">
-    <h3><mat-icon>account_balance_wallet</mat-icon> Cuentas por pagar ({{ cuentas.length }})</h3>
-    <div class="table-wrapper" *ngIf="cuentas.length; else vacio">
+    <h3><mat-icon>account_balance_wallet</mat-icon> Cuentas por pagar ({{ pag.total }})</h3>
+    <div class="table-wrapper" *ngIf="pag.filas.length; else vacio">
       <table mat-table [dataSource]="pag.filas">
         <ng-container matColumnDef="factura">
           <th mat-header-cell *matHeaderCellDef>Factura</th>
@@ -90,7 +90,7 @@
     </div>
     <mat-paginator *ngIf="pag.total" [length]="pag.total" [pageIndex]="pag.pagina"
                    [pageSize]="pag.tam" [pageSizeOptions]="pag.opciones"
-                   (page)="pag.alPaginar($event)" showFirstLastButtons></mat-paginator>
+                   (page)="alPaginar($event)" showFirstLastButtons></mat-paginator>
     <ng-template #vacio>
       <div class="empty-state"><mat-icon>account_balance_wallet</mat-icon><p>Sin cuentas por pagar registradas.</p></div>
     </ng-template>

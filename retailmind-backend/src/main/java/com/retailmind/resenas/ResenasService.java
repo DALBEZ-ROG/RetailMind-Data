@@ -85,25 +85,106 @@ public class ResenasService {
 
     // ── Reseñas ──────────────────────────────────────────────────────────
 
-    /** Listado de moderación (personal): todas, con filtro opcional por estado. */
+    private static final String SEL_RESENAS = """
+            SELECT r.id, r.producto_id, p.nombre AS producto, r.cliente_id,
+                   c.nombre AS cliente, r.calificacion, r.titulo, r.comentario,
+                   r.compra_verificada, r.estado, r.fecha_creacion,
+                   (SELECT count(*) FROM resena_util v WHERE v.resena_id = r.id AND v.es_util)     AS utiles,
+                   (SELECT count(*) FROM resena_util v WHERE v.resena_id = r.id AND NOT v.es_util) AS no_utiles,
+                   (SELECT count(*) FROM reporte_resena rr
+                    WHERE rr.resena_id = r.id AND rr.estado = 'pendiente') AS reportes_pendientes
+            """;
+
+    private static final String JOIN_RESENAS = """
+            FROM resena r
+            JOIN producto p ON p.id = r.producto_id
+            LEFT JOIN cliente c ON c.id = r.cliente_id
+            """;
+
+    /** Traducción del filtro «reportadas» de la pantalla (con / sin). */
+    private static final String W_CON_REPORTES = """
+             AND EXISTS (SELECT 1 FROM reporte_resena rr
+                         WHERE rr.resena_id = r.id AND rr.estado = 'pendiente')
+            """;
+    private static final String W_SIN_REPORTES = """
+             AND NOT EXISTS (SELECT 1 FROM reporte_resena rr
+                             WHERE rr.resena_id = r.id AND rr.estado = 'pendiente')
+            """;
+
+    private static final java.util.Set<String> REPORTADAS = java.util.Set.of("todos", "con", "sin");
+
+    /**
+     * Bandeja de moderación de reseñas, PAGINADA EN EL SERVIDOR y con SUS
+     * CUATRO CRITERIOS EN SQL.
+     *
+     * <h3>Por qué dejó de devolver una lista</h3>
+     * Devolvía las 263.077 reseñas: **82,07 MB medidos**, el listado más grande
+     * del sistema, en cada apertura de pantalla.
+     *
+     * <h3>Los cuatro criterios vivían en el navegador</h3>
+     * `resenas.component.aplicarFiltros()` recorría el array completo con
+     * estado, calificación, «reportadas» y un buscador de texto libre sobre
+     * producto / cliente / título / comentario. El buscador es el caso más
+     * claro del fallo silencioso: escribir el nombre de un producto que no está
+     * entre las 25 primeras reseñas habría devuelto «sin resultados» con toda
+     * naturalidad. Los cuatro se evalúan aquí, contra las 263.077, y `total`
+     * cuenta el conjunto filtrado.
+     *
+     * <h3>El desempate del ORDER BY</h3>
+     * `fecha_creacion` no es única en 263.077 filas; sin desempate por `r.id`
+     * la misma reseña puede salir en dos páginas y otra en ninguna.
+     */
     @Transactional(readOnly = true)
-    public List<Map<String, Object>> listarResenas(String estado) {
-        if (estado != null && !estado.isBlank()) {
+    public Map<String, Object> listarResenas(String estado, Integer calificacion,
+                                             String reportadas, String q,
+                                             Integer page, Integer size, Boolean conTotal) {
+        // El WHERE se arma SOLO con los filtros presentes; las piezas son
+        // constantes del código y los valores viajan como parámetros ligados.
+        StringBuilder w = new StringBuilder(" WHERE 1 = 1\n");
+        List<Object> args = new java.util.ArrayList<>();
+
+        if (estado != null && !estado.isBlank() && !"todos".equals(estado)) {
             validarEnLista(estado, TRANSICIONES_RESENA.keySet(), "estado de la reseña");
+            w.append(" AND r.estado = ?\n");
+            args.add(estado);
         }
-        return pg.queryForList("""
-                SELECT r.id, r.producto_id, p.nombre AS producto, r.cliente_id,
-                       c.nombre AS cliente, r.calificacion, r.titulo, r.comentario,
-                       r.compra_verificada, r.estado, r.fecha_creacion,
-                       (SELECT count(*) FROM resena_util v WHERE v.resena_id = r.id AND v.es_util)     AS utiles,
-                       (SELECT count(*) FROM resena_util v WHERE v.resena_id = r.id AND NOT v.es_util) AS no_utiles,
-                       (SELECT count(*) FROM reporte_resena rr
-                        WHERE rr.resena_id = r.id AND rr.estado = 'pendiente') AS reportes_pendientes
-                FROM resena r
-                JOIN producto p ON p.id = r.producto_id
-                LEFT JOIN cliente c ON c.id = r.cliente_id
-                WHERE r.estado = COALESCE(NULLIF(?, ''), r.estado)
-                ORDER BY r.fecha_creacion DESC""", estado);
+        if (calificacion != null) {
+            if (calificacion < 1 || calificacion > 5) {
+                throw new IllegalArgumentException(
+                        "La calificación del filtro debe estar entre 1 y 5: " + calificacion);
+            }
+            w.append(" AND r.calificacion = ?\n");
+            args.add(calificacion);
+        }
+        if (reportadas != null && !reportadas.isBlank() && !"todos".equals(reportadas)) {
+            validarEnLista(reportadas, REPORTADAS, "filtro de reportadas");
+            w.append("con".equals(reportadas) ? W_CON_REPORTES : W_SIN_REPORTES);
+        }
+        String busq = (q == null || q.isBlank()) ? null : q.trim();
+        boolean conTexto = busq != null;
+        if (conTexto) {
+            // Las MISMAS cuatro columnas que miraba el buscador del navegador.
+            w.append(" AND (p.nombre ILIKE ? OR c.nombre ILIKE ?"
+                   + " OR r.titulo ILIKE ? OR r.comentario ILIKE ?)\n");
+            for (int i = 0; i < 4; i++) { args.add("%" + busq + "%"); }
+        }
+        String where = w.toString();
+        Object[] a = args.toArray();
+
+        String sqlItems = SEL_RESENAS + JOIN_RESENAS + where
+                        + " ORDER BY r.fecha_creacion DESC, r.id DESC";
+
+        int pag = com.retailmind.comun.Paginacion.pagina(page);
+        int tam = com.retailmind.comun.Paginacion.tamano(size);
+
+        if (Boolean.FALSE.equals(conTotal)) {
+            return com.retailmind.comun.Paginacion.paginarSinTotal(pg, sqlItems, a, pag, tam);
+        }
+        // El conteo solo arrastra los joins que el filtro necesita: sin
+        // buscador de texto, ni `producto` ni `cliente` cambian el número.
+        String sqlCount = "SELECT count(*) "
+                + (conTexto ? JOIN_RESENAS : "FROM resena r") + where;
+        return com.retailmind.comun.Paginacion.paginar(pg, sqlItems, sqlCount, a, pag, tam);
     }
 
     /**

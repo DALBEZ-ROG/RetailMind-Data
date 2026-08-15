@@ -111,21 +111,67 @@ public class InformesSoporteService extends InformeServiceBase {
                 LEFT JOIN categoria_ticket ct ON ct.id = t.categoria_ticket_id
                 LEFT JOIN usuario u ON u.id = t.asignado_usuario_id
                 """;
-        final String filtro = """
-                WHERE (?::varchar IS NULL OR t.estado = ?::varchar)
-                  AND (?::boolean IS NOT TRUE OR t.estado NOT IN ('resuelto', 'cerrado'))
-                  AND (?::varchar IS NULL OR t.prioridad = ?::varchar)
-                  AND (?::varchar IS NULL OR ct.nombre ILIKE '%' || ?::varchar || '%')
-                  AND (?::varchar IS NULL OR u.nombre ILIKE '%' || ?::varchar || '%'
-                       OR u.apellido ILIKE '%' || ?::varchar || '%'
-                       OR u.email ILIKE '%' || ?::varchar || '%')
-                  AND (?::varchar IS NULL OR t.numero ILIKE '%' || ?::varchar || '%'
-                       OR t.asunto ILIKE '%' || ?::varchar || '%'
-                       OR c.nombre ILIKE '%' || ?::varchar || '%'
-                       OR c.apellido ILIKE '%' || ?::varchar || '%')
-                """;
-        Object[] args = { estadoConcreto, estadoConcreto, soloPendientes, pri, pri, cat, cat,
-                ag, ag, ag, ag, q, q, q, q, q };
+        /*
+         * El WHERE se arma SOLO con los filtros presentes, y no con guardas
+         * `(? IS NULL OR ...)`. No es estética: esas guardas NOMBRAN los alias
+         * `ct`, `u` y `c` aunque el filtro venga vacío, y mientras los nombren
+         * el conteo está obligado a arrastrar sus tres JOIN — que es justo lo
+         * que se quiere evitar (ver el bloque de abajo). Las piezas son
+         * constantes del código y los valores viajan ligados.
+         */
+        StringBuilder w = new StringBuilder(" WHERE 1 = 1\n");
+        List<Object> lista = new java.util.ArrayList<>();
+        if (estadoConcreto != null) {
+            w.append(" AND t.estado = ?\n");
+            lista.add(estadoConcreto);
+        }
+        if (soloPendientes) {
+            w.append(" AND t.estado NOT IN ('resuelto', 'cerrado')\n");
+        }
+        if (pri != null) {
+            w.append(" AND t.prioridad = ?\n");
+            lista.add(pri);
+        }
+        if (cat != null) {
+            w.append(" AND ct.nombre ILIKE '%' || ? || '%'\n");
+            lista.add(cat);
+        }
+        if (ag != null) {
+            w.append(" AND (u.nombre ILIKE '%' || ? || '%'"
+                   + " OR u.apellido ILIKE '%' || ? || '%'"
+                   + " OR u.email ILIKE '%' || ? || '%')\n");
+            lista.add(ag); lista.add(ag); lista.add(ag);
+        }
+        if (q != null) {
+            w.append(" AND (t.numero ILIKE '%' || ? || '%'"
+                   + " OR t.asunto ILIKE '%' || ? || '%'"
+                   + " OR c.nombre ILIKE '%' || ? || '%'"
+                   + " OR c.apellido ILIKE '%' || ? || '%')\n");
+            lista.add(q); lista.add(q); lista.add(q); lista.add(q);
+        }
+        final String filtro = w.toString();
+        Object[] args = lista.toArray();
+
+        /*
+         * EL CONTEO SOLO ARRASTRA LOS JOIN QUE ALGÚN FILTRO NECESITA.
+         *
+         * Sin filtros, contar la bandeja con las tres uniones colgando cuesta
+         * 1.083 ms; sin ellas, 378 ms. La diferencia es que `cliente` (50.072)
+         * y `usuario` (50.182) también tienen RLS, así que el motor evalúa
+         * `esta_en_horario()` también sobre sus filas para un JOIN cuyo único
+         * efecto sobre el número es ninguno.
+         *
+         * Es seguro dejarlos fuera:
+         *   · los dos LEFT JOIN no pueden cambiar el número de filas, nunca;
+         *   · el JOIN a `cliente` es INNER, pero `ticket_soporte.cliente_id` es
+         *     NOT NULL con FK y hoy hay 0 huérfanos (verificado), así que
+         *     tampoco lo cambia.
+         * Es el mismo recorte que ya aplica `VentasService.listarPedidos`.
+         */
+        final String tablaConteo = "FROM ticket_soporte t"
+                + (q != null   ? " JOIN cliente c ON c.id = t.cliente_id\n" : "")
+                + (cat != null ? " LEFT JOIN categoria_ticket ct ON ct.id = t.categoria_ticket_id\n" : "")
+                + (ag != null  ? " LEFT JOIN usuario u ON u.id = t.asignado_usuario_id\n" : "");
 
         Map<String, Object> res = paginar("""
                 SELECT t.id, t.numero, t.estado, t.prioridad, t.asunto,
@@ -145,7 +191,7 @@ public class InformesSoporteService extends InformeServiceBase {
                 ORDER BY (t.estado NOT IN ('resuelto', 'cerrado')
                           AND t.fecha_limite IS NOT NULL AND t.fecha_limite < now()) DESC,
                          t.fecha_limite NULLS LAST, t.id DESC""",
-                "SELECT count(*) " + tabla + filtro, args, page, size);
+                "SELECT count(*) " + tablaConteo + filtro, args, page, size);
 
         Map<String, Object> tot = pg.queryForMap("""
                 SELECT count(*) AS tickets,
@@ -195,6 +241,12 @@ public class InformesSoporteService extends InformeServiceBase {
         String h = fecha(hasta, "hasta");
         exigirRangoValido(d, h);
 
+        // `ticket_soporte` (179.851) no tiene índice por fecha, y la corrección
+        // gana igual: 663 → 29,1 ms, porque esta_en_horario() deja de llamarse
+        // fila a fila. `filtroDia` produce cláusulas «AND ...», que es
+        // exactamente lo que hace falta tanto en un ON como en un WHERE.
+        String[] ts = instantesDelDia(d, h);
+
         // El mismo filtro de período se aplica DENTRO del LEFT JOIN (no en el
         // WHERE) para no perder las categorías sin tickets en la ventana.
         List<Map<String, Object>> items = pg.queryForList("""
@@ -215,11 +267,10 @@ public class InformesSoporteService extends InformeServiceBase {
                            AS dias_promedio_abierto
                 FROM categoria_ticket ct
                 LEFT JOIN ticket_soporte t ON t.categoria_ticket_id = ct.id
-                     AND (?::date IS NULL OR t.fecha_creacion >= ?::date)
-                     AND (?::date IS NULL OR t.fecha_creacion <  (?::date + 1))
+                """ + filtroDia("t.fecha_creacion", ts) + """
                 GROUP BY ct.id, ct.nombre, ct.prioridad_defecto
                 ORDER BY tickets DESC, ct.nombre""",
-                new Object[] { d, d, h, h });
+                conLimites(new Object[0], ts));
 
         Map<String, Object> tot = pg.queryForMap("""
                 SELECT count(*) AS tickets,
@@ -228,9 +279,9 @@ public class InformesSoporteService extends InformeServiceBase {
                        count(DISTINCT t.categoria_ticket_id) AS categorias_con_tickets,
                        count(*) FILTER (WHERE t.categoria_ticket_id IS NULL) AS sin_categoria
                 FROM ticket_soporte t
-                WHERE (?::date IS NULL OR t.fecha_creacion >= ?::date)
-                  AND (?::date IS NULL OR t.fecha_creacion <  (?::date + 1))""",
-                new Object[] { d, d, h, h });
+                WHERE 1 = 1
+                """ + filtroDia("t.fecha_creacion", ts),
+                conLimites(new Object[0], ts));
 
         return conResumen(sobre(items), List.of(
                 kpi("Tickets del período", tot.get("tickets"), "numero"),
@@ -267,11 +318,9 @@ public class InformesSoporteService extends InformeServiceBase {
         String h = fecha(hasta, "hasta");
         exigirRangoValido(d, h);
 
-        final String filtro = """
-                WHERE (?::date IS NULL OR t.fecha_creacion >= ?::date)
-                  AND (?::date IS NULL OR t.fecha_creacion <  (?::date + 1))
-                """;
-        Object[] args = { d, d, h, h };
+        String[] ts = instantesDelDia(d, h);
+        final String filtro = " WHERE 1 = 1\n" + filtroDia("t.fecha_creacion", ts);
+        Object[] args = conLimites(new Object[0], ts);
 
         List<Map<String, Object>> items = pg.queryForList("""
                 SELECT COALESCE(NULLIF(trim(concat(u.nombre, ' ', COALESCE(u.apellido, ''))), ''),

@@ -9,8 +9,8 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { MatPaginatorModule } from '@angular/material/paginator';
-import { PaginaLocal } from '../../../core/services/pagina-local.util';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
+import { PaginaServidor } from '../../../core/services/pagina-servidor.util';
 import { ComprasService } from '../../../core/services/compras.service';
 import { ReferenciasService } from '../../../core/services/referencias.service';
 import { NavPermissionsService } from '../../../core/navigation/nav-permissions.service';
@@ -30,10 +30,15 @@ import {
 })
 export class FacturasCompraComponent implements OnInit {
 
+  /** Órdenes FACTURABLES para el selector. Hoy son 4 de 134.588. */
   ordenes: OrdenCompraRow[] = [];
-  cuentas: CuentaPorPagarRow[] = [];
-  /** La página que se pinta: sin esto el DOM recibía las 134.558 cuentas. */
-  readonly pag = new PaginaLocal<CuentaPorPagarRow>();
+
+  /**
+   * La página de cuentas por pagar que devuelve el SERVIDOR. Antes llegaban las
+   * 134.558 (26,11 MB) y el recorte era del navegador. Esta tabla no tiene
+   * filtros propios.
+   */
+  readonly pag = new PaginaServidor<CuentaPorPagarRow>();
 
   /**
    * Estaba escrito como literal DENTRO de `matRowDef`, y una expresión de
@@ -70,15 +75,41 @@ export class FacturasCompraComponent implements OnInit {
     this.cargarCuentas();
   }
 
-  cargarCuentas(): void {
+  cargarCuentas(conTotal = true): void {
     if (!this.puedeVerCuentas) return;
-    this.compras.cuentasPorPagar().subscribe(c => { this.cuentas = c; this.pag.fijar(c); });
+    this.compras.cuentasPorPagar({
+      page: this.pag.pagina, size: this.pag.tam, conTotal
+    }).subscribe(pg => this.pag.aplicar(pg));
   }
 
-  /** Facturables: recibidas COMPLETAS y sin factura previa (compuertas del backend). */
+  /** Cambiar de página NO recuenta: el conjunto es el mismo. */
+  alPaginar(e: PageEvent): void {
+    this.pag.alPaginar(e);
+    this.cargarCuentas(false);
+  }
+
+  /**
+   * Facturables: recibidas COMPLETAS y sin factura previa (compuertas del
+   * backend). **El filtro se movió a SQL** (`facturables=true`).
+   *
+   * Antes se descargaban las 134.588 órdenes y se filtraban aquí con
+   * `o.filter(...)`. Al paginar el endpoint, ese filter habría mirado las 25
+   * filas de la primera página y el selector habría salido VACÍO **sin un solo
+   * error**: las órdenes facturables son 4 y el listado va por `id DESC`, así
+   * que ninguna está entre las 25 primeras. Es exactamente el fallo silencioso
+   * que ya se corrigió en `ventas/pedidos`.
+   *
+   * Se piden 200 —el tope de `Paginacion`— porque el selector no pagina; el
+   * conteo real viaja en `total` y se guarda para poder decirlo en pantalla si
+   * algún día pasara de 200.
+   */
+  totalFacturables = 0;
+
   cargarOrdenes(): void {
-    this.compras.ordenes().subscribe(o =>
-      this.ordenes = o.filter(x => x.estado === 'recibida' && !x.tiene_factura));
+    this.compras.ordenes({ facturables: true, size: 200 }).subscribe(pg => {
+      this.ordenes = pg.items;
+      this.totalFacturables = pg.total;
+    });
   }
 
   abrirPago(c: CuentaPorPagarRow): void {

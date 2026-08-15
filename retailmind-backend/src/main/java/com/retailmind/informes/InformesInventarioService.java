@@ -219,6 +219,11 @@ public class InformesInventarioService extends InformeServiceBase {
         String h = fecha(hasta, "hasta");
         exigirRangoValido(d, h);
 
+        // El kardex es la tabla más grande del sistema (8,0 M) y SÍ tiene índice
+        // por fecha: comparado contra `date` el filtro no lo usaba y el informe
+        // recorría los 8 M llamando a esta_en_horario() por fila —17.060 ms—;
+        // con el instante ligado, 17,6 ms.
+        String[] ts = instantesDelDia(d, h);
         final String from = """
                 FROM movimiento_inventario mi
                 JOIN tipo_movimiento tm ON tm.id = mi.tipo_movimiento_id
@@ -230,10 +235,9 @@ public class InformesInventarioService extends InformeServiceBase {
                   AND (?::varchar IS NULL OR b.codigo = ?::varchar)
                   AND (?::varchar IS NULL OR tm.codigo = ?::varchar)
                   AND (?::varchar IS NULL OR tm.naturaleza = ?::varchar)
-                  AND (?::date    IS NULL OR mi.fecha_creacion >= ?::date)
-                  AND (?::date    IS NULL OR mi.fecha_creacion <  (?::date + 1))
-                """;
-        Object[] args = { q, q, q, bod, bod, tp, tp, nat, nat, d, d, h, h };
+                """ + filtroDia("mi.fecha_creacion", ts);
+        Object[] args = conLimites(
+                new Object[] { q, q, q, bod, bod, tp, tp, nat, nat }, ts);
 
         Map<String, Object> res = paginar("""
                 SELECT mi.id, mi.fecha_creacion, pv.sku, p.nombre AS producto,
@@ -312,17 +316,17 @@ public class InformesInventarioService extends InformeServiceBase {
                     WHERE mi.referencia_tipo = 'ajuste_inventario'
                       AND mi.referencia_id = a.id) ag ON true
                 """;
+        // `ajuste_inventario` son 53 filas: aquí la corrección no cambia el
+        // reloj, se hace por coherencia — un solo patrón de filtro por día en
+        // todos los informes, para que nadie copie el viejo desde aquí.
+        String[] ts = instantesDelDia(d, h);
         final String filtro = """
                 WHERE (?::varchar IS NULL OR a.tipo   = ?::varchar)
                   AND (?::varchar IS NULL OR a.estado = ?::varchar)
                   AND (?::varchar IS NULL OR a.motivo ILIKE '%' || ?::varchar || '%')
                   AND (?::varchar IS NULL OR b.codigo = ?::varchar)
-                  AND (?::date    IS NULL
-                       OR COALESCE(a.fecha_aplicacion, a.fecha_creacion) >= ?::date)
-                  AND (?::date    IS NULL
-                       OR COALESCE(a.fecha_aplicacion, a.fecha_creacion) < (?::date + 1))
-                """;
-        Object[] args = { tp, tp, est, est, mot, mot, bod, bod, d, d, h, h };
+                """ + filtroDia("COALESCE(a.fecha_aplicacion, a.fecha_creacion)", ts);
+        Object[] args = conLimites(new Object[] { tp, tp, est, est, mot, mot, bod, bod }, ts);
 
         Map<String, Object> res = paginar("""
                 SELECT a.id, a.tipo, a.estado, a.motivo, b.nombre AS bodega,
@@ -398,13 +402,13 @@ public class InformesInventarioService extends InformeServiceBase {
                       AND mi.referencia_id = t.id
                       AND tm.codigo = 'salida_transferencia') ag ON true
                 """;
+        // 71 transferencias: igual que en ajustes, se unifica el patrón.
+        String[] ts = instantesDelDia(d, h);
         final String filtro = """
                 WHERE (?::varchar IS NULL OR t.estado = ?::varchar)
                   AND (?::varchar IS NULL OR bo.codigo = ?::varchar OR bd.codigo = ?::varchar)
-                  AND (?::date    IS NULL OR t.fecha_creacion >= ?::date)
-                  AND (?::date    IS NULL OR t.fecha_creacion <  (?::date + 1))
-                """;
-        Object[] args = { est, est, bod, bod, bod, d, d, h, h };
+                """ + filtroDia("t.fecha_creacion", ts);
+        Object[] args = conLimites(new Object[] { est, est, bod, bod, bod }, ts);
 
         Map<String, Object> res = paginar("""
                 SELECT t.id, t.estado, bo.nombre AS origen, bd.nombre AS destino,

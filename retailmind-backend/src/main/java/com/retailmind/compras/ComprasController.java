@@ -58,8 +58,27 @@ public class ComprasController {
                         r.observacion(), r.items()));
     }
 
+    /**
+     * Listado de órdenes PAGINADO: sobre {@code {items, total, page, size}}.
+     * Devolvía las 134.588 órdenes (27,18 MB).
+     *
+     * {@code facturables=true} (recibida y sin factura, hoy 4 de 134.588) y
+     * {@code recibibles=true} (confirmada o recibida_parcial, hoy 79) son los
+     * predicados que las pantallas de facturas y de recepciones aplicaban EN EL
+     * NAVEGADOR sobre la tabla entera. Evaluados sobre la página visible los dos
+     * selectores habrían salido vacíos sin un solo error.
+     */
     @GetMapping("/ordenes")
-    public List<Map<String, Object>> ordenes() { return servicio.listarOrdenes(); }
+    public Map<String, Object> ordenes(
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) Boolean facturables,
+            @RequestParam(required = false) Boolean recibibles,
+            @RequestParam(required = false) Long incluirOrdenId,
+            @RequestParam(required = false) Boolean conTotal) {
+        return servicio.listarOrdenes(page, size, facturables, recibibles,
+                incluirOrdenId, conTotal);
+    }
 
     @GetMapping("/ordenes/{id}")
     public Map<String, Object> orden(@PathVariable long id) { return servicio.obtenerOrden(id); }
@@ -99,8 +118,14 @@ public class ComprasController {
     }
 
     // d) Cuentas por pagar y pagos
+    /** Cuentas por pagar PAGINADAS: devolvía las 134.558 cuentas (26,11 MB). */
     @GetMapping("/cuentas-por-pagar")
-    public List<Map<String, Object>> cuentas() { return servicio.listarCuentasPorPagar(); }
+    public Map<String, Object> cuentas(
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) Boolean conTotal) {
+        return servicio.listarCuentasPorPagar(page, size, conTotal);
+    }
 
     @PostMapping("/cuentas-por-pagar/{id}/pagos")
     public ResponseEntity<?> pagar(@PathVariable long id, @RequestBody PagoReq r) {

@@ -1,11 +1,11 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
   ItemOrdenReq, ItemRecepcionReq, OrdenCompraRow, OrdenCompraDetalle,
   FacturaCompra, CuentaPorPagarRow, ProveedorFichaRow, ProductoProveedorRow,
-  ProductoCompraRef
+  ProductoCompraRef, Pagina
 } from '../models/operativo.model';
 
 @Injectable({ providedIn: 'root' })
@@ -21,7 +21,29 @@ export class ComprasService {
     return this.http.post<OrdenCompraDetalle>(`${this.base}/ordenes`, body);
   }
 
-  ordenes(): Observable<OrdenCompraRow[]> { return this.http.get<OrdenCompraRow[]>(`${this.base}/ordenes`); }
+  /**
+   * Órdenes de compra PAGINADAS EN EL SERVIDOR (antes: las 134.588, 27,18 MB).
+   *
+   * `facturables` es el predicado que `facturas-compra` aplicaba en el
+   * navegador —«recibida y sin factura»— y que hoy casa con 4 órdenes de
+   * 134.588: sobre una página de 25 ordenada por `id DESC` no aparecería
+   * NINGUNA, y el selector saldría vacío sin dar error.
+   */
+  ordenes(opts: {
+    page?: number; size?: number; facturables?: boolean; recibibles?: boolean;
+    incluirOrdenId?: number | null; conTotal?: boolean;
+  } = {}): Observable<Pagina<OrdenCompraRow>> {
+    let params = new HttpParams();
+    if (opts.page != null)    { params = params.set('page', opts.page); }
+    if (opts.size != null)    { params = params.set('size', opts.size); }
+    if (opts.facturables)     { params = params.set('facturables', true); }
+    if (opts.recibibles)      { params = params.set('recibibles', true); }
+    if (opts.incluirOrdenId != null) {
+      params = params.set('incluirOrdenId', opts.incluirOrdenId);
+    }
+    if (opts.conTotal === false) { params = params.set('conTotal', false); }
+    return this.http.get<Pagina<OrdenCompraRow>>(`${this.base}/ordenes`, { params });
+  }
 
   /** CU-O-12: aprobar orden emitida (enviada → confirmada). Solo GERENTE/ADMIN. */
   aprobarOrden(id: number):
@@ -49,9 +71,19 @@ export class ComprasService {
   }
 
   // ── Devolución a proveedor (script 45) ────────────────────────────────
-  itemsDefectuosos(estado?: string | null): Observable<any[]> {
-    return this.http.get<any[]>(`${this.base}/items-defectuosos`,
-      { params: estado ? { estado } : {} });
+  /**
+   * Pool de ítems defectuosos PAGINADO EN EL SERVIDOR (antes: los 27.831,
+   * 12,66 MB). El filtro por `estado` ya se resolvía en SQL y no cambia.
+   */
+  itemsDefectuosos(opts: {
+    estado?: string | null; page?: number; size?: number; conTotal?: boolean;
+  } = {}): Observable<Pagina<any>> {
+    let params = new HttpParams();
+    if (opts.estado)       { params = params.set('estado', opts.estado); }
+    if (opts.page != null) { params = params.set('page', opts.page); }
+    if (opts.size != null) { params = params.set('size', opts.size); }
+    if (opts.conTotal === false) { params = params.set('conTotal', false); }
+    return this.http.get<Pagina<any>>(`${this.base}/items-defectuosos`, { params });
   }
   recepcionDetallesRef(): Observable<any[]> {
     return this.http.get<any[]>(`${this.base}/recepciones/detalles-ref`);
@@ -107,8 +139,14 @@ export class ComprasService {
     return this.http.get<ProductoCompraRef[]>(`${this.base}/productos-ref`, { params: { q } });
   }
 
-  cuentasPorPagar(): Observable<CuentaPorPagarRow[]> {
-    return this.http.get<CuentaPorPagarRow[]>(`${this.base}/cuentas-por-pagar`);
+  /** Cuentas por pagar PAGINADAS (antes: las 134.558, 26,11 MB). */
+  cuentasPorPagar(opts: { page?: number; size?: number; conTotal?: boolean } = {}):
+      Observable<Pagina<CuentaPorPagarRow>> {
+    let params = new HttpParams();
+    if (opts.page != null) { params = params.set('page', opts.page); }
+    if (opts.size != null) { params = params.set('size', opts.size); }
+    if (opts.conTotal === false) { params = params.set('conTotal', false); }
+    return this.http.get<Pagina<CuentaPorPagarRow>>(`${this.base}/cuentas-por-pagar`, { params });
   }
   registrarPago(cuentaId: number, body: { monto: number; metodoPagoId: number; referencia?: string }):
       Observable<{ pagoId: number; saldoPendiente: number; estadoCuenta: string }> {

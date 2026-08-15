@@ -150,6 +150,8 @@ export interface FacturaVentaRow {
 }
 export interface PaginaFacturasVenta {
   items: FacturaVentaRow[]; total: number; page: number; size: number;
+  /** Ver `Pagina.totalEsMinimo`: 2.855.378 facturas no se cuentan enteras. */
+  totalEsMinimo?: boolean;
 }
 /**
  * Sobre del listado de pedidos. Dejó de ser un array porque el endpoint
@@ -158,6 +160,8 @@ export interface PaginaFacturasVenta {
  */
 export interface PaginaPedidosVenta {
   items: PedidoVentaRow[]; total: number; page: number; size: number;
+  /** Ver `Pagina.totalEsMinimo`: 2.999.993 pedidos no se cuentan enteros. */
+  totalEsMinimo?: boolean;
 }
 export interface EnvioDetalle {
   id: number; numero: string; numero_guia: string; estado: string;
@@ -168,6 +172,22 @@ export interface EnvioDetalle {
 export interface SeguimientoRow { estado: string; descripcion: string; ubicacion: string; fecha_evento: string; }
 // ── Tramo de salida: preparación de bodega y despacho con detalle (script 39) ─
 // Sin montos: son vistas OPERATIVAS de bodega/despacho (segregación financiera)
+/**
+ * Sobre estándar de todo listado paginado EN EL SERVIDOR: espeja
+ * `comun.Paginacion` del backend. `total` es el conteo del conjunto FILTRADO
+ * (no el de la página) y vale -1 cuando el servidor no lo recalculó.
+ */
+export interface Pagina<T> {
+  items: T[]; total: number; page: number; size: number;
+  /**
+   * true = `total` es un MÍNIMO, no el conteo exacto: la consulta llegó al
+   * tope de `comun.Paginacion.TOPE_CONTEO` y se cortó ahí a propósito, porque
+   * contar bajo RLS cuesta una llamada a `esta_en_horario()` por fila. La
+   * pantalla DEBE decirlo («más de N»): un total que miente sin avisar es peor
+   * que uno lento.
+   */
+  totalEsMinimo?: boolean;
+}
 export interface PreparacionRow {
   id: number; numero: string; estado: string; canal: string; fecha_pedido: string;
   cliente: string; factura: string | null;

@@ -130,45 +130,133 @@ public class SoporteService {
 
     // ── Tickets de soporte ───────────────────────────────────────────────
 
+    /** Estados posibles del ticket: las claves de TRANSICIONES son la lista blanca. */
+    private static final Set<String> ESTADOS_TICKET = TRANSICIONES.keySet();
+
+    /** Bandejas del personal, tal cual las ofrece el conmutador de la pantalla. */
+    private static final Set<String> BANDEJAS = Set.of("todos", "sin_asignar", "mios");
+
+    /** El cliente no cuenta las notas internas ni ve a quién está asignado. */
+    private static final String SEL_TICKETS_CLIENTE = """
+            SELECT t.id, t.numero, t.asunto, t.prioridad, t.estado, t.pedido_id,
+                   t.fecha_creacion, t.fecha_cierre, ct.nombre AS categoria,
+                   (SELECT count(*) FROM mensaje_ticket m
+                    WHERE m.ticket_soporte_id = t.id AND NOT m.es_interno) AS mensajes
+            FROM ticket_soporte t
+            LEFT JOIN categoria_ticket ct ON ct.id = t.categoria_ticket_id
+            """;
+
+    /** Bandeja del personal: incluye SLA (vencimiento por prioridad). */
+    private static final String SEL_TICKETS_STAFF = """
+            SELECT t.id, t.numero, t.asunto, t.prioridad, t.estado, t.pedido_id,
+                   t.fecha_creacion, t.fecha_cierre, ct.nombre AS categoria,
+                   t.cliente_id, c.nombre AS cliente,
+                   t.asignado_usuario_id,
+                   trim(concat(u.nombre, ' ', COALESCE(u.apellido, ''))) AS asignado,
+                   (t.asignado_usuario_id IS NOT NULL
+                    AND t.asignado_usuario_id = ?::bigint) AS asignado_a_mi,
+                   (SELECT count(*) FROM mensaje_ticket m
+                    WHERE m.ticket_soporte_id = t.id) AS mensajes,
+                   t.fecha_limite,
+                   (now() > t.fecha_limite
+                    AND t.estado NOT IN ('resuelto', 'cerrado')) AS sla_vencido
+            FROM ticket_soporte t
+            LEFT JOIN categoria_ticket ct ON ct.id = t.categoria_ticket_id
+            LEFT JOIN cliente c ON c.id = t.cliente_id
+            LEFT JOIN usuario u ON u.id = t.asignado_usuario_id
+            """;
+
+    /**
+     * Bandeja de tickets, PAGINADA EN EL SERVIDOR y con SUS CUATRO FILTROS EN SQL.
+     *
+     * <h3>Por qué dejó de devolver una lista</h3>
+     * Devolvía los 179.851 tickets (78,98 MB medidos) en cada apertura.
+     *
+     * <h3>Los cuatro filtros vivían en el navegador y ese es el riesgo real</h3>
+     * `tickets.component.aplicarFiltros()` recorría el array completo con
+     * bandeja / estado / categoría / prioridad. Paginar sin mudarlos habría
+     * dejado cada filtro mirando las 25 filas visibles: pedir «urgentes» sobre
+     * una página de tickets ordenados por urgencia habría devuelto algo
+     * plausible, y pedir «cerrado» —que el ORDER BY manda al final de 179.851
+     * filas— habría devuelto SIEMPRE cero sin un solo error. Los cuatro se
+     * evalúan aquí, contra el conjunto completo, y `total` los cuenta.
+     *
+     * <h3>La categoría viaja por NOMBRE</h3>
+     * Es lo que ya elegía el selector de la pantalla, y sigue siendo un
+     * parámetro ligado contra `categoria_ticket.nombre`: no se concatena.
+     *
+     * <h3>El desempate del ORDER BY</h3>
+     * Ordenaba por estado, prioridad y `fecha_creacion DESC`, y ninguna de las
+     * tres es única —hay 179.851 tickets en 4 prioridades—: con LIMIT/OFFSET
+     * eso reparte filas repetidas entre páginas. Se desempata por `t.id DESC`.
+     */
     @Transactional(readOnly = true)
-    public List<Map<String, Object>> listarTickets() {
-        Long clienteId = clienteActualId();
-        if (esCliente()) {
-            // Aislamiento por propiedad: el cliente solo ve sus tickets y no
-            // cuenta las notas internas ni ve a quién está asignado.
-            return pg.queryForList("""
-                    SELECT t.id, t.numero, t.asunto, t.prioridad, t.estado, t.pedido_id,
-                           t.fecha_creacion, t.fecha_cierre, ct.nombre AS categoria,
-                           (SELECT count(*) FROM mensaje_ticket m
-                            WHERE m.ticket_soporte_id = t.id AND NOT m.es_interno) AS mensajes
-                    FROM ticket_soporte t
-                    LEFT JOIN categoria_ticket ct ON ct.id = t.categoria_ticket_id
-                    WHERE t.cliente_id = ?
-                    ORDER BY t.fecha_creacion DESC""", clienteId);
+    public Map<String, Object> listarTickets(Integer page, Integer size, String bandeja,
+                                             String estado, String categoria,
+                                             String prioridad, Boolean conTotal) {
+        boolean cliente = esCliente();
+
+        // El WHERE se arma SOLO con los filtros presentes; las piezas son
+        // constantes del código y los valores viajan ligados.
+        StringBuilder w = new StringBuilder(" WHERE 1 = 1\n");
+        List<Object> args = new java.util.ArrayList<>();
+
+        // El SELECT del personal lleva un parámetro propio (asignado_a_mi) y va
+        // ANTES que los del WHERE: el orden de los argumentos es el del SQL.
+        if (!cliente) { args.add(usuarioActualId()); }
+
+        if (cliente) {
+            w.append(" AND t.cliente_id = ?\n");
+            args.add(clienteActualId());
+        } else if (bandeja != null && !bandeja.isBlank() && !"todos".equals(bandeja)) {
+            validarEnLista(bandeja, BANDEJAS, "bandeja");
+            if ("sin_asignar".equals(bandeja)) {
+                w.append(" AND t.asignado_usuario_id IS NULL\n");
+            } else {
+                w.append(" AND t.asignado_usuario_id = ?::bigint\n");
+                args.add(usuarioActualId());
+            }
         }
-        // Bandeja del personal: incluye SLA (vencimiento por prioridad) y
-        // ordena lo urgente/vencido primero, luego lo más nuevo.
-        return pg.queryForList("""
-                SELECT t.id, t.numero, t.asunto, t.prioridad, t.estado, t.pedido_id,
-                       t.fecha_creacion, t.fecha_cierre, ct.nombre AS categoria,
-                       t.cliente_id, c.nombre AS cliente,
-                       t.asignado_usuario_id,
-                       trim(concat(u.nombre, ' ', COALESCE(u.apellido, ''))) AS asignado,
-                       (t.asignado_usuario_id IS NOT NULL
-                        AND t.asignado_usuario_id = ?::bigint) AS asignado_a_mi,
-                       (SELECT count(*) FROM mensaje_ticket m
-                        WHERE m.ticket_soporte_id = t.id) AS mensajes,
-                       t.fecha_limite,
-                       (now() > t.fecha_limite
-                        AND t.estado NOT IN ('resuelto', 'cerrado')) AS sla_vencido
-                FROM ticket_soporte t
-                LEFT JOIN categoria_ticket ct ON ct.id = t.categoria_ticket_id
-                LEFT JOIN cliente c ON c.id = t.cliente_id
-                LEFT JOIN usuario u ON u.id = t.asignado_usuario_id
-                ORDER BY (t.estado IN ('resuelto', 'cerrado')),
-                         CASE t.prioridad WHEN 'urgente' THEN 0 WHEN 'alta' THEN 1
-                                          WHEN 'media' THEN 2 ELSE 3 END,
-                         t.fecha_creacion DESC""", usuarioActualId());
+        if (estado != null && !estado.isBlank()) {
+            validarEnLista(estado, ESTADOS_TICKET, "estado del ticket");
+            w.append(" AND t.estado = ?\n");
+            args.add(estado);
+        }
+        if (prioridad != null && !prioridad.isBlank()) {
+            validarEnLista(prioridad, PRIORIDADES, "prioridad del ticket");
+            w.append(" AND t.prioridad = ?\n");
+            args.add(prioridad);
+        }
+        boolean porCategoria = categoria != null && !categoria.isBlank();
+        if (porCategoria) {
+            w.append(" AND ct.nombre = ?\n");
+            args.add(categoria.trim());
+        }
+        String where = w.toString();
+        Object[] a = args.toArray();
+
+        String sqlItems = (cliente ? SEL_TICKETS_CLIENTE : SEL_TICKETS_STAFF) + where
+                + (cliente
+                   ? " ORDER BY t.fecha_creacion DESC, t.id DESC"
+                   : " ORDER BY (t.estado IN ('resuelto', 'cerrado')),"
+                   + " CASE t.prioridad WHEN 'urgente' THEN 0 WHEN 'alta' THEN 1"
+                   + " WHEN 'media' THEN 2 ELSE 3 END,"
+                   + " t.fecha_creacion DESC, t.id DESC");
+
+        int pag = com.retailmind.comun.Paginacion.pagina(page);
+        int tam = com.retailmind.comun.Paginacion.tamano(size);
+
+        if (Boolean.FALSE.equals(conTotal)) {
+            return com.retailmind.comun.Paginacion.paginarSinTotal(pg, sqlItems, a, pag, tam);
+        }
+
+        // El conteo omite el parámetro de `asignado_a_mi` (es del SELECT) y los
+        // joins de pintado; solo conserva `categoria_ticket` si se filtra por él.
+        Object[] aCount = cliente ? a : java.util.Arrays.copyOfRange(a, 1, a.length);
+        String sqlCount = "SELECT count(*) FROM ticket_soporte t"
+                + (porCategoria ? " LEFT JOIN categoria_ticket ct ON ct.id = t.categoria_ticket_id" : "")
+                + where;
+        return com.retailmind.comun.Paginacion.paginar(pg, sqlItems, a, sqlCount, aCount, pag, tam);
     }
 
     /**

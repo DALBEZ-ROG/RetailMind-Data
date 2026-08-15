@@ -121,6 +121,7 @@ public class MapaSeguridadService {
         sobre.put("resumen", resumen());
         sobre.put("roles", roles());
         sobre.put("usuarios", usuariosPorRol());
+        sobre.put("topeUsuariosPorRol", TOPE_USUARIOS_POR_ROL);
         sobre.put("horarios", horarios());
         sobre.put("protegidos", PermisosMotorService.reglasProtegidas());
         return sobre;
@@ -260,10 +261,29 @@ public class MapaSeguridadService {
                 """.formatted(PRIV_ESTANDAR));
     }
 
-    /** Bloque 2 — quién pertenece a qué. */
+    /**
+     * Cuántos usuarios se listan POR ROL en el bloque «quién pertenece a qué».
+     *
+     * No es un recorte cosmético: `usuario` tiene <b>50.182</b> filas —110 de
+     * personal y 50.072 clientes—, y devolverlas todas hacía que
+     * {@code /api/seguridad/mapa} pesara <b>8,6 MB</b> y tardara 4,7 s, que era
+     * TODO el tiempo de apertura de la pantalla de Permisos. Además la tabla se
+     * pintaba entera en el DOM.
+     *
+     * Listar los 50.072 clientes no añade nada: todos cuelgan del mismo rol de
+     * motor, y el recuento por rol ya se ve —exacto— en la tabla de roles
+     * ({@code usuarios_activos / usuarios_total}). Lo que este bloque aporta es
+     * PODER MIRAR quién hay en cada rol, y para eso basta una muestra. La
+     * pantalla dice cuántos se listan y cuántos hay.
+     */
+    private static final int TOPE_USUARIOS_POR_ROL = 25;
+
+    /** Bloque 2 — quién pertenece a qué (muestra por rol, ver el tope). */
     private List<Map<String, Object>> usuariosPorRol() {
         return pg.queryForList("""
+                SELECT * FROM (
                 SELECT u.id, u.nombre, u.apellido, u.email, u.activo,
+                       row_number() OVER (PARTITION BY ro.id ORDER BY u.email) AS n_en_rol,
                        ro.codigo AS rol_app, ro.nombre AS rol_nombre,
                        -- COALESCE y no CASE a secas: un rol PERSONALIZADO no
                        -- está en la lista fija y saldría con rol_motor NULL.
@@ -283,8 +303,13 @@ public class MapaSeguridadService {
                 JOIN usuario_rol ur ON ur.usuario_id = u.id
                 JOIN rol ro ON ro.id = ur.rol_id
                 LEFT JOIN rol_personalizado rp ON rp.rol_id = ro.id
-                ORDER BY ro.id, u.email""");
+                ) x
+                WHERE x.n_en_rol <= ?
+                ORDER BY x.rol_app, x.email""", TOPE_USUARIOS_POR_ROL);
     }
+
+    /** El tope que aplica {@link #usuariosPorRol}, para que la pantalla lo diga. */
+    public static int topeUsuariosPorRol() { return TOPE_USUARIOS_POR_ROL; }
 
     /**
      * Bloque 5 — la ventana horaria de cada rol por día, con el veredicto de

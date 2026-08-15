@@ -10,8 +10,10 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { MatPaginatorModule } from '@angular/material/paginator';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { PaginaLocal } from '../../../core/services/pagina-local.util';
+import { PaginaServidor } from '../../../core/services/pagina-servidor.util';
+import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { ResenasService } from '../../../core/services/resenas.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -79,10 +81,18 @@ const TRANSICIONES_REPORTE: Record<string, string[]> = {
 export class ResenasComponent implements OnInit {
 
   // ── Moderación (personal) ──────────────────────────────────────────────
-  private todasResenas: ResenaRow[] = [];
-  resenas: ResenaRow[] = [];
-  /** Páginas visibles: sin esto el DOM recibía las 263.077 reseñas. */
-  readonly pag = new PaginaLocal<ResenaRow>();
+  /**
+   * La página de reseñas que devuelve el SERVIDOR. Antes llegaban las 263.077
+   * (82,07 MB) y `aplicarFiltros()` recorría ese array con los cuatro
+   * criterios; **los cuatro se movieron a SQL**.
+   */
+  readonly pag = new PaginaServidor<ResenaRow>();
+
+  /**
+   * Los REPORTES siguen con paginación en cliente, y a propósito:
+   * `reporte_resena` tiene **1 fila** (27 ms, 0,00 MB medidos). Aquí no hay
+   * nada que acotar y paginar en servidor solo añadiría un viaje.
+   */
   readonly pagReportes = new PaginaLocal<ReporteResenaRow>();
   filtroEstado = 'todos';
   filtroTexto = '';
@@ -140,6 +150,8 @@ export class ResenasComponent implements OnInit {
       },
       error: () => {}
     });
+    this.buscar$.pipe(debounceTime(350), distinctUntilChanged())
+      .subscribe(() => this.aplicarFiltros());
     if (this.esCliente) {
       // El formulario solo ofrece productos COMPRADOS (el backend lo enforza)
       this.servicio.productosComprados().subscribe({
@@ -164,12 +176,43 @@ export class ResenasComponent implements OnInit {
       });
       if (this.productoSel) this.verProducto();
     } else {
-      this.servicio.resenas().subscribe({
-        next: data => { this.todasResenas = data; this.aplicarFiltros(); this.loading = false; },
-        error: () => this.loading = false
-      });
+      this.cargarBandeja();
       this.cargarReportes();
     }
+  }
+
+  /**
+   * Pide UNA página al servidor con los cuatro criterios ya aplicados.
+   *
+   * @param conTotal false al cambiar de página: el conjunto filtrado no cambió
+   *                 y el conteo sobre 263.077 reseñas cuesta ~0,6 s bajo RLS.
+   */
+  cargarBandeja(conTotal = true): void {
+    this.loading = true;
+    this.servicio.resenas({
+      estado: this.filtroEstado,
+      calificacion: this.filtroCalificacion === 'todos' ? undefined : this.filtroCalificacion,
+      reportadas: this.filtroReportadas,
+      q: this.filtroTexto.trim() || undefined,
+      page: this.pag.pagina, size: this.pag.tam, conTotal
+    }).subscribe({
+      next: pg => {
+        this.pag.aplicar(pg);
+        this.loading = false;
+        // La reseña seleccionada solo sigue viva si está en la página visible.
+        this.resenaSeleccionada = this.pag.filas
+          .find(r => r.id === this.resenaSeleccionada?.id) ?? null;
+        // Moderar la última fila de la página la deja vacía: retrocede.
+        if (this.pag.ajustarTrasBorrado()) { this.cargarBandeja(conTotal); }
+      },
+      error: () => this.loading = false
+    });
+  }
+
+  /** Cambiar de página NO recuenta: el conjunto filtrado es el mismo. */
+  alPaginar(e: PageEvent): void {
+    this.pag.alPaginar(e);
+    this.cargarBandeja(false);
   }
 
   cargarReportes(): void {
@@ -179,25 +222,22 @@ export class ResenasComponent implements OnInit {
     });
   }
 
+  /**
+   * Cambiar cualquier criterio vuelve a la primera página y RECUENTA.
+   *
+   * Los cuatro criterios ya no se evalúan aquí: viajan al endpoint. El
+   * buscador de texto se retrasa 350 ms para no disparar una consulta por
+   * tecla sobre 263.077 filas.
+   */
+  private buscar$ = new Subject<void>();
+
   aplicarFiltros(): void {
-    const q = this.filtroTexto.trim().toLowerCase();
-    this.resenas = this.todasResenas.filter(r => {
-      if (this.filtroEstado !== 'todos' && r.estado !== this.filtroEstado) return false;
-      if (this.filtroCalificacion !== 'todos'
-          && r.calificacion !== this.filtroCalificacion) return false;
-      const conReportes = (r.reportes_pendientes ?? 0) > 0;
-      if (this.filtroReportadas === 'con' && !conReportes) return false;
-      if (this.filtroReportadas === 'sin' && conReportes) return false;
-      if (!q) return true;
-      return (r.producto ?? '').toLowerCase().includes(q)
-          || (r.cliente ?? '').toLowerCase().includes(q)
-          || (r.titulo ?? '').toLowerCase().includes(q)
-          || (r.comentario ?? '').toLowerCase().includes(q);
-    });
-    this.pag.fijar(this.resenas);
-    this.resenaSeleccionada = this.resenas
-      .find(r => r.id === this.resenaSeleccionada?.id) ?? null;
+    this.pag.reiniciar();
+    this.cargarBandeja();
   }
+
+  /** Ligado al `ngModelChange` de la caja de texto. */
+  alEscribirFiltro(): void { this.buscar$.next(); }
 
   limpiarFiltros(): void {
     this.filtroTexto = '';

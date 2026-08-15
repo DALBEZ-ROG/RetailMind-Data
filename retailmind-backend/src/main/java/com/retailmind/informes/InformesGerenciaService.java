@@ -144,15 +144,60 @@ public class InformesGerenciaService extends InformeServiceBase {
      * es la fecha a la que conviene mover el filtro.
      *
      * Filtro: fecha (AAAA-MM-DD). Sin paginar: son agregados, no un listado.
+     *
+     * <h3>EL DÍA SE ACOTA CON DOS INSTANTES LIGADOS, Y NO ES UN DETALLE</h3>
+     * El informe tardaba <b>36,4 s</b>. La causa no era el volumen ni el número
+     * de bloques: era que <b>ninguno</b> de los tres filtros por día podía usar
+     * su índice, y los tres recorrían enteras `pedido` (3,0 M), `pago` (2,87 M)
+     * y `factura_venta` (2,86 M) — diez barridos completos por petición.
+     *
+     * El motivo es la combinación de RLS con la forma del predicado. Estas
+     * tablas tienen `pol_horario`, cuyo qual de seguridad
+     * ({@code esta_en_horario(fn_grupo_actual())}) NO es «leakproof»; PostgreSQL
+     * solo deja que una condición del usuario se evalúe ANTES de ese qual —que
+     * es lo que hace un {@code Index Cond}— si esa condición es a su vez
+     * leakproof. El predicado de antes fallaba por DOS motivos a la vez:
+     * <ul>
+     *   <li>{@code fecha_pedido >= d.f} comparaba <b>timestamptz con date</b>, y
+     *       {@code timestamptz_ge_date} tiene {@code proleakproof = false}
+     *       (verificado en {@code pg_proc}); {@code timestamptz_ge} sí lo es.</li>
+     *   <li>el {@code COALESCE(?::date, CURRENT_DATE)} dentro del qual lo vuelve
+     *       opaco: medido, el MISMO predicado con {@code CURRENT_DATE::timestamptz}
+     *       a pelo da {@code Index Cond} y con el COALESCE encima da
+     *       {@code Parallel Seq Scan}.</li>
+     * </ul>
+     * Por eso el día se resuelve APARTE, en una consulta de microsegundos, y sus
+     * dos fronteras viajan como PARÁMETROS LIGADOS de tipo timestamptz. El qual
+     * queda {@code fecha >= ? AND fecha < ?} —dos operadores leakproof sobre dos
+     * Param— y el plan pasa a {@code Index Only Scan}: 4.517 ms → 12,8 ms en
+     * `pedido`. No se tocó el esquema, ni un índice, ni una política.
+     *
+     * OJO al mantenerlo: el intervalo es SEMIABIERTO {@code [desde, hasta)} y
+     * `hasta` es el día siguiente, no las 23:59. Y las dos fronteras se calculan
+     * en la BD y no en Java: {@code CURRENT_DATE} y el casteo a timestamptz
+     * dependen del `TimeZone` de la sesión (America/Guayaquil), que es el mismo
+     * ancla que usa `esta_en_horario`.
      */
     @Transactional(readOnly = true)
     public Map<String, Object> fotoDia(String fecha) {
         String f = fecha(fecha, "fecha");
 
-        // Un solo parámetro para toda la consulta: el día se resuelve una vez
-        // en la CTE y los tres bloques del día lo cruzan.
+        // Las dos fronteras del día, resueltas de una vez y fuera del qual.
+        // Cuesta microsegundos: no toca ninguna tabla.
+        // Las fronteras viajan de vuelta como TEXTO con desplazamiento
+        // explícito («2026-08-14 00:00:00-05»), no como java.sql.Timestamp: un
+        // Timestamp no lleva zona y el driver lo formatearía con la zona de la
+        // JVM, que no tiene por qué ser la de la sesión de PostgreSQL. Así el
+        // instante que vuelve es EXACTAMENTE el que la BD calculó.
+        Map<String, Object> dia = pg.queryForMap("""
+                SELECT COALESCE(?::date, CURRENT_DATE)::timestamptz::text        AS desde,
+                       (COALESCE(?::date, CURRENT_DATE) + 1)::timestamptz::text  AS hasta,
+                       to_char(COALESCE(?::date, CURRENT_DATE), 'DD/MM/YYYY')    AS etiqueta""",
+                f, f, f);
+        String desde = (String) dia.get("desde");
+        String hasta = (String) dia.get("hasta");
+
         List<Map<String, Object>> items = pg.queryForList("""
-                WITH d AS (SELECT COALESCE(?::date, CURRENT_DATE) AS f)
                 SELECT * FROM (
                     -- Fila 0: el día no tuvo NADA. Se dice explícitamente en vez
                     -- de dejar la tabla con solo pendientes, que se leería como
@@ -161,16 +206,17 @@ public class InformesGerenciaService extends InformeServiceBase {
                            'Sin pedidos, cobros ni facturas en la fecha consultada' AS concepto,
                            0::bigint AS cantidad, NULL::numeric AS monto,
                            'El resumen indica el último día con pedidos' AS nota
-                    FROM d
                     WHERE NOT EXISTS (SELECT 1 FROM pedido p
-                                       WHERE p.fecha_pedido >= d.f AND p.fecha_pedido < d.f + 1)
+                                       WHERE p.fecha_pedido >= ?::timestamptz
+                                         AND p.fecha_pedido <  ?::timestamptz)
                       AND NOT EXISTS (SELECT 1 FROM pago pg
                                        WHERE pg.estado = 'completado'
-                                         AND pg.fecha_pago >= d.f AND pg.fecha_pago < d.f + 1)
+                                         AND pg.fecha_pago >= ?::timestamptz
+                                         AND pg.fecha_pago <  ?::timestamptz)
                       AND NOT EXISTS (SELECT 1 FROM factura_venta fv
                                        WHERE fv.estado <> 'anulada'
-                                         AND fv.fecha_emision >= d.f
-                                         AND fv.fecha_emision < d.f + 1)
+                                         AND fv.fecha_emision >= ?::timestamptz
+                                         AND fv.fecha_emision <  ?::timestamptz)
 
                     UNION ALL
                     SELECT 1, 'Pedidos del día',
@@ -179,8 +225,8 @@ public class InformesGerenciaService extends InformeServiceBase {
                            'Pedidos creados en la fecha consultada' AS nota
                     FROM pedido p
                     JOIN estado_pedido ep ON ep.id = p.estado_pedido_id
-                    CROSS JOIN d
-                    WHERE p.fecha_pedido >= d.f AND p.fecha_pedido < d.f + 1
+                    WHERE p.fecha_pedido >= ?::timestamptz
+                      AND p.fecha_pedido <  ?::timestamptz
                     GROUP BY ep.nombre
 
                     UNION ALL
@@ -188,25 +234,30 @@ public class InformesGerenciaService extends InformeServiceBase {
                            round(sum(pg.monto), 2), 'Dinero efectivamente cobrado'
                     FROM pago pg
                     JOIN metodo_pago mp ON mp.id = pg.metodo_pago_id
-                    CROSS JOIN d
                     WHERE pg.estado = 'completado'
-                      AND pg.fecha_pago >= d.f AND pg.fecha_pago < d.f + 1
+                      AND pg.fecha_pago >= ?::timestamptz
+                      AND pg.fecha_pago <  ?::timestamptz
                     GROUP BY mp.nombre
 
                     UNION ALL
+                    -- `pago.fecha_creacion` NO tiene índice; el que acota aquí
+                    -- es `idx_pago_estado`, porque 'fallido' son 176 filas de
+                    -- 2,87 M. Por eso este bloque filtra primero por estado.
                     SELECT 2, 'Cobros del día', 'Intentos de pago rechazados', count(*), NULL,
                            'No entraron a caja'
-                    FROM pago pg CROSS JOIN d
+                    FROM pago pg
                     WHERE pg.estado = 'fallido'
-                      AND pg.fecha_creacion >= d.f AND pg.fecha_creacion < d.f + 1
+                      AND pg.fecha_creacion >= ?::timestamptz
+                      AND pg.fecha_creacion <  ?::timestamptz
                     HAVING count(*) > 0
 
                     UNION ALL
                     SELECT 3, 'Facturación del día', 'Facturas de venta emitidas', count(*),
                            round(sum(fv.total), 2), 'Excluye las anuladas'
-                    FROM factura_venta fv CROSS JOIN d
+                    FROM factura_venta fv
                     WHERE fv.estado <> 'anulada'
-                      AND fv.fecha_emision >= d.f AND fv.fecha_emision < d.f + 1
+                      AND fv.fecha_emision >= ?::timestamptz
+                      AND fv.fecha_emision <  ?::timestamptz
                     HAVING count(*) > 0
 
                     UNION ALL
@@ -265,30 +316,40 @@ public class InformesGerenciaService extends InformeServiceBase {
                     FROM item_defectuoso i WHERE i.estado = 'pendiente'
                 ) foto
                 WHERE cantidad > 0 OR orden IN (0, 4)
-                ORDER BY orden, cantidad DESC, concepto""", f);
+                ORDER BY orden, cantidad DESC, concepto""",
+                // Los 12 parámetros son el MISMO par de fronteras repetido, en
+                // el orden textual de la consulta: los tres NOT EXISTS de la
+                // fila 0 y luego un par por cada bloque del día.
+                desde, hasta, desde, hasta, desde, hasta,
+                desde, hasta,
+                desde, hasta,
+                desde, hasta,
+                desde, hasta);
 
         // Las dos fechas del resumen viajan ya FORMATEADAS como texto: un `date`
         // puro se serializa «2026-07-26» y el formateador de la pantalla lo
         // interpreta como medianoche UTC, restando un día en América/Guayaquil.
         // Las columnas de fecha de los demás informes son timestamptz y no
         // tienen ese problema; aquí el dato ES un día, no un instante.
+        // Los dos KPIs de pedidos salían de DOS subconsultas sobre el mismo
+        // conjunto (count y sum por separado): ahora es UN solo recorrido.
         Map<String, Object> tot = pg.queryForMap("""
-                WITH d AS (SELECT COALESCE(?::date, CURRENT_DATE) AS f)
-                SELECT to_char(d.f, 'DD/MM/YYYY') AS dia,
-                       (SELECT count(*) FROM pedido p
-                         WHERE p.fecha_pedido >= d.f AND p.fecha_pedido < d.f + 1) AS pedidos,
+                SELECT (SELECT count(*) FROM pedido p
+                         WHERE p.fecha_pedido >= ?::timestamptz
+                           AND p.fecha_pedido <  ?::timestamptz) AS pedidos,
                        (SELECT COALESCE(round(sum(p.total), 2), 0) FROM pedido p
-                         WHERE p.fecha_pedido >= d.f AND p.fecha_pedido < d.f + 1)
-                           AS monto_pedidos,
+                         WHERE p.fecha_pedido >= ?::timestamptz
+                           AND p.fecha_pedido <  ?::timestamptz) AS monto_pedidos,
                        (SELECT COALESCE(round(sum(pg.monto), 2), 0) FROM pago pg
                          WHERE pg.estado = 'completado'
-                           AND pg.fecha_pago >= d.f AND pg.fecha_pago < d.f + 1) AS cobrado,
+                           AND pg.fecha_pago >= ?::timestamptz
+                           AND pg.fecha_pago <  ?::timestamptz) AS cobrado,
                        (SELECT to_char(max(p.fecha_pedido), 'DD/MM/YYYY') FROM pedido p)
-                           AS ultimo_dia
-                FROM d""", f);
+                           AS ultimo_dia""",
+                desde, hasta, desde, hasta, desde, hasta);
 
         return conResumen(sobre(items), List.of(
-                kpi("Día consultado", tot.get("dia"), "texto"),
+                kpi("Día consultado", dia.get("etiqueta"), "texto"),
                 kpi("Pedidos del día", tot.get("pedidos"), "numero"),
                 kpi("Valor de los pedidos", tot.get("monto_pedidos"), "moneda"),
                 kpi("Cobrado en el día", tot.get("cobrado"), "moneda"),
@@ -517,16 +578,18 @@ public class InformesGerenciaService extends InformeServiceBase {
                 FROM log_auditoria a
                 LEFT JOIN usuario u ON u.id = a.usuario_id
                 """;
+        // `log_auditoria` son 7.542 filas: aquí el reloj no cambia. Se unifica
+        // el patrón igual, para que no quede un ejemplar del viejo del que
+        // copiar en el mismo archivo donde vive la explicación.
+        String[] ts = instantesDelDia(d, h);
         final String filtro = """
                 WHERE (?::varchar IS NULL OR u.nombre ILIKE '%' || ?::varchar || '%'
                        OR u.apellido ILIKE '%' || ?::varchar || '%'
                        OR u.email ILIKE '%' || ?::varchar || '%')
                   AND (?::varchar IS NULL OR a.tabla = ?::varchar)
                   AND (?::varchar IS NULL OR a.accion = upper(?::varchar))
-                  AND (?::date IS NULL OR a.fecha_creacion >= ?::date)
-                  AND (?::date IS NULL OR a.fecha_creacion <  (?::date + 1))
-                """;
-        Object[] args = { us, us, us, us, tb, tb, ac, ac, d, d, h, h };
+                """ + filtroDia("a.fecha_creacion", ts);
+        Object[] args = conLimites(new Object[] { us, us, us, us, tb, tb, ac, ac }, ts);
 
         Map<String, Object> res = paginar("""
                 SELECT a.id, a.fecha_creacion, a.accion, a.tabla, a.registro_id,
@@ -597,16 +660,15 @@ public class InformesGerenciaService extends InformeServiceBase {
         // Un solo parámetro cubre desenlace y motivo: 'exitoso'/'fallido'
         // resuelven por la bandera y cualquier otro valor de la lista blanca
         // cae contra motivo_fallo.
+        String[] ts = instantesDelDia(d, h);
         final String filtro = """
                 WHERE (?::varchar IS NULL
                        OR (?::varchar = 'exitoso' AND l.exitoso)
                        OR (?::varchar = 'fallido' AND NOT l.exitoso)
                        OR l.motivo_fallo = ?::varchar)
                   AND (?::varchar IS NULL OR l.email_intentado ILIKE '%' || ?::varchar || '%')
-                  AND (?::date IS NULL OR l.fecha_creacion >= ?::date)
-                  AND (?::date IS NULL OR l.fecha_creacion <  (?::date + 1))
-                """;
-        Object[] args = { r, r, r, r, c, c, d, d, h, h };
+                """ + filtroDia("l.fecha_creacion", ts);
+        Object[] args = conLimites(new Object[] { r, r, r, r, c, c }, ts);
 
         Map<String, Object> res = paginar("""
                 SELECT l.id, l.fecha_creacion, l.exitoso, l.motivo_fallo,

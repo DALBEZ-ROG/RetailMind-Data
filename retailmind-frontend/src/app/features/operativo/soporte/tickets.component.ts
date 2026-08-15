@@ -12,17 +12,18 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
-import { MatPaginatorModule } from '@angular/material/paginator';
-import { PaginaLocal } from '../../../core/services/pagina-local.util';
-import { Subject, debounceTime, distinctUntilChanged, switchMap, of } from 'rxjs';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
+import { PaginaServidor } from '../../../core/services/pagina-servidor.util';
+import { Subject, debounceTime, distinctUntilChanged, switchMap, of, map } from 'rxjs';
 import { SoporteService } from '../../../core/services/soporte.service';
 import { ReferenciasService } from '../../../core/services/referencias.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { mensajeError } from '../../../core/services/api-error.util';
 import {
   TicketRow, TicketDetalle, MensajeTicketRow, CategoriaTicketRef,
-  UsuarioSoporteRef, PedidoSoporteRef, ProductoTicketRef, ClienteRef
+  UsuarioSoporteRef, PedidoSoporteRef, ProductoTicketRef
 } from '../../../core/models/operativo.model';
+import { SelectBuscableComponent } from '../../../core/components/select-buscable/select-buscable.component';
 import { CodigoLegiblePipe } from '../../../core/pipes/etiquetas.pipe';
 
 /** Espeja las transiciones del backend (SoporteService.TRANSICIONES). */
@@ -48,14 +49,24 @@ const TRANSICIONES: Record<string, string[]> = {
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatAutocompleteModule,
     MatCheckboxModule, MatSnackBarModule, MatTooltipModule, MatButtonToggleModule,
-    MatPaginatorModule, CodigoLegiblePipe],
+    MatPaginatorModule, SelectBuscableComponent, CodigoLegiblePipe],
   templateUrl: './tickets.component.html',
   styleUrl: '../operativo-shared.scss'
 })
 export class TicketsComponent implements OnInit {
 
-  tickets: TicketRow[] = [];
   loading = true;
+
+  /**
+   * ¿Hay algún filtro puesto? Decide el mensaje del estado vacío. Antes se
+   * miraba `tickets.length`, que era el listado COMPLETO en memoria; con la
+   * página del servidor ese dato ya no existe y usarlo diría «no hay tickets»
+   * cuando lo que pasa es que el filtro no casa con ninguno.
+   */
+  get hayFiltro(): boolean {
+    return this.filtroBandeja !== 'todos' || !!this.filtroEstado
+        || !!this.filtroCategoria || !!this.filtroPrioridad;
+  }
 
   showForm = false;
   form = this.formVacio();
@@ -68,8 +79,24 @@ export class TicketsComponent implements OnInit {
   prioridadSel = '';
 
   categoriasRef: CategoriaTicketRef[] = [];
-  clientesRef: ClienteRef[] = [];
   usuariosRef: UsuarioSoporteRef[] = [];
+
+  /**
+   * Buscador de cliente EN SERVIDOR (tope 50 filas por consulta).
+   *
+   * Esta pantalla se descargaba los 50.072 clientes (4,03 MB) y los pintaba
+   * como 50.072 `<mat-option>` dentro de un `mat-select`. Ahora es el mismo
+   * `app-select-buscable` de pedidos, en modo servidor.
+   */
+  buscarCliente = (q: string) =>
+    this.referencias.clientes(q).pipe(
+      map(cs => cs.map(c => ({ id: c.id, texto: `${c.nombre} (${c.email})` }))));
+
+  /** El selector devuelve el id elegido; recargar sus pedidos es lo de antes. */
+  clienteElegido(id: number | null): void {
+    this.form.clienteId = id;
+    this.clienteCambiado();
+  }
   pedidosRef: PedidoSoporteRef[] = [];
 
   // Buscador del producto del reclamo (script 50): el catálogo tiene ~1.221
@@ -115,37 +142,45 @@ export class TicketsComponent implements OnInit {
   }
 
   /**
-   * Bandeja con los filtros aplicados (client-side sobre la lista cargada).
+   * La página que devuelve el SERVIDOR.
    *
-   * Es un CAMPO y se recalcula en `aplicarFiltros()`. Como getter recorría los
-   * 179.851 tickets en CADA ciclo de detección de cambios y devolvía un array
-   * nuevo, así que `MatTable` rehacía la tabla entera una y otra vez: es la
-   * trampa §8.6 de `PATRON_UI.md` sobre el listado más grande del sistema.
+   * Antes llegaban los 179.851 tickets (78,98 MB) y `aplicarFiltros()`
+   * recorría ese array con los cuatro criterios. **Los cuatro se movieron a
+   * SQL**: sobre una página de 25, «cerrado» —que el orden por urgencia manda
+   * al final de 179.851 filas— habría devuelto SIEMPRE cero sin dar un error, y
+   * «sin asignar» habría dependido de qué cayera en la página visible.
    */
-  ticketsFiltrados: TicketRow[] = [];
+  readonly pag = new PaginaServidor<TicketRow>();
 
-  /** La página que se pinta; el resto de la bandeja no llega al DOM. */
-  readonly pag = new PaginaLocal<TicketRow>();
+  /**
+   * Opciones del selector de categoría.
+   *
+   * Salían de recorrer la bandeja entera (`[...new Set(data.map(...))]`), que
+   * era el otro uso oculto del listado completo. Ahora salen de
+   * `categorias-ref`, que es el catálogo de verdad y ya se pedía para el
+   * formulario de alta: no depende de qué tickets estén cargados.
+   */
+  get categoriasEnBandeja(): string[] { return this._categorias; }
+  private _categorias: string[] = [];
 
-  /** Categorías presentes, recalculadas al cargar y no por ciclo. */
-  categoriasEnBandeja: string[] = [];
-
+  /** Cambiar cualquier filtro vuelve a la primera página y RECUENTA. */
   aplicarFiltros(): void {
-    this.ticketsFiltrados = this.tickets.filter(t =>
-      (this.filtroBandeja === 'todos'
-        || (this.filtroBandeja === 'sin_asignar' && !t.asignado_usuario_id)
-        || (this.filtroBandeja === 'mios' && t.asignado_a_mi))
-      && (!this.filtroEstado || t.estado === this.filtroEstado)
-      && (!this.filtroCategoria || t.categoria === this.filtroCategoria)
-      && (!this.filtroPrioridad || t.prioridad === this.filtroPrioridad));
-    this.pag.fijar(this.ticketsFiltrados);
+    this.pag.reiniciar();
+    this.cargar();
   }
 
   ngOnInit(): void {
     this.cargar();
-    this.soporte.categoriasRef().subscribe({ next: c => this.categoriasRef = c, error: () => {} });
+    this.soporte.categoriasRef().subscribe({
+      next: c => {
+        this.categoriasRef = c;
+        this._categorias = c.map(x => x.nombre).sort();
+      },
+      error: () => {}
+    });
     if (this.esGestion) {
-      this.referencias.clientes().subscribe({ next: c => this.clientesRef = c, error: () => {} });
+      // Los clientes ya NO se descargan aquí: los busca `app-select-buscable`
+      // contra el servidor cuando se escribe (antes eran 50.072 filas).
       this.soporte.usuariosRef().subscribe({ next: u => this.usuariosRef = u, error: () => {} });
     }
     this.buscarProducto$.pipe(
@@ -162,18 +197,33 @@ export class TicketsComponent implements OnInit {
              productoVarianteId: null as number | null, asunto: '', descripcion: '' };
   }
 
-  cargar(): void {
+  /**
+   * @param conTotal false al cambiar de página: el conjunto filtrado no cambió
+   *                 y el conteo cuesta ~0,6 s sobre 179.851 tickets bajo RLS.
+   */
+  cargar(conTotal = true): void {
     this.loading = true;
-    this.soporte.tickets().subscribe({
-      next: data => {
-        this.tickets = data;
-        this.categoriasEnBandeja =
-          [...new Set(data.map(t => t.categoria).filter((c): c is string => !!c))].sort();
-        this.aplicarFiltros();
+    this.soporte.tickets({
+      page: this.pag.pagina, size: this.pag.tam, conTotal,
+      bandeja: this.esCliente ? undefined : this.filtroBandeja,
+      estado: this.filtroEstado || undefined,
+      categoria: this.filtroCategoria || undefined,
+      prioridad: this.filtroPrioridad || undefined
+    }).subscribe({
+      next: pg => {
+        this.pag.aplicar(pg);
         this.loading = false;
+        // Cerrar el último ticket de la página la deja vacía: retrocede.
+        if (this.pag.ajustarTrasBorrado()) { this.cargar(conTotal); }
       },
       error: () => this.loading = false
     });
+  }
+
+  /** Cambiar de página NO recuenta: el conjunto filtrado es el mismo. */
+  alPaginar(e: PageEvent): void {
+    this.pag.alPaginar(e);
+    this.cargar(false);
   }
 
   nuevo(): void {

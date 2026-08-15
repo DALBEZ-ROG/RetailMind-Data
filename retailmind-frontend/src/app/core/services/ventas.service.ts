@@ -6,7 +6,7 @@ import { HttpParams } from '@angular/common/http';
 import {
   ItemPedidoReq, PedidoVentaRow, PedidoVentaDetalle,
   FacturaVenta, PaginaFacturasVenta, PaginaPedidosVenta, PagoClienteRes, EnvioDetalle,
-  SeguimientoRow, PreparacionRow, DetalleLogistico, NovedadesEnvioRes
+  SeguimientoRow, PreparacionRow, DetalleLogistico, NovedadesEnvioRes, Pagina
 } from '../models/operativo.model';
 
 @Injectable({ providedIn: 'root' })
@@ -75,8 +75,18 @@ export class VentasService {
   }
 
   // ── Preparación por BODEGA (cola de picking, script 39) ──────────────
-  colaPreparacion(): Observable<PreparacionRow[]> {
-    return this.http.get<PreparacionRow[]>(`${this.base}/preparacion`);
+  /**
+   * Cola de picking PAGINADA EN EL SERVIDOR. Devolvía las 26.551 filas y era
+   * el endpoint más lento del sistema (27,5 s): cada fila arrastra dos
+   * subconsultas y un LATERAL, y se pagaban 26.551 veces.
+   */
+  colaPreparacion(opts: { page?: number; size?: number; conTotal?: boolean } = {}):
+      Observable<Pagina<PreparacionRow>> {
+    let params = new HttpParams();
+    if (opts.page != null) { params = params.set('page', opts.page); }
+    if (opts.size != null) { params = params.set('size', opts.size); }
+    if (opts.conTotal === false) { params = params.set('conTotal', false); }
+    return this.http.get<Pagina<PreparacionRow>>(`${this.base}/preparacion`, { params });
   }
   detallePreparacion(pedidoId: number): Observable<DetalleLogistico> {
     return this.http.get<DetalleLogistico>(`${this.base}/preparacion/${pedidoId}`);

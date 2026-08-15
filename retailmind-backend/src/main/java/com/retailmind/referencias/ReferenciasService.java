@@ -35,11 +35,41 @@ public class ReferenciasService {
                 "SELECT id, codigo, nombre FROM bodega WHERE activo ORDER BY nombre");
     }
 
+    /** Tope de un selector: nunca se descarga el padrón entero. */
+    private static final int TOPE_SELECTOR = 50;
+
+    /**
+     * Clientes para los selectores, BUSCANDO EN EL SERVIDOR.
+     *
+     * <h3>Por qué no se pagina: se busca</h3>
+     * Devolvía los **50.072 clientes** (4,03 MB medidos) en cada apertura de la
+     * pantalla de pedidos y de la de tickets, y esta última los pintaba como
+     * 50.072 {@code <mat-option>}. Un selector no se recorre por páginas —nadie
+     * busca a un cliente pasando 2.003 páginas de 25—: se escribe el nombre. Por
+     * eso el criterio del buscador se resuelve aquí, contra el padrón COMPLETO,
+     * y solo vuelven {@link #TOPE_SELECTOR} filas.
+     *
+     * <h3>Sin texto devuelve las primeras, no todas</h3>
+     * Así el desplegable se abre con algo que enseñar mientras el usuario
+     * escribe, sin que eso implique traerse el padrón.
+     *
+     * El texto viaja como parámetro ligado; no se concatena nada.
+     */
     @Transactional(readOnly = true)
-    public List<Map<String, Object>> clientes() {
+    public List<Map<String, Object>> clientes(String q) {
+        String filtro = (q == null || q.isBlank()) ? null : "%" + q.trim() + "%";
+        if (filtro == null) {
+            return pg.queryForList("""
+                    SELECT id, nombre || ' ' || COALESCE(apellido, '') AS nombre, email
+                    FROM cliente ORDER BY nombre LIMIT ?""", TOPE_SELECTOR);
+        }
         return pg.queryForList("""
                 SELECT id, nombre || ' ' || COALESCE(apellido, '') AS nombre, email
-                FROM cliente ORDER BY nombre""");
+                FROM cliente
+                WHERE nombre ILIKE ? OR apellido ILIKE ? OR email ILIKE ?
+                   OR (nombre || ' ' || COALESCE(apellido, '')) ILIKE ?
+                ORDER BY nombre LIMIT ?""",
+                filtro, filtro, filtro, filtro, TOPE_SELECTOR);
     }
 
     @Transactional(readOnly = true)

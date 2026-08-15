@@ -12,6 +12,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { Router } from '@angular/router';
+import { map } from 'rxjs';
 import { VentasService } from '../../../core/services/ventas.service';
 import { ReferenciasService } from '../../../core/services/referencias.service';
 import { NavPermissionsService } from '../../../core/navigation/nav-permissions.service';
@@ -19,7 +20,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { SelectBuscableComponent, OpcionBuscable } from '../../../core/components/select-buscable/select-buscable.component';
 import { mensajeError } from '../../../core/services/api-error.util';
 import {
-  ClienteRef, BodegaRef, VarianteRef, CatalogoRef, PedidoVentaRow, PedidoVentaDetalle
+  BodegaRef, VarianteRef, CatalogoRef, PedidoVentaRow, PedidoVentaDetalle
 } from '../../../core/models/operativo.model';
 import { CodigoLegiblePipe } from '../../../core/pipes/etiquetas.pipe';
 
@@ -36,11 +37,21 @@ interface LineaPedido { varianteId: number | null; cantidad: number; }
 })
 export class PedidosVentaComponent implements OnInit {
 
-  clientes: ClienteRef[] = [];
   bodegas: BodegaRef[] = [];
   variantes: VarianteRef[] = [];
-  clientesOpc: OpcionBuscable[] = [];
   variantesOpc: OpcionBuscable[] = [];
+
+  /**
+   * Buscador de cliente EN SERVIDOR (tope 50 filas por consulta).
+   *
+   * Antes se descargaban los 50.072 clientes (4,03 MB) al abrir la pantalla y
+   * `SelectBuscable` filtraba ese array. Se pasa como función al componente,
+   * que la llama con debounce; hay que ligarla con arrow porque el `this` que
+   * necesita es el de la pantalla, no el del selector.
+   */
+  buscarCliente = (q: string) =>
+    this.referencias.clientes(q).pipe(
+      map(cs => cs.map(c => ({ id: c.id, texto: `${c.nombre} (${c.email})` }))));
   loading = true;
 
   // Paginación client-side de la tabla de pedidos
@@ -118,12 +129,6 @@ export class PedidosVentaComponent implements OnInit {
 
   ngOnInit(): void {
     this.cargarPedidos();
-    if (this.nav.canDato('refClientes')) {
-      this.referencias.clientes().subscribe(c => {
-        this.clientes = c;
-        this.clientesOpc = c.map(x => ({ id: x.id, texto: `${x.nombre} (${x.email})` }));
-      });
-    }
     if (this.puedeVerBodegas) {
       this.referencias.bodegas().subscribe(b => this.bodegas = b);
     }
@@ -152,8 +157,12 @@ export class PedidosVentaComponent implements OnInit {
     this.ventas.pedidos({ page: this.pagina, size: this.tamPagina, conTotal }).subscribe({
       next: pg => {
         this.pedidosPagina = pg.items;
-        // total = -1 significa «no se recontó»: se conserva el que ya había.
-        if (pg.total >= 0) { this.total = pg.total; }
+        // total = -1 significa «no se recontó»: se conserva el que ya había,
+        // y con él su carácter de exacto o de mínimo.
+        if (pg.total >= 0) {
+          this.total = pg.total;
+          this.totalEsMinimo = !!pg.totalEsMinimo;
+        }
         this.loading = false;
       },
       error: () => this.loading = false
@@ -163,8 +172,22 @@ export class PedidosVentaComponent implements OnInit {
   /** La página visible, tal cual la devolvió el servidor. */
   pedidosPagina: PedidoVentaRow[] = [];
 
-  /** Conteo REAL del conjunto, no de la página: lo usa el paginador. */
+  /** Conteo del conjunto, no de la página: lo usa el paginador. */
   total = 0;
+
+  /**
+   * `total` es un MÍNIMO: contar los 2.999.993 pedidos bajo RLS cuesta 4,3 s
+   * porque `esta_en_horario()` se evalúa por fila, así que el servidor corta el
+   * conteo en su tope. La pantalla lo DICE («más de N») en vez de dar por
+   * exacta una cifra que no lo es.
+   */
+  totalEsMinimo = false;
+
+  /** Lo que se pinta junto al título. */
+  get etiquetaTotal(): string {
+    const n = this.total.toLocaleString('es-EC');
+    return this.totalEsMinimo ? `más de ${n}` : n;
+  }
 
   /**
    * Cambiar de página NO recuenta: el conjunto es el mismo y el conteo sobre

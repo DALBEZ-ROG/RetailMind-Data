@@ -325,6 +325,13 @@
       </div>
       <div class="op-card">
         <h3><mat-icon>badge</mat-icon> Quién pertenece a qué ({{ usuarios.length }})</h3>
+        <p class="nota-limitacion">
+          <mat-icon>info</mat-icon>
+          Muestra de <strong>{{ mapa.topeUsuariosPorRol }} usuarios por rol</strong>: el
+          sistema tiene 50.182 y listarlos todos hacía que esta pantalla descargara
+          8,6 MB. El recuento EXACTO de cada rol está en la columna «Usuarios» de la
+          tabla de roles, arriba.
+        </p>
         <div class="table-wrapper">
           <table mat-table [dataSource]="usuarios">
             <ng-container matColumnDef="usuario">

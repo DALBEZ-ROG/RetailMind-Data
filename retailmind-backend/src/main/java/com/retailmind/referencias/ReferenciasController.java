@@ -29,8 +29,14 @@ public class ReferenciasController {
     @GetMapping("/bodegas")
     public List<Map<String, Object>> bodegas() { return servicio.bodegas(); }
 
+    /**
+     * Clientes del selector, BUSCANDO EN SERVIDOR con tope. Devolvía los 50.072
+     * (4,03 MB) y la pantalla de tickets los pintaba como 50.072 mat-option.
+     */
     @GetMapping("/clientes")
-    public List<Map<String, Object>> clientes() { return servicio.clientes(); }
+    public List<Map<String, Object>> clientes(@RequestParam(required = false) String q) {
+        return servicio.clientes(q);
+    }
 
     @GetMapping("/transportistas")
     public List<Map<String, Object>> transportistas() { return servicio.transportistas(); }

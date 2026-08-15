@@ -486,10 +486,15 @@ public class VentasService {
         // El conteo NO arrastra los joins que solo sirven para pintar la fila.
         // Medido bajo `grp_administrador` con RLS: el conteo de facturables pasa
         // de 57,7 s con `cliente` y `transportista` colgando a 8,8 s sin ellos.
-        String sqlCount = "SELECT count(*) " + JOIN_BASE
-                        + (busq != null ? JOIN_CLIENTE : "") + where;
+        //
+        // Y va CON TOPE: sin filtro son 2.999.993 pedidos y contarlos cuesta
+        // 4,3 s porque RLS evalúa `esta_en_horario()` por fila. Con el tope el
+        // total es exacto hasta 200.000 y por encima viaja declarado como
+        // mínimo (`totalEsMinimo`), que la pantalla pinta como «más de».
+        String cuerpoConteo = JOIN_BASE + (busq != null ? JOIN_CLIENTE : "") + where;
 
-        return com.retailmind.comun.Paginacion.paginar(pg, sqlItems, sqlCount, a, pag, tam);
+        return com.retailmind.comun.Paginacion.paginarConTope(
+                pg, sqlItems, cuerpoConteo, a, pag, tam);
     }
 
     /** Valida un filtro contra su lista blanca: fuera de ella, 400 legible. */
@@ -779,26 +784,58 @@ public class VentasService {
         return obtenerFactura(facturaId); // totales ya recalculados por el trigger
     }
 
-    /** Listado de facturas de venta emitidas, con búsqueda y paginación. */
+    /**
+     * Listado de facturas de venta emitidas, con búsqueda y paginación.
+     *
+     * <h3>Dos defectos que se sumaban, y el segundo era el gordo</h3>
+     * <ol>
+     *   <li><b>La búsqueda vacía filtraba igual.</b> Con la caja de búsqueda en
+     *       blanco el filtro era {@code '%%'} y el WHERE quedaba en
+     *       {@code numero ILIKE '%%' OR razon_social ILIKE '%%' OR p.numero
+     *       ILIKE '%%'} — siempre cierto, pero evaluado con tres ILIKE sobre
+     *       2.855.378 facturas MÁS un JOIN a `pedido` (3,0 M, también con RLS).
+     *       Medido: el conteo pasaba de 5.867 ms a <b>13.171 ms</b> solo por
+     *       arrastrar ese predicado que no filtra nada. Ahora, sin texto, no se
+     *       añade ni el WHERE ni el JOIN.</li>
+     *   <li><b>El conteo no tenía tope.</b> Contar 2.855.378 facturas bajo RLS
+     *       cuesta 5.867 ms porque `esta_en_horario()` se evalúa por fila. Se
+     *       pasa a {@link com.retailmind.comun.Paginacion#paginarConTope}: el
+     *       total es EXACTO hasta 200.000 y por encima viaja como mínimo
+     *       declarado, y la pantalla lo dice.</li>
+     * </ol>
+     * El JOIN a `pedido` solo se conserva cuando hace falta: para pintar
+     * `numero_pedido` en la página, y en el conteo únicamente si se busca por
+     * número de pedido. Es un INNER JOIN sobre una FK NOT NULL a la clave
+     * primaria, así que quitarlo del conteo no cambia el número de filas.
+     */
     @Transactional(readOnly = true)
     public Map<String, Object> listarFacturas(String q, int page, int size) {
         int tam = Math.min(Math.max(size, 1), 100);
         int pagina = Math.max(page, 0);
-        String filtro = "%" + (q == null ? "" : q.trim()) + "%";
-        Long total = pg.queryForObject("""
-                SELECT COUNT(*) FROM factura_venta fv
-                JOIN pedido p ON p.id = fv.pedido_id
-                WHERE fv.numero ILIKE ? OR fv.razon_social ILIKE ? OR p.numero ILIKE ?""",
-                Long.class, filtro, filtro, filtro);
-        List<Map<String, Object>> items = pg.queryForList("""
+        String busq = (q == null || q.isBlank()) ? null : q.trim();
+
+        // El WHERE se arma SOLO si hay búsqueda; las piezas son constantes del
+        // código y el texto viaja como parámetro ligado.
+        String where = busq == null ? "" : """
+                 WHERE fv.numero ILIKE ? OR fv.razon_social ILIKE ?
+                    OR p.numero ILIKE ?
+                """;
+        Object[] args = busq == null ? new Object[0]
+                : new Object[] { "%" + busq + "%", "%" + busq + "%", "%" + busq + "%" };
+
+        String cuerpoConteo = "FROM factura_venta fv"
+                + (busq == null ? "" : " JOIN pedido p ON p.id = fv.pedido_id")
+                + where;
+
+        String sqlItems = """
                 SELECT fv.id, fv.numero, fv.estado, fv.fecha_emision, fv.total,
                        fv.razon_social AS cliente, fv.pedido_id, p.numero AS numero_pedido
                 FROM factura_venta fv
                 JOIN pedido p ON p.id = fv.pedido_id
-                WHERE fv.numero ILIKE ? OR fv.razon_social ILIKE ? OR p.numero ILIKE ?
-                ORDER BY fv.id DESC LIMIT ? OFFSET ?""",
-                filtro, filtro, filtro, tam, pagina * tam);
-        return Map.of("items", items, "total", total, "page", pagina, "size", tam);
+                """ + where + " ORDER BY fv.id DESC";
+
+        return com.retailmind.comun.Paginacion.paginarConTope(
+                pg, sqlItems, cuerpoConteo, args, pagina, tam);
     }
 
     @Transactional(readOnly = true)
@@ -819,28 +856,85 @@ public class VentasService {
 
     // ── Preparación por BODEGA (picking/empaque, script 39) ──────────────
 
-    /** Cola de preparación: pedidos facturados (por tomar) y en preparación.
-     *  SIN montos: es una vista operativa de BODEGA (segregación financiera). */
+    /** Las cuatro columnas caras de la cola: una subconsulta y un LATERAL POR
+     *  FILA. Con la cola entera (26.551 pedidos) esto tardaba 27,5 s; sobre una
+     *  página de 25 se paga 25 veces, no 26.551. */
+    private static final String SEL_PREPARACION = """
+            SELECT p.id, p.numero, ep.codigo AS estado, p.canal, p.fecha_pedido,
+                   c.nombre || ' ' || COALESCE(c.apellido,'') AS cliente,
+                   fv.numero AS factura, t.nombre AS transportista,
+                   me.nombre AS metodo_envio,
+                   (SELECT COUNT(*) FROM pedido_detalle pd
+                    WHERE pd.pedido_id = p.id) AS items,
+                   (SELECT COALESCE(SUM(pd.cantidad), 0) FROM pedido_detalle pd
+                    WHERE pd.pedido_id = p.id) AS unidades
+            FROM pedido p
+            JOIN estado_pedido ep ON ep.id = p.estado_pedido_id
+            JOIN cliente c ON c.id = p.cliente_id
+            LEFT JOIN LATERAL (SELECT numero FROM factura_venta
+                               WHERE pedido_id = p.id ORDER BY id DESC LIMIT 1) fv ON true
+            LEFT JOIN transportista t ON t.id = p.transportista_id
+            LEFT JOIN metodo_envio me ON me.id = p.metodo_envio_id
+            """;
+
+    /**
+     * El filtro de estado de la cola, POR ID Y CONTRA EL ÍNDICE.
+     *
+     * Estaba escrito como {@code WHERE ep.codigo IN ('facturado',
+     * 'en_preparacion')}, lo que obliga a unir `estado_pedido` y deja el
+     * predicado sobre una columna de OTRA tabla: el plan era un
+     * {@code Parallel Seq Scan} de los 3,0 M de `pedido` con
+     * `esta_en_horario()` evaluada fila a fila — <b>4.446 ms</b> para encontrar
+     * 26.551 filas.
+     *
+     * Aquí la comparación es {@code estado_pedido_id = ANY(ARRAY[...])} con los
+     * ids resueltos por subconsulta escalar (InitPlan: se evalúan UNA vez). El
+     * operador es {@code int4eq}, que sí es leakproof, así que puede bajar a
+     * {@code Index Cond} sobre `idx_pedido_estado` pese al qual de seguridad de
+     * RLS. Medido: <b>109 ms</b>, y el conteo sigue siendo EXACTO — no hace
+     * falta ningún tope aquí.
+     *
+     * Los códigos siguen siendo la fuente de verdad; lo que cambia es que se
+     * traducen a id antes de tocar `pedido`, no dentro del recorrido.
+     */
+    private static final String W_PREPARACION = """
+             WHERE p.estado_pedido_id = ANY (ARRAY[
+                     (SELECT id FROM estado_pedido WHERE codigo = 'facturado'),
+                     (SELECT id FROM estado_pedido WHERE codigo = 'en_preparacion')])
+            """;
+
+    /**
+     * Cola de preparación: pedidos facturados (por tomar) y en preparación.
+     * SIN montos: es una vista operativa de BODEGA (segregación financiera).
+     *
+     * <h3>Por qué dejó de devolver una lista</h3>
+     * Devolvía la cola COMPLETA —26.551 pedidos, 7,01 MB— y la pantalla los
+     * pintaba todos: era el endpoint más lento del sistema (27,5 s medidos)
+     * porque cada fila arrastra dos subconsultas sobre `pedido_detalle` y un
+     * LATERAL sobre `factura_venta`. Ahora devuelve el sobre
+     * {@code {items, total, page, size}}.
+     *
+     * <h3>El desempate del ORDER BY no es cosmético</h3>
+     * Ordenaba solo por {@code fecha_pedido}, que NO es única: dos pedidos del
+     * mismo instante pueden salir en distinto orden en dos consultas, y con
+     * LIMIT/OFFSET eso hace que una fila aparezca en dos páginas y otra en
+     * ninguna. Se desempata por {@code p.id}, que sí lo es.
+     */
     @Transactional(readOnly = true)
-    public List<Map<String, Object>> colaPreparacion() {
-        return pg.queryForList("""
-                SELECT p.id, p.numero, ep.codigo AS estado, p.canal, p.fecha_pedido,
-                       c.nombre || ' ' || COALESCE(c.apellido,'') AS cliente,
-                       fv.numero AS factura, t.nombre AS transportista,
-                       me.nombre AS metodo_envio,
-                       (SELECT COUNT(*) FROM pedido_detalle pd
-                        WHERE pd.pedido_id = p.id) AS items,
-                       (SELECT COALESCE(SUM(pd.cantidad), 0) FROM pedido_detalle pd
-                        WHERE pd.pedido_id = p.id) AS unidades
-                FROM pedido p
-                JOIN estado_pedido ep ON ep.id = p.estado_pedido_id
-                JOIN cliente c ON c.id = p.cliente_id
-                LEFT JOIN LATERAL (SELECT numero FROM factura_venta
-                                   WHERE pedido_id = p.id ORDER BY id DESC LIMIT 1) fv ON true
-                LEFT JOIN transportista t ON t.id = p.transportista_id
-                LEFT JOIN metodo_envio me ON me.id = p.metodo_envio_id
-                WHERE ep.codigo IN ('facturado', 'en_preparacion')
-                ORDER BY p.fecha_pedido""");
+    public Map<String, Object> colaPreparacion(Integer page, Integer size, Boolean conTotal) {
+        String sqlItems = SEL_PREPARACION + W_PREPARACION + " ORDER BY p.fecha_pedido, p.id";
+        Object[] a = new Object[0];
+
+        int pag = com.retailmind.comun.Paginacion.pagina(page);
+        int tam = com.retailmind.comun.Paginacion.tamano(size);
+
+        if (Boolean.FALSE.equals(conTotal)) {
+            return com.retailmind.comun.Paginacion.paginarSinTotal(pg, sqlItems, a, pag, tam);
+        }
+        // El conteo ya no une `estado_pedido`: el filtro va por id contra el
+        // índice, así que sobra el join que antes obligaba a recorrer la tabla.
+        String sqlCount = "SELECT count(*) FROM pedido p" + W_PREPARACION;
+        return com.retailmind.comun.Paginacion.paginar(pg, sqlItems, sqlCount, a, pag, tam);
     }
 
     /**

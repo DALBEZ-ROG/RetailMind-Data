@@ -235,7 +235,7 @@
 
   <!-- ── Mis Devoluciones (RMA): estado, guía de retorno y reembolso ── -->
   <div class="op-card" *ngIf="devoluciones.length">
-    <h3><mat-icon>assignment_return</mat-icon> Mis Devoluciones ({{ devoluciones.length }})</h3>
+    <h3><mat-icon>assignment_return</mat-icon> Mis Devoluciones ({{ totalDevoluciones }})</h3>
     <div class="table-wrapper">
       <table mat-table [dataSource]="devoluciones">
         <ng-container matColumnDef="numero">

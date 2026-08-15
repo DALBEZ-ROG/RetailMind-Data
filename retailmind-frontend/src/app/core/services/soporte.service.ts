@@ -1,10 +1,10 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
   CategoriaTicketRow, CategoriaTicketRef, TicketRow, TicketDetalle,
-  UsuarioSoporteRef, PedidoSoporteRef, ProductoTicketRef, FaqRow, FaqActiva
+  UsuarioSoporteRef, PedidoSoporteRef, ProductoTicketRef, FaqRow, FaqActiva, Pagina
 } from '../models/operativo.model';
 
 @Injectable({ providedIn: 'root' })
@@ -31,7 +31,28 @@ export class SoporteService {
   }
 
   // Tickets
-  tickets(): Observable<TicketRow[]> { return this.http.get<TicketRow[]>(`${this.base}/tickets`); }
+  /**
+   * Bandeja de tickets PAGINADA EN EL SERVIDOR (antes: los 179.851, 78,98 MB).
+   *
+   * Los CUATRO filtros —bandeja, estado, categoría, prioridad— viajan al
+   * backend y se resuelven contra el conjunto completo. Aplicarlos aquí sobre
+   * la página recibida daría resultados plausibles y falsos: «cerrado» vive al
+   * final de un orden por urgencia y no aparece en la primera página nunca.
+   */
+  tickets(opts: {
+    page?: number; size?: number; bandeja?: string; estado?: string;
+    categoria?: string; prioridad?: string; conTotal?: boolean;
+  } = {}): Observable<Pagina<TicketRow>> {
+    let params = new HttpParams();
+    if (opts.page != null)  { params = params.set('page', opts.page); }
+    if (opts.size != null)  { params = params.set('size', opts.size); }
+    if (opts.bandeja && opts.bandeja !== 'todos') { params = params.set('bandeja', opts.bandeja); }
+    if (opts.estado)        { params = params.set('estado', opts.estado); }
+    if (opts.categoria)     { params = params.set('categoria', opts.categoria); }
+    if (opts.prioridad)     { params = params.set('prioridad', opts.prioridad); }
+    if (opts.conTotal === false) { params = params.set('conTotal', false); }
+    return this.http.get<Pagina<TicketRow>>(`${this.base}/tickets`, { params });
+  }
   ticket(id: number): Observable<TicketDetalle> {
     return this.http.get<TicketDetalle>(`${this.base}/tickets/${id}`);
   }

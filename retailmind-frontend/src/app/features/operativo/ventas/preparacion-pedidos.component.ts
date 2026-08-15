@@ -4,8 +4,10 @@ import { FormsModule } from '@angular/forms';
 import { MatTableModule } from '@angular/material/table';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { VentasService } from '../../../core/services/ventas.service';
+import { PaginaServidor } from '../../../core/services/pagina-servidor.util';
 import { mensajeError } from '../../../core/services/api-error.util';
 import { PreparacionRow, DetalleLogistico } from '../../../core/models/operativo.model';
 
@@ -21,13 +23,20 @@ import { PreparacionRow, DetalleLogistico } from '../../../core/models/operativo
   selector: 'app-preparacion-pedidos',
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
-    MatSnackBarModule],
+    MatPaginatorModule, MatSnackBarModule],
   templateUrl: './preparacion-pedidos.component.html',
   styleUrl: '../operativo-shared.scss'
 })
 export class PreparacionPedidosComponent implements OnInit {
 
-  cola: PreparacionRow[] = [];
+  /**
+   * La página que devuelve el servidor. Esta pantalla no tenía paginador
+   * NINGUNO: pintaba las 26.551 filas de la cola y esperaba 27,5 s a que el
+   * endpoint las calculara. No tiene filtros propios, así que no hay ningún
+   * criterio que mover a SQL: solo cambia quién recorta.
+   */
+  readonly pag = new PaginaServidor<PreparacionRow>();
+
   columnas = ['numero', 'cliente', 'canal', 'items', 'transportista', 'estado', 'acciones'];
   columnasDetalle = ['sku', 'producto', 'cantidad'];
 
@@ -39,12 +48,27 @@ export class PreparacionPedidosComponent implements OnInit {
 
   ngOnInit(): void { this.cargarCola(); }
 
-  cargarCola(): void {
-    this.ventas.colaPreparacion().subscribe({
-      next: c => this.cola = c,
+  /**
+   * @param conTotal false al cambiar de página: el conjunto no ha cambiado y
+   *                 el conteo cuesta 4,7 s bajo RLS.
+   */
+  cargarCola(conTotal = true): void {
+    this.ventas.colaPreparacion({
+      page: this.pag.pagina, size: this.pag.tam, conTotal
+    }).subscribe({
+      next: p => {
+        this.pag.aplicar(p);
+        // Preparar el último pedido de la página la deja vacía: retrocede.
+        if (this.pag.ajustarTrasBorrado()) { this.cargarCola(conTotal); }
+      },
       error: e => this.snackBar.open(
         mensajeError(e, 'No se pudo cargar la cola de preparación'), 'Cerrar', { duration: 5000 })
     });
+  }
+
+  alPaginar(e: PageEvent): void {
+    this.pag.alPaginar(e);
+    this.cargarCola(false);
   }
 
   verDetalle(pedidoId: number): void {

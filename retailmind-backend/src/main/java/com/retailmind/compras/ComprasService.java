@@ -165,30 +165,100 @@ public class ComprasService {
         return orden;
     }
 
+    /** Segregación financiera: BODEGA lista órdenes SIN el total. */
+    private static final String SEL_OC_BODEGA = """
+            SELECT oc.id, oc.numero, oc.estado, oc.fecha_emision,
+                   p.razon_social AS proveedor, b.nombre AS bodega,
+                   EXISTS (SELECT 1 FROM factura_compra fc
+                           WHERE fc.orden_compra_id = oc.id) AS tiene_factura
+            """;
+
+    /** `tiene_factura` permite al frontend distinguir la orden ya facturada. */
+    private static final String SEL_OC_COMPLETO = """
+            SELECT oc.id, oc.numero, oc.estado, oc.fecha_emision, oc.total,
+                   p.razon_social AS proveedor, b.nombre AS bodega,
+                   EXISTS (SELECT 1 FROM factura_compra fc
+                           WHERE fc.orden_compra_id = oc.id) AS tiene_factura
+            """;
+
+    private static final String JOIN_OC = """
+            FROM orden_compra oc
+            JOIN proveedor p ON p.id = oc.proveedor_id
+            JOIN bodega b ON b.id = oc.bodega_id
+            """;
+
+    /**
+     * El predicado EXACTO que aplicaba la pantalla de facturas de compra en el
+     * navegador: recibida COMPLETA y sin factura previa. Es la MISMA regla
+     * —las compuertas del backend no cambian—, movida de sitio.
+     */
+    private static final String W_OC_FACTURABLES = """
+             AND oc.estado = 'recibida'
+             AND NOT EXISTS (SELECT 1 FROM factura_compra fc
+                             WHERE fc.orden_compra_id = oc.id)
+            """;
+
+    /**
+     * El predicado EXACTO que aplicaba la pantalla de recepciones: aprobada por
+     * gerencia ('confirmada') o con recepción parcial. Hoy son **79** órdenes
+     * de 134.588 y son las de id más bajo, o sea las últimas del listado.
+     */
+    private static final String W_OC_RECIBIBLES =
+            " AND oc.estado IN ('confirmada', 'recibida_parcial')\n";
+
+    /**
+     * Listado de órdenes de compra, PAGINADO EN EL SERVIDOR.
+     *
+     * <h3>Por qué dejó de devolver una lista</h3>
+     * Devolvía las 134.588 órdenes (27,18 MB medidos) en cada apertura de
+     * pantalla.
+     *
+     * <h3>`facturables` es el filtro que estaba en el navegador</h3>
+     * `facturas-compra.component` se traía la tabla ENTERA solo para quedarse
+     * con las órdenes «recibidas y sin factura» —hoy son **4** de 134.588— y
+     * llenar con ellas un selector; `recepciones.component` hacía lo mismo con
+     * «confirmada o recibida_parcial» —**79** de 134.588—. Al paginar, esos
+     * filtros habrían mirado las 25 filas visibles y los dos selectores habrían
+     * salido VACÍOS sin dar un solo error: ambos conjuntos son de id bajo y el
+     * listado va por `id DESC`. Por eso los predicados se evalúan aquí, contra
+     * el conjunto completo, igual que se hizo en `ventas/pedidos`.
+     *
+     * @param incluirOrdenId deja pasar SIEMPRE esa orden aunque ya no cumpla el
+     *                       predicado. Es la traducción literal del
+     *                       `|| x.id === this.ordenId` que tenía la pantalla de
+     *                       recepciones para no perder de vista la orden que
+     *                       acaba de recibir.
+     */
     @Transactional(readOnly = true)
-    public List<Map<String, Object>> listarOrdenes() {
-        // Segregación financiera: BODEGA lista órdenes sin el total
-        if (esBodega()) {
-            return pg.queryForList("""
-                    SELECT oc.id, oc.numero, oc.estado, oc.fecha_emision,
-                           p.razon_social AS proveedor, b.nombre AS bodega,
-                           EXISTS (SELECT 1 FROM factura_compra fc
-                                   WHERE fc.orden_compra_id = oc.id) AS tiene_factura
-                    FROM orden_compra oc
-                    JOIN proveedor p ON p.id = oc.proveedor_id
-                    JOIN bodega b ON b.id = oc.bodega_id
-                    ORDER BY oc.id DESC""");
+    public Map<String, Object> listarOrdenes(Integer page, Integer size, Boolean facturables,
+                                             Boolean recibibles, Long incluirOrdenId,
+                                             Boolean conTotal) {
+        StringBuilder w = new StringBuilder(" WHERE 1 = 1\n");
+        List<Object> args = new java.util.ArrayList<>();
+        String predicado = Boolean.TRUE.equals(facturables) ? W_OC_FACTURABLES
+                         : Boolean.TRUE.equals(recibibles)  ? W_OC_RECIBIBLES : null;
+        if (predicado != null) {
+            if (incluirOrdenId != null) {
+                w.append(" AND (oc.id = ? OR (TRUE").append(predicado).append("))\n");
+                args.add(incluirOrdenId);
+            } else {
+                w.append(predicado);
+            }
         }
-        // tiene_factura permite al frontend ofrecer solo ordenes facturables
-        return pg.queryForList("""
-                SELECT oc.id, oc.numero, oc.estado, oc.fecha_emision, oc.total,
-                       p.razon_social AS proveedor, b.nombre AS bodega,
-                       EXISTS (SELECT 1 FROM factura_compra fc
-                               WHERE fc.orden_compra_id = oc.id) AS tiene_factura
-                FROM orden_compra oc
-                JOIN proveedor p ON p.id = oc.proveedor_id
-                JOIN bodega b ON b.id = oc.bodega_id
-                ORDER BY oc.id DESC""");
+        String where = w.toString();
+        Object[] a = args.toArray();
+
+        String sqlItems = (esBodega() ? SEL_OC_BODEGA : SEL_OC_COMPLETO)
+                        + JOIN_OC + where + " ORDER BY oc.id DESC";
+
+        int pag = com.retailmind.comun.Paginacion.pagina(page);
+        int tam = com.retailmind.comun.Paginacion.tamano(size);
+
+        if (Boolean.FALSE.equals(conTotal)) {
+            return com.retailmind.comun.Paginacion.paginarSinTotal(pg, sqlItems, a, pag, tam);
+        }
+        String sqlCount = "SELECT count(*) FROM orden_compra oc" + where;
+        return com.retailmind.comun.Paginacion.paginar(pg, sqlItems, sqlCount, a, pag, tam);
     }
 
     // ── a.2) Aprobar orden de compra (CU-O-12) ───────────────────────────
@@ -512,15 +582,32 @@ public class ComprasService {
                 "estadoCuenta", liquidada ? "pagada" : "parcial");
     }
 
+    /**
+     * Cuentas por pagar, PAGINADO EN EL SERVIDOR. Devolvía las 134.558 cuentas
+     * (26,11 MB medidos). La pantalla no ofrece ningún filtro sobre esta tabla,
+     * así que no hay criterio que mudar a SQL: solo cambia quién recorta.
+     * `cxp.id DESC` es único, así que la paginación no repite ni salta filas.
+     */
     @Transactional(readOnly = true)
-    public List<Map<String, Object>> listarCuentasPorPagar() {
-        return pg.queryForList("""
+    public Map<String, Object> listarCuentasPorPagar(Integer page, Integer size,
+                                                     Boolean conTotal) {
+        String sqlItems = """
                 SELECT cxp.id, cxp.monto_original, cxp.saldo_pendiente, cxp.estado,
                        cxp.fecha_vencimiento, fc.numero_factura, p.razon_social AS proveedor
                 FROM cuenta_por_pagar cxp
                 JOIN factura_compra fc ON fc.id = cxp.factura_compra_id
                 JOIN proveedor p ON p.id = cxp.proveedor_id
-                ORDER BY cxp.id DESC""");
+                ORDER BY cxp.id DESC""";
+        Object[] a = new Object[0];
+
+        int pag = com.retailmind.comun.Paginacion.pagina(page);
+        int tam = com.retailmind.comun.Paginacion.tamano(size);
+
+        if (Boolean.FALSE.equals(conTotal)) {
+            return com.retailmind.comun.Paginacion.paginarSinTotal(pg, sqlItems, a, pag, tam);
+        }
+        return com.retailmind.comun.Paginacion.paginar(pg, sqlItems,
+                "SELECT count(*) FROM cuenta_por_pagar cxp", a, pag, tam);
     }
 
     // ── Utilitarios ──────────────────────────────────────────────────────

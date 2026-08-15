@@ -205,7 +205,7 @@
       <div class="form-grid">
         <mat-form-field appearance="outline" style="grid-column: span 2;">
           <mat-label>Buscar</mat-label>
-          <input matInput [(ngModel)]="filtroTexto" (ngModelChange)="aplicarFiltros()"
+          <input matInput [(ngModel)]="filtroTexto" (ngModelChange)="alEscribirFiltro()"
                  placeholder="Producto, cliente, título o comentario…">
           <mat-icon matSuffix>search</mat-icon>
         </mat-form-field>
@@ -244,7 +244,7 @@
 
     <!-- ── LA GRILLA + REGLA 2 ── -->
     <div class="op-card">
-      <h3><mat-icon>list</mat-icon> Reseñas ({{ resenas.length }})</h3>
+      <h3><mat-icon>list</mat-icon> Reseñas ({{ pag.total }})</h3>
 
       <app-acciones-registro
           entidad="reseña" articulo="una"
@@ -266,7 +266,7 @@
         ninguna. «Modificar» gobierna su estado de publicación, nunca el texto del cliente.
       </p>
 
-      <div class="table-wrapper table-seleccionable" *ngIf="resenas.length; else vacio">
+      <div class="table-wrapper table-seleccionable" *ngIf="pag.filas.length; else vacio">
         <table mat-table [dataSource]="pag.filas">
           <ng-container matColumnDef="producto">
             <th mat-header-cell *matHeaderCellDef>Producto</th>
@@ -319,7 +319,7 @@
       </div>
       <mat-paginator *ngIf="pag.total" [length]="pag.total" [pageIndex]="pag.pagina"
                      [pageSize]="pag.tam" [pageSizeOptions]="pag.opciones"
-                     (page)="pag.alPaginar($event)" showFirstLastButtons></mat-paginator>
+                     (page)="alPaginar($event)" showFirstLastButtons></mat-paginator>
       <ng-template #vacio>
         <div class="empty-state" *ngIf="!loading">
           <mat-icon>rate_review</mat-icon>

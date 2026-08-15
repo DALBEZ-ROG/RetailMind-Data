@@ -141,7 +141,7 @@
              los informes cuya recencia se mide contra el almacén y no contra
              el reloj (OTD-VEN-19). -->
         <span class="titulo-ancla" *ngIf="sufijoTitulo">· {{ sufijoTitulo }}</span>
-        <span class="conteo" *ngIf="!loading">({{ total | number }})</span>
+        <span class="conteo" *ngIf="!loading">({{ etiquetaTotal }})</span>
       </h3>
       <p class="informe-desc">{{ informe.descripcion }}</p>
 

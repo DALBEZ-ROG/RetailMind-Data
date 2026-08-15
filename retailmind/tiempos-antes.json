@@ -1,0 +1,1025 @@
+{
+ "etiqueta": "antes",
+ "filas": [
+  {
+   "ruta": "/inicio",
+   "ms": 56,
+   "redTotal": 0,
+   "quieta": true,
+   "apis": [],
+   "causa": "sin llamadas a la API (solo render)",
+   "enlace": true
+  },
+  {
+   "ruta": "/dashboard",
+   "ms": 2858,
+   "redTotal": 5850,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "sesiones",
+     "ms": 2743
+    },
+    {
+     "url": "dashboard/resumen",
+     "ms": 2742
+    },
+    {
+     "url": "dashboard/series",
+     "ms": 365
+    }
+   ],
+   "causa": "API sesiones (2743 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/sesiones",
+   "ms": 885,
+   "redTotal": 857,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "sesiones",
+     "ms": 857
+    }
+   ],
+   "causa": "API sesiones (857 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/conversiones",
+   "ms": 79,
+   "redTotal": 76,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "conversiones",
+     "ms": 45
+    },
+    {
+     "url": "conversiones/resumen",
+     "ms": 31
+    }
+   ],
+   "causa": "API conversiones (45 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/admin-etl",
+   "ms": 77,
+   "redTotal": 44,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "init/semanas",
+     "ms": 44
+    }
+   ],
+   "causa": "API init/semanas (44 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/gestion-datos",
+   "ms": 84,
+   "redTotal": 69,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "gestion/fact-eventos",
+     "ms": 47
+    },
+    {
+     "url": "funnel/semanas-disponibles",
+     "ms": 22
+    }
+   ],
+   "causa": "API gestion/fact-eventos (47 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/admin-usuarios",
+   "ms": 1470,
+   "redTotal": 1393,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "auth/usuarios",
+     "ms": 1385
+    },
+    {
+     "url": "auth/roles",
+     "ms": 8
+    }
+   ],
+   "causa": "API auth/usuarios (1385 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/funnel",
+   "ms": 755,
+   "redTotal": 1478,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "funnel/resumen",
+     "ms": 692
+    },
+    {
+     "url": "funnel/sesiones",
+     "ms": 662
+    },
+    {
+     "url": "funnel/semanas-disponibles",
+     "ms": 124
+    }
+   ],
+   "causa": "API funnel/resumen (692 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/analytics/region",
+   "ms": 205,
+   "redTotal": 176,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "analytics/region/resumen",
+     "ms": 176
+    }
+   ],
+   "causa": "API analytics/region/resumen (176 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/analytics/dispositivo",
+   "ms": 315,
+   "redTotal": 546,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "analytics/dispositivo/resumen",
+     "ms": 296
+    },
+    {
+     "url": "analytics/dispositivo/tendencia",
+     "ms": 231
+    },
+    {
+     "url": "funnel/semanas-disponibles",
+     "ms": 19
+    }
+   ],
+   "causa": "API analytics/dispositivo/resumen (296 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/analytics/trafico",
+   "ms": 371,
+   "redTotal": 641,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "analytics/trafico/embudo-por-canal",
+     "ms": 354
+    },
+    {
+     "url": "analytics/trafico/resumen",
+     "ms": 287
+    }
+   ],
+   "causa": "API analytics/trafico/embudo-por-canal (354 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/inicializacion",
+   "ms": 145,
+   "redTotal": 107,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "init/estado",
+     "ms": 79
+    },
+    {
+     "url": "init/semanas",
+     "ms": 28
+    }
+   ],
+   "causa": "API init/estado (79 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/admin/reportes",
+   "ms": 20,
+   "redTotal": 0,
+   "quieta": true,
+   "apis": [],
+   "causa": "sin llamadas a la API (solo render)",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/productos",
+   "ms": 81,
+   "redTotal": 50,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "admin/catalogo/productos/buscar",
+     "ms": 32
+    },
+    {
+     "url": "admin/catalogo/marcas",
+     "ms": 9
+    },
+    {
+     "url": "admin/catalogo/categorias",
+     "ms": 9
+    }
+   ],
+   "causa": "frontend / render",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/catalogo/marcas",
+   "ms": 84,
+   "redTotal": 7,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "admin/catalogo/marcas",
+     "ms": 7
+    }
+   ],
+   "causa": "frontend / render",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/catalogo/categorias",
+   "ms": 22,
+   "redTotal": 7,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "admin/catalogo/categorias",
+     "ms": 7
+    }
+   ],
+   "causa": "frontend / render",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/horarios",
+   "ms": 81,
+   "redTotal": 15,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "admin/horarios",
+     "ms": 15
+    }
+   ],
+   "causa": "frontend / render",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/seguridad/accesos",
+   "ms": 78,
+   "redTotal": 23,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "seguridad/accesos",
+     "ms": 23
+    }
+   ],
+   "causa": "frontend / render",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/seguridad/permisos",
+   "ms": 4399,
+   "redTotal": 407,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "seguridad/mapa",
+     "ms": 288
+    },
+    {
+     "url": "seguridad/politicas",
+     "ms": 39
+    },
+    {
+     "url": "seguridad/objetos",
+     "ms": 37
+    },
+    {
+     "url": "seguridad/permisos",
+     "ms": 29
+    }
+   ],
+   "causa": "frontend / render",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/compras/ordenes",
+   "ms": 7448,
+   "redTotal": 1322,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "compras/ordenes",
+     "ms": 1094
+    },
+    {
+     "url": "referencias/variantes",
+     "ms": 158
+    },
+    {
+     "url": "referencias/proveedores",
+     "ms": 32
+    },
+    {
+     "url": "health",
+     "ms": 22
+    }
+   ],
+   "causa": "frontend / render",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/compras/recepciones",
+   "ms": 78,
+   "redTotal": 20,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "compras/ordenes",
+     "ms": 20
+    }
+   ],
+   "causa": "frontend / render",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/compras/facturas",
+   "ms": 2985,
+   "redTotal": 3677,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "compras/ordenes",
+     "ms": 2934
+    },
+    {
+     "url": "compras/cuentas-por-pagar",
+     "ms": 732
+    },
+    {
+     "url": "referencias/metodos-pago",
+     "ms": 11
+    }
+   ],
+   "causa": "API compras/ordenes (2934 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/compras/proveedores",
+   "ms": 142,
+   "redTotal": 83,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "compras/proveedores",
+     "ms": 83
+    }
+   ],
+   "causa": "API compras/proveedores (83 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/compras/devoluciones-proveedor",
+   "ms": 3793,
+   "redTotal": 3782,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "compras/items-defectuosos",
+     "ms": 3672
+    },
+    {
+     "url": "compras/recepciones/detalles-ref",
+     "ms": 73
+    },
+    {
+     "url": "referencias/proveedores",
+     "ms": 19
+    },
+    {
+     "url": "compras/devoluciones-proveedor",
+     "ms": 18
+    }
+   ],
+   "causa": "API compras/items-defectuosos (3672 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/inventario/transferencias",
+   "ms": 325,
+   "redTotal": 306,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "referencias/variantes",
+     "ms": 260
+    },
+    {
+     "url": "inventario/transferencias",
+     "ms": 32
+    },
+    {
+     "url": "referencias/bodegas",
+     "ms": 14
+    }
+   ],
+   "causa": "API referencias/variantes (260 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/inventario/ajustes",
+   "ms": 310,
+   "redTotal": 270,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "referencias/variantes",
+     "ms": 237
+    },
+    {
+     "url": "inventario/ajustes",
+     "ms": 20
+    },
+    {
+     "url": "referencias/bodegas",
+     "ms": 13
+    }
+   ],
+   "causa": "API referencias/variantes (237 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/inventario/kardex",
+   "ms": 204,
+   "redTotal": 284,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "referencias/variantes",
+     "ms": 183
+    },
+    {
+     "url": "inventario/kardex",
+     "ms": 91
+    },
+    {
+     "url": "referencias/bodegas",
+     "ms": 10
+    }
+   ],
+   "causa": "API referencias/variantes (183 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/ventas/pedidos",
+   "ms": 5259,
+   "redTotal": 5447,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "ventas/pedidos",
+     "ms": 5220
+    },
+    {
+     "url": "referencias/variantes",
+     "ms": 205
+    },
+    {
+     "url": "referencias/metodos-pago",
+     "ms": 13
+    },
+    {
+     "url": "referencias/bodegas",
+     "ms": 9
+    }
+   ],
+   "causa": "API ventas/pedidos (5220 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/ventas/facturas",
+   "ms": 10263,
+   "redTotal": 10742,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "ventas/facturas",
+     "ms": 10208
+    },
+    {
+     "url": "ventas/pedidos",
+     "ms": 534
+    }
+   ],
+   "causa": "API ventas/facturas (10208 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/ventas/preparacion",
+   "ms": 4894,
+   "redTotal": 4877,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "ventas/preparacion",
+     "ms": 4858
+    },
+    {
+     "url": "health",
+     "ms": 19
+    }
+   ],
+   "causa": "API ventas/preparacion (4858 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/ventas/despachos",
+   "ms": 623,
+   "redTotal": 1179,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "ventas/pedidos",
+     "ms": 601
+    },
+    {
+     "url": "ventas/pedidos",
+     "ms": 557
+    },
+    {
+     "url": "referencias/transportistas",
+     "ms": 13
+    },
+    {
+     "url": "referencias/metodos-envio",
+     "ms": 8
+    }
+   ],
+   "causa": "API ventas/pedidos (601 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/ventas/devoluciones",
+   "ms": 831,
+   "redTotal": 804,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "devoluciones",
+     "ms": 789
+    },
+    {
+     "url": "devoluciones/transportistas-ref",
+     "ms": 15
+    }
+   ],
+   "causa": "API devoluciones (789 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/marketing/cupones",
+   "ms": 82,
+   "redTotal": 24,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "marketing/cupones",
+     "ms": 24
+    }
+   ],
+   "causa": "frontend / render",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/marketing/promociones",
+   "ms": 249,
+   "redTotal": 256,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "marketing/productos-ref",
+     "ms": 229
+    },
+    {
+     "url": "marketing/promociones",
+     "ms": 27
+    }
+   ],
+   "causa": "API marketing/productos-ref (229 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/marketing/campanas",
+   "ms": 82,
+   "redTotal": 21,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "marketing/campanas",
+     "ms": 21
+    }
+   ],
+   "causa": "frontend / render",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/marketing/banners",
+   "ms": 83,
+   "redTotal": 38,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "marketing/banners",
+     "ms": 21
+    },
+    {
+     "url": "marketing/campanas",
+     "ms": 17
+    }
+   ],
+   "causa": "frontend / render",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/marketing/newsletter",
+   "ms": 79,
+   "redTotal": 21,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "marketing/newsletter",
+     "ms": 21
+    }
+   ],
+   "causa": "frontend / render",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/gerencia/metas",
+   "ms": 59785,
+   "redTotal": 57,
+   "quieta": false,
+   "apis": [
+    {
+     "url": "health",
+     "ms": 32
+    },
+    {
+     "url": "health",
+     "ms": 25
+    }
+   ],
+   "causa": "frontend / render",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/soporte/tickets",
+   "ms": 1758,
+   "redTotal": 1736,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "soporte/tickets",
+     "ms": 1668
+    },
+    {
+     "url": "soporte/usuarios-ref",
+     "ms": 47
+    },
+    {
+     "url": "soporte/categorias-ref",
+     "ms": 21
+    }
+   ],
+   "causa": "API soporte/tickets (1668 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/soporte/categorias",
+   "ms": 1629,
+   "redTotal": 1613,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "soporte/categorias",
+     "ms": 1613
+    }
+   ],
+   "causa": "API soporte/categorias (1613 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/soporte/faq",
+   "ms": 83,
+   "redTotal": 27,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "soporte/faqs",
+     "ms": 14
+    },
+    {
+     "url": "soporte/categorias-ref",
+     "ms": 13
+    }
+   ],
+   "causa": "frontend / render",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/resenas",
+   "ms": 1580,
+   "redTotal": 1780,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "resenas",
+     "ms": 1546
+    },
+    {
+     "url": "resenas/productos-ref",
+     "ms": 212
+    },
+    {
+     "url": "resenas/reportes",
+     "ms": 22
+    }
+   ],
+   "causa": "API resenas (1546 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/resenas/preguntas",
+   "ms": 247,
+   "redTotal": 270,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "resenas/productos-ref",
+     "ms": 237
+    },
+    {
+     "url": "resenas/preguntas",
+     "ms": 33
+    }
+   ],
+   "causa": "API resenas/productos-ref (237 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/informes/ventas",
+   "ms": 10351,
+   "redTotal": 10549,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "informes/ventas/cartera-pedidos",
+     "ms": 10261
+    },
+    {
+     "url": "dwh/estado",
+     "ms": 288
+    }
+   ],
+   "causa": "API informes/ventas/cartera-pedidos (10261 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/informes/inventario",
+   "ms": 154,
+   "redTotal": 142,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "dwh/estado",
+     "ms": 91
+    },
+    {
+     "url": "informes/inventario/bajo-minimo",
+     "ms": 51
+    }
+   ],
+   "causa": "API dwh/estado (91 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/informes/compras",
+   "ms": 1498,
+   "redTotal": 1515,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "informes/compras/ordenes",
+     "ms": 1420
+    },
+    {
+     "url": "dwh/estado",
+     "ms": 95
+    }
+   ],
+   "causa": "API informes/compras/ordenes (1420 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/informes/logistica",
+   "ms": 15231,
+   "redTotal": 15287,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "informes/logistica/cola-despacho",
+     "ms": 15163
+    },
+    {
+     "url": "dwh/estado",
+     "ms": 87
+    },
+    {
+     "url": "health",
+     "ms": 37
+    }
+   ],
+   "causa": "API informes/logistica/cola-despacho (15163 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/informes/soporte",
+   "ms": 2068,
+   "redTotal": 2100,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "informes/soporte/bandeja",
+     "ms": 2016
+    },
+    {
+     "url": "dwh/estado",
+     "ms": 84
+    }
+   ],
+   "causa": "API informes/soporte/bandeja (2016 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/informes/gerencia",
+   "ms": 743,
+   "redTotal": 801,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "informes/gerencia/foto-dia",
+     "ms": 724
+    },
+    {
+     "url": "dwh/estado",
+     "ms": 77
+    }
+   ],
+   "causa": "API informes/gerencia/foto-dia (724 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/panorama",
+   "ms": 1616,
+   "redTotal": 1543,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "panorama",
+     "ms": 1543
+    }
+   ],
+   "causa": "API panorama (1543 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/tableros/omnicanal",
+   "ms": 1555,
+   "redTotal": 1426,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "tableros/omnicanal",
+     "ms": 1426
+    }
+   ],
+   "causa": "API tableros/omnicanal (1426 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/tableros/rentabilidad",
+   "ms": 4172,
+   "redTotal": 2880,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "tableros/rentabilidad",
+     "ms": 2880
+    }
+   ],
+   "causa": "API tableros/rentabilidad (2880 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/tableros/cliente-posventa",
+   "ms": 5058,
+   "redTotal": 4890,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "tableros/cliente-posventa",
+     "ms": 4849
+    },
+    {
+     "url": "health",
+     "ms": 41
+    }
+   ],
+   "causa": "API tableros/cliente-posventa (4849 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/tableros/operacion",
+   "ms": 3052,
+   "redTotal": 2973,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "tableros/operacion",
+     "ms": 2973
+    }
+   ],
+   "causa": "API tableros/operacion (2973 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/tableros/costo-operacion",
+   "ms": 860,
+   "redTotal": 600,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "tableros/costo-operacion",
+     "ms": 600
+    }
+   ],
+   "causa": "API tableros/costo-operacion (600 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/tableros/abastecimiento",
+   "ms": 2598,
+   "redTotal": 1302,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "tableros/abastecimiento",
+     "ms": 1302
+    }
+   ],
+   "causa": "API tableros/abastecimiento (1302 ms)",
+   "enlace": true
+  },
+  {
+   "ruta": "/operativo/tableros/gobierno-dato",
+   "ms": 853,
+   "redTotal": 768,
+   "quieta": true,
+   "apis": [
+    {
+     "url": "tableros/gobierno-dato",
+     "ms": 768
+    }
+   ],
+   "causa": "API tableros/gobierno-dato (768 ms)",
+   "enlace": true
+  }
+ ],
+ "totalMs": 187110,
+ "heapInicial": 9.9,
+ "heapFinal": 85.5,
+ "recargas": 1,
+ "problemas": [],
+ "cuatroXX": [
+  "HTTP 404 /favicon.ico"
+ ]
+}

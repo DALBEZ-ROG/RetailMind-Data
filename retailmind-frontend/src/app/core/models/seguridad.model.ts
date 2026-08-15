@@ -74,6 +74,12 @@ export interface MapaSeguridad {
   resumen: ResumenSeguridad;
   roles: RolMotor[];
   usuarios: UsuarioDeRol[];
+  /**
+   * Cuántos usuarios se listan POR ROL en `usuarios`. `usuario` tiene 50.182
+   * filas y devolverlas todas hacía que este sobre pesara 8,6 MB; el recuento
+   * exacto por rol sigue estando en la tabla de roles.
+   */
+  topeUsuariosPorRol?: number;
   horarios: VentanaHoraria[];
   protegidos: ReglaProtegida[];
 }

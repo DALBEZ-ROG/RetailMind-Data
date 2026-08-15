@@ -126,10 +126,17 @@ public class VentasController {
                 .body(pdf);
     }
 
-    // ── Preparación por BODEGA (cola de picking; SecurityConfig: ADMIN/BODEGA)
+    /**
+     * Cola de picking PAGINADA: sobre {@code {items, total, page, size}}.
+     * SecurityConfig: ADMIN/BODEGA. Devolvía las 26.551 filas de golpe y era
+     * el endpoint más lento del sistema (27,5 s medidos).
+     */
     @GetMapping("/preparacion")
-    public List<Map<String, Object>> colaPreparacion() {
-        return servicio.colaPreparacion();
+    public Map<String, Object> colaPreparacion(
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) Boolean conTotal) {
+        return servicio.colaPreparacion(page, size, conTotal);
     }
 
     /** Detalle para picking: ítems, cliente, dirección y transportista asignado. */

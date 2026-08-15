@@ -83,8 +83,11 @@ public class InformesVentasService extends InformeServiceBase {
         exigirRangoValido(d, h);
         String q = texto(buscar);
 
-        // Guarda NULL por parámetro: el mismo valor va dos veces (IS NULL +
-        // comparación). Cero concatenación de datos del usuario.
+        // El filtro de DÍA va aparte y al final (ver InformeServiceBase.
+        // instantesDelDia): comparado contra `date` recorría los 3,0 M de
+        // `pedido` fila a fila, 4.874 ms → 7,8 ms. Los demás filtros conservan
+        // su guarda NULL por parámetro: son selectivos y no eran el cuello.
+        String[] ts = instantesDelDia(d, h);
         final String from = """
                 FROM pedido p
                 JOIN estado_pedido ep ON ep.id = p.estado_pedido_id
@@ -92,15 +95,13 @@ public class InformesVentasService extends InformeServiceBase {
                 LEFT JOIN usuario v ON v.id = p.vendedor_id
                 WHERE (?::varchar IS NULL OR ep.codigo = ?::varchar)
                   AND (?::varchar IS NULL OR p.canal  = ?::varchar)
-                  AND (?::date    IS NULL OR p.fecha_pedido >= ?::date)
-                  AND (?::date    IS NULL OR p.fecha_pedido <  (?::date + 1))
                   AND (?::varchar IS NULL OR p.numero ILIKE '%' || ?::varchar || '%'
                        OR concat(c.nombre, ' ', c.apellido) ILIKE '%' || ?::varchar || '%'
                        OR c.email ILIKE '%' || ?::varchar || '%')
-                """;
-        Object[] args = { est, est, can, can, d, d, h, h, q, q, q, q };
+                """ + filtroDia("p.fecha_pedido", ts);
+        Object[] args = conLimites(new Object[] { est, est, can, can, q, q, q, q }, ts);
 
-        Map<String, Object> res = paginar("""
+        Map<String, Object> res = paginarConTope("""
                 SELECT p.id, p.numero, p.fecha_pedido, p.canal,
                        ep.codigo AS estado_codigo, ep.nombre AS estado, ep.orden AS estado_orden,
                        NULLIF(trim(concat(c.nombre, ' ', COALESCE(c.apellido, ''))), '') AS cliente,
@@ -108,7 +109,34 @@ public class InformesVentasService extends InformeServiceBase {
                        NULLIF(trim(concat(v.nombre, ' ', COALESCE(v.apellido, ''))), '') AS vendedor,
                        p.subtotal, p.monto_descuento, p.costo_envio, p.total
                 """ + from + " ORDER BY p.fecha_pedido DESC, p.id DESC",
-                "SELECT count(*) " + from, args, page, size);
+                from, args, page, size);
+
+        /*
+         * LOS TRES KPI SOLO SE CALCULAN SI EL CONJUNTO CABE EN EL TOPE.
+         *
+         * `count(*)` y las dos sumas recorren el conjunto filtrado entero, y
+         * bajo RLS eso cuesta 4.632 ms sobre los 2.999.993 pedidos — otro tanto
+         * que el conteo. Acotar el conteo y dejar los KPI habría bajado la
+         * pantalla de 10,3 s a 5 s y nada más.
+         *
+         * No se pueden acotar: una suma sobre 200.000 pedidos ARBITRARIOS de
+         * 3 M no es «el monto total aproximado», es un número sin significado.
+         * Así que por encima del tope no se calculan, se devuelven vacíos y el
+         * informe DICE por qué. Con cualquier filtro puesto —que es para lo que
+         * está la pantalla— el conjunto baja del tope y los tres son exactos.
+         */
+        if (conteoAcotado(res)) {
+            res.put("salvedad", "El filtro actual abarca más de "
+                    + com.retailmind.comun.Paginacion.TOPE_CONTEO
+                    + " pedidos, así que el total de la cabecera es un MÍNIMO y los importes"
+                    + " no se calculan: sumarlos exigiría recorrer los 2.999.993 pedidos en"
+                    + " cada apertura. Acota por estado, canal o fechas y las tres cifras"
+                    + " pasan a ser exactas.");
+            return conResumen(res, List.of(
+                    kpi("Pedidos en el filtro", null, "numero"),
+                    kpi("Monto total", null, "moneda"),
+                    kpi("Monto aún en proceso", null, "moneda")));
+        }
 
         Map<String, Object> tot = pg.queryForMap("""
                 SELECT count(*) AS pedidos,
@@ -147,15 +175,14 @@ public class InformesVentasService extends InformeServiceBase {
         boolean soloPropio = "VENDEDOR".equals(rolActual());
         Long propio = soloPropio ? usuarioActualId() : null;
 
+        String[] ts = instantesDelDia(d, h);
         final String from = """
                 FROM pedido p
                 JOIN estado_pedido ep ON ep.id = p.estado_pedido_id
                 LEFT JOIN usuario u ON u.id = p.vendedor_id
-                WHERE (?::date   IS NULL OR p.fecha_pedido >= ?::date)
-                  AND (?::date   IS NULL OR p.fecha_pedido <  (?::date + 1))
-                  AND (?::bigint IS NULL OR p.vendedor_id = ?::bigint)
-                """;
-        Object[] args = { d, d, h, h, propio, propio };
+                WHERE (?::bigint IS NULL OR p.vendedor_id = ?::bigint)
+                """ + filtroDia("p.fecha_pedido", ts);
+        Object[] args = conLimites(new Object[] { propio, propio }, ts);
 
         List<Map<String, Object>> items = pg.queryForList("""
                 SELECT p.vendedor_id,
@@ -464,6 +491,7 @@ public class InformesVentasService extends InformeServiceBase {
         String d = fecha(desde, "desde");
         String h = fecha(hasta, "hasta");
         exigirRangoValido(d, h);
+        String[] ts = instantesDelDia(d, h);
 
         // La participación se calcula con sum(...) OVER () sobre los canales
         // que quedan DENTRO del filtro: si se acota a un canal, ese canal es el
@@ -494,13 +522,12 @@ public class InformesVentasService extends InformeServiceBase {
                 JOIN estado_pedido ep ON ep.id = p.estado_pedido_id
                 LEFT JOIN cliente c ON c.id = p.cliente_id
                 WHERE (?::varchar IS NULL OR p.canal = ?::varchar)
-                  AND (?::date    IS NULL OR p.fecha_pedido >= ?::date)
-                  AND (?::date    IS NULL OR p.fecha_pedido <  (?::date + 1))
+                """ + filtroDia("p.fecha_pedido", ts) + """
                 GROUP BY p.canal
                 HAVING count(*) FILTER (WHERE ep.codigo <> 'cancelado') > 0
                     OR count(*) FILTER (WHERE ep.codigo = 'cancelado') > 0
                 ORDER BY monto_vendido DESC""",
-                can, can, d, d, h, h);
+                conLimites(new Object[] { can, can }, ts));
 
         BigDecimal monto = BigDecimal.ZERO;
         long pedidos = 0;

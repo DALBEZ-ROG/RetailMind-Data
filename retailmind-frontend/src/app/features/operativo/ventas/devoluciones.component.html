@@ -6,20 +6,20 @@
   </div>
 
   <div class="op-card">
-    <h3><mat-icon>list_alt</mat-icon> Bandeja de devoluciones ({{ devoluciones.length }})</h3>
+    <h3><mat-icon>list_alt</mat-icon> Bandeja de devoluciones ({{ pag.total }})</h3>
     <div class="form-grid">
       <mat-form-field appearance="outline">
         <mat-label>Filtrar por estado</mat-label>
-        <mat-select [(ngModel)]="filtroEstado" (selectionChange)="cargar()">
+        <mat-select [(ngModel)]="filtroEstado" (selectionChange)="filtrar()">
           <mat-option [value]="null">Todos</mat-option>
           <mat-option *ngFor="let e of estados" [value]="e">{{ e }}</mat-option>
         </mat-select>
       </mat-form-field>
     </div>
     <div class="form-actions">
-      <button class="btn-limpiar" (click)="cargar()"><mat-icon>refresh</mat-icon> Actualizar</button>
+      <button class="btn-limpiar" (click)="filtrar()"><mat-icon>refresh</mat-icon> Actualizar</button>
     </div>
-    <div class="table-wrapper" *ngIf="devoluciones.length; else vacio">
+    <div class="table-wrapper" *ngIf="pag.filas.length; else vacio">
       <table mat-table [dataSource]="pag.filas">
         <ng-container matColumnDef="numero">
           <th mat-header-cell *matHeaderCellDef>Número</th>
@@ -68,7 +68,7 @@
     </div>
     <mat-paginator *ngIf="pag.total" [length]="pag.total" [pageIndex]="pag.pagina"
                    [pageSize]="pag.tam" [pageSizeOptions]="pag.opciones"
-                   (page)="pag.alPaginar($event)" showFirstLastButtons></mat-paginator>
+                   (page)="alPaginar($event)" showFirstLastButtons></mat-paginator>
     <ng-template #vacio>
       <div class="empty-state" *ngIf="!loading">
         <mat-icon>assignment_return</mat-icon><p>No hay devoluciones con ese filtro.</p>

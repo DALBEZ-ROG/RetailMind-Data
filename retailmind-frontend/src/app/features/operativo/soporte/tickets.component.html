@@ -19,12 +19,11 @@
 
     <div *ngIf="showForm" style="margin-top: 20px;">
       <div class="form-grid">
-        <mat-form-field appearance="outline" *ngIf="esGestion">
-          <mat-label>Cliente</mat-label>
-          <mat-select [(ngModel)]="form.clienteId" (selectionChange)="clienteCambiado()">
-            <mat-option *ngFor="let c of clientesRef" [value]="c.id">{{ c.nombre }}</mat-option>
-          </mat-select>
-        </mat-form-field>
+        <!-- Buscador EN SERVIDOR: eran 50.072 mat-option en el DOM. -->
+        <app-select-buscable *ngIf="esGestion" label="Cliente"
+            [buscador]="buscarCliente" [value]="form.clienteId"
+            (valueChange)="clienteElegido($event)">
+        </app-select-buscable>
         <mat-form-field appearance="outline">
           <mat-label>Categoría del problema</mat-label>
           <mat-select [(ngModel)]="form.categoriaId">
@@ -85,7 +84,7 @@
 
   <div class="op-card">
     <h3><mat-icon>list</mat-icon> {{ esCliente ? 'Mis tickets' : 'Tickets' }}
-      ({{ ticketsFiltrados.length }}<span *ngIf="ticketsFiltrados.length !== tickets.length"> de {{ tickets.length }}</span>)
+      ({{ pag.total }})
     </h3>
 
     <!-- Filtros de la bandeja (solo personal) -->
@@ -118,7 +117,7 @@
       </mat-form-field>
     </div>
 
-    <div class="table-wrapper" *ngIf="ticketsFiltrados.length; else vacio">
+    <div class="table-wrapper" *ngIf="pag.filas.length; else vacio">
       <table mat-table [dataSource]="pag.filas">
         <ng-container matColumnDef="numero">
           <th mat-header-cell *matHeaderCellDef>Ticket</th>
@@ -202,11 +201,11 @@
     </div>
     <mat-paginator *ngIf="pag.total" [length]="pag.total" [pageIndex]="pag.pagina"
                    [pageSize]="pag.tam" [pageSizeOptions]="pag.opciones"
-                   (page)="pag.alPaginar($event)" showFirstLastButtons></mat-paginator>
+                   (page)="alPaginar($event)" showFirstLastButtons></mat-paginator>
     <ng-template #vacio>
       <div class="empty-state" *ngIf="!loading">
         <mat-icon>support_agent</mat-icon>
-        <p>{{ tickets.length ? 'Ningún ticket coincide con los filtros.' : 'No hay tickets todavía.' }}</p>
+        <p>{{ hayFiltro ? 'Ningún ticket coincide con los filtros.' : 'No hay tickets todavía.' }}</p>
       </div>
     </ng-template>
   </div>
