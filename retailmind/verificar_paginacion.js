@@ -107,10 +107,12 @@ function totalDelRango(rango) {
 }
 
 /**
- * El 404 de `favicon.ico` es PRE-EXISTENTE y ajeno a esta sesión (el archivo
- * existe en `src/` pero `angular.json` solo copia `src/assets/**`). El mensaje
- * genérico del navegador no dice QUÉ recurso falló, así que solo se descarta
- * si todas las respuestas >=400 observadas son ruido conocido.
+ * El 404 de `favicon.ico` era PRE-EXISTENTE y ajeno a esta sesión (el archivo
+ * vivía en `src/` pero `angular.json` solo copia `src/assets/**`). **CORREGIDO
+ * el 2026-08-15** con la sesión del logotipo de marca: el icono se sirve desde
+ * `assets/` y `src/favicon.ico` se eliminó. El mensaje genérico del navegador
+ * no dice QUÉ recurso falló, así que solo se descarta si todas las respuestas
+ * >=400 observadas son ruido conocido; hoy ese filtro no casa con nada.
  */
 function esRuidoGenerico(texto, respuestas) {
   if (!/Failed to load resource/i.test(texto)) return false;

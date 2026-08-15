@@ -9,7 +9,11 @@
             [matTooltip]="sidebarOpen ? 'Ocultar menú' : 'Mostrar menú'">
       <mat-icon>{{ sidebarOpen ? 'menu_open' : 'menu' }}</mat-icon>
     </button>
-    <a class="navbar-logo" routerLink="/inicio" matTooltip="Ir al inicio">RetailMind</a>
+    <a class="navbar-logo" routerLink="/inicio" matTooltip="Ir al inicio">
+      <img class="navbar-logo-mark" src="assets/ic_retailmind.png"
+           alt="Logotipo de RetailMind" width="30" height="32">
+      <span class="navbar-logo-text">RetailMind</span>
+    </a>
     <span class="navbar-spacer"></span>
 
     <div class="navbar-actions" *ngIf="currentUser">

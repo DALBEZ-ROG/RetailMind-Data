@@ -101,23 +101,14 @@
   margin-bottom: 32px;
 }
 
-.logo-icon-container {
-  width: 72px;
+// El logotipo sustituye al icono genérico en placa degradada: trae su propio
+// hexágono índigo, así que sobre otro degradado se ensuciaría. Se apoya directo
+// en el cristal de la tarjeta a 72px, la misma altura que ocupaba la placa.
+.login-logo {
+  display: block;
   height: 72px;
-  border-radius: 50%;
-  background: var(--primary-gradient);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: auto;
   margin: 0 auto 16px;
-  box-shadow: 0 12px 32px rgba(26, 35, 126, 0.35);
-
-  mat-icon {
-    color: white;
-    font-size: 36px;
-    width: 36px;
-    height: 36px;
-  }
 }
 
 .platform-badge {

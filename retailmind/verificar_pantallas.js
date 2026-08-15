@@ -45,10 +45,13 @@ const COMPRAS = { u: 'compras@retailmind.com', p: clave('RETAILMIND_STAFF_PASS')
 // ciegas, y cada respuesta >= 400 se imprime con su URL para que se pueda
 // atribuir.
 //
-// `favicon.ico` da 404 en TODAS las pantallas y es PRE-EXISTENTE: el fichero
-// existe en `src/favicon.ico` y lo referencia `index.html`, pero `angular.json`
-// solo copia `src/assets/**`, así que nunca llega a `dist`. Ninguno de esos dos
-// archivos se tocó en esta sesión. Es cosmético y queda declarado, no corregido.
+// `favicon.ico` daba 404 en TODAS las pantallas: el fichero vivía en
+// `src/favicon.ico` y lo referenciaba `index.html`, pero `angular.json` solo
+// copia `src/assets/**`, así que nunca llegaba a `dist`. **CORREGIDO el
+// 2026-08-15** con la sesión del logotipo de marca: el icono se genera desde
+// `assets/ic_retailmind.png` y se sirve como `assets/favicon-32.png`. El filtro
+// se conserva por si otra pantalla pidiera un icono distinto, pero hoy no casa
+// con nada — `retailmind/verificar_logotipo.js` prueba que el 404 no existe.
 const RUIDO = [
   /favicon/i,
   /Failed to load resource: net::ERR_/i          // recursos externos (fuentes)

@@ -31,18 +31,58 @@
 }
 
 .navbar-logo {
-  font-size: 20px;
-  font-weight: 800;
-  background: var(--primary-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  letter-spacing: -0.5px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
   text-decoration: none;
   cursor: pointer;
   transition: var(--transition);
 
   &:hover {
     opacity: 0.8;
+  }
+}
+
+// Marca gráfica: 32px = la mitad de los 64px de la barra, con 16px de aire arriba
+// y abajo. Fondo transparente, así que se apoya en el cristal del navbar sin placa.
+.navbar-logo-mark {
+  display: block;
+  height: 32px;
+  width: auto;
+  flex-shrink: 0;
+}
+
+.navbar-logo-text {
+  font-size: 20px;
+  font-weight: 800;
+  background: var(--primary-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.5px;
+  white-space: nowrap;
+}
+
+// Ancho reducido: cae el nombre y queda la marca gráfica, que ya identifica sola.
+// El tooltip y el texto alternativo mantienen el nombre accesible.
+//
+// A esta anchura las acciones de la derecha (badge de rol + nombre de usuario)
+// medían 239 px sobre ~310 px de barra útil y se solapaban con lo que hubiera a
+// su izquierda — ocurría YA con el nombre en texto, y con más margen (~86 px de
+// solape frente a 5). Se recorta el nombre del botón de usuario, que es lo que
+// ocupa 156 de esos 239 px y que además ya se lee en la cabecera de su menú.
+@media (max-width: 560px) {
+  .navbar-logo-text {
+    display: none;
+  }
+
+  .navbar {
+    padding: 0 16px;
+  }
+
+  .user-btn span {
+    display: none;
   }
 }
 
