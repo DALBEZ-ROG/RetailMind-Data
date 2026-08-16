@@ -52,7 +52,11 @@ import { PrevisionGraficoComponent, PuntoPrevision } from './prevision-grafico.c
     MatTooltipModule, MatPaginatorModule, MatProgressBarModule,
     ActualizacionAlmacenComponent, PrevisionGraficoComponent],
   templateUrl: './informes-departamento.component.html',
-  styleUrls: ['../operativo-shared.scss', './informes.scss']
+  // `informes-piloto.scss` va SOLO aquí. `informes.scss` lo comparte
+  // `tablero.component.ts`, así que las reglas del piloto puestas allí
+  // viajarían también al paquete de los siete tableros (medido: +6,9 kB de
+  // CSS muerto). Ver la cabecera del propio archivo.
+  styleUrls: ['../operativo-shared.scss', './informes.scss', './informes-piloto.scss']
 })
 export class InformesDepartamentoComponent implements OnInit {
 
@@ -75,6 +79,35 @@ export class InformesDepartamentoComponent implements OnInit {
   resumen: KpiInforme[] = [];
   columnas: string[] = [];
   total = 0;
+
+  /**
+   * Columnas de la fila de indicadores. Es un CAMPO recalculado al llegar el
+   * sobre y NO un getter (§8.6 del patrón).
+   *
+   * El número de indicadores varía por informe —medido: de 0 en OTD-VEN-15 a
+   * 11 en OTD-VEN-19— y dejar que lo repartiera `auto-fit` producía la fila
+   * rota: a 1920 px entraban SIETE columnas, así que los 8 de OTD-VEN-07
+   * salían **7 + 1** y los 11 de OTD-VEN-19, **7 + 4**. Con el reparto
+   * calculado son 4 + 4 y 4 + 4 + 3.
+   */
+  colsKpi = 1;
+
+  /**
+   * Cuántas columnas reparten `n` cajas en filas PAREJAS sin pasar de
+   * `maxCols`. Primero se fija el número de FILAS —el mínimo que cabe— y
+   * después se reparte entre ellas; es al revés de como lo hace `flex-wrap` o
+   * `auto-fit`, que llenan la primera hasta que no cabe una más.
+   *
+   * Es la misma función que `tablero.component.ts`, con un tope distinto: allí
+   * es 5 y aquí 4, porque la columna del selector se lleva 280 px y con cinco
+   * columnas la tarjeta baja a ~200 px, que es justo el ancho con el que
+   * «$525.083.889,49» no cabe. El tope es lo que garantiza los repartos
+   * pedidos: 8 → 4+4, 7 → 4+3, 11 → 4+4+3.
+   */
+  private static reparto(n: number, maxCols: number): number {
+    if (n <= 0) { return 1; }
+    return Math.ceil(n / Math.ceil(n / maxCols));
+  }
 
   /**
    * `total` es un MÍNIMO porque el servidor cortó el conteo en su tope. Solo
@@ -171,6 +204,46 @@ export class InformesDepartamentoComponent implements OnInit {
     return this.actual?.id === informe.id;
   }
 
+  // ── Presentación: el piloto de Ventas (2026-08-15) ───────────────────
+  // Las dos banderas viven en la DEFINICIÓN del departamento y no en la
+  // pantalla: así extenderlas a otro departamento es una línea en su archivo
+  // de definiciones, y los cinco que no las declaran se pintan como siempre.
+
+  /** Selector en columna a la izquierda en vez de parrilla de tarjetas. */
+  get selectorVertical(): boolean { return !!this.depto?.selectorVertical; }
+
+  /** Tarjetas de resumen en vidrio (las de los tableros) en vez de índigo. */
+  get kpiVidrio(): boolean { return !!this.depto?.kpiVidrio; }
+
+  /**
+   * A ancho reducido la columna se pliega a una cabecera de UNA línea que
+   * dice qué informe está abierto, y la lista se despliega al pulsarla.
+   *
+   * Por qué plegada y no una lista siempre visible: por debajo de 1100 px las
+   * dos columnas no caben, así que la lista pasa a ir ENCIMA del contenido —
+   * y 17 filas encima de los filtros es el mismo defecto que esta sesión
+   * corrige, solo que peor (17 filas en vez de 5). Plegada cuesta cero
+   * mientras se lee el informe y un toque cuando se quiere cambiar.
+   *
+   * La bandera solo la MIRA la hoja por debajo del punto de ruptura; por
+   * encima, la lista se ve entera pase lo que pase con este booleano.
+   */
+  listaAbierta = false;
+
+  alternarLista(): void { this.listaAbierta = !this.listaAbierta; }
+
+  /** Al elegir informe en modo plegado, la lista se cierra sola. */
+  seleccionarYPlegar(informe: DefinicionInforme): void {
+    this.seleccionar(informe);
+    this.listaAbierta = false;
+  }
+
+  /** Rótulo de la cabecera plegable: el informe abierto, o el hueco. */
+  get resumenSeleccion(): string {
+    return this.actual ? `${this.actual.id} · ${this.actual.titulo}`
+                       : 'Elige un informe';
+  }
+
   // ── Simples vs. compuestos ───────────────────────────────────────────
   // Los dos contadores se CALCULAN sobre lo que hay pintado; ninguna cifra
   // está escrita a mano. Con el filtro puesto, el tipo excluido queda en 0,
@@ -247,6 +320,7 @@ export class InformesDepartamentoComponent implements OnInit {
         this.total = sobre.total ?? this.filas.length;
         this.totalEsMinimo = !!sobre['totalEsMinimo'];
         this.resumen = sobre.resumen ?? [];
+        this.colsKpi = InformesDepartamentoComponent.reparto(this.resumen.length, 4);
         if (sobre.alcance === 'propio') {
           // El informe puede traer su propio texto: en OTD-VEN-19 el recorte es
           // por CARTERA (a quién ha atendido) y no por autoría de la venta, y
@@ -278,6 +352,7 @@ export class InformesDepartamentoComponent implements OnInit {
       error: e => {
         this.filas = [];
         this.resumen = [];
+        this.colsKpi = 1;
         this.total = 0;
         this.loading = false;
         this.snackBar.open(
@@ -371,6 +446,76 @@ export class InformesDepartamentoComponent implements OnInit {
 
   claseChip(col: ColumnaInforme, fila: Record<string, any>): string {
     return col.color ? col.color(fila) : 'neutral';
+  }
+
+  // ── Un KPI SIN VALOR no es un KPI que vale cero ──────────────────────
+
+  /**
+   * ¿La tarjeta trae una cifra de verdad?
+   *
+   * El backend distingue las dos cosas y envía `valor: null` cuando NO calculó
+   * el indicador. Hoy solo pasa en OTD-VEN-01: por encima del tope de conteo
+   * (`Paginacion.TOPE_CONTEO` = 200.000) las dos sumas recorrerían los
+   * 2.999.991 pedidos en cada apertura, y una suma sobre 200.000 pedidos
+   * arbitrarios de tres millones no es «el total aproximado», es un número sin
+   * significado — así que el servicio devuelve los tres KPI vacíos y adjunta
+   * la `salvedad` que lo explica (`InformesVentasService:128-139`).
+   *
+   * La pantalla NO respetaba esa distinción: `formatear(null,'numero')` pasa
+   * por `Number(null)`, que es 0, y la cabecera acababa diciendo «Pedidos en
+   * el filtro: 0» y «$0,00» justo encima de un título que dice «(más de
+   * 200.000)». Se leía como un fallo del sistema cuando era una decisión
+   * declarada del servidor.
+   */
+  tieneValor(k: KpiInforme): boolean {
+    return k.valor !== null && k.valor !== undefined && k.valor !== '';
+  }
+
+  /** El valor ya formateado. Se usa para pintarlo, para medirlo y para el `title`. */
+  textoKpi(k: KpiInforme): string {
+    return this.formatear(k.valor, k.tipo);
+  }
+
+  /**
+   * Tamaño de la cifra según lo LARGA que sea.
+   *
+   * No todos estos indicadores son números. El backend manda también frases —
+   * «Ferreteria y Herramienta», «Servilletas Supermaxi Basico Coco x24»,
+   * «16347 clientes · el mayor silencio entre ellos, 760 días» (56 caracteres)—
+   * y a 27 px/800 se salían de la caja. Los importes tampoco caben:
+   * «$525.083.889,49» son 15 dígitos que a 27 px miden ~243 px dentro de una
+   * tarjeta de 246 px con 36 px de relleno. Ocho valores desbordaban, medido.
+   *
+   * La alternativa —ensanchar la tarjeta— rompe el reparto en filas parejas, y
+   * la de recortar con puntos suspensivos ESCONDE el dato. Se escala la letra:
+   * un número corto conserva el tratamiento de cifra grande, que es lo que
+   * hace legible un tablero de un vistazo, y una frase pasa a tamaño de texto,
+   * que es lo que de verdad es. La escala baja en pasos de la misma familia
+   * tipográfica, no continua, para que dos tarjetas vecinas con valores
+   * parecidos no salgan con tamaños distintos por un carácter.
+   *
+   * Devuelve una CADENA (no un objeto ni un array), así que llamarla desde la
+   * plantilla no rompe la detección de cambios como haría un getter que
+   * construye una colección nueva (§8.6).
+   */
+  claseKpi(k: KpiInforme): string {
+    const n = this.textoKpi(k).length;
+    if (n <= 10) { return ''; }            // 27 px — «2.883.686», «104», «12,4 %»
+    if (n <= 14) { return 'kpi-v-medio'; } // 22 px — «$1.234.567,89»
+    if (n <= 19) { return 'kpi-v-corto'; } // 18 px — «$525.083.889,49»
+    return 'kpi-v-frase';                  // 14 px y hasta tres líneas
+  }
+
+  /**
+   * Por qué no hay cifra, en el `title` NATIVO de la tarjeta (§18: nada de
+   * `matTooltip`). El texto es el que envía el propio informe en su
+   * `salvedad`, que es quien conoce el motivo; solo si no lo envía se recurre
+   * a una frase genérica, para no inventar una razón que no consta.
+   */
+  get motivoSinCalcular(): string {
+    return this.salvedad
+      || 'El informe no calculó este indicador para el filtro actual. '
+       + 'Acota la consulta y volverá a mostrarse.';
   }
 
   // ── Sparkline (regla 2 de §5.2.9, lo estrena OTD-VEN-19) ─────────────

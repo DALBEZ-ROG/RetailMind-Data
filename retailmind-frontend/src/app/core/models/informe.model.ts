@@ -152,6 +152,42 @@ export interface DefinicionDepartamento {
   descripcion: string;
   icono: string;
   informes: DefinicionInforme[];
+
+  /*
+   * ── PRESENTACIÓN, opt-in por departamento (piloto 2026-08-15) ──────────
+   *
+   * Las dos banderas siguientes son de PINTADO y nada más: no cambian ni el
+   * endpoint, ni los filtros, ni los datos. Existen porque la pantalla es UNA
+   * sola para los seis departamentos y el rediseño se está probando en Ventas
+   * antes de extenderlo. Un departamento que no las declara se pinta
+   * EXACTAMENTE igual que antes — ése es el punto de que sean opcionales y de
+   * que el valor por defecto sea el comportamiento viejo.
+   *
+   * Extenderlo a otro departamento = añadir la línea a su archivo de
+   * definiciones. No hay que tocar la plantilla, ni la hoja, ni el componente.
+   */
+
+  /**
+   * `true` = el selector de informes se pinta como una COLUMNA a la izquierda
+   * y el contenido ocupa el resto del ancho, en vez de como una parrilla de
+   * tarjetas que empuja los filtros y la tabla fuera de la pantalla.
+   *
+   * En Ventas la parrilla ocupaba 389 px de alto (cinco filas para 17
+   * informes) y la tabla empezaba en el píxel 1.407, muy por debajo del pliegue.
+   */
+  selectorVertical?: boolean;
+
+  /**
+   * `true` = las tarjetas de resumen se pintan en VIDRIO (lavado índigo sobre
+   * blanco), como en los siete tableros de dirección, en vez de en índigo
+   * sólido.
+   *
+   * El criterio es el de `tableros.scss`: el degradado primario saturado queda
+   * RESERVADO a lo que dice «estás aquí» —la cabecera y el informe elegido—;
+   * si además lo llevan los indicadores, la mancha de color deja de significar
+   * nada.
+   */
+  kpiVidrio?: boolean;
 }
 
 /** Tarjeta de resumen que el backend adjunta al sobre. */

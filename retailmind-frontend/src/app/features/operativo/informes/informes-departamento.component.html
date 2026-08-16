@@ -10,52 +10,86 @@
        al terminar, recarga el informe abierto. -->
   <app-actualizacion-almacen (actualizado)="cargar()"></app-actualizacion-almacen>
 
-  <!-- Recuento de lo que se está ofreciendo, por tipo. Se calcula de `visibles`
-       —lo que de verdad hay pintado abajo— y no de una cifra escrita a mano:
-       si el filtro recorta la lista, el contador baja con ella. -->
-  <div class="selector-conteo" *ngIf="disponibles.length">
-    <span class="conteo-total">{{ visibles.length }} de {{ disponibles.length }} informes</span>
-    <button type="button" class="conteo-pastilla simple" [class.apagada]="filtroFuente === 'compuesto'"
-            (click)="alternarFuente('simple')"
-            matTooltip="Informes SIMPLES: se responden sobre la foto del presente, contra
-                        PostgreSQL. Pulsa para ver solo éstos.">
-      <span class="marca-fuente-simple" aria-hidden="true"></span>
-      {{ conteoSimples }} simples
-    </button>
-    <button type="button" class="conteo-pastilla compuesto"
-            [class.apagada]="filtroFuente === 'simple'"
-            (click)="alternarFuente('compuesto')"
-            matTooltip="Informes COMPUESTOS: recorren histórico o cruzan períodos, y se sirven
-                        del almacén analítico (ClickHouse). Pulsa para ver solo éstos.">
-      <span class="marca-fuente-compuesto" aria-hidden="true"></span>
-      {{ conteoCompuestos }} compuestos
-    </button>
-    <button type="button" class="conteo-limpiar" *ngIf="filtroFuente"
-            (click)="alternarFuente(filtroFuente)">
-      <mat-icon>filter_alt_off</mat-icon> Ver todos
-    </button>
-  </div>
+  <!-- ═══ SELECTOR + CONTENIDO ════════════════════════════════════════════
+       Con `selectorVertical` (hoy solo Ventas) los dos hijos de este div se
+       reparten en DOS COLUMNAS: el selector a la izquierda, en una columna
+       estrecha y pegajosa, y todo el contenido a la derecha. Sin la bandera,
+       el mismo marcado se apila como siempre y la pantalla no cambia — por
+       eso los otros cinco departamentos no se tocan. -->
+  <div class="informes-cuerpo" [class.con-columna]="selectorVertical">
 
-  <!-- Selector de informe: una tarjeta por objetivo táctico disponible al rol.
-       El tipo se distingue por TRES señales a la vez —color de la píldora,
-       forma de la marca y la palabra escrita— porque el color solo no puede
-       ser el único portador de la información. -->
-  <div class="informe-selector">
-    <button type="button" class="informe-chip" *ngFor="let inf of visibles"
-            [ngClass]="'fuente-' + inf.fuente"
-            [class.activo]="esActual(inf)" (click)="seleccionar(inf)"
-            [matTooltip]="inf.descripcion">
-      <mat-icon>{{ inf.icono }}</mat-icon>
-      <span class="chip-texto">
-        <span class="chip-id">{{ inf.id }}</span>
-        <span class="chip-titulo">{{ inf.titulo }}</span>
-      </span>
-      <span class="chip-fuente" [title]="tituloFuente(inf)">
-        <span class="marca-fuente" aria-hidden="true"></span>
-        {{ inf.fuente === 'compuesto' ? 'Compuesto' : 'Simple' }}
-      </span>
-    </button>
-  </div>
+    <!-- ── Columna del selector ─────────────────────────────────────────
+         El recuento va DENTRO de la columna, no encima de la página: es el
+         encabezado de esta lista y su filtro, no una franja aparte. -->
+    <div class="selector-columna" [class.lista-abierta]="listaAbierta"
+         *ngIf="disponibles.length">
+
+      <!-- Cabecera plegable. La hoja solo la enseña por debajo del punto de
+           ruptura, donde las dos columnas ya no caben (ver §"colapso" en
+           informes.scss). Por encima está oculta y la lista se ve entera. -->
+      <button type="button" class="selector-plegable" (click)="alternarLista()"
+              [attr.aria-expanded]="listaAbierta">
+        <mat-icon>{{ listaAbierta ? 'expand_less' : 'list' }}</mat-icon>
+        <span class="plegable-texto">
+          <span class="plegable-rotulo">Informe</span>
+          <span class="plegable-actual">{{ resumenSeleccion }}</span>
+        </span>
+        <span class="plegable-conteo">{{ visibles.length }}</span>
+      </button>
+
+      <!-- Recuento de lo que se está ofreciendo, por tipo. Se calcula de
+           `visibles` —lo que de verdad hay pintado abajo— y no de una cifra
+           escrita a mano: si el filtro recorta la lista, el contador baja
+           con ella. -->
+      <div class="selector-conteo">
+        <span class="conteo-total">{{ visibles.length }} de {{ disponibles.length }} informes</span>
+        <button type="button" class="conteo-pastilla simple" [class.apagada]="filtroFuente === 'compuesto'"
+                (click)="alternarFuente('simple')"
+                matTooltip="Informes SIMPLES: se responden sobre la foto del presente, contra
+                            PostgreSQL. Pulsa para ver solo éstos.">
+          <span class="marca-fuente-simple" aria-hidden="true"></span>
+          {{ conteoSimples }} simples
+        </button>
+        <button type="button" class="conteo-pastilla compuesto"
+                [class.apagada]="filtroFuente === 'simple'"
+                (click)="alternarFuente('compuesto')"
+                matTooltip="Informes COMPUESTOS: recorren histórico o cruzan períodos, y se sirven
+                            del almacén analítico (ClickHouse). Pulsa para ver solo éstos.">
+          <span class="marca-fuente-compuesto" aria-hidden="true"></span>
+          {{ conteoCompuestos }} compuestos
+        </button>
+        <button type="button" class="conteo-limpiar" *ngIf="filtroFuente"
+                (click)="alternarFuente(filtroFuente)">
+          <mat-icon>filter_alt_off</mat-icon> Ver todos
+        </button>
+      </div>
+
+      <!-- Selector de informe: una entrada por objetivo táctico disponible al
+           rol. El tipo se distingue por TRES señales a la vez —color, FORMA de
+           la marca (círculo lleno / rombo hueco) y la PALABRA escrita— porque
+           el color no puede ser el único portador de la información (§9.bis.25).
+           Sobre la entrada elegida, que se pinta con el degradado primario,
+           sobreviven la forma y la palabra. -->
+      <div class="informe-selector">
+        <button type="button" class="informe-chip" *ngFor="let inf of visibles"
+                [ngClass]="'fuente-' + inf.fuente"
+                [class.activo]="esActual(inf)" (click)="seleccionarYPlegar(inf)"
+                [matTooltip]="inf.descripcion">
+          <mat-icon>{{ inf.icono }}</mat-icon>
+          <span class="chip-texto">
+            <span class="chip-id">{{ inf.id }}</span>
+            <span class="chip-titulo">{{ inf.titulo }}</span>
+          </span>
+          <span class="chip-fuente" [title]="tituloFuente(inf)">
+            <span class="marca-fuente" aria-hidden="true"></span>
+            {{ inf.fuente === 'compuesto' ? 'Compuesto' : 'Simple' }}
+          </span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ── Columna del contenido ────────────────────────────────────────── -->
+    <div class="informe-contenido">
 
   <div class="op-card" *ngIf="disponibles.length && !visibles.length">
     <div class="empty-state">
@@ -66,13 +100,25 @@
 
   <ng-container *ngIf="actual as informe">
 
-    <!-- Filtros declarados por el informe -->
-    <div class="op-card" *ngIf="informe.filtros.length">
+    <!-- Filtros declarados por el informe.
+
+         `filtros-card` es el MISMO nombre que usan los siete tableros y sirve
+         para lo mismo: es el asidero de la barra de UNA SOLA LÍNEA. Fuera del
+         piloto no hay ninguna regla que case con él, así que los otros cinco
+         departamentos no cambian por llevarlo.
+
+         `subscriptSizing` va LIGADO a la bandera del piloto: 'dynamic' retira
+         el hueco de 22 px que Material reserva bajo cada campo para el
+         `mat-hint`, y NINGÚN filtro de informe lleva hint. 'fixed' es el valor
+         por defecto de Material, o sea exactamente el comportamiento de hoy
+         para los cinco departamentos que no entran en el piloto. -->
+    <div class="op-card filtros-card" *ngIf="informe.filtros.length">
       <h3><mat-icon>filter_alt</mat-icon> Filtros</h3>
       <div class="form-grid">
         <ng-container *ngFor="let f of informe.filtros">
 
           <mat-form-field appearance="outline" *ngIf="f.tipo === 'select'"
+                          [subscriptSizing]="selectorVertical ? 'dynamic' : 'fixed'"
                           [class.campo-ancho]="f.ancho === 'ancho'">
             <mat-label>{{ f.etiqueta }}</mat-label>
             <mat-select [(ngModel)]="valores[f.param]" (selectionChange)="aplicarFiltros()">
@@ -80,23 +126,27 @@
             </mat-select>
           </mat-form-field>
 
-          <mat-form-field appearance="outline" *ngIf="f.tipo === 'fecha'">
+          <mat-form-field appearance="outline" *ngIf="f.tipo === 'fecha'"
+                          [subscriptSizing]="selectorVertical ? 'dynamic' : 'fixed'">
             <mat-label>{{ f.etiqueta }}</mat-label>
             <input matInput type="date" [(ngModel)]="valores[f.param]" (change)="aplicarFiltros()">
           </mat-form-field>
 
-          <mat-form-field appearance="outline" *ngIf="f.tipo === 'periodo'">
+          <mat-form-field appearance="outline" *ngIf="f.tipo === 'periodo'"
+                          [subscriptSizing]="selectorVertical ? 'dynamic' : 'fixed'">
             <mat-label>{{ f.etiqueta }}</mat-label>
             <input matInput type="month" [(ngModel)]="valores[f.param]" (change)="aplicarFiltros()">
           </mat-form-field>
 
-          <mat-form-field appearance="outline" *ngIf="f.tipo === 'numero'">
+          <mat-form-field appearance="outline" *ngIf="f.tipo === 'numero'"
+                          [subscriptSizing]="selectorVertical ? 'dynamic' : 'fixed'">
             <mat-label>{{ f.etiqueta }}</mat-label>
             <input matInput type="number" min="0" [(ngModel)]="valores[f.param]"
                    (change)="aplicarFiltros()">
           </mat-form-field>
 
           <mat-form-field appearance="outline" *ngIf="f.tipo === 'texto'"
+                          [subscriptSizing]="selectorVertical ? 'dynamic' : 'fixed'"
                           [class.campo-ancho]="f.ancho === 'ancho'">
             <mat-label>{{ f.etiqueta }}</mat-label>
             <input matInput [(ngModel)]="valores[f.param]"
@@ -118,11 +168,31 @@
       </div>
     </div>
 
-    <!-- Resumen: tarjetas que el backend adjunta al sobre -->
-    <div class="kpi-grid" *ngIf="resumen.length">
+    <!-- Resumen: tarjetas que el backend adjunta al sobre.
+         `kpis-vidrio` (opt-in del departamento) las pinta como las de los
+         siete tableros: vidrio con lavado índigo, y el degradado saturado
+         reservado a la cabecera y al informe elegido. -->
+    <!-- `cols-N` reparte las tarjetas en filas PAREJAS. El número lo calcula el
+         componente al llegar el sobre (campo, no getter — §8.6), porque varía
+         de 3 a 11 según el informe. Sin él, `auto-fit` llena la primera fila
+         hasta que no cabe una más: a 1920 px eran SIETE columnas y ocho
+         indicadores salían 7 + 1. -->
+    <div class="kpi-grid" [class.kpis-vidrio]="kpiVidrio"
+         [ngClass]="'cols-' + colsKpi" *ngIf="resumen.length">
       <div class="kpi-card" *ngFor="let k of resumen">
         <span class="kpi-label">{{ k.etiqueta }}</span>
-        <span class="kpi-value">{{ formatear(k.valor, k.tipo) }}</span>
+        <!-- Un KPI sin valor NO se pinta como un cero: el backend distingue
+             «no hay» de «vale 0» mandando null, y la pantalla tiene que
+             distinguirlo también. El porqué va en el `title` NATIVO (§18). -->
+        <!-- El tamaño se ELIGE por lo largo que sea el valor: varios de estos
+             indicadores no son números sino frases. El texto completo va en el
+             `title` NATIVO (§18) por si aun así hubiera que recortarlo. -->
+        <span class="kpi-value" *ngIf="tieneValor(k)"
+              [ngClass]="claseKpi(k)" [attr.title]="textoKpi(k)">{{ textoKpi(k) }}</span>
+        <span class="kpi-value kpi-sin-calcular" *ngIf="!tieneValor(k)"
+              [attr.title]="motivoSinCalcular">
+          <mat-icon>do_not_disturb_on</mat-icon> No calculado
+        </span>
       </div>
     </div>
 
@@ -235,5 +305,8 @@
       <p>Tu rol no tiene informes tácticos habilitados en este departamento.</p>
     </div>
   </div>
+
+    </div><!-- /.informe-contenido -->
+  </div><!-- /.informes-cuerpo -->
 
 </div>

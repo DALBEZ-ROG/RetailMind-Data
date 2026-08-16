@@ -1,0 +1,569 @@
+// ════════════════════════════════════════════════════════════════════════
+// PILOTO DE PRESENTACIÓN DE LA PANTALLA DE INFORMES — Ventas, 2026-08-15
+// ════════════════════════════════════════════════════════════════════════
+//
+// POR QUÉ ESTE ARCHIVO EXISTE Y NO ES UN BLOQUE MÁS DE `informes.scss`:
+// `informes.scss` NO es solo de esta pantalla. Lo importa también
+// `tablero.component.ts` (`styleUrls: [… '../informes/informes.scss' …]`),
+// así que todo lo que se escriba allí viaja además al paquete de los siete
+// tableros de dirección. Medido: con estas reglas dentro, el trozo
+// `tablero-component` pasaba de 125,79 kB a 132,69 kB de CSS que ninguna de
+// sus pantallas usa. Aquí, y enganchado SOLO por
+// `informes-departamento.component.ts`, los tableros quedan byte a byte
+// como estaban.
+//
+// TODO lo de este archivo es opt-in por departamento y cuelga de una clase
+// que pone la plantilla a partir de `DefinicionDepartamento`:
+//   · `.informes-cuerpo.con-columna`  ← `selectorVertical`
+//   · `.kpi-grid.kpis-vidrio`         ← `kpiVidrio`
+// Hoy las dos las declara únicamente `ventas.informes.ts`. Un departamento
+// que no las declara se pinta exactamente como antes: mismo marcado, ninguna
+// regla vieja tocada. Extenderlo a otro = una línea en su archivo de
+// definiciones, sin abrir esta hoja.
+
+@use '@angular/material' as mat;
+
+// La cabecera plegable NO existe fuera del piloto. La plantilla la emite
+// siempre —es un botón más, no un `*ngIf` sobre la bandera— y esta regla la
+// apaga para todo el mundo; solo el bloque de abajo, y solo por debajo de su
+// punto de corte, vuelve a encenderla. Sin esto, los cinco departamentos que
+// no entran en el piloto estrenarían un botón que no les sirve de nada.
+.selector-plegable { display: none; }
+
+// ═══════════════════════════════════════════════════════════════════════
+// SELECTOR EN COLUMNA — piloto de Ventas (2026-08-15)
+// ═══════════════════════════════════════════════════════════════════════
+//
+// TODO lo de este bloque cuelga de `.informes-cuerpo.con-columna`, y la clase
+// la pone la PLANTILLA a partir de `DefinicionDepartamento.selectorVertical`,
+// que hoy solo declara Ventas. Sin esa clase, `.informes-cuerpo` es un `div`
+// sin estilo y las otras cinco pantallas se apilan exactamente igual que
+// antes: el marcado es el mismo y ninguna regla de arriba se ha tocado.
+//
+// EL PROBLEMA QUE RESUELVE, medido: con 17 informes la parrilla horizontal
+// ocupaba 389 px de alto (cinco filas) y empujaba la tabla al píxel 1.407 de
+// un documento visto por una ventana de 900 px. El informe que acabas de
+// elegir quedaba fuera de la pantalla.
+//
+// LA ESCALA DE ESPACIADO es la del sistema —8 / 12 / 16— y no entra ningún
+// múltiplo suelto.
+$col-ancho: 280px;
+// La barra de navegación es `position: fixed`, arranca en 12 px y mide 64:
+// termina en el 76. La columna se pega 12 px por debajo de ella.
+$col-sticky: 88px;
+// Punto de corte: por debajo, dos columnas dejan de caber y la lista se
+// pliega (ver «EL COLAPSO» al final del bloque).
+$col-corte: 1100px;
+
+.informes-cuerpo.con-columna {
+  display: grid;
+  // `minmax(0, 1fr)` en la segunda columna NO es decorativo: sin él, el
+  // ancho mínimo automático de un elemento de rejilla lo fija su contenido,
+  // y una tabla de doce columnas ensancharía la rejilla entera hasta sacar
+  // la página por la derecha en vez de hacer scroll dentro de su envoltorio.
+  grid-template-columns: $col-ancho minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+
+  // ── La columna ───────────────────────────────────────────────────────
+  .selector-columna {
+    position: sticky;
+    top: $col-sticky;
+    // Su PROPIO scroll, y solo suyo: `overscroll-behavior: contain` corta el
+    // encadenamiento, así que llegar al final de la lista con la rueda no
+    // sigue desplazando la página por debajo.
+    max-height: calc(100vh - #{$col-sticky} - 16px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    // Sitio para la barra de desplazamiento sin que se coma el borde de las
+    // entradas cuando aparece.
+    padding-right: 4px;
+
+    &::-webkit-scrollbar { width: 6px; }
+    &::-webkit-scrollbar-thumb {
+      border-radius: 3px;
+      background: rgba(57, 73, 171, 0.22);
+    }
+    &::-webkit-scrollbar-track { background: transparent; }
+  }
+
+  // El contenido, otra vez con el mínimo a cero por lo mismo de arriba.
+  .informe-contenido { min-width: 0; }
+
+  // ── El recuento, ahora cabecera de la columna ────────────────────────
+  // Deja de ser una franja a lo ancho de la página: es el encabezado de esta
+  // lista y su filtro, y se apila en dos líneas para caber en 280 px.
+  .selector-conteo {
+    gap: 8px;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(57, 73, 171, 0.12);
+
+    .conteo-total { width: 100%; font-size: 12px; }
+    .conteo-pastilla { padding: 4px 10px; font-size: 11px; }
+    .conteo-limpiar { padding: 4px 6px; font-size: 11px; }
+  }
+
+  // ── La lista ─────────────────────────────────────────────────────────
+  .informe-selector {
+    display: flex;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    // 3 px y no 4: el hueco entre entradas es lo primero que se cede para
+    // pagar el aumento de la letra del título (ver `.chip-titulo`).
+    gap: 3px;
+    margin-bottom: 0;
+  }
+
+  // ── La entrada ───────────────────────────────────────────────────────
+  // Las TRES señales del tipo siguen ahí (§9.bis.25): el color del filo
+  // izquierdo y de la insignia, la FORMA de la marca —círculo lleno para el
+  // simple, rombo hueco para el compuesto— y la PALABRA escrita. Lo único
+  // que se retira es el icono del informe, que en 280 px robaba 32 px de
+  // ancho al título y lo partía en dos líneas; no portaba ninguna
+  // distinción que las otras tres no lleven ya.
+  .informe-chip {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 8px;
+    row-gap: 1px;
+    align-items: start;
+    // 5 px arriba y abajo, no 6: junto con el hueco de 3 px es lo que paga el
+    // aumento de la letra del título sin que los 17 dejen de caber.
+    padding: 5px 10px;
+    border-radius: var(--border-radius-sm);
+    // El vidrio de la parrilla se rebaja: diecisiete cajas con sombra en una
+    // columna son diecisiete sombras. La entrada es plana y la elegida es la
+    // única que sobresale.
+    background: rgba(255, 255, 255, 0.55);
+    border: 1px solid rgba(57, 73, 171, 0.10);
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+
+    > mat-icon { display: none; }
+
+    // `display: contents` disuelve el envoltorio para que el identificador y
+    // el título sean elementos de ESTA rejilla: así el identificador comparte
+    // línea con la insignia y el título se queda con el ancho ENTERO. Con el
+    // envoltorio intacto, el título compartía columna con la insignia y se
+    // quedaba en 144 px de los 247 disponibles.
+    .chip-texto { display: contents; }
+
+    // EL REPARTO DE LA LETRA EN LA COLUMNA.
+    // Lo que se lee para elegir es el NOMBRE del informe; el código
+    // «OTD-VEN-NN» es una referencia que se consulta, no algo que se lea
+    // diecisiete veces seguidas. Así que el nombre SUBE de 12 a 13,5 px y el
+    // código BAJA de 9,5 a 9 px, y los tres píxeles que hacían falta salen del
+    // relleno (6→5) y del hueco entre entradas (4→3). La entrada sigue
+    // midiendo ~43 px y los 17 siguen cabiendo.
+    .chip-id {
+      grid-column: 1;
+      grid-row: 1;
+      font-size: 9px;
+      letter-spacing: 0.5px;
+      line-height: 1.15;
+    }
+
+    .chip-titulo {
+      grid-column: 1 / -1;
+      grid-row: 2;
+      font-size: 13.5px;
+      font-weight: 600;
+      line-height: 1.28;
+      // Un nombre largo parte por palabras; nunca se sale de la columna.
+      overflow-wrap: anywhere;
+    }
+
+    .chip-fuente {
+      grid-column: 2;
+      grid-row: 1;
+      margin-left: 0;
+      padding: 1px 6px;
+      font-size: 8.5px;
+      letter-spacing: 0.3px;
+    }
+
+    // Sin desplazamiento vertical al pasar por encima: en una lista, mover la
+    // entrada bajo el puntero desalinea las diecisiete de al lado.
+    &:hover {
+      transform: none;
+      box-shadow: none;
+      background: rgba(57, 73, 171, 0.07);
+    }
+
+    &.fuente-simple,
+    &.fuente-compuesto { border-left-width: 3px; }
+
+    // El elegido: degradado primario, que en esta pantalla está RESERVADO a
+    // la cabecera y a lo seleccionado. Aquí sí aplica, y es lo único con
+    // color lleno en toda la columna.
+    //
+    // OJO — COLISIÓN DE CASCADA, y costó una pasada de verificación:
+    // `informes.scss` ya pinta el elegido con `.informe-chip.activo`
+    // (especificidad 0,2,0), pero la regla de arriba de este mismo bloque es
+    // `.informes-cuerpo.con-columna .informe-chip` (0,3,0) y GANA. El fondo
+    // blanco plano se comía el degradado y, como el color del texto sí venía
+    // de `.activo`, la entrada elegida quedaba en BLANCO SOBRE BLANCO: la
+    // única señal de qué informe estabas viendo, invisible. Por eso el fondo,
+    // el borde y los dos filos se REPITEN aquí en vez de heredarse.
+    &.activo {
+      background: var(--primary-gradient);
+      border-color: transparent;
+      box-shadow: 0 2px 10px rgba(26, 35, 126, 0.22);
+
+      // El filo izquierdo sigue llevando el color del tipo, en su versión
+      // clara para que se lea sobre el índigo (igual que en la parrilla).
+      &.fuente-simple    { border-left-color: rgba(255, 255, 255, 0.85); }
+      &.fuente-compuesto { border-left-color: rgba(178, 235, 242, 0.95); }
+
+      &:hover { background: var(--primary-gradient); }
+    }
+  }
+
+  // ── BARRA DE FILTROS: UNA SOLA LÍNEA ─────────────────────────────────
+  // El mismo tratamiento que los siete tableros (`tableros.scss`,
+  // `.filtros-card` + `.filtros-barra`), para que las dos zonas del sistema se
+  // lean igual. Allí la barra mide 79 px; aquí medía **217 px** con dos o tres
+  // filtros y **308 px** con seis, porque los campos iban en una rejilla y los
+  // dos botones en una segunda fila debajo.
+  //
+  // NO hace falta cambiar el marcado: los tres hijos de la tarjeta —el
+  // rótulo, `.form-grid` y `.form-actions`— ya están en el orden correcto, así
+  // que basta con convertir la tarjeta en la fila y darle a cada hijo su
+  // papel. Reescribir la plantilla habría obligado a duplicarla con un
+  // `*ngIf` sobre la bandera.
+  .filtros-card {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 12px 20px;
+    margin-bottom: 16px;
+
+    // Densidad por el mecanismo de Angular Material y no por una altura
+    // escrita a mano: el campo baja de ~56 a ~44 px y sus adornos —flecha del
+    // select, lupa, etiqueta flotante— se recolocan solos. Es la misma línea
+    // que usan los tableros. El otro tramo de los 79→44 px lo quita
+    // `subscriptSizing="dynamic"`, que va en la plantilla ligado a la bandera.
+    @include mat.form-field-density(-3);
+
+    > h3 {
+      flex: 0 0 auto;
+      margin: 0;
+      color: var(--text-secondary);
+      font-size: 13px;
+    }
+
+    // La base de 300 px es lo que mantiene los botones EN ESTA FILA. Con
+    // `flex-basis: auto` el bloque de campos declara su tamaño máximo y
+    // flexbox reparte en líneas ANTES de encoger, así que los botones caían
+    // abajo aunque hubiera sitio de sobra. Declarando una base pequeña que
+    // luego CRECE, la fila se arma primero y los campos se reparten después
+    // en el hueco que queda. (Lección ya escrita en `tableros.scss`.)
+    .form-grid {
+      display: flex;
+      flex: 1 1 300px;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px 12px;
+      margin-bottom: 0;
+
+      .mat-mdc-form-field {
+        flex: 1 1 150px;
+        max-width: 260px;
+        // Sin esto, el mínimo de un elemento flexible es el de su CONTENIDO y
+        // el campo se niega a bajar de su ancho natural.
+        min-width: 0;
+      }
+
+      // En la parrilla, `campo-ancho` era «ocupa dos columnas». Aquí no hay
+      // columnas: es «pide más sitio», que es lo mismo que quiere decir.
+      .campo-ancho {
+        flex: 2 1 220px;
+        max-width: 340px;
+      }
+    }
+
+    // `0 1 auto` y NO `0 0 auto`: al convertirse en elemento de la fila, un
+    // bloque que no puede encogerse se dimensiona por su CONTENIDO máximo, y
+    // los dos botones más la etiqueta medían 390 px — en una ventana de 390 px
+    // eso sacaba el documento a 467 px de ancho. Con `flex-wrap` y el mínimo a
+    // cero, el grupo se parte en dos líneas antes que desbordar.
+    .form-actions {
+      flex: 0 1 auto;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      margin-top: 0;
+      margin-left: auto;
+    }
+
+    // Dentro de la barra el código del informe deja de empujar: es una
+    // etiqueta al final de la fila, no un elemento alineado a la derecha.
+    .objetivo-tag { margin-left: 4px; }
+
+    // En un teléfono la fila deja de ser una fila: cada campo a lo ancho y las
+    // herramientas debajo. Apretar cinco campos en 342 px no los hace legibles,
+    // los hace inservibles.
+    @media (max-width: 560px) {
+      .form-grid {
+        flex: 1 1 100%;
+
+        .mat-mdc-form-field,
+        .campo-ancho {
+          flex: 1 1 100%;
+          max-width: none;
+        }
+      }
+
+      .form-actions {
+        width: 100%;
+        margin-left: 0;
+        justify-content: flex-start;
+      }
+    }
+  }
+
+  // ── EL COLAPSO ───────────────────────────────────────────────────────
+  // Por encima del corte la cabecera plegable no existe: la lista se ve
+  // entera y plegarla no tendría sentido.
+  .selector-plegable { display: none; }
+
+  @media (max-width: $col-corte) {
+    grid-template-columns: minmax(0, 1fr);
+
+    .selector-columna {
+      position: static;
+      max-height: none;
+      overflow: visible;
+      padding-right: 0;
+      margin-bottom: 16px;
+    }
+
+    // Por qué PLEGADA y no una lista siempre visible: sin las dos columnas la
+    // lista pasa a ir ENCIMA del contenido, y diecisiete filas encima de los
+    // filtros son el mismo defecto que esta sesión corrige, solo que peor —
+    // 17 filas donde antes había 5. Plegada no cuesta nada mientras se lee el
+    // informe, y cuesta un toque cuando se quiere cambiar. La cabecera DICE
+    // cuál está abierto, así que la información no se pierde al plegarse.
+    .selector-plegable {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid rgba(57, 73, 171, 0.16);
+      border-radius: var(--border-radius-sm);
+      background: rgba(255, 255, 255, 0.85);
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      text-align: left;
+
+      > mat-icon {
+        flex: 0 0 auto;
+        color: var(--primary-light);
+        font-size: 20px;
+        width: 20px;
+        height: 20px;
+      }
+
+      .plegable-texto {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        min-width: 0;
+        flex: 1 1 auto;
+      }
+
+      .plegable-rotulo {
+        font-size: 9.5px;
+        font-weight: 800;
+        letter-spacing: 0.6px;
+        text-transform: uppercase;
+        color: var(--text-light);
+      }
+
+      .plegable-actual {
+        font-size: 12.5px;
+        font-weight: 700;
+        color: var(--text-primary);
+        // Un título largo no puede empujar el contador fuera de la caja.
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .plegable-conteo {
+        flex: 0 0 auto;
+        padding: 2px 9px;
+        border-radius: 999px;
+        background: rgba(57, 73, 171, 0.10);
+        color: var(--primary);
+        font-size: 11px;
+        font-weight: 800;
+      }
+    }
+
+    // Plegado por defecto; la clase la pone el componente.
+    .selector-conteo,
+    .informe-selector { display: none; }
+
+    .selector-columna.lista-abierta {
+      .selector-conteo { display: flex; margin-top: 12px; }
+
+      .informe-selector {
+        display: flex;
+        // Su propio scroll también aquí: en un teléfono, 17 entradas
+        // desplegadas son 700 px que empujarían los filtros fuera otra vez.
+        max-height: 46vh;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        margin-top: 8px;
+      }
+    }
+  }
+}
+
+
+// ── UN KPI SIN VALOR NO ES UN KPI QUE VALE CERO ─────────────────────────
+// El backend manda `valor: null` cuando NO calculó el indicador, y hasta hoy
+// la pantalla lo pasaba por `Number(null)` y pintaba «0» y «$0,00» — encima de
+// un título que decía «(más de 200.000)». Ahora se pinta la ausencia, en tono
+// menor y con un tamaño que NO compite con las cifras de sus vecinas: la
+// tarjeta se lee de un vistazo como «aquí no hay número», no como un cero.
+// El porqué va en el `title` NATIVO de la tarjeta (§18).
+.kpi-value.kpi-sin-calcular {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0;
+  opacity: 0.75;
+  cursor: help;
+
+  mat-icon { font-size: 17px; width: 17px; height: 17px; }
+}
+
+// ── TARJETAS DE RESUMEN EN VIDRIO ───────────────────────────────────────
+// Opt-in por departamento (`DefinicionDepartamento.kpiVidrio`; hoy solo
+// Ventas). Es el MISMO tratamiento que el de los siete tableros de dirección
+// —`tableros.scss`, bloque `.tablero-kpis`— y no una variante nueva: mismo
+// lavado índigo, mismo punto de cian en la esquina, mismo borde, mismo 27/800
+// sobre `--primary` y la misma altura mínima.
+//
+// El criterio es el de allí: el degradado primario saturado se RESERVA a lo
+// que dice «estás aquí» —la cabecera y el informe elegido del selector—. Con
+// los indicadores pintados del mismo índigo lleno, la mancha de color deja de
+// significar nada y compite con el título.
+.kpi-grid.kpis-vidrio {
+  // ── FILAS PAREJAS ──────────────────────────────────────────────────────
+  // El reparto lo decide el COMPONENTE (`colsKpi`), no el ancho de la caja.
+  // `auto-fit` llena la primera fila hasta que no cabe una más y tira el resto
+  // abajo: a 1920 px daba siete columnas y ocho indicadores salían 7 + 1, con
+  // once salían 7 + 4. Fijando las columnas, 8 → 4+4, 7 → 4+3 y 11 → 4+4+3.
+  // Se llega hasta 4 y no más porque la columna del selector se lleva 280 px:
+  // con cinco columnas la tarjeta baja a ~200 px, que es el ancho con el que
+  // «$525.083.889,49» ya no cabe ni encogiendo la letra un paso.
+  @for $i from 1 through 4 {
+    &.cols-#{$i} { grid-template-columns: repeat($i, minmax(0, 1fr)); }
+  }
+
+  // Por debajo del ancho de un portátil el reparto calculado deja de tener
+  // sentido —cuatro columnas en una tableta son cuatro columnas ilegibles— y
+  // vuelve a mandar el ancho mínimo de la caja.
+  @media (max-width: 1024px) {
+    &[class*='cols-'] { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+  }
+  @media (max-width: 560px) {
+    &[class*='cols-'] { grid-template-columns: minmax(0, 1fr); }
+  }
+
+  .kpi-card {
+    // 100 px es la altura del contenido con la etiqueta más larga en dos
+    // líneas; fijarla es lo que deja las tarjetas de la fila compartiendo
+    // línea de base aunque una etiqueta envuelva y la de al lado no.
+    min-height: 100px;
+    padding: 14px 18px 16px;
+    border-radius: var(--border-radius-sm);
+    background:
+      linear-gradient(150deg,
+        rgba(57, 73, 171, 0.085) 0%,
+        rgba(57, 73, 171, 0.035) 55%,
+        rgba(0, 188, 212, 0.06) 100%),
+      rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(57, 73, 171, 0.16);
+    box-shadow: 0 1px 3px rgba(26, 35, 126, 0.05);
+    color: var(--text-primary);
+  }
+
+  .kpi-label {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    line-height: 1.35;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    opacity: 1;
+  }
+
+  // El número se apoya en el borde inferior: así todas las cifras de la fila
+  // comparten línea de base aunque una etiqueta ocupe dos líneas.
+  .kpi-value {
+    margin-top: auto;
+    font-size: 27px;
+    font-weight: 800;
+    letter-spacing: -0.8px;
+    line-height: 1.05;
+    color: var(--primary);
+    font-variant-numeric: tabular-nums;
+    // Red de seguridad: pase lo que pase con el tamaño, el valor no se sale de
+    // la tarjeta. Una palabra sin espacios se parte antes que desbordar.
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  // ── LA ESCALA DEL VALOR ────────────────────────────────────────────────
+  // La clase la pone `claseKpi()` a partir de la LONGITUD del texto ya
+  // formateado. El motivo está en el componente; aquí solo viven los pasos.
+  // Los tres bajan también el `letter-spacing` negativo, que a tamaños
+  // pequeños aprieta las letras hasta hacerlas ilegibles.
+  .kpi-value.kpi-v-medio {
+    font-size: 22px;
+    letter-spacing: -0.5px;
+  }
+
+  .kpi-value.kpi-v-corto {
+    font-size: 18px;
+    letter-spacing: -0.2px;
+  }
+
+  // Una FRASE, no una cifra: se pinta como texto —peso 700, interlineado de
+  // lectura, sin el apretado de las cifras— y se le permiten hasta tres
+  // líneas. Recortar con puntos suspensivos escondería el dato; el `title`
+  // nativo lleva el texto completo por si aun así hiciera falta.
+  .kpi-value.kpi-v-frase {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0;
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    overflow: hidden;
+  }
+
+  // Sobre vidrio el gris del sistema tiene contraste de sobra; sobre el
+  // índigo lleno del pintado viejo se queda en el blanco heredado.
+  .kpi-value.kpi-sin-calcular {
+    font-size: 15px;
+    letter-spacing: 0;
+    color: var(--text-secondary);
+    opacity: 1;
+  }
+}
+

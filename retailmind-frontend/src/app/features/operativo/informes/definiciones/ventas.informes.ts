@@ -129,6 +129,16 @@ export const INFORMES_VENTAS: DefinicionDepartamento = {
   descripcion: 'Dirección y control de la cartera, el equipo comercial, la voz del cliente y '
              + 'la composición de la venta por canal',
   icono: 'insights',
+
+  // ── PILOTO DE PRESENTACIÓN (2026-08-15) ────────────────────────────────
+  // Ventas es el departamento con MÁS informes (17: 6 simples + 11
+  // compuestos) y por eso el que peor sufría la parrilla horizontal — cinco
+  // filas de tarjetas antes de llegar a los filtros. Las dos banderas se
+  // declaran SOLO aquí: los otros cinco departamentos conservan su pintado
+  // actual hasta que el piloto se dé por bueno.
+  selectorVertical: true,
+  kpiVidrio: true,
+
   informes: [
 
     // ── OTD-VEN-01 ────────────────────────────────────────────────────
