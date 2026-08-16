@@ -107,6 +107,15 @@ export const INFORMES_GERENCIA: DefinicionDepartamento = {
   titulo: 'Informes de Gerencia',
   descripcion: 'Foto del día, vigencias de marketing y el rastro de lo que pasa en el sistema',
   icono: 'flag',
+
+  // ── PRESENTACIÓN (2026-08-16): el piloto de Ventas, ya validado ────────
+  // 12 informes en la columna, 9 indicadores como mucho (GER-05 y GER-11 →
+  // 3+3+3) y 5 filtros. Comparte con Compras el único informe con GRÁFICO
+  // —OTD-GER-13, la previsión de demanda—, cuyo SVG se reescala solo dentro
+  // de la columna de contenido.
+  selectorVertical: true,
+  kpiVidrio: true,
+
   informes: [
 
     // ── OTD-GER-01 ────────────────────────────────────────────────────

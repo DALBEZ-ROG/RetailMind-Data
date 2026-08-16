@@ -67,6 +67,14 @@ export const INFORMES_SOPORTE: DefinicionDepartamento = {
   titulo: 'Informes de Soporte',
   descripcion: 'Bandeja de tickets, causas por categoría y reparto del trabajo del equipo',
   icono: 'support_agent',
+
+  // ── PRESENTACIÓN (2026-08-16): el piloto de Ventas, ya validado ────────
+  // El departamento con MENOS informes (8), 8 indicadores como mucho
+  // (SOP-03 y SOP-06 → 4+4) y 5 filtros. Ninguna de las tres dimensiones
+  // llega a lo que Ventas ya sostenía: entra solo con las banderas.
+  selectorVertical: true,
+  kpiVidrio: true,
+
   informes: [
 
     // ── OTD-SOP-01 ────────────────────────────────────────────────────

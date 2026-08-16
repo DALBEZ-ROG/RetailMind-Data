@@ -161,6 +161,25 @@ export const INFORMES_COMPRAS: DefinicionDepartamento = {
   titulo: 'Informes de Compras',
   descripcion: 'Órdenes y aprobaciones, deuda con proveedores, mercancía defectuosa y a quién comprar',
   icono: 'shopping_cart',
+
+  // ── PRESENTACIÓN (2026-08-16): el piloto de Ventas, ya validado ────────
+  // Compras es el departamento que TENSIONA el piloto, y no por el número de
+  // informes (13, cuatro menos que Ventas) sino por dos cosas que Ventas no
+  // tenía:
+  //   · el informe con MÁS indicadores del sistema —OTD-COM-09, con 15— y el
+  //     único con 13 (OTD-COM-03), que es el ÚNICO recuento con el que el
+  //     reparto en filas parejas deja una tarjeta sola (13 = 4+4+4+**1**).
+  //     Se resuelve en `informes-piloto.scss`, en una regla general para
+  //     cualquier resto de uno y sin nombrar a ningún departamento;
+  //   · el informe con MÁS filtros —OTD-COM-09, con 7 frente a los 6 de
+  //     OTD-VEN-11—, que la barra de una línea reparte en dos líneas ordenadas
+  //     sin desbordar.
+  // Aquí vive además OTD-GER-13, el único informe con GRÁFICO. Su SVG lleva
+  // `width: 100%` sobre un `viewBox`, así que se reescala solo al perder los
+  // 280 px que se lleva la columna del selector.
+  selectorVertical: true,
+  kpiVidrio: true,
+
   informes: [
 
     // ── OTD-COM-01 ────────────────────────────────────────────────────

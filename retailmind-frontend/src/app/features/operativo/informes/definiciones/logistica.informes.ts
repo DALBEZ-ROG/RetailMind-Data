@@ -172,6 +172,16 @@ export const INFORMES_LOGISTICA: DefinicionDepartamento = {
   titulo: 'Informes de Logística',
   descripcion: 'Cola de despacho, seguimiento de envíos, devoluciones en curso y costo del transporte',
   icono: 'local_shipping',
+
+  // ── PRESENTACIÓN (2026-08-16): el piloto de Ventas, ya validado ────────
+  // 13 informes en la columna, 9 indicadores como mucho (LOG-04/07/08/10 y la
+  // serie de LOG-11) y 5 filtros. Lo único que Ventas no tenía es OTD-LOG-08,
+  // con TRES filtros anchos en la misma barra; la barra los reparte en dos
+  // líneas antes que desbordar, que es justo lo que `flex-wrap` con
+  // `min-width: 0` garantiza.
+  selectorVertical: true,
+  kpiVidrio: true,
+
   informes: [
 
     // ── OTD-LOG-01 ────────────────────────────────────────────────────

@@ -11,11 +11,11 @@
   <app-actualizacion-almacen (actualizado)="cargar()"></app-actualizacion-almacen>
 
   <!-- ═══ SELECTOR + CONTENIDO ════════════════════════════════════════════
-       Con `selectorVertical` (hoy solo Ventas) los dos hijos de este div se
-       reparten en DOS COLUMNAS: el selector a la izquierda, en una columna
-       estrecha y pegajosa, y todo el contenido a la derecha. Sin la bandera,
-       el mismo marcado se apila como siempre y la pantalla no cambia — por
-       eso los otros cinco departamentos no se tocan. -->
+       Con `selectorVertical` (desde el 2026-08-16, los seis departamentos)
+       los dos hijos de este div se reparten en DOS COLUMNAS: el selector a la
+       izquierda, en una columna estrecha y pegajosa, y todo el contenido a la
+       derecha. Sin la bandera, el mismo marcado se apila como siempre — la
+       bandera sigue siendo opt-in y quitarla devuelve la pantalla vieja. -->
   <div class="informes-cuerpo" [class.con-columna]="selectorVertical">
 
     <!-- ── Columna del selector ─────────────────────────────────────────

@@ -144,6 +144,16 @@ export const INFORMES_INVENTARIO: DefinicionDepartamento = {
   titulo: 'Informes de Inventario',
   descripcion: 'Control de existencias, reposición, movimientos y capital almacenado',
   icono: 'warehouse',
+
+  // ── PRESENTACIÓN (2026-08-16): el piloto de Ventas, ya validado ────────
+  // Inventario es el departamento MÁS pequeño de los seis en las tres
+  // dimensiones que el piloto tensiona: 10 informes en la columna, 7
+  // indicadores como mucho (INV-09 e INV-10) y 5 filtros (INV-05). Todo por
+  // debajo de lo que Ventas ya sostenía, así que las banderas entran sin
+  // ajuste propio.
+  selectorVertical: true,
+  kpiVidrio: true,
+
   informes: [
 
     // ── OTD-INV-01 ────────────────────────────────────────────────────

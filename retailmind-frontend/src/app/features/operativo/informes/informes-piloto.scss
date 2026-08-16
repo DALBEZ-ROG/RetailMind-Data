@@ -1,5 +1,7 @@
 // ════════════════════════════════════════════════════════════════════════
-// PILOTO DE PRESENTACIÓN DE LA PANTALLA DE INFORMES — Ventas, 2026-08-15
+// PRESENTACIÓN DE LA PANTALLA DE INFORMES
+//   · piloto en Ventas ............................ 2026-08-15
+//   · extendido a los SEIS departamentos .......... 2026-08-16
 // ════════════════════════════════════════════════════════════════════════
 //
 // POR QUÉ ESTE ARCHIVO EXISTE Y NO ES UN BLOQUE MÁS DE `informes.scss`:
@@ -16,10 +18,12 @@
 // que pone la plantilla a partir de `DefinicionDepartamento`:
 //   · `.informes-cuerpo.con-columna`  ← `selectorVertical`
 //   · `.kpi-grid.kpis-vidrio`         ← `kpiVidrio`
-// Hoy las dos las declara únicamente `ventas.informes.ts`. Un departamento
-// que no las declara se pinta exactamente como antes: mismo marcado, ninguna
-// regla vieja tocada. Extenderlo a otro = una línea en su archivo de
-// definiciones, sin abrir esta hoja.
+// Desde el 2026-08-16 las declaran los SEIS archivos de definiciones. El
+// mecanismo NO cambia por eso: siguen siendo opt-in, y un departamento que
+// las quitara volvería a pintarse como antes sin tocar esta hoja. La
+// extensión costó exactamente dos líneas por departamento MÁS una regla nueva
+// —el «resto de uno» del reparto de indicadores, abajo—, que apareció porque
+// Compras tiene recuentos de KPI que Ventas no tenía.
 
 @use '@angular/material' as mat;
 
@@ -36,7 +40,7 @@
 //
 // TODO lo de este bloque cuelga de `.informes-cuerpo.con-columna`, y la clase
 // la pone la PLANTILLA a partir de `DefinicionDepartamento.selectorVertical`,
-// que hoy solo declara Ventas. Sin esa clase, `.informes-cuerpo` es un `div`
+// que declaran los seis. Sin esa clase, `.informes-cuerpo` es un `div`
 // sin estilo y las otras cinco pantallas se apilan exactamente igual que
 // antes: el marcado es el mismo y ninguna regla de arriba se ha tocado.
 //
@@ -472,14 +476,104 @@ $col-corte: 1100px;
     &.cols-#{$i} { grid-template-columns: repeat($i, minmax(0, 1fr)); }
   }
 
+  // ── EL RESTO DE UNO ────────────────────────────────────────────────────
+  // Extendiendo el piloto a los otros cinco departamentos (2026-08-16)
+  // apareció el ÚNICO recuento con el que el reparto en filas parejas falla:
+  // TRECE indicadores. Ventas no lo tenía —su máximo son los 11 de
+  // OTD-VEN-19— y Compras sí: OTD-COM-03 (puntualidad de pago) manda 13, que
+  // con cuatro columnas salen **4 + 4 + 4 + 1** y dejan la última tarjeta
+  // sola debajo de una fila llena.
+  //
+  // No es un fallo de `reparto(n, 4)`: con un tope de cuatro columnas, 13 no
+  // se puede repartir sin resto de uno —13 mod 4, mod 3 y mod 2 valen todos
+  // 1—. La única salida es que las FILAS no tengan todas el mismo número de
+  // tarjetas: 13 = 4 + 3 + 3 + 3.
+  //
+  // Se resuelve con una base de DOCE columnas y tarjetas que ocupan 3 (→ 4
+  // por fila) o 4 (→ 3 por fila). La equivalencia es EXACTA, no aproximada:
+  // con el mismo hueco, una tarjeta de 3 de 12 mide `W/4 − 0,75·hueco`, que es
+  // justo lo que mide una de 4 columnas nativas; y una de 4 de 12 mide
+  // `W/3 − 0,667·hueco`, lo mismo que una de 3 nativas. Ninguna tarjeta cambia
+  // de tamaño en los recuentos que ya estaban bien.
+  //
+  // La regla es GENERAL y no nombra a ningún departamento ni a ningún
+  // recuento: se activa cuando la novena tarjeta EMPEZANDO POR EL FINAL cae en
+  // una posición ≡ 1 (mod 4), que es la forma de preguntar «¿el total deja
+  // resto de uno?» sin poder mirar al padre —vale para 13, para 17 y para 21—.
+  // Dentro de `.cols-4` los únicos totales que la disparan son ésos; 9 también
+  // cumple la condición, pero un informe de 9 indicadores se reparte en TRES
+  // columnas y nunca llega aquí.
+  &.cols-4 {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+
+    > * { grid-column: span 3; }
+
+    > :nth-last-child(9):nth-child(4n + 1),
+    > :nth-last-child(9):nth-child(4n + 1) ~ * { grid-column: span 4; }
+  }
+
   // Por debajo del ancho de un portátil el reparto calculado deja de tener
   // sentido —cuatro columnas en una tableta son cuatro columnas ilegibles— y
-  // vuelve a mandar el ancho mínimo de la caja.
+  // manda el ancho mínimo de la caja.
+  //
+  // EL `span` HAY QUE SOLTARLO AQUÍ, Y CON SU MISMA ESPECIFICIDAD. Medido a
+  // 900 px antes de corregirlo: los trece indicadores de OTD-COM-03 salían
+  // **4 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1**, nueve filas de UNA tarjeta. La
+  // causa es que un `:nth-child()` PESA COMO UNA CLASE: el selector del resto
+  // de uno vale (0,5,0) y un `> *` a secas vale (0,3,0), así que las nueve
+  // últimas tarjetas seguían pidiendo CUATRO columnas dentro de una rejilla de
+  // TRES y cada una se llevaba su fila. Por eso el reseteo repite los mismos
+  // selectores en vez de confiar en el universal.
   @media (max-width: 1024px) {
-    &[class*='cols-'] { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+    &[class*='cols-'] {
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+
+      > *,
+      > :nth-last-child(9):nth-child(4n + 1),
+      > :nth-last-child(9):nth-child(4n + 1) ~ * { grid-column: auto; }
+    }
+
+    // ── LA BANDA DE TABLETA, TAMBIÉN EN FILAS PAREJAS ────────────────────
+    // Con `auto-fit` el número de columnas lo decide el ancho, y ahí vuelve a
+    // aparecer el resto de uno: a 900 px caben tres, y trece indicadores salen
+    // 3+3+3+3+**1**. Mismo criterio que arriba y misma base de doce columnas,
+    // pero a TRES por fila (`span 4`); cuando el total deja resto de uno sobre
+    // tres, las CUATRO últimas pasan a dos por fila y el reparto se cierra:
+    // 13 → 3+3+3+2+2, 10 → 3+3+2+2, 7 → 3+2+2, 4 → 2+2.
+    //
+    // Se corta en 641 px porque tres tarjetas de 200 px con sus dos huecos
+    // piden 632: por debajo, tres por fila las dejaría más estrechas que el
+    // mínimo que el propio piloto declaró, y ahí sigue mandando `auto-fit`.
+    // Solo entran `cols-3` y `cols-4` —los repartos que de verdad se dan, de 3
+    // indicadores en adelante—; un informe de uno o dos seguiría estirándose a
+    // lo ancho como hasta ahora.
+    @media (min-width: 641px) {
+      &.cols-3,
+      &.cols-4 {
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+
+        > *,
+        > :nth-last-child(9):nth-child(4n + 1),
+        > :nth-last-child(9):nth-child(4n + 1) ~ * { grid-column: span 4; }
+
+        > :nth-last-child(4):nth-child(3n + 1),
+        > :nth-last-child(4):nth-child(3n + 1) ~ * { grid-column: span 6; }
+      }
+    }
   }
+
+  // En un teléfono es una tarjeta por fila y no hay reparto que valer: se
+  // sueltan los DOS juegos de `span`, otra vez con su misma especificidad.
   @media (max-width: 560px) {
-    &[class*='cols-'] { grid-template-columns: minmax(0, 1fr); }
+    &[class*='cols-'] {
+      grid-template-columns: minmax(0, 1fr);
+
+      > *,
+      > :nth-last-child(9):nth-child(4n + 1),
+      > :nth-last-child(9):nth-child(4n + 1) ~ *,
+      > :nth-last-child(4):nth-child(3n + 1),
+      > :nth-last-child(4):nth-child(3n + 1) ~ * { grid-column: auto; }
+    }
   }
 
   .kpi-card {
