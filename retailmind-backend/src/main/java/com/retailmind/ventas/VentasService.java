@@ -921,9 +921,21 @@ public class VentasService {
      * ninguna. Se desempata por {@code p.id}, que sí lo es.
      */
     @Transactional(readOnly = true)
-    public Map<String, Object> colaPreparacion(Integer page, Integer size, Boolean conTotal) {
-        String sqlItems = SEL_PREPARACION + W_PREPARACION + " ORDER BY p.fecha_pedido, p.id";
-        Object[] a = new Object[0];
+    public Map<String, Object> colaPreparacion(Integer page, Integer size, Boolean conTotal,
+                                               String q) {
+        // Búsqueda por número de pedido o cliente. La cola son 26.551 pedidos
+        // ordenados por fecha ASCENDENTE, así que un pedido recién facturado
+        // entra por el FINAL: sin este filtro, bodega no tiene forma de llegar
+        // a él salvo paginando cientos de páginas. El criterio se evalúa contra
+        // la cola COMPLETA, nunca sobre la página ya recortada.
+        String busq = (q == null || q.isBlank()) ? null : q.trim();
+        String filtro = busq == null ? ""
+                : " AND (p.numero ILIKE ? OR (c.nombre || ' ' || COALESCE(c.apellido,'')) ILIKE ?)\n";
+        Object[] a = busq == null ? new Object[0]
+                : new Object[] { "%" + busq + "%", "%" + busq + "%" };
+
+        String sqlItems = SEL_PREPARACION + W_PREPARACION + filtro
+                        + " ORDER BY p.fecha_pedido, p.id";
 
         int pag = com.retailmind.comun.Paginacion.pagina(page);
         int tam = com.retailmind.comun.Paginacion.tamano(size);
@@ -933,7 +945,10 @@ public class VentasService {
         }
         // El conteo ya no une `estado_pedido`: el filtro va por id contra el
         // índice, así que sobra el join que antes obligaba a recorrer la tabla.
-        String sqlCount = "SELECT count(*) FROM pedido p" + W_PREPARACION;
+        // `cliente` solo se une cuando hay búsqueda, que es cuando hace falta.
+        String sqlCount = "SELECT count(*) FROM pedido p"
+                        + (busq != null ? " JOIN cliente c ON c.id = p.cliente_id" : "")
+                        + W_PREPARACION + filtro;
         return com.retailmind.comun.Paginacion.paginar(pg, sqlItems, sqlCount, a, pag, tam);
     }
 

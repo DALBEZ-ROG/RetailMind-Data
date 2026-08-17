@@ -6,6 +6,24 @@
 
   <div class="op-card">
     <h3><mat-icon>pending_actions</mat-icon> Cola de preparación</h3>
+
+    <!-- La cola va por fecha ascendente sobre 26.551 pedidos: lo recién
+         facturado entra por el final. Buscar por número es lo que permite
+         llegar a un pedido concreto sin paginar cientos de páginas. -->
+    <div class="form-grid">
+      <mat-form-field appearance="outline">
+        <mat-label>Buscar (número de pedido o cliente)</mat-label>
+        <input matInput [(ngModel)]="q" (ngModelChange)="alBuscar()" placeholder="PED-… / nombre">
+        <mat-icon matSuffix>search</mat-icon>
+        <mat-hint>La cola está ordenada de más antiguo a más nuevo</mat-hint>
+      </mat-form-field>
+    </div>
+    <div class="form-actions" *ngIf="q.trim()">
+      <button class="btn-limpiar" (click)="limpiarBusqueda()">
+        <mat-icon>filter_alt_off</mat-icon> Quitar búsqueda
+      </button>
+    </div>
+
     <div class="table-wrapper" *ngIf="pag.filas.length; else vacia">
       <table mat-table [dataSource]="pag.filas">
         <ng-container matColumnDef="numero">

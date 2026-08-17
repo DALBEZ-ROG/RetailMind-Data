@@ -80,11 +80,12 @@ export class VentasService {
    * el endpoint más lento del sistema (27,5 s): cada fila arrastra dos
    * subconsultas y un LATERAL, y se pagaban 26.551 veces.
    */
-  colaPreparacion(opts: { page?: number; size?: number; conTotal?: boolean } = {}):
+  colaPreparacion(opts: { page?: number; size?: number; conTotal?: boolean; q?: string } = {}):
       Observable<Pagina<PreparacionRow>> {
     let params = new HttpParams();
     if (opts.page != null) { params = params.set('page', opts.page); }
     if (opts.size != null) { params = params.set('size', opts.size); }
+    if (opts.q)            { params = params.set('q', opts.q); }
     if (opts.conTotal === false) { params = params.set('conTotal', false); }
     return this.http.get<Pagina<PreparacionRow>>(`${this.base}/preparacion`, { params });
   }

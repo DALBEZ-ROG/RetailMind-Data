@@ -69,6 +69,40 @@
 
   <div class="op-card">
     <h3><mat-icon>list_alt</mat-icon> Pedidos registrados ({{ etiquetaTotal }})</h3>
+
+    <!-- Filtros del listado: los resuelve el SERVIDOR contra los 2.999.993
+         pedidos. Un pedido nuevo no está en la primera página (su id sale de la
+         secuencia y el orden es por id descendente), así que buscar por número
+         es la forma de encontrarlo. -->
+    <div class="form-grid">
+      <mat-form-field appearance="outline">
+        <mat-label>Buscar (número de pedido o cliente)</mat-label>
+        <input matInput [(ngModel)]="q" (ngModelChange)="alBuscar()" placeholder="PED-… / nombre">
+        <mat-icon matSuffix>search</mat-icon>
+        <mat-hint>Un pedido recién creado no sale en la primera página: búscalo por su número</mat-hint>
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Estado</mat-label>
+        <mat-select [(ngModel)]="filtroEstado" (ngModelChange)="aplicarFiltros()">
+          <mat-option value="">Todos</mat-option>
+          <mat-option *ngFor="let e of estados" [value]="e">{{ e | codigoLegible }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Canal</mat-label>
+        <mat-select [(ngModel)]="filtroCanal" (ngModelChange)="aplicarFiltros()">
+          <mat-option value="">Todos</mat-option>
+          <mat-option *ngFor="let c of canales" [value]="c">{{ c | codigoLegible }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+    <div class="form-actions" *ngIf="hayFiltros">
+      <button class="btn-limpiar" (click)="limpiarFiltros()">
+        <mat-icon>filter_alt_off</mat-icon> Quitar filtros
+      </button>
+      <span class="stat-chip chip-info">Filtrando sobre el total de pedidos, no sobre la página</span>
+    </div>
+
     <div class="table-wrapper" *ngIf="total; else vacio">
       <table mat-table [dataSource]="pedidosPagina">
         <ng-container matColumnDef="numero">
@@ -123,7 +157,11 @@
                    [pageSize]="tamPagina" [pageSizeOptions]="tamanos"
                    (page)="alPaginar($event)" showFirstLastButtons></mat-paginator>
     <ng-template #vacio>
-      <div class="empty-state" *ngIf="!loading"><mat-icon>point_of_sale</mat-icon><p>No hay pedidos registrados.</p></div>
+      <div class="empty-state" *ngIf="!loading">
+        <mat-icon>point_of_sale</mat-icon>
+        <p *ngIf="!hayFiltros">No hay pedidos registrados.</p>
+        <p *ngIf="hayFiltros">Ningún pedido coincide con el filtro.</p>
+      </div>
     </ng-template>
   </div>
 

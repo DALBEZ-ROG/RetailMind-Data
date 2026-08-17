@@ -8,8 +8,10 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { map } from 'rxjs/operators';
 import { VentasService } from '../../../core/services/ventas.service';
 import { ReferenciasService } from '../../../core/services/referencias.service';
+import { SelectBuscableComponent } from '../../../core/components/select-buscable/select-buscable.component';
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { mensajeError } from '../../../core/services/api-error.util';
 import {
@@ -29,7 +31,8 @@ import { CodigoLegiblePipe } from '../../../core/pipes/etiquetas.pipe';
   selector: 'app-despachos',
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
-    MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule, CodigoLegiblePipe],
+    MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule,
+    SelectBuscableComponent, CodigoLegiblePipe],
   templateUrl: './despachos.component.html',
   styleUrl: '../operativo-shared.scss'
 })
@@ -91,6 +94,26 @@ export class DespachosComponent implements OnInit {
       this.pedidosEnTransito = pg.items;
       this.totalEnTransito = pg.total;
     });
+  }
+
+  /**
+   * Buscadores de las dos colas, resueltos EN EL SERVIDOR.
+   *
+   * Los desplegables ofrecían los 200 pedidos más recientes POR ID, y eso deja
+   * fuera justo lo que se acaba de trabajar: los ids nuevos salen de la
+   * secuencia (4.341) mientras que los 2.999.993 sembrados llegan a
+   * 2.100.119.001, así que un pedido recién preparado es de los ÚLTIMOS en ese
+   * orden. Escribiendo el número, el filtro se aplica a la cola completa.
+   */
+  buscarPreparado = (q: string) => this.buscarPedidoDeCola('preparado', q);
+  buscarEnTransito = (q: string) => this.buscarPedidoDeCola('despachado', q);
+
+  private buscarPedidoDeCola(estado: string, q: string) {
+    return this.ventas.pedidos({ estado, q, size: this.TOPE_COLA, conTotal: false })
+      .pipe(map(pg => pg.items.map(p => ({
+        id: p.id,
+        texto: `${p.numero} — ${p.cliente}${p.transportista ? ' · ' + p.transportista : ''}`
+      }))));
   }
 
   /** Al elegir el pedido carga su detalle logístico (ítems + asignación). */

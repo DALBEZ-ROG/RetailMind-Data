@@ -232,7 +232,7 @@ public class ComprasService {
     @Transactional(readOnly = true)
     public Map<String, Object> listarOrdenes(Integer page, Integer size, Boolean facturables,
                                              Boolean recibibles, Long incluirOrdenId,
-                                             Boolean conTotal) {
+                                             Boolean conTotal, String buscar) {
         StringBuilder w = new StringBuilder(" WHERE 1 = 1\n");
         List<Object> args = new java.util.ArrayList<>();
         String predicado = Boolean.TRUE.equals(facturables) ? W_OC_FACTURABLES
@@ -245,11 +245,46 @@ public class ComprasService {
                 w.append(predicado);
             }
         }
+        // Búsqueda por número de orden o proveedor. El texto va SIEMPRE como
+        // parámetro ligado —tres veces—; nunca concatenado (regla de oro n.º 2).
+        //
+        // Se buscan los DOS nombres del proveedor: la tabla trae `razon_social`
+        // («ElectroImport del Pacífico S.A.») y `nombre_comercial`
+        // («ElectroPac»), y la grilla enseña el primero mientras que la ficha de
+        // proveedores enseña el segundo. Buscando solo por uno, escribir lo que
+        // se ve en la otra pantalla devuelve cero filas.
+        String q = buscar == null ? "" : buscar.trim();
+        if (!q.isEmpty()) {
+            w.append(" AND (oc.numero ILIKE ? OR p.razon_social ILIKE ?"
+                   + " OR p.nombre_comercial ILIKE ?)\n");
+            args.add("%" + q + "%");
+            args.add("%" + q + "%");
+            args.add("%" + q + "%");
+        }
         String where = w.toString();
         Object[] a = args.toArray();
 
+        // ── EL ORDEN: primero lo que YA OCURRIÓ, y de eso, lo más reciente ──
+        //
+        // `ORDER BY oc.id DESC` a secas entierra la orden que el usuario acaba
+        // de emitir, y no por un fallo: la carga masiva de la década reservó
+        // ids hasta 2.100.003.975 y fechas de creación hasta el 27/12/2034,
+        // mientras que una orden nueva toma el siguiente valor de la secuencia
+        // (hoy ~919) y la fecha de hoy. Por id queda de las últimas; por fecha,
+        // ocho años por detrás de las sembradas.
+        //
+        // Ordenar solo por `fecha_creacion DESC` tampoco sirve, por lo mismo:
+        // arriba saldrían las de 2034. Así que el criterio es en DOS tramos —
+        // lo ya ocurrido primero, lo fechado en el futuro después — y dentro de
+        // cada tramo, lo más reciente arriba. Una orden emitida hace un minuto
+        // es la fila 1; las 2.034 siguen consultables debajo.
+        //
+        // `oc.id DESC` se queda como desempate para que el orden sea total y la
+        // paginación no repita filas cuando dos comparten instante.
         String sqlItems = (esBodega() ? SEL_OC_BODEGA : SEL_OC_COMPLETO)
-                        + JOIN_OC + where + " ORDER BY oc.id DESC";
+                        + JOIN_OC + where
+                        + " ORDER BY (oc.fecha_creacion <= now()) DESC,"
+                        + " oc.fecha_creacion DESC, oc.id DESC";
 
         int pag = com.retailmind.comun.Paginacion.pagina(page);
         int tam = com.retailmind.comun.Paginacion.tamano(size);
@@ -257,7 +292,9 @@ public class ComprasService {
         if (Boolean.FALSE.equals(conTotal)) {
             return com.retailmind.comun.Paginacion.paginarSinTotal(pg, sqlItems, a, pag, tam);
         }
-        String sqlCount = "SELECT count(*) FROM orden_compra oc" + where;
+        // El conteo lleva los MISMOS joins que los items: el filtro de búsqueda
+        // toca `p.razon_social`, y sin el join el count no compila.
+        String sqlCount = "SELECT count(*) " + JOIN_OC + where;
         return com.retailmind.comun.Paginacion.paginar(pg, sqlItems, sqlCount, a, pag, tam);
     }
 

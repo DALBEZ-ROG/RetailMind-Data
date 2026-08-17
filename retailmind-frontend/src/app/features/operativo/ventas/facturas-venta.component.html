@@ -7,22 +7,21 @@
   <div class="op-card">
     <h3><mat-icon>post_add</mat-icon> Emitir factura</h3>
     <div class="form-grid">
-      <mat-form-field appearance="outline">
-        <mat-label>Pedido</mat-label>
-        <mat-select [(ngModel)]="pedidoId">
-          <mat-option *ngFor="let p of pedidos" [value]="p.id">
-            {{ p.numero }} — {{ p.cliente }} ({{ p.total | currency:'USD' }} · {{ p.estado | codigoLegible }})
-          </mat-option>
-        </mat-select>
-        <!-- Que la lista está recortada se DICE: una lista truncada en silencio
-             se lee como «no queda nada por facturar», justo lo contrario. -->
-        <mat-hint *ngIf="pedidos.length < TOPE_SELECTOR">
-          Solo pedidos pagados y aún sin factura ({{ pedidos.length | number }})
-        </mat-hint>
-        <mat-hint *ngIf="pedidos.length >= TOPE_SELECTOR">
-          Solo pedidos pagados y aún sin factura — los {{ TOPE_SELECTOR }} más recientes
-        </mat-hint>
-      </mat-form-field>
+      <!-- Buscador, no desplegable: los facturables son 15.172 entre 2.999.993
+           pedidos y el que se busca casi nunca está entre los más recientes por
+           id. Se teclea el número (o el cliente) y filtra el SERVIDOR con la
+           misma compuerta del backend. -->
+      <app-select-buscable label="Pedido a facturar"
+                           placeholder="Escribe el número de pedido (PED-…) o el cliente"
+                           [buscador]="buscarPedidoFacturable"
+                           [(value)]="pedidoId"></app-select-buscable>
+    </div>
+    <div class="form-actions">
+      <span class="stat-chip chip-info">
+        <mat-icon style="font-size:14px;height:14px;width:14px;">info</mat-icon>
+        Solo aparecen pedidos ya PAGADOS y aún sin factura. Si el tuyo no sale,
+        regístrale primero el pago en Pedidos de Venta.
+      </span>
     </div>
     <div class="form-actions">
       <button class="btn-aplicar" (click)="emitirFactura()" [disabled]="procesando">

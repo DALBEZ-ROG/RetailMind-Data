@@ -11,10 +11,11 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { Subject } from 'rxjs';
-import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
+import { debounceTime, distinctUntilChanged, map } from 'rxjs/operators';
 import { VentasService } from '../../../core/services/ventas.service';
+import { SelectBuscableComponent } from '../../../core/components/select-buscable/select-buscable.component';
 import { mensajeError } from '../../../core/services/api-error.util';
-import { PedidoVentaRow, FacturaVenta, FacturaVentaRow } from '../../../core/models/operativo.model';
+import { FacturaVenta, FacturaVentaRow } from '../../../core/models/operativo.model';
 import { CodigoLegiblePipe } from '../../../core/pipes/etiquetas.pipe';
 
 @Component({
@@ -22,21 +23,36 @@ import { CodigoLegiblePipe } from '../../../core/pipes/etiquetas.pipe';
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule,
-    MatTooltipModule, MatPaginatorModule, CodigoLegiblePipe],
+    MatTooltipModule, MatPaginatorModule, SelectBuscableComponent, CodigoLegiblePipe],
   templateUrl: './facturas-venta.component.html',
   styleUrl: '../operativo-shared.scss'
 })
 export class FacturasVentaComponent implements OnInit {
 
-  // Emisión: solo pedidos PAGADOS sin factura (compuerta del backend)
-  pedidos: PedidoVentaRow[] = [];
-
   /**
-   * Cuántos facturables se ofrecen en el desplegable. El servidor no entrega
-   * más de 200 por página, y meter 15.172 opciones en un `mat-select` sería
-   * cambiar un problema de memoria por otro de render.
+   * Buscador de pedidos FACTURABLES, resuelto EN EL SERVIDOR.
+   *
+   * Antes era un `mat-select` con los 50 facturables más recientes por id, y
+   * ahí no se podía TECLEAR nada. Con 15.172 facturables entre 2.999.993
+   * pedidos —y con los recién creados al final del orden por id, porque su id
+   * sale de la secuencia (4.341) y los sembrados llegan a 2.100.119.001— el
+   * pedido que uno quiere facturar prácticamente nunca estaba en esa lista.
+   * Ahora se escribe el número (o el cliente) y el filtro se aplica al conjunto
+   * completo, con la MISMA compuerta `facturables=true` del backend.
    */
-  readonly TOPE_SELECTOR = 200;
+  buscarPedidoFacturable = (q: string) =>
+    this.ventas.pedidos({ facturables: true, q, size: this.TOPE_SELECTOR, conTotal: false })
+      .pipe(map(pg => pg.items.map(p => ({
+        id: p.id,
+        // El monto puede no venir (roles logísticos no leen `pedido.total`):
+        // en ese caso se omite en vez de pintar «$NaN».
+        texto: p.total != null
+          ? `${p.numero} — ${p.cliente} ($${Number(p.total).toFixed(2)})`
+          : `${p.numero} — ${p.cliente}`
+      }))));
+
+  /** Tope de coincidencias por consulta: es un buscador, no un volcado. */
+  readonly TOPE_SELECTOR = 50;
 
   pedidoId: number | null = null;
   factura: FacturaVenta | null = null;
@@ -67,32 +83,11 @@ export class FacturasVentaComponent implements OnInit {
   constructor(private ventas: VentasService, private snackBar: MatSnackBar) {}
 
   ngOnInit(): void {
-    this.cargarPedidos();
     this.cargarFacturas();
     this.busqueda$.pipe(debounceTime(350), distinctUntilChanged()).subscribe(() => {
       this.pagina = 0;
       this.cargarFacturas();
     });
-  }
-
-  /**
-   * Selector de pedidos FACTURABLES.
-   *
-   * El filtro (estado en pagado/en_preparacion/despachado/entregado y sin
-   * factura) lo aplica ahora el SERVIDOR con `facturables=true`: es la misma
-   * regla, movida de sitio. Aplicarla aquí sobre una página exigiría antes
-   * descargar los 2.999.993 pedidos —que es lo que tumbaba el backend— y, con
-   * el listado paginado, filtrar solo la página visible habría dejado el
-   * selector casi siempre VACÍO sin dar ningún error: los 15.172 facturables
-   * no están en las primeras 200 filas de tres millones.
-   */
-  cargarPedidos(): void {
-    // Sin conteo: contar los facturables exige recorrer los 2.999.993 pedidos
-    // con un NOT EXISTS contra `factura_venta`, y bajo RLS eso son ~9 s para
-    // un número que aquí solo serviría de rótulo. El selector se declara como
-    // «los N más recientes» y no promete un total.
-    this.ventas.pedidos({ facturables: true, size: this.TOPE_SELECTOR, conTotal: false })
-      .subscribe(pg => this.pedidos = pg.items);
   }
 
   cargarFacturas(): void {
@@ -132,7 +127,6 @@ export class FacturasVentaComponent implements OnInit {
         this.pedidoId = null;
         this.snackBar.open(`Factura ${f.numero} emitida — total ${f.total}`, 'OK',
           { duration: 3500, panelClass: ['snack-success'] });
-        this.cargarPedidos();
         this.cargarFacturas();
       },
       error: e => {

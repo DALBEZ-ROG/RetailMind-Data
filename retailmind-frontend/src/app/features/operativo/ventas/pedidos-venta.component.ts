@@ -12,7 +12,8 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { Router } from '@angular/router';
-import { map } from 'rxjs';
+import { map, Subject } from 'rxjs';
+import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 import { VentasService } from '../../../core/services/ventas.service';
 import { ReferenciasService } from '../../../core/services/referencias.service';
 import { NavPermissionsService } from '../../../core/navigation/nav-permissions.service';
@@ -54,10 +55,36 @@ export class PedidosVentaComponent implements OnInit {
       map(cs => cs.map(c => ({ id: c.id, texto: `${c.nombre} (${c.email})` }))));
   loading = true;
 
-  // Paginación client-side de la tabla de pedidos
+  // Paginación server-side de la tabla de pedidos
   pagina = 0;
   tamPagina = 25;
   readonly tamanos = [25, 50, 100];
+
+  /**
+   * Filtros del listado, resueltos EN EL SERVIDOR.
+   *
+   * Sin ellos esta pantalla era inservible para el trabajo del día: la carga
+   * masiva escribió ids explícitos hasta 2.100.119.001, mientras que
+   * `pedido_id_seq` sigue por los 4.000 largos, así que un pedido recién
+   * creado NO cae en la primera página del `ORDER BY p.id DESC` — cae en la
+   * ÚLTIMA, a unas 120.000 páginas de distancia. Buscar por número es la única
+   * forma de volver a encontrarlo.
+   *
+   * El filtrado nunca se hace aquí sobre la página recibida: eso miraría 25
+   * filas de 2.999.993 y devolvería «no hay nada» sin dar ningún error.
+   */
+  q = '';
+  filtroEstado = '';
+  filtroCanal = '';
+  private busqueda$ = new Subject<string>();
+
+  readonly estados = ['pendiente', 'confirmado', 'pagado', 'facturado', 'en_preparacion',
+    'preparado', 'despachado', 'entregado', 'devuelto', 'no_entregado', 'cancelado'];
+  readonly canales = ['web', 'tienda', 'telefono'];
+
+  get hayFiltros(): boolean {
+    return !!(this.q.trim() || this.filtroEstado || this.filtroCanal);
+  }
 
   showForm = false;
   clienteId: number | null = null;
@@ -129,6 +156,9 @@ export class PedidosVentaComponent implements OnInit {
 
   ngOnInit(): void {
     this.cargarPedidos();
+    // El texto se consulta con debounce; estado y canal disparan al instante.
+    this.busqueda$.pipe(debounceTime(350), distinctUntilChanged())
+      .subscribe(() => this.aplicarFiltros());
     if (this.puedeVerBodegas) {
       this.referencias.bodegas().subscribe(b => this.bodegas = b);
     }
@@ -154,7 +184,12 @@ export class PedidosVentaComponent implements OnInit {
    */
   cargarPedidos(conTotal = true): void {
     this.loading = true;
-    this.ventas.pedidos({ page: this.pagina, size: this.tamPagina, conTotal }).subscribe({
+    this.ventas.pedidos({
+      page: this.pagina, size: this.tamPagina, conTotal,
+      q: this.q.trim() || undefined,
+      estado: this.filtroEstado || undefined,
+      canal: this.filtroCanal || undefined
+    }).subscribe({
       next: pg => {
         this.pedidosPagina = pg.items;
         // total = -1 significa «no se recontó»: se conserva el que ya había,
@@ -200,6 +235,25 @@ export class PedidosVentaComponent implements OnInit {
     this.cargarPedidos(false);
   }
 
+  /** Cada tecla del buscador: la consulta la lanza el debounce. */
+  alBuscar(): void { this.busqueda$.next(this.q); }
+
+  /**
+   * Cambiar un filtro cambia el CONJUNTO, así que vuelve a la primera página y
+   * SÍ recuenta: el total anterior era el de otro conjunto.
+   */
+  aplicarFiltros(): void {
+    this.pagina = 0;
+    this.cargarPedidos();
+  }
+
+  limpiarFiltros(): void {
+    this.q = '';
+    this.filtroEstado = '';
+    this.filtroCanal = '';
+    this.aplicarFiltros();
+  }
+
   agregarLinea(): void { this.lineas.push({ varianteId: null, cantidad: 1 }); }
   quitarLinea(i: number): void { this.lineas.splice(i, 1); }
 
@@ -232,7 +286,15 @@ export class PedidosVentaComponent implements OnInit {
           { duration: 3500, panelClass: ['snack-success'] });
         this.showForm = false;
         this.clienteId = null; this.lineas = [{ varianteId: null, cantidad: 1 }];
-        this.cargarPedidos();
+        // Se FILTRA al pedido recién creado y se abre su detalle. Sin esto el
+        // pedido nace invisible: su id sale de la secuencia (4.341) y el
+        // listado ordena por id descendente sobre los 2.999.993 sembrados con
+        // ids explícitos de hasta 2.100.119.001, así que aparecería en la
+        // última página. Aquí es donde está el botón «Registrar pago».
+        this.q = pedido.numero;
+        this.filtroEstado = ''; this.filtroCanal = '';
+        this.aplicarFiltros();
+        this.verPedido(pedido.id);
       },
       error: e => {
         this.procesando = false;

@@ -7,16 +7,18 @@
   <div class="op-card">
     <h3><mat-icon>assignment_turned_in</mat-icon> Nuevo despacho</h3>
     <div class="form-grid">
-      <mat-form-field appearance="outline">
-        <mat-label>Pedido a despachar</mat-label>
-        <mat-select [(ngModel)]="pedidoId" (selectionChange)="seleccionarPedido()">
-          <mat-option *ngFor="let p of pedidos" [value]="p.id">
-            {{ p.numero }} — {{ p.cliente }}{{ p.transportista ? ' · ' + p.transportista : '' }}
-          </mat-option>
-        </mat-select>
-        <mat-hint>Solo pedidos PREPARADOS por bodega<span *ngIf="totalPreparados > TOPE_COLA">
-          — {{ TOPE_COLA }} más recientes de {{ totalPreparados | number }}</span></mat-hint>
-      </mat-form-field>
+      <!-- Buscador, no desplegable: la cola de preparados son miles de pedidos
+           y los recién preparados NO están entre los más recientes por id
+           (el porqué, en el comentario de `buscarPedidoDeCola`). -->
+      <div>
+        <app-select-buscable label="Pedido a despachar"
+                             placeholder="Escribe el número (PED-…) o el cliente"
+                             [buscador]="buscarPreparado"
+                             [value]="pedidoId"
+                             (valueChange)="pedidoId = $event; seleccionarPedido()">
+        </app-select-buscable>
+        <div class="slug-hint">Solo pedidos PREPARADOS por bodega ({{ totalPreparados | number }} en cola)</div>
+      </div>
       <mat-form-field appearance="outline">
         <mat-label>Observación</mat-label>
         <input matInput [(ngModel)]="observacion">
@@ -83,16 +85,14 @@
   <div class="op-card">
     <h3><mat-icon>task_alt</mat-icon> Confirmar entrega</h3>
     <div class="form-grid">
-      <mat-form-field appearance="outline">
-        <mat-label>Pedido en tránsito</mat-label>
-        <mat-select [(ngModel)]="pedidoEntregaId">
-          <mat-option *ngFor="let p of pedidosEnTransito" [value]="p.id">
-            {{ p.numero }} — {{ p.cliente }}{{ p.transportista ? ' · ' + p.transportista : '' }}
-          </mat-option>
-        </mat-select>
-        <mat-hint>Solo pedidos despachados pendientes de entrega<span *ngIf="totalEnTransito > TOPE_COLA">
-          — {{ TOPE_COLA }} más recientes de {{ totalEnTransito | number }}</span></mat-hint>
-      </mat-form-field>
+      <div>
+        <app-select-buscable label="Pedido en tránsito"
+                             placeholder="Escribe el número (PED-…) o el cliente"
+                             [buscador]="buscarEnTransito"
+                             [(value)]="pedidoEntregaId"></app-select-buscable>
+        <div class="slug-hint">Solo pedidos despachados pendientes de entrega
+          ({{ totalEnTransito | number }} en tránsito)</div>
+      </div>
       <mat-form-field appearance="outline">
         <mat-label>Observación de la entrega</mat-label>
         <input matInput [(ngModel)]="observacionEntrega">
@@ -111,15 +111,15 @@
     <p>Incidencias sobre pedidos despachados: registra qué pasó y resuélvela
       reprogramando un nuevo intento (máx. 3) o devolviendo el envío al almacén.</p>
     <div class="form-grid">
-      <mat-form-field appearance="outline">
-        <mat-label>Pedido en tránsito</mat-label>
-        <mat-select [(ngModel)]="pedidoNovedadId" (selectionChange)="seleccionarPedidoNovedad()">
-          <mat-option *ngFor="let p of pedidosEnTransito" [value]="p.id">
-            {{ p.numero }} — {{ p.cliente }}{{ p.transportista ? ' · ' + p.transportista : '' }}
-          </mat-option>
-        </mat-select>
-        <mat-hint>Solo pedidos despachados (no entregados)</mat-hint>
-      </mat-form-field>
+      <div>
+        <app-select-buscable label="Pedido en tránsito"
+                             placeholder="Escribe el número (PED-…) o el cliente"
+                             [buscador]="buscarEnTransito"
+                             [value]="pedidoNovedadId"
+                             (valueChange)="pedidoNovedadId = $event; seleccionarPedidoNovedad()">
+        </app-select-buscable>
+        <div class="slug-hint">Solo pedidos despachados (no entregados)</div>
+      </div>
     </div>
 
     <ng-container *ngIf="novedadesInfo?.envio as env">

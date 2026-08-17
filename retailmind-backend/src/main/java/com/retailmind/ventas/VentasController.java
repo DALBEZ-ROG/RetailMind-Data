@@ -135,8 +135,9 @@ public class VentasController {
     public Map<String, Object> colaPreparacion(
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size,
-            @RequestParam(required = false) Boolean conTotal) {
-        return servicio.colaPreparacion(page, size, conTotal);
+            @RequestParam(required = false) Boolean conTotal,
+            @RequestParam(required = false) String q) {
+        return servicio.colaPreparacion(page, size, conTotal, q);
     }
 
     /** Detalle para picking: ítems, cliente, dirección y transportista asignado. */

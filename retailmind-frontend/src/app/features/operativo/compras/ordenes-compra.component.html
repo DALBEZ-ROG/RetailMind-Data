@@ -78,6 +78,27 @@
     </div>
   </div>
 
+  <!-- Criterios de búsqueda: el mismo molde que el resto de pantallas
+       (`op-card` + `form-grid` + campo con lupa y debounce). Hace falta aquí
+       porque el listado son 134.588 órdenes: sin filtro, encontrar una es
+       paginar a ciegas. -->
+  <div class="op-card">
+    <h3><mat-icon>search</mat-icon> Criterios de búsqueda</h3>
+    <div class="form-grid">
+      <mat-form-field appearance="outline" style="grid-column: span 2;">
+        <mat-label>Buscar</mat-label>
+        <input matInput [(ngModel)]="busqueda" (ngModelChange)="alEscribirBusqueda()"
+               placeholder="Nº de orden o proveedor…">
+        <mat-icon matSuffix>search</mat-icon>
+      </mat-form-field>
+      <div class="form-actions">
+        <button class="btn-limpiar" (click)="limpiarBusqueda()">
+          <mat-icon>filter_alt_off</mat-icon> Limpiar
+        </button>
+      </div>
+    </div>
+  </div>
+
   <div class="op-card">
     <h3><mat-icon>list_alt</mat-icon> Órdenes emitidas ({{ pag.total }})</h3>
     <div class="table-wrapper" *ngIf="pag.filas.length; else vacio">

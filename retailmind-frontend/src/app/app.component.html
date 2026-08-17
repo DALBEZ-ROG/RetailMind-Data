@@ -120,7 +120,13 @@
     </ng-container>
 
     <!-- Operación Section (visibilidad por rol, espeja SecurityConfig) -->
-    <ng-container *ngIf="canCatalogo || canCompras || canInventario || canVentas || canPreparar || canLogistica || canKardex || canDevoluciones">
+    <!-- El ciclo de venta salió de aquí a su propia sección, así que la
+         condición ya no puede nombrar sus permisos: con ellos, un VENDEDOR
+         (sin catálogo, compras, inventario ni kardex) pintaba el rótulo
+         «Operación» encima de NINGÚN enlace. -->
+    <ng-container *ngIf="canCatalogo || canCompras || canFacturasCompra || canProveedores
+                      || canInventario || canAjustes || canKardex
+                      || canAccesos || canPermisosMotor">
       <div class="sidebar-section-label">Operación</div>
 
       <ng-container *ngIf="canCatalogo">
@@ -196,6 +202,18 @@
         <mat-icon>receipt_long</mat-icon>
         <span>Kardex</span>
       </a>
+
+    </ng-container>
+
+    <!-- Ciclo de venta (rótulo propio, espeja SecurityConfig).
+         Iba suelto dentro de «Operación» y eso dejaba a BODEGA sin ninguna
+         pista de que «Preparación de Pedidos» es su paso del ciclo de venta:
+         el rol no tiene `ventas` ni `despachar`, así que su único enlace del
+         ciclo aparecía entre «Kardex» y «Devoluciones», sin encabezado que lo
+         explicara. Cada enlace sigue gobernado por SU permiso; lo que cambia
+         es dónde se lee. -->
+    <ng-container *ngIf="canVentas || canPreparar || canDespachar || canDevoluciones">
+      <div class="sidebar-section-label">Ciclo de Venta</div>
 
       <ng-container *ngIf="canVentas">
         <a class="nav-item" routerLink="/operativo/ventas/pedidos" routerLinkActive="active">

@@ -1,6 +1,8 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Subject } from 'rxjs';
+import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 import { MatTableModule } from '@angular/material/table';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
@@ -58,6 +60,10 @@ export class OrdenesCompraComponent implements OnInit {
   lineas: LineaOrden[] = [{ varianteId: null, cantidad: 1, precioUnitario: 0 }];
 
   ordenCreada: OrdenCompraDetalle | null = null;
+
+  /** Texto del filtro: número de orden o proveedor. */
+  busqueda = '';
+  private texto$ = new Subject<void>();
   detalleOrden: OrdenCompraDetalle | null = null;
   procesando = false;
 
@@ -96,6 +102,10 @@ export class OrdenesCompraComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    // El texto se aplica con debounce, como en el resto de pantallas: cada
+    // pulsación no puede disparar una consulta sobre 134.588 órdenes.
+    this.texto$.pipe(debounceTime(350), distinctUntilChanged())
+      .subscribe(() => { this.pag.pagina = 0; this.cargarOrdenes(); });
     this.cargarOrdenes();
     this.referencias.proveedores().subscribe(p => this.proveedores = p);
     this.referencias.bodegas().subscribe(b => this.bodegas = b);
@@ -108,10 +118,19 @@ export class OrdenesCompraComponent implements OnInit {
 
   cargarOrdenes(conTotal = true): void {
     this.loading = true;
-    this.compras.ordenes({ page: this.pag.pagina, size: this.pag.tam, conTotal }).subscribe({
+    this.compras.ordenes({ page: this.pag.pagina, size: this.pag.tam, conTotal,
+                           buscar: this.busqueda.trim() || undefined }).subscribe({
       next: pg => { this.pag.aplicar(pg); this.loading = false; },
       error: () => this.loading = false
     });
+  }
+
+  alEscribirBusqueda(): void { this.texto$.next(); }
+
+  limpiarBusqueda(): void {
+    this.busqueda = '';
+    this.pag.pagina = 0;
+    this.cargarOrdenes();
   }
 
   /** Cambiar de página NO recuenta: el conjunto es el mismo. */
@@ -156,6 +175,13 @@ export class OrdenesCompraComponent implements OnInit {
         this.proveedorId = null; this.bodegaId = null; this.observacion = '';
         this.fechaEntregaEsperada = null;
         this.lineas = [{ varianteId: null, cantidad: 1, precioUnitario: 0 }];
+        // La orden recién emitida NO sale primera si se ordena por id o por
+        // fecha: la carga masiva reservó ids hasta 2.100.003.975 y fechas
+        // hasta 2034, mientras que una orden nueva toma el siguiente valor de
+        // la secuencia (hoy ~919) y la fecha de hoy. Así que en vez de mentir
+        // con el orden, se filtra por su número: queda sola y arriba.
+        this.busqueda = orden.numero;
+        this.pag.pagina = 0;
         this.cargarOrdenes();
       },
       error: e => {

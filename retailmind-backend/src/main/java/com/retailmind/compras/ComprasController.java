@@ -75,9 +75,10 @@ public class ComprasController {
             @RequestParam(required = false) Boolean facturables,
             @RequestParam(required = false) Boolean recibibles,
             @RequestParam(required = false) Long incluirOrdenId,
-            @RequestParam(required = false) Boolean conTotal) {
+            @RequestParam(required = false) Boolean conTotal,
+            @RequestParam(required = false) String buscar) {
         return servicio.listarOrdenes(page, size, facturables, recibibles,
-                incluirOrdenId, conTotal);
+                incluirOrdenId, conTotal, buscar);
     }
 
     @GetMapping("/ordenes/{id}")

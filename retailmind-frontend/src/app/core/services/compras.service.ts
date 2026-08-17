@@ -31,7 +31,7 @@ export class ComprasService {
    */
   ordenes(opts: {
     page?: number; size?: number; facturables?: boolean; recibibles?: boolean;
-    incluirOrdenId?: number | null; conTotal?: boolean;
+    incluirOrdenId?: number | null; conTotal?: boolean; buscar?: string;
   } = {}): Observable<Pagina<OrdenCompraRow>> {
     let params = new HttpParams();
     if (opts.page != null)    { params = params.set('page', opts.page); }
@@ -41,6 +41,7 @@ export class ComprasService {
     if (opts.incluirOrdenId != null) {
       params = params.set('incluirOrdenId', opts.incluirOrdenId);
     }
+    if (opts.buscar)             { params = params.set('buscar', opts.buscar); }
     if (opts.conTotal === false) { params = params.set('conTotal', false); }
     return this.http.get<Pagina<OrdenCompraRow>>(`${this.base}/ordenes`, { params });
   }

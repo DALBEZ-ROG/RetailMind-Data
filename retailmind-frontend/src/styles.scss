@@ -69,6 +69,21 @@ $theme: mat.define-light-theme((
   // suaviza el corte; la señal que cuenta es el anillo interior.
   --campo-anillo: 0 0 0 2px rgba(57, 73, 171, 0.75), 0 0 0 5px rgba(57, 73, 171, 0.14);
   --campo-anillo-error: 0 0 0 2px rgba(213, 0, 0, 0.75), 0 0 0 5px rgba(213, 0, 0, 0.14);
+
+  // ── LA SUPERFICIE SOBRE LA QUE SE APOYA LA ETIQUETA FLOTADA ─────────────
+  // La etiqueta flotada NO cabe entera fuera del campo (medido: en un diálogo
+  // ya sobresale 3,8 px por encima del recorte de `.mat-mdc-dialog-content`,
+  // que es `overflow: auto`, y en la barra de filtros solo hay ~13 px de
+  // relleno de tarjeta por encima). Como no se puede subir, se limpia por
+  // DEBAJO: una franja del color de la superficie que hay detrás del campo,
+  // pintada tras la etiqueta. Ver el bloque «LA FRANJA» más abajo.
+  //
+  // El valor es el color COMPUESTO, no el declarado: `.op-card` es blanco al
+  // 85 % sobre `--bg-main`, y eso da #fdfdfe medido en el DOM vivo. Se declara
+  // como variable —y no como literal dentro de la regla— porque cada
+  // superficie que hospede campos puede sobreescribirlo con una línea; hoy
+  // solo lo hace `.dubai-dialog`.
+  --campo-etiqueta-fondo: #fdfdfe;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -726,6 +741,15 @@ select.select-premium,
 // una hoja con encapsulación no lo alcanza (§2.4 y trampa 2 de PATRON_UI.md).
 // ──────────────────────────────────────────────────────────────────────────────
 .dubai-dialog {
+  // La superficie de un diálogo NO es la de una tarjeta: el panel es blanco al
+  // 92 % sobre el velo del CDK (negro al 32 %) sobre la página, y eso compone
+  // #f8f8f8, cinco puntos más oscuro que el #fdfdfe de `.op-card`. Con el
+  // valor de la tarjeta, la franja de la etiqueta se vería como un parche
+  // claro detrás del texto en los 20 diálogos. El velo es HERMANO del panel y
+  // no ancestro, así que no sale de recorrer el DOM hacia arriba: hay que
+  // componerlo a mano (medido en el DOM vivo).
+  --campo-etiqueta-fondo: #f8f8f8;
+
   .mat-mdc-form-field-subscript-wrapper {
     min-height: 16px;
 
@@ -824,6 +848,69 @@ select.select-premium,
   // 3 · La etiqueta flotada se apoya SOBRE el relleno.
   .mdc-floating-label--float-above { translate: 0 -5px; }
 
+  // ── LA FRANJA: lo que separa la etiqueta del borde del campo ──────────────
+  //
+  // EL DEFECTO, medido en los tres contextos (2026-08-16): la caja de la
+  // etiqueta flotada baja **3,24 px CSS** por debajo del borde superior del
+  // relleno, y el anillo de foco ocupa justo los 2 px de encima de ese borde,
+  // así que al enfocar el índigo cruza la mitad inferior de las letras: la
+  // etiqueta se monta sobre la línea del contenedor. La cifra es la MISMA en
+  // pantalla completa (densidad 0), en la barra de filtros (densidad −3) y en
+  // el diálogo, porque el ajuste de arriba es un `translate` y por tanto un
+  // delta; lo que cambia entre contextos es solo la escala de pintado.
+  //
+  // POR QUÉ NO SE SUBE LA ETIQUETA, que sería lo obvio: no hay sitio. Medido,
+  // la etiqueta flotada del primer campo de un diálogo YA sobresale 3,8 px por
+  // encima del borde de `.mat-mdc-dialog-content`, que es `overflow: auto` y
+  // por tanto recorta; y en la barra de filtros el campo solo tiene ~13 px de
+  // relleno de tarjeta por encima. Subirla exigiría pagar relleno superior en
+  // el diálogo Y en la barra de filtros —la misma barra que se acaba de
+  // compactar de 16.176 a 5.224 px en las seis pantallas de informes—, así que
+  // la colisión se quita por DEBAJO y la maquetación no se toca.
+  //
+  // CÓMO: una franja del color de la superficie que hay DETRÁS del campo,
+  // pintada entre el anillo y las letras. Donde la franja cae sobre la tarjeta
+  // es invisible (mismo color); donde cae sobre el borde del relleno y sobre
+  // el anillo, los interrumpe justo el ancho de la etiqueta. Es la misma
+  // figura que la muesca del contorno de Material —la etiqueta encaja en un
+  // hueco del borde—, pero sobre un relleno en vez de sobre una línea.
+  //
+  // Va en un PSEUDO-ELEMENTO y no en el `background` de la etiqueta por dos
+  // razones concretas:
+  //   · `inset: 0 -4px` da aire a los lados SIN mover el texto; con `padding`
+  //     habría que compensar con un margen negativo y el texto se desplaza si
+  //     MDC cambia el `left` de la etiqueta;
+  //   · la etiqueta lleva la clase `--float-above` desde el PRIMER fotograma
+  //     de la animación, mientras todavía viaja desde dentro del campo. Con el
+  //     fondo puesto sobre la etiqueta se vería una píldora blanca subiendo
+  //     por dentro del relleno. El pseudo-elemento aparece con un retardo de
+  //     130 ms —cuando la etiqueta ya llegó— y se va sin retardo al bajar.
+  //
+  // `isolation: isolate` es lo que hace que el `z-index: -1` se quede DENTRO
+  // de la etiqueta: la franja pasa por detrás de las letras y por delante del
+  // anillo. Sin él, el −1 se iría a buscar el contexto de apilamiento de más
+  // arriba y la franja acabaría por debajo del propio relleno, que es
+  // exactamente lo que hay que tapar.
+  .mdc-floating-label {
+    isolation: isolate;
+
+    &::before {
+      content: '';
+      position: absolute;
+      inset: 0 -4px;
+      z-index: -1;
+      border-radius: 3px;
+      background: var(--campo-etiqueta-fondo);
+      opacity: 0;
+      transition: opacity 90ms linear;
+    }
+  }
+
+  .mdc-floating-label--float-above::before {
+    opacity: 1;
+    transition-delay: 130ms;
+  }
+
   // El COLOR del rótulo se deja en manos de Material a propósito: medido sobre
   // el relleno nuevo, su negro al 60 % da 5,47:1 y el índigo del foco otros
   // 5,47:1, mejor los dos que el --text-secondary de la casa (4,62:1). Lo que
@@ -867,9 +954,20 @@ select.select-premium,
       box-shadow: none;
     }
 
-    .mdc-floating-label,
     .mat-mdc-input-element,
     .mat-mdc-select-value-text { opacity: 0.55; }
+
+    // La etiqueta se apaga por COLOR y no por `opacity`, que es como estaba:
+    // la opacidad la heredaría también su franja, y una franja al 55 % deja
+    // ver por debajo el borde del relleno — justo lo que esta sesión corrige.
+    // El tono es el mismo que producía `opacity: .55` sobre el negro al 60 %
+    // de Material (alfa efectiva 0,33), así que un campo deshabilitado se ve
+    // igual que antes. El contraste no aplica aquí: WCAG 1.4.3 exime a los
+    // controles deshabilitados.
+    .mdc-floating-label {
+      opacity: 1;
+      color: rgba(0, 0, 0, 0.33);
+    }
 
     .mat-mdc-text-field-wrapper,
     .mat-mdc-input-element,
