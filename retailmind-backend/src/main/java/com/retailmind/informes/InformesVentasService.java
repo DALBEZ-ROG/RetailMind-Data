@@ -7,6 +7,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -48,6 +50,65 @@ public class InformesVentasService extends InformeServiceBase {
             "pendiente", "confirmado", "pagado", "facturado", "en_preparacion",
             "preparado", "despachado", "entregado", "cancelado", "devuelto", "no_entregado");
 
+    /**
+     * Los cuatro estados en los que el pedido ya NO está en la cartera: llegó,
+     * se anuló, volvió o no se pudo entregar.
+     *
+     * Es una CONSTANTE DEL CÓDIGO —literal, sin nada del usuario dentro— y vive
+     * en un solo sitio a propósito: la usan el filtro sintético `en_curso` y el
+     * KPI «Monto aún en proceso», y si las dos listas se separan la pantalla
+     * enseña un total de cartera que no cuadra con el importe que tiene al lado.
+     * Es la misma disciplina que la recepción canónica del ETL (C6.1).
+     */
+    private static final String TERMINALES_SQL =
+            "('entregado', 'cancelado', 'devuelto', 'no_entregado')";
+
+    /**
+     * Estado sintético de la CARTERA: los pedidos que siguen vivos, o sea la
+     * negación de los cuatro terminales. No es una columna de `estado_pedido`.
+     *
+     * Es el valor por defecto del filtro en la pantalla, y no por comodidad:
+     * «cartera» SON los pedidos abiertos. De los 2.999.995 pedidos, 2.641.189
+     * están entregados y son historia, no cartera — con el filtro vacío la
+     * consulta abarcaba los 3 M, se pasaba del tope de conteo y los tres KPI
+     * salían SIN CALCULAR (medido: sumar bajo RLS cuesta 4,58 s, que es la razón
+     * documentada de que no se calculen por encima del tope). En curso son
+     * 75.139, muy por debajo del tope, así que con el defecto puesto los tres
+     * indicadores son EXACTOS y la pantalla ya no abre con «No calculado».
+     *
+     * Mismo patrón que el `pendientes` de OTD-SOP-01: el valor por defecto lo
+     * declara la definición del frontend (`valorInicial`) y aquí solo se acepta
+     * y se traduce, para que un `GET` sin `estado` siga significando «sin
+     * filtro» y no mienta sobre lo que devuelve.
+     */
+    private static final String EN_CURSO = "en_curso";
+
+    /** Lo que el filtro de estado admite: los reales más el sintético. */
+    private static final Set<String> ESTADOS_FILTRO =
+            Stream.concat(ESTADOS.stream(), Stream.of(EN_CURSO)).collect(Collectors.toUnmodifiableSet());
+
+    /**
+     * La traducción de `en_curso` a SQL, y **no es la forma obvia**.
+     *
+     * Lo natural sería `ep.codigo NOT IN <terminales>`, que es correcto y **tarda
+     * 4,6 s**: el `NOT IN` va contra la tabla UNIDA, así que el planificador no
+     * puede empujarlo a `idx_pedido_estado` y hace un Parallel Seq Scan de los
+     * 3 M de `pedido`. Medido, con la misma respuesta: 4.671 ms / 4.690 ms.
+     *
+     * Filtrando por la columna INDEXADA del propio `pedido` con `= ANY(array)`,
+     * el plan pasa a Bitmap Index Scan y baja a **~200 ms — unas 20 veces menos**
+     * (197 ms / 200 ms medidos, ya con el JOIN a `estado_pedido` puesto). La
+     * subconsulta `estado_pedido_id IN (SELECT id ... WHERE codigo NOT IN ...)`
+     * NO sirve: el planificador la resuelve como semi-join y vuelve a los 4,58 s.
+     *
+     * Va con `= ANY(?::bigint[])` y **un solo parámetro LIGADO** —el array como
+     * texto `{1,2,3}`— en vez de un `IN (?,?,?)` cuyo número de placeholders
+     * habría que construir: así no se arma nada de SQL por concatenación
+     * (regla de oro n.º 2) y el cast explícito cumple la n.º 8.
+     */
+    private static final String CLAUSULA_EN_CURSO =
+            " AND p.estado_pedido_id = ANY(?::bigint[])\n";
+
     /** Espeja pedido.canal: 'web' = tienda en línea; 'tienda'/'telefono' = interno. */
     private static final Set<String> CANALES = Set.of("web", "tienda", "telefono");
 
@@ -64,19 +125,52 @@ public class InformesVentasService extends InformeServiceBase {
         super(pg);
     }
 
+    /**
+     * Los ids de los estados NO terminales, en el formato de array de PostgreSQL
+     * (`{1,2,3}`), para `CLAUSULA_EN_CURSO`.
+     *
+     * Se RESUELVEN desde los códigos en cada consulta en vez de escribirse: son
+     * 11 filas y el coste no se mide, mientras que un id escrito a mano es un
+     * error esperando. Durante el desarrollo de esto se probó con la lista
+     * `(2,3,4,5,6,7)` supuesta por el `orden` de la tabla y resultó incluir el id
+     * **6, que es `entregado`** — 2.641.189 pedidos—, así que el «filtro de
+     * cartera» devolvía la tabla entera y la consulta volvía a los 4,2 s. Los
+     * ids reales no siguen el orden del proceso (`facturado` es 9 y `preparado`
+     * el 10, posteriores a `entregado`), que es exactamente por lo que no se
+     * codifican.
+     */
+    private String idsNoTerminales() {
+        List<Long> ids = pg.queryForList(
+                "SELECT id FROM estado_pedido WHERE codigo NOT IN " + TERMINALES_SQL
+                + " ORDER BY id", Long.class);
+        return ids.stream().map(String::valueOf).collect(Collectors.joining(",", "{", "}"));
+    }
+
     // ─────────────────────────────────────────────────────────────────────
     // OTD-VEN-01 — Cartera de pedidos por estado
     // ─────────────────────────────────────────────────────────────────────
 
     /**
      * Toda la cartera con el paso del proceso en que está cada pedido hoy.
-     * Filtros: estado (código), canal, rango de fecha del pedido y búsqueda
-     * por número de pedido o cliente. Paginado (4.083 pedidos hoy).
+     * Filtros: estado (código, o el sintético {@code en_curso}), canal, rango de
+     * fecha del pedido y búsqueda por número de pedido o cliente. Paginado.
+     *
+     * <p>El filtro de estado arranca en {@code en_curso} desde la pantalla: son
+     * 75.139 pedidos de los 2.999.995, y esa diferencia es la que decide si los
+     * tres KPI se calculan o salen vacíos (ver {@link #EN_CURSO} y el bloque de
+     * abajo sobre el tope). Con el filtro vacío —«todos los estados»— el conjunto
+     * son los 3 M, se pasa del tope y los importes NO se calculan a propósito.
      */
     @Transactional(readOnly = true)
     public Map<String, Object> carteraPedidos(String estado, String canal, String desde,
                                               String hasta, String buscar, int page, int size) {
-        String est = opcion(estado, ESTADOS, "estado");
+        String est = opcion(estado, ESTADOS_FILTRO, "estado");
+        // `en_curso` no es un estado de la tabla: se traduce a la negación de los
+        // cuatro terminales y viaja como BANDERA, no como valor. Así el SQL sigue
+        // siendo constante y lo que el usuario mandó solo entra por `opcion()`,
+        // que es una lista blanca.
+        String estadoConcreto = EN_CURSO.equals(est) ? null : est;
+        boolean soloEnCurso = EN_CURSO.equals(est);
         String can = opcion(canal, CANALES, "canal");
         String d = fecha(desde, "desde");
         String h = fecha(hasta, "hasta");
@@ -98,8 +192,16 @@ public class InformesVentasService extends InformeServiceBase {
                   AND (?::varchar IS NULL OR p.numero ILIKE '%' || ?::varchar || '%'
                        OR concat(c.nombre, ' ', c.apellido) ILIKE '%' || ?::varchar || '%'
                        OR c.email ILIKE '%' || ?::varchar || '%')
-                """ + filtroDia("p.fecha_pedido", ts);
-        Object[] args = conLimites(new Object[] { est, est, can, can, q, q, q, q }, ts);
+                """
+                + (soloEnCurso ? CLAUSULA_EN_CURSO : "")
+                + filtroDia("p.fecha_pedido", ts);
+
+        List<Object> params = new ArrayList<>();
+        params.add(estadoConcreto); params.add(estadoConcreto);
+        params.add(can); params.add(can);
+        params.add(q); params.add(q); params.add(q); params.add(q);
+        if (soloEnCurso) { params.add(idsNoTerminales()); }
+        Object[] args = conLimites(params.toArray(), ts);
 
         Map<String, Object> res = paginarConTope("""
                 SELECT p.id, p.numero, p.fecha_pedido, p.canal,
@@ -142,7 +244,8 @@ public class InformesVentasService extends InformeServiceBase {
                 SELECT count(*) AS pedidos,
                        COALESCE(sum(p.total), 0) AS monto,
                        COALESCE(sum(p.total) FILTER (WHERE ep.codigo NOT IN
-                            ('entregado', 'cancelado', 'devuelto', 'no_entregado')), 0) AS en_curso
+                """ + TERMINALES_SQL + """
+                            ), 0) AS en_curso
                 """ + from, args);
 
         return conResumen(res, List.of(

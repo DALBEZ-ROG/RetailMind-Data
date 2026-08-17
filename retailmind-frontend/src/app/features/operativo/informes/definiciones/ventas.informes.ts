@@ -152,8 +152,17 @@ export const INFORMES_VENTAS: DefinicionDepartamento = {
       roles: ['ADMIN', 'GERENTE', 'VENDEDOR'],
       vacio: 'Ningún pedido coincide con los filtros elegidos.',
       filtros: [
-        { param: 'estado', etiqueta: 'Estado', tipo: 'select', opciones: [
-          { valor: '',               etiqueta: 'Todos los estados' },
+        // «En curso» no es un estado de la tabla: agrupa los pedidos que siguen
+        // vivos, o sea la negación de los cuatro terminales, y es la pregunta con
+        // la que se abre una cartera. Es el valor por defecto y eso NO es
+        // cosmética: con «todos los estados» el conjunto son los 2.999.995
+        // pedidos, se pasa del tope de conteo y los tres indicadores de la
+        // cabecera salen «No calculado» (sumar bajo RLS cuesta 4,58 s). En curso
+        // son 75.139 y los tres son exactos.
+        { param: 'estado', etiqueta: 'Estado', tipo: 'select', valorInicial: 'en_curso',
+          opciones: [
+          { valor: 'en_curso',       etiqueta: 'En curso (cartera abierta)' },
+          { valor: '',               etiqueta: 'Todos los estados (sin importes)' },
           { valor: 'pendiente',      etiqueta: 'Pendiente' },
           { valor: 'confirmado',     etiqueta: 'Confirmado' },
           { valor: 'pagado',         etiqueta: 'Pagado' },
