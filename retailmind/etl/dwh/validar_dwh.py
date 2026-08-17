@@ -508,11 +508,26 @@ CONTROLES += [
                                    WHERE f.orden_compra_id = oc.id)),
                    (SELECT count(*) FROM orden_compra
                      WHERE fecha_entrega_esperada IS NOT NULL),
+                   -- `pares` y `cumplieron` van contra la recepción CANÓNICA de
+                   -- la orden —la ÚLTIMA por (fecha_recepcion, id)—, que es la que
+                   -- publica `fact_orden_compra` (C6.1). Una orden puede tener DOS
+                   -- recepciones (la 920 las tiene desde el 2026-08-16) y con un
+                   -- `JOIN recepcion_mercancia` a secas aportaba DOS pares: el
+                   -- control acusaría a la tabla de un descuadre propio. Mismo
+                   -- criterio y misma exigencia de igualdad exacta; otro grano.
                    (SELECT count(*) FROM orden_compra oc
-                     JOIN recepcion_mercancia r ON r.orden_compra_id = oc.id
+                     JOIN LATERAL (SELECT rm.fecha_recepcion
+                                   FROM recepcion_mercancia rm
+                                   WHERE rm.orden_compra_id = oc.id
+                                   ORDER BY rm.fecha_recepcion DESC, rm.id DESC
+                                   LIMIT 1) r ON TRUE
                      WHERE oc.fecha_entrega_esperada IS NOT NULL),
                    (SELECT count(*) FROM orden_compra oc
-                     JOIN recepcion_mercancia r ON r.orden_compra_id = oc.id
+                     JOIN LATERAL (SELECT rm.fecha_recepcion
+                                   FROM recepcion_mercancia rm
+                                   WHERE rm.orden_compra_id = oc.id
+                                   ORDER BY rm.fecha_recepcion DESC, rm.id DESC
+                                   LIMIT 1) r ON TRUE
                      WHERE oc.fecha_entrega_esperada IS NOT NULL
                        AND (r.fecha_recepcion AT TIME ZONE '{ZONA_HORARIA}')::date
                            <= oc.fecha_entrega_esperada),
@@ -587,10 +602,17 @@ CONTROLES += [
                    (SELECT SUM(cantidad_rechazada) FROM recepcion_detalle),
                    (SELECT SUM(cantidad_recibida + cantidad_rechazada) FROM recepcion_detalle),
                    (SELECT SUM(subtotal) FROM orden_compra_detalle),
-                   (SELECT count(*) FROM recepcion_detalle WHERE cantidad_rechazada > 0),
+                   -- Por LÍNEA y no por fila de recepción (C6.3): una línea puede
+                   -- recibirse en varios actos y «tuvo rechazo» / «se sirvió
+                   -- completa» son propiedades de la línea, medidas sobre el TOTAL
+                   -- recibido. La línea 2.957 (12 pedidas, servidas 11 + 1) no
+                   -- contaba como completa en ninguna de sus dos recepciones.
                    (SELECT count(*) FROM orden_compra_detalle d
-                     JOIN recepcion_detalle rd ON rd.orden_compra_detalle_id = d.id
-                     WHERE rd.cantidad_recibida >= d.cantidad),
+                     WHERE (SELECT SUM(rd.cantidad_rechazada) FROM recepcion_detalle rd
+                            WHERE rd.orden_compra_detalle_id = d.id) > 0),
+                   (SELECT count(*) FROM orden_compra_detalle d
+                     WHERE (SELECT SUM(rd.cantidad_recibida) FROM recepcion_detalle rd
+                            WHERE rd.orden_compra_detalle_id = d.id) >= d.cantidad),
                    (SELECT count(DISTINCT producto_variante_id) FROM orden_compra_detalle),
                    (SELECT count(DISTINCT orden_compra_id) FROM orden_compra_detalle)
         """,
@@ -615,15 +637,56 @@ CONTROLES += [
         # La MISMA traducción que aplica `transformar()` en Python, escrita aquí
         # de nuevo a propósito: si la validación importara el mapa de la tarea,
         # ambos compartirían el error y el control sería una tautología.
+        #
+        # DOS CORRECCIONES DEL 2026-08-17, y ninguna afloja el criterio:
+        #
+        # (a) LA REGLA DE ESCAPE FALTABA. Este CASE traducía el sinónimo y dejaba
+        #     pasar cualquier otro valor TAL CUAL, mientras Python manda todo lo no
+        #     previsto a 'Otro' (§5.3). Mientras los motivos crudos fueron los 6
+        #     conocidos la omisión no se vio; en cuanto la aplicación escribió uno
+        #     nuevo —«Caja dañada», 2026-08-16, `motivo_rechazo` es TEXTO LIBRE—
+        #     PostgreSQL decía «Caja dañada» donde ClickHouse dice 'Otro' y el
+        #     control fallaba por no expresar la regla entera. Ahora la lista
+        #     blanca de los cinco canónicos está escrita aquí, independiente de la
+        #     de la tarea: si Python mandara un motivo REAL a 'Otro', o metiera uno
+        #     inventado en un cubo canónico, esta fila sigue delatándolo.
+        #
+        # (b) EL GRANO. Se agrupa por LÍNEA, no por fila de recepción, y el motivo
+        #     de la línea se elige con la misma regla declarada en
+        #     `_RECEPCION_AGREGADA`: el de la recepción que rechazó y, entre
+        #     varias, la última por id (C6.3).
         sql_pg="""
-            SELECT CASE LOWER(TRIM(rd.motivo_rechazo))
+            WITH linea AS (
+                SELECT d.id,
+                       SUM(rd.cantidad_rechazada) AS rechazadas,
+                       (SELECT NULLIF(TRIM(r3.motivo_rechazo), '')
+                        FROM recepcion_detalle r3
+                        WHERE r3.orden_compra_detalle_id = d.id
+                          AND NULLIF(TRIM(r3.motivo_rechazo), '') IS NOT NULL
+                        ORDER BY (r3.cantidad_rechazada > 0) DESC, r3.id DESC
+                        LIMIT 1) AS motivo_crudo
+                FROM orden_compra_detalle d
+                JOIN recepcion_detalle rd ON rd.orden_compra_detalle_id = d.id
+                GROUP BY d.id
+            )
+            SELECT CASE LOWER(TRIM(motivo_crudo))
+                        WHEN 'empaque danado en transito'
+                             THEN 'Empaque danado en transito'
+                        WHEN 'producto con defecto de fabrica'
+                             THEN 'Producto con defecto de fabrica'
+                        WHEN 'fecha de caducidad proxima'
+                             THEN 'Fecha de caducidad proxima'
+                        WHEN 'no coincide con especificacion'
+                             THEN 'No coincide con especificacion'
+                        WHEN 'unidades incompletas en caja'
+                             THEN 'Unidades incompletas en caja'
                         WHEN 'cajas mojadas en el transporte'
                              THEN 'Empaque danado en transito'
-                        ELSE rd.motivo_rechazo
+                        ELSE 'Otro'
                    END AS motivo,
-                   count(*), SUM(rd.cantidad_rechazada)
-            FROM recepcion_detalle rd
-            WHERE rd.cantidad_rechazada > 0
+                   count(*), SUM(rechazadas)
+            FROM linea
+            WHERE rechazadas > 0
             GROUP BY 1 ORDER BY 1
         """,
         sql_ch=f"""

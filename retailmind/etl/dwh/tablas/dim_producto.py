@@ -23,6 +23,52 @@ llevar varias categorías y hay que elegir una. En estos datos NO ocurre: la
 denormalización es 1:1 y sin pérdida, no hay regla de desempate que inventar.
 Se comprobó antes de escribir el SELECT precisamente porque el esquema invita a
 suponer lo contrario, y porque un fan-out aquí multiplicaría filas en silencio.
+
+═══════════════════════════════════════════════════════════════════════════════
+`peso_kg` ES Nullable — corrección del 2026-08-17
+═══════════════════════════════════════════════════════════════════════════════
+
+`producto_variante.peso_kg` es NULLABLE en PostgreSQL y esta columna lo declaraba
+`Decimal(10,3)` a secas. Mientras las 1.221 variantes del seed traían peso (script
+54 se los cargó a todas) el hueco no se notó. En cuanto la aplicación creó
+variantes nuevas —tres, el 2026-08-12 y el 2026-08-16— la carga empezó a fallar
+con un mensaje que NO nombra la columna ni la fila:
+
+    InvalidOperation: [<class 'decimal.ConversionSyntax'>]
+
+porque `clickhouse_connect` escribe una columna Decimal con
+`int(Decimal(str(x)) * mult)`, y con `x = None` eso es `Decimal('None')`. No es un
+valor mal formado en la base: es un NULL legítimo contra una columna que no lo
+admitía.
+
+Se declara `Nullable` y NO se resuelve con `COALESCE(peso_kg, 0)`, por la lección
+de la Fase 3B: **en ClickHouse «no hay dato» y «el dato es cero» se parecen
+demasiado**. Un peso 0 es una afirmación —«no pesa»— y aquí la verdad es «no se
+sabe». Hoy no hay informe ni tablero que lea esta columna (verificado), así que
+el NULL no propaga a ninguna aritmética.
+
+`margen_catalogo_pct` ES Nullable POR LA MISMA RAZÓN, y no porque hoy falle.
+Sale de un `ROUND(((precio − costo) / NULLIF(pv.precio, 0)) * 100, 2)`: el
+`NULLIF` evita la división por cero, pero **su resultado es NULL**, así que con
+`precio = 0` esta columna reproducía el fallo de `peso_kg` exactamente, una
+columna más allá. Ninguna variante tiene precio 0 hoy (mínimo $0,45) y desde el
+2026-08-17 `CatalogoAdminService.precioValidado()` lo impide en el alta Y en la
+edición — pero el CHECK del motor es `precio >= 0`, o sea **el cero es legal para
+PostgreSQL**, y un script de siembra no pasa por la aplicación. Con la columna
+Nullable, ese caso publica un margen NULL («indefinido», que es la verdad) en vez
+de abortar la carga de la dimensión contra la que resuelven `fact_venta_linea`,
+`fact_compra_linea`, `fact_resena` y `fact_devolucion_linea`.
+
+Las dos columnas Nullable de esta tabla son, entonces, la misma lección escrita
+dos veces: **una columna no-Nullable en el almacén es una apuesta sobre datos que
+la aplicación no garantiza.** Si añades una columna Decimal aquí, mira antes si su
+origen puede ser NULL —por nulabilidad de la columna, por un `NULLIF`, por un
+`LEFT JOIN`— porque el error no te lo va a decir: `clickhouse_connect` hace
+`int(Decimal(str(x)) * mult)` y con `x = None` eso es `Decimal('None')`, que
+levanta un `ConversionSyntax` sin nombrar tabla, fila ni columna.
+
+Historial: ficha **C-19** de `DEUDA_TECNICA.md` y correcciones **C6.4** y **C6.5**
+de `docs/estrategico/CORRECCIONES_DISENO_ETL.md`.
 """
 
 from datetime import datetime
@@ -50,8 +96,8 @@ class DimProducto(TareaCarga):
             categoria_id         UInt16,
             precio               Decimal(14,2),
             costo                Decimal(14,2),
-            margen_catalogo_pct  Decimal(6,2),
-            peso_kg              Decimal(10,3),
+            margen_catalogo_pct  Nullable(Decimal(6,2)),
+            peso_kg              Nullable(Decimal(10,3)),
             activo               UInt8,
             fecha_carga          DateTime('{ZONA_HORARIA}')
         )

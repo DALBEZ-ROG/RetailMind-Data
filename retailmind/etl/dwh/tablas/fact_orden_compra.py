@@ -14,10 +14,16 @@ antes de escribir un solo JOIN, que es lo que el encargo de la fase mandaba, y
 el resultado tiene dos mitades:
 
     LO QUE SÍ SE SOSTIENE — la multiplicidad
-        máx. recepciones por OC ..................... 1
+        máx. recepciones por OC ..................... 1   ← YA NO, ver C6.1 abajo
         OC con más de una factura ................... 0
         facturas con más de una cuenta por pagar .... 0
         facturas sin orden de compra ................ 0
+
+**AVISO (2026-08-17): la primera línea de ese bloque CADUCÓ.** Una orden de compra
+puede tener DOS recepciones y desde el 2026-08-16 las tiene (OC 920). El
+`LEFT JOIN recepcion_mercancia` que esa medición autorizaba se sustituyó por la
+recepción CANÓNICA — ver la constante `_RECEPCION_CANONICA` y la corrección C6.1.
+Las otras tres siguen verificadas.
 
     LO QUE NO — la cobertura
         órdenes de compra ........................... 865
@@ -106,12 +112,23 @@ un 0 querría decir «incumplió», que es una afirmación distinta de «no se s
 4. AGREGADOS DEL DETALLE Y ETIQUETA DEL PROVEEDOR
 ═══════════════════════════════════════════════════════════════════════════════
 
-`lineas`, `unidades_pedidas`, `unidades_recibidas` y `unidades_rechazadas` se
-calculan en un LATERAL sobre el detalle. No hay fan-out posible: se verificó que
-`recepcion_detalle` es 1:1 con `orden_compra_detalle` donde existe (0 líneas con
-dos recepciones) y que `orden_compra_detalle.cantidad_recibida` coincide SIEMPRE
-con `recepcion_detalle.cantidad_recibida` (0 discrepancias en 2.855 líneas), de
-modo que la denormalización no introduce una segunda verdad.
+`lineas`, `unidades_pedidas` y `unidades_recibidas` se calculan en un LATERAL
+sobre el detalle de la ORDEN, y `unidades_rechazadas` en un LATERAL propio sobre
+`recepcion_detalle`.
+
+Están SEPARADOS desde el 2026-08-17 y esa separación es la corrección C6.2. Antes
+los cuatro salían de un solo LATERAL que unía el detalle de la orden con
+`recepcion_detalle`, apoyándose en una medición que ya no se sostiene: «0 líneas
+con dos recepciones». Hoy hay una (la línea 2.957 de la OC 920), y ese LEFT JOIN
+la duplicaba DENTRO del LATERAL: `lineas` contaba 3 donde hay 2 y las unidades se
+sumaban dos veces. Lo pedido y lo recibido son del DETALLE DE LA ORDEN —una fila
+por línea, pase lo que pase—; el rechazo es del documento de RECEPCIÓN y se suma
+sobre todas las recepciones de la orden.
+
+Lo que sí sigue verificado: `orden_compra_detalle.cantidad_recibida` coincide
+SIEMPRE con la SUMA de `recepcion_detalle.cantidad_recibida` de esa línea (12 = 11
++ 1 en la línea de dos recepciones), de modo que la denormalización no introduce
+una segunda verdad.
 
 El rótulo `proveedor` es `razon_social` y no `nombre_comercial`, a propósito: es
 el mismo que `fact_flujo_caja.contraparte_nombre` usa para el egreso. La misma
@@ -200,6 +217,40 @@ class FactOrdenCompra(TareaCarga):
     #: pueda aplicarse en un sitio y olvidarse en otro (corrección C3.4).
     _DIA_RECEPCION = f"(r.fecha_recepcion AT TIME ZONE '{ZONA_HORARIA}')::date"
 
+    #: LA RECEPCIÓN CANÓNICA DE LA ORDEN — corrección C6.1 (2026-08-17).
+    #:
+    #: Una orden puede tener MÁS DE UNA recepción y desde el 2026-08-16 la tiene:
+    #: la OC 920 se recibió en dos actos (11 unidades aceptadas y 1 rechazada por
+    #: «Caja dañada», y al día siguiente la que faltaba). El dato es correcto y es
+    #: el flujo que la aplicación permite —`recepcion_mercancia` no tiene UNIQUE
+    #: sobre `orden_compra_id`—; lo que estaba mal era esta consulta, que con un
+    #: `LEFT JOIN recepcion_mercancia` devolvía DOS filas para esa orden y rompía
+    #: el grano.
+    #:
+    #: Se toma la ÚLTIMA por `(fecha_recepcion, id)` y no la primera, porque las
+    #: unidades que viajan en la fila son el TOTAL recibido (de
+    #: `orden_compra_detalle.cantidad_recibida`, la suma de todas las recepciones).
+    #: Emparejar ese total con la fecha de la PRIMERA recepción afirmaría que las
+    #: 12 unidades estaban en bodega cuando solo había 11. Con la última, la fila
+    #: dice: «todo lo que llegó, había llegado en esta fecha».
+    #:
+    #: Consecuencia declarada para COM-05/COM-06: la promesa se juzga contra la
+    #: orden COMPLETA. Un proveedor que entrega el 99 % a tiempo y el resto tarde
+    #: cuenta como incumplimiento, que es la lectura estricta de «cumplió el plazo».
+    #:
+    #: `estado` NO se filtra. El CHECK admite 'anulada', pero hoy las 134.563
+    #: recepciones son 'confirmada' (verificado) y los controles cuentan por
+    #: EXISTS sin mirar el estado. Si algún día aparece una anulada, el filtro
+    #: tiene que entrar AQUÍ Y EN `sql_controles` a la vez, o la extracción y su
+    #: cifra de control dejarán de hablar del mismo conjunto.
+    _RECEPCION_CANONICA = """
+        SELECT rm.id, rm.fecha_recepcion
+        FROM recepcion_mercancia rm
+        WHERE rm.orden_compra_id = oc.id
+        ORDER BY rm.fecha_recepcion DESC, rm.id DESC
+        LIMIT 1
+    """
+
     def sql_extraccion(self) -> str:
         """
         Se parte de `orden_compra` y TODO lo demás entra por LEFT JOIN: son 865
@@ -249,24 +300,35 @@ class FactOrdenCompra(TareaCarga):
             agg.lineas,
             agg.unidades_pedidas,
             agg.unidades_recibidas,
-            agg.unidades_rechazadas
+            rech.unidades_rechazadas
         FROM orden_compra oc
         JOIN proveedor pv                ON pv.id  = oc.proveedor_id
         JOIN bodega b                    ON b.id   = oc.bodega_id
-        LEFT JOIN recepcion_mercancia r  ON r.orden_compra_id     = oc.id
+        LEFT JOIN LATERAL ({self._RECEPCION_CANONICA}) r ON TRUE
         LEFT JOIN factura_compra fc      ON fc.orden_compra_id    = oc.id
         LEFT JOIN cuenta_por_pagar cpp   ON cpp.factura_compra_id = fc.id
         LEFT JOIN LATERAL (
+            -- Sin `recepcion_detalle` aquí dentro: una línea puede tener DOS
+            -- líneas de recepción y el LEFT JOIN duplicaba la línea de la orden,
+            -- inflando `lineas`, `unidades_pedidas` y `unidades_recibidas`
+            -- (corrección C6.2). Lo pedido y lo recibido viven en el DETALLE de
+            -- la orden, que es 1 fila por línea pase lo que pase.
             SELECT
                 count(*)                                   AS lineas,
                 COALESCE(SUM(d.cantidad), 0)               AS unidades_pedidas,
-                COALESCE(SUM(d.cantidad_recibida), 0)      AS unidades_recibidas,
-                COALESCE(SUM(rd.cantidad_rechazada), 0)    AS unidades_rechazadas
+                COALESCE(SUM(d.cantidad_recibida), 0)      AS unidades_recibidas
             FROM orden_compra_detalle d
-            LEFT JOIN recepcion_detalle rd
-                   ON rd.orden_compra_detalle_id = d.id
             WHERE d.orden_compra_id = oc.id
         ) agg ON TRUE
+        LEFT JOIN LATERAL (
+            -- El rechazo sí es del documento de recepción, y se suma sobre TODAS
+            -- las recepciones de la orden: es la misma cifra que el control toma
+            -- con `SUM(cantidad_rechazada) FROM recepcion_detalle`.
+            SELECT COALESCE(SUM(rd.cantidad_rechazada), 0)  AS unidades_rechazadas
+            FROM recepcion_detalle rd
+            JOIN orden_compra_detalle d2 ON d2.id = rd.orden_compra_detalle_id
+            WHERE d2.orden_compra_id = oc.id
+        ) rech ON TRUE
         ORDER BY oc.fecha_emision, oc.proveedor_id, oc.id
         """
 
@@ -285,7 +347,7 @@ class FactOrdenCompra(TareaCarga):
         conjunto: `con_ambos` (838) es la única que lo delata. Validar solo las
         dos primeras dejaría pasar un JOIN que pierde o inventa una orden.
         """
-        return """
+        return f"""
         SELECT
             (SELECT count(*) FROM orden_compra)                        AS filas,
             (SELECT count(*) FROM orden_compra oc
@@ -301,18 +363,25 @@ class FactOrdenCompra(TareaCarga):
                            WHERE f.orden_compra_id = oc.id))           AS con_ambos,
             (SELECT count(*) FROM orden_compra
              WHERE fecha_entrega_esperada IS NOT NULL)                 AS con_esperada,
+            -- Las TRES cifras de plazo van contra la recepción CANÓNICA, la misma
+            -- que usa `sql_extraccion` (C6.1). Con un `JOIN recepcion_mercancia`
+            -- a secas, la orden con dos recepciones aportaba DOS pares y sumaba
+            -- su ciclo dos veces: el control habría culpado a la extracción de un
+            -- descuadre que estaba en el propio control. El `JOIN LATERAL … LIMIT 1`
+            -- no cambia el criterio —sigue contando solo órdenes con recepción y
+            -- sigue exigiendo igualdad EXACTA—, cambia el GRANO.
             (SELECT count(*) FROM orden_compra oc
-             JOIN recepcion_mercancia r ON r.orden_compra_id = oc.id
+             JOIN LATERAL ({self._RECEPCION_CANONICA}) r ON TRUE
              WHERE oc.fecha_entrega_esperada IS NOT NULL)              AS pares_comparables,
             (SELECT count(*) FROM orden_compra oc
-             JOIN recepcion_mercancia r ON r.orden_compra_id = oc.id
+             JOIN LATERAL ({self._RECEPCION_CANONICA}) r ON TRUE
              WHERE oc.fecha_entrega_esperada IS NOT NULL
                AND (r.fecha_recepcion AT TIME ZONE 'America/Guayaquil')::date
                    <= oc.fecha_entrega_esperada)                       AS cumplieron,
             (SELECT SUM((r.fecha_recepcion AT TIME ZONE 'America/Guayaquil')::date
                         - oc.fecha_emision)
              FROM orden_compra oc
-             JOIN recepcion_mercancia r ON r.orden_compra_id = oc.id)  AS suma_dias_ciclo,
+             JOIN LATERAL ({self._RECEPCION_CANONICA}) r ON TRUE)      AS suma_dias_ciclo,
             (SELECT SUM(total) FROM orden_compra)                      AS total_ordenes,
             (SELECT SUM(total) FROM factura_compra)                    AS total_facturas,
             (SELECT SUM(monto_original) FROM cuenta_por_pagar)         AS cxp_original,

@@ -133,6 +133,13 @@ recepciones, 2.855 distintas sobre 2.855 filas) y
 denormalización no introduce una segunda verdad. Se toma la de la RECEPCIÓN, que
 es el documento que también trae el rechazo y el motivo.
 
+**AVISO (2026-08-17): ese 1:1 CADUCÓ y con él el `LEFT JOIN` que autorizaba.**
+Hay una línea con dos recepciones (la 2.957 de la OC 920) y el join la partía en
+dos filas. La recepción entra ahora AGREGADA por línea: ver la constante
+`_RECEPCION_AGREGADA` y la corrección C6.3. Lo que sigue en pie es la segunda
+mitad de la frase —`cantidad_recibida` del detalle coincide con la SUMA de las
+recepciones de la línea—, y es justo lo que hace que agregar sea lícito.
+
 Bitácora completa de correcciones: `docs/estrategico/CORRECCIONES_DISENO_ETL.md`.
 """
 
@@ -230,6 +237,44 @@ class FactCompraLinea(TareaCarga):
     _LLEGADO = ("(COALESCE(rd.cantidad_recibida, 0) "
                 "+ COALESCE(rd.cantidad_rechazada, 0))")
 
+    #: LA RECEPCIÓN DE LA LÍNEA, AGREGADA — corrección C6.3 (2026-08-17).
+    #:
+    #: El grano de esta tabla es UNA LÍNEA DE ORDEN, y hasta hoy la recepción
+    #: entraba con `LEFT JOIN recepcion_detalle` amparándose en una medición que
+    #: caducó: «`recepcion_detalle` es estrictamente 1:1 con `orden_compra_detalle`
+    #: donde existe». Ya no lo es. La línea 2.957 (OC 920) tiene DOS líneas de
+    #: recepción —11 aceptadas con 1 rechazada, y la que faltaba al día
+    #: siguiente— y ese JOIN la partía en dos filas, rompiendo el grano y sumando
+    #: 12 unidades pedidas y $1.020,00 de subtotal que no existen.
+    #:
+    #: La recepción se AGREGA, no se elige: una línea puede recibirse en varios
+    #: actos y lo recibido es la SUMA de todos. Así `cantidad_recibida` sigue
+    #: cuadrando al centavo con `SUM(cantidad_recibida) FROM recepcion_detalle`,
+    #: que es lo que mide el control.
+    #:
+    #: `lineas_recepcion` (count, nunca NULL) sustituye al viejo `rd.id IS NOT
+    #: NULL` como prueba de «esta línea tuvo recepción»: los SUM sobre cero filas
+    #: devuelven NULL y no distinguirían «recibí 0» de «no hubo recepción».
+    #:
+    #: EL MOTIVO no se puede sumar y hay que elegirlo. Se toma el de la recepción
+    #: que de verdad RECHAZÓ algo y, entre varias, la última por `id`. Un motivo
+    #: sin rechazo no debe viajar —`_validar_motivos` aborta si aparece— y en la
+    #: línea real el segundo acto no rechazó nada y no trae motivo.
+    _RECEPCION_AGREGADA = """
+        SELECT
+            count(*)                    AS lineas_recepcion,
+            SUM(r2.cantidad_recibida)   AS cantidad_recibida,
+            SUM(r2.cantidad_rechazada)  AS cantidad_rechazada,
+            (SELECT NULLIF(TRIM(r3.motivo_rechazo), '')
+             FROM recepcion_detalle r3
+             WHERE r3.orden_compra_detalle_id = d.id
+               AND NULLIF(TRIM(r3.motivo_rechazo), '') IS NOT NULL
+             ORDER BY (r3.cantidad_rechazada > 0) DESC, r3.id DESC
+             LIMIT 1)                   AS motivo_rechazo
+        FROM recepcion_detalle r2
+        WHERE r2.orden_compra_detalle_id = d.id
+    """
+
     def sql_extraccion(self) -> str:
         """
         `motivo_rechazo` sale CRUDO del SELECT —solo recortado y con NULL
@@ -264,7 +309,7 @@ class FactCompraLinea(TareaCarga):
 
             d.precio_unitario,
             d.subtotal,
-            CASE WHEN rd.id IS NOT NULL AND rd.cantidad_recibida >= d.cantidad
+            CASE WHEN rd.lineas_recepcion > 0 AND rd.cantidad_recibida >= d.cantidad
                  THEN 1 ELSE 0 END                         AS completa
         FROM orden_compra_detalle d
         JOIN orden_compra oc        ON oc.id = d.orden_compra_id
@@ -274,8 +319,7 @@ class FactCompraLinea(TareaCarga):
         LEFT JOIN producto_categoria pc
                                     ON pc.producto_id = p.id AND pc.es_principal
         LEFT JOIN categoria c       ON c.id  = pc.categoria_id
-        LEFT JOIN recepcion_detalle rd
-                                    ON rd.orden_compra_detalle_id = d.id
+        LEFT JOIN LATERAL ({self._RECEPCION_AGREGADA}) rd ON TRUE
         ORDER BY d.producto_variante_id, oc.proveedor_id, oc.fecha_emision, d.id
         """
 
@@ -324,10 +368,22 @@ class FactCompraLinea(TareaCarga):
     #: canónicos en el origen. Es una traducción del mapa de Python: si se añade
     #: un sinónimo allí, hay que añadirlo aquí — y el control de conteo de
     #: motivos avisa si se olvida.
+    #: Lleva la REGLA DE ESCAPE desde el 2026-08-17. Antes traducía el sinónimo y
+    #: dejaba pasar lo demás tal cual, así que contaba un motivo nuevo como una
+    #: categoría propia mientras Python lo mandaba a 'Otro'. Con los 6 crudos de
+    #: entonces daba 5 y cuadraba; con «Caja dañada» (2026-08-16) daba 6 y seguía
+    #: cuadrando POR CASUALIDAD —5 canónicos + 'Otro' también son 6—, y con dos
+    #: motivos nuevos habría dado 7 contra 6. Un control que acierta por
+    #: coincidencia no es un control.
     _MOTIVO_NORMALIZADO_SQL = """
         CASE LOWER(TRIM(rd.motivo_rechazo))
+             WHEN 'empaque danado en transito'     THEN 'Empaque danado en transito'
+             WHEN 'producto con defecto de fabrica' THEN 'Producto con defecto de fabrica'
+             WHEN 'fecha de caducidad proxima'     THEN 'Fecha de caducidad proxima'
+             WHEN 'no coincide con especificacion' THEN 'No coincide con especificacion'
+             WHEN 'unidades incompletas en caja'   THEN 'Unidades incompletas en caja'
              WHEN 'cajas mojadas en el transporte' THEN 'Empaque danado en transito'
-             ELSE rd.motivo_rechazo
+             ELSE 'Otro'
         END
     """
 
@@ -340,16 +396,28 @@ class FactCompraLinea(TareaCarga):
             (SELECT SUM(cantidad_recibida) FROM recepcion_detalle)    AS unidades_recibidas,
             (SELECT SUM(cantidad_rechazada) FROM recepcion_detalle)   AS unidades_rechazadas,
             (SELECT SUM(subtotal) FROM orden_compra_detalle)          AS subtotal,
-            (SELECT count(*) FROM recepcion_detalle WHERE cantidad_rechazada > 0)
+            -- LÍNEAS con rechazo, contadas por LÍNEA y no por fila de recepción
+            -- (C6.3): una línea recibida en dos actos que rechace en ambos es UNA
+            -- línea con rechazo, no dos. El criterio no se toca —«rechazó algo»—,
+            -- solo el grano en el que se cuenta, que ahora es el de la tabla.
+            (SELECT count(*) FROM orden_compra_detalle d
+             WHERE (SELECT SUM(rd.cantidad_rechazada) FROM recepcion_detalle rd
+                    WHERE rd.orden_compra_detalle_id = d.id) > 0)
                                                                       AS lineas_con_rechazo,
             (SELECT count(DISTINCT {self._MOTIVO_NORMALIZADO_SQL})
              FROM recepcion_detalle rd WHERE rd.motivo_rechazo IS NOT NULL)
                                                                       AS motivos_normalizados,
             (SELECT count(DISTINCT rd.motivo_rechazo) FROM recepcion_detalle rd
              WHERE rd.motivo_rechazo IS NOT NULL)                     AS motivos_crudos,
+            -- «Completa» es una propiedad de la LÍNEA y se mide sobre el TOTAL
+            -- recibido (C6.3). Por fila de recepción, la línea 2.957 —12 pedidas,
+            -- servidas 11 + 1— no contaba como completa en NINGUNA de sus dos
+            -- recepciones, cuando la verdad es que se sirvió entera. El SUM sobre
+            -- cero filas es NULL y no cuenta: la línea sin recepción sigue fuera.
             (SELECT count(*) FROM orden_compra_detalle d
-             JOIN recepcion_detalle rd ON rd.orden_compra_detalle_id = d.id
-             WHERE rd.cantidad_recibida >= d.cantidad)                AS completas,
+             WHERE (SELECT SUM(rd.cantidad_recibida) FROM recepcion_detalle rd
+                    WHERE rd.orden_compra_detalle_id = d.id) >= d.cantidad)
+                                                                      AS completas,
             (SELECT count(DISTINCT producto_variante_id) FROM orden_compra_detalle)
                                                                       AS variantes,
             (SELECT count(DISTINCT orden_compra_id) FROM orden_compra_detalle)
@@ -362,8 +430,9 @@ class FactCompraLinea(TareaCarga):
             (SELECT SUM(rd.cantidad_recibida + rd.cantidad_rechazada)
              FROM recepcion_detalle rd)                               AS unidades_llegadas,
             (SELECT count(*) FROM orden_compra_detalle d
-             JOIN recepcion_detalle rd ON rd.orden_compra_detalle_id = d.id
-             WHERE rd.cantidad_recibida + rd.cantidad_rechazada > d.cantidad)
+             WHERE (SELECT SUM(rd.cantidad_recibida + rd.cantidad_rechazada)
+                    FROM recepcion_detalle rd
+                    WHERE rd.orden_compra_detalle_id = d.id) > d.cantidad)
                                                                       AS rechazo_aditivo
         """
 
