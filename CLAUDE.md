@@ -1,9 +1,12 @@
 # RetailMind — contexto para Claude Code
 
-Tienda PyME con back-office completo. **PostgreSQL (BD `retailmind`, 111 tablas) es la ÚNICA
-base transaccional** — incluida la TIENDA DEL CLIENTE (catálogo `/api/catalogo` con ~1.214
-productos reales cargados del dataset original vía ETL puntual, carrito, wishlist,
-perfil/direcciones, checkout y mis pedidos, migrados 2026-07-11). **Desde el 2026-08-03 PostgreSQL
+Tienda PyME con back-office completo. **PostgreSQL (BD `retailmind`, 113 tablas — medidas el
+2026-08-17; eran 111 antes de `rol_personalizado` del script 87) es la ÚNICA
+base transaccional** — incluida la TIENDA DEL CLIENTE (catálogo `/api/catalogo`, carrito, wishlist,
+perfil/direcciones, checkout y mis pedidos, migrados 2026-07-11). El catálogo arrancó con ~1.214
+productos del dataset original vía ETL puntual y **hoy son 6.217 productos / 6.224 variantes**,
+porque la Fase 0 de la carga masiva sembró 5.000 más (ver la tabla de cifras de «LA CARGA MASIVA»,
+que manda sobre cualquier número anterior de este archivo). **Desde el 2026-08-03 PostgreSQL
 corre EN UN CONTENEDOR** (puerto 5432), así que la vieja frase «con Docker apagado todo funciona»
 YA NO VALE: sin Docker no hay base. Lo que SÍ sigue en pie —y es el invariante de diseño que hay
 que respetar— es que **ClickHouse es solo analítica** (paquete `analytics/` + señal de eventos para
@@ -220,23 +223,45 @@ parar sin perder nada: `docker compose stop` o, como mucho, `docker compose down
 ## LA CARGA MASIVA: 3.000.000 DE PEDIDOS EN UNA DÉCADA (2026-08-10/11, fases 0-3)
 
 **Las cifras del sistema HOY** (y son las que mandan sobre cualquier número
-anterior de este archivo, que describe el estado previo a la carga):
+anterior de este archivo, que describe el estado previo a la carga).
+**Re-medidas todas el 2026-08-17**, porque las pruebas manuales del 12 al 16 de
+agosto movieron los conteos —poco, pero los movieron— y porque dos cifras estaban
+mal de antes:
 
-| | antes de la carga | HOY |
+| | antes de la carga | HOY (2026-08-17) |
 |---|---|---|
-| pedidos | 4.083 | **2.999.991** |
-| líneas de pedido | 10.384 | **7.622.429** |
-| hitos de historial | 24.610 | **20.215.644** |
-| movimientos de kardex | 23.289 | **7.930.685** |
-| posiciones de inventario | 1.406 | **11.406** (todas cuadradas) |
-| facturas de venta | 3.887 | **2.855.377** |
-| clientes · variantes | 72 · 1.221 | **50.072 · 6.221** |
-| base `retailmind` | ~250 MB | **13 GB** |
-| modelo del DWH | 66.082 filas | **32,60 M filas / 1,92 GiB** |
+| pedidos | 4.083 | **2.999.995** |
+| líneas de pedido | 10.384 | **7.622.438** |
+| hitos de historial | 24.610 | **20.215.662** |
+| movimientos de kardex | 23.289 | **8.008.403** |
+| posiciones de inventario | 1.406 | **11.407** (todas cuadradas) |
+| facturas de venta | 3.887 | **2.855.380** |
+| clientes · variantes | 72 · 1.221 | **50.072 · 6.224** |
+| base `retailmind` | ~250 MB | **17 GB** |
+| modelo del DWH | 66.082 filas | **26.971.498 filas / 1,47 GiB** |
 | ventana temporal | 2025-01 → 2026-07 | **2025-01 → 2034-12** |
-| ticket medio | $1.400,06 | **$182,16** |
+| ticket medio | $1.400,06 | **$182,09** |
 
-**Los 49 controles del ETL cuadran EXACTAMENTE.**
+Dos advertencias sobre esta tabla, porque las dos son trampas para la próxima
+sesión:
+
+- **El «modelo del DWH» NO son 32,60 M filas ni 1,92 GiB**, como decía esta tabla
+  hasta hoy. El modelo publicado son **26.971.498 filas en 21 tablas / 1,47 GiB**,
+  medidas con `system.tables` excluyendo `etl_ejecucion` y las `%_new`. Y no es que
+  se haya perdido nada: la corrida ANTERIOR a la de hoy ya tenía **26.971.368**
+  filas publicadas (comprobado en la bitácora), así que la cifra vieja nunca
+  describió el modelo. Lo más probable es que saliera de una suma que incluía las
+  tablas de staging a mitad de corrida o los `filas_escritas` duplicados de los
+  marcadores — la trampa que este mismo archivo documenta en el bloque de Airflow.
+  **Al medir el almacén: `system.tables`, excluyendo `etl_ejecucion` y `%_new`.**
+- **El ticket medio son $182,09** con la definición explícita `AVG(pedido.total)`
+  sobre los **2.883.688** pedidos NO cancelados (unidos a `estado_pedido` por
+  `estado_pedido_id`: en `pedido` **no hay** columna `estado` ni `estado_pedido`).
+  El $182,16 anterior no venía con su definición, así que no se puede saber si
+  difiere por las pruebas o por medirse de otro modo.
+
+**Los 49 controles del ETL cuadran EXACTAMENTE** (verificado el 2026-08-17 tras la
+reparación del bloque final de este archivo).
 
 ### Las cuatro fases, su método y sus tramos
 
@@ -465,11 +490,15 @@ ahora arma el pool con `connectionTimeout=3s`, `validationTimeout=1.5s`,
 `initializationFailTimeout=-1` y propiedades del driver `connect_timeout=2.5s` /
 `socket_timeout=30s`; `checkPythonRuntime` con `waitFor(3s)`. Verificado en vivo:
 `/api/health` responde en ~3.1s acotados con `status: UP, analytics: DEGRADED` — YA SIRVE
-como healthcheck de contenedores. **Tipo 1 vigentes = 0 A ESA FECHA** (2026-07-18) — hoy la
-cuenta es **A = 1**: el 2026-08-07 entró **A-3** (la pantalla de gestión de datos edita y borra
-`fact_eventos` por `event_pk`, que **no es una clave**: 50.000 valores distintos sobre 2.823.245
-filas, así que un borrado se lleva entre 52 y 139 eventos). La foto completa de deuda vive en
-`DEUDA_TECNICA.md` (raíz) + `docs/INVENTARIO_DEUDA_CONSOLIDADO.md` (re-verificado).
+como healthcheck de contenedores. **Tipo 1 vigentes = 0 A ESA FECHA** (2026-07-18). Después
+entró **A-3** (la pantalla de gestión de datos editaba y borraba `fact_eventos` por `event_pk`,
+que **no es una clave**: 50.000 valores distintos sobre 2.823.245 filas, así que un borrado se
+llevaba entre 52 y 139 eventos) y **se cerró el mismo 2026-08-07** retirando la escritura, así
+que **hoy la cuenta es A = 0** (esta línea decía «A = 1» hasta el 2026-08-17, contradiciendo al
+propio `DEUDA_TECNICA.md`, que ya daba A-3 por resuelto en su sección D). Lo que quedó vivo de
+ahí es la fragilidad **C-15**: la tabla sigue sin identificador único. La foto completa de deuda
+vive en `DEUDA_TECNICA.md` (raíz) + `docs/INVENTARIO_DEUDA_CONSOLIDADO.md` (re-verificado), y el
+recuento que manda es el de la cabecera de `DEUDA_TECNICA.md`: **A = 0 · B = 28 · C = 20**.
 
 **CONTRASTE DE CATÁLOGO Y DEMANDA (2026-07-24, scripts 67 y 68-70)**: corrige los hallazgos
 A2/A3/A5/A6/B4 de `docs/tactico/AUDITORIA_TRANSVERSAL_SEED.md` (§11 lleva el estado).
@@ -1080,11 +1109,12 @@ solo escucha IPv4 → `unhealthy` eterno **con la página sirviéndose bien**: s
 YA ESTÁ (2026-08-06, ver el bloque «ORQUESTACIÓN DEL ETL CON AIRFLOW» al final), y con él
 **`DWH_CRON=-`** ya está puesto. El MODELO DE
 DATOS está **COMPLETO**: las **19 tablas de hechos** del DWH más `fact_prevision_demanda` y
-`fact_alerta_cliente` — **21 tablas, 66.082 filas** (medidas el 2026-08-07), cargadas y
-validadas (**49 controles en verde**). Esa es la cifra del MODELO; la base `retailmind_dwh`
-tiene **22 objetos** porque además está la bitácora `etl_ejecucion`, que NO es del modelo y por
-eso no se suma — y que además CRECE con cada corrida del DAG, así que sumarla da un número
-distinto cada día (862 filas el 2026-08-07). El **CATÁLOGO TÁCTICO**: 30 informes simples y
+`fact_alerta_cliente` — **21 tablas**, hoy con **26.971.498 filas / 1,47 GiB** (re-medidas el
+2026-08-17; las «66.082 filas» eran de ANTES de la carga masiva y se quedaron aquí de la
+redacción original), cargadas y validadas (**49 controles en verde**). Esa es la cifra del
+MODELO; la base `retailmind_dwh` tiene **22 objetos** porque además está la bitácora
+`etl_ejecucion`, que NO es del modelo y por eso no se suma — y que además CRECE con cada corrida
+del DAG, así que sumarla da un número distinto cada día (862 filas el 2026-08-07). El **CATÁLOGO TÁCTICO**: 30 informes simples y
 **43 rutas de informe compuesto**, que NO son 43 objetivos — el desglose reconciliado es
 **39 objetivos OTD con ruta propia + 2 modelos estratégicos + `costo-envio-mensual` (declarado
 fuera del catálogo) + `prevision-demanda` servida en dos departamentos**. Desde el 2026-08-07
@@ -1205,7 +1235,9 @@ tablas del modelo y `web` con `fact_eventos`). **La base `retailmind` no se toca
 (`comun.guardia_base`) aborta si el destino de escritura no es `retailmind_benchmark`.
 **Resultado, con el matiz incómodo incluido**: a **66.082 filas PostgreSQL GANA** (0,74× y 0,69×
 en OTD-VEN-06 y OTD-INV-04), y a **2.823.245 filas ClickHouse gana 16,96×** — la relación mejora
-**24×** entre las dos escalas. Espacio: PostgreSQL ocupa **6,8×** más con los mismos datos. Si vas
+**24×** entre las dos escalas. (Esas 66.082 filas son la escala PEQUEÑA del benchmark, que era el
+tamaño del modelo el 2026-08-07 y no lo es ya: hoy son 26.971.498. Rehacer la medición a la escala
+de hoy movería el punto pequeño de la curva, no la conclusión.) Espacio: PostgreSQL ocupa **6,8×** más con los mismos datos. Si vas
 a tocar esto: (1) PostgreSQL corre con **índices cubrientes hechos a medida** para cada consulta y
 `VACUUM ANALYZE` —sin el vacuum el mapa de visibilidad está vacío y NO hay *index only scan*
 aunque el índice exista—, mientras que ClickHouse va **a pelo**: la ventaja medida es un SUELO;
