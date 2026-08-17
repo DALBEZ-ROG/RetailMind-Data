@@ -641,7 +641,9 @@ distinta — en `/accesos` motor + ruta coinciden (solo grp_administrador y grp_
 ahí el corte lo hace la RUTA, como en INV-07 y LOG-11; por eso van en su propia línea de
 `SecurityConfig`; (2) el valor por DEFECTO de un filtro es diseño: SOP-01 arranca en el estado
 sintético `pendientes` (= `estado NOT IN ('resuelto','cerrado')`, traducido en el servicio, nunca
-concatenado), GER-04 en `situacion=vigente` y GER-06 en `vigencia=vigente`; (3) la `situacion`
+concatenado), **VEN-01 en el sintético `en_curso`** (ver el bloque «LA CARTERA ABRÍA CON LOS TRES
+INDICADORES SIN CALCULAR» al final), GER-04 en `situacion=vigente` y GER-06 en
+`vigencia=vigente`; (3) la `situacion`
 del cupón replica las TRES condiciones de canje de `DescuentosService` (activo + ventana +
 `usos_maximos`), no `activo`; (4) GER-01 emite una fila explícita «Día sin movimiento» y un KPI
 «Último día con pedidos» porque el seed llega al 2026-07-22 (pedidos) / 07-23 (cobros) y
@@ -1307,6 +1309,167 @@ py -3 retailmind/verificar_ven0304.py        # ~2 min: V2, V3 y la matriz de rol
 node retailmind/verificar_pantallas.js       # ~1 min: consola del navegador, necesita
                                              # `npm i --no-save puppeteer` en el frontend
 ```
+
+**EL USO REAL DE LA APP INVALIDÓ TRES SUPUESTOS DEL ETL (2026-08-17, solo código, sin script,
+sin tocar un solo dato de negocio)**: sesión de diagnóstico y reparación. La pantalla de informes
+mostraba **fallo parcial** desde el 2026-08-16: `dim_producto`, `fact_orden_compra` y
+`fact_compra_linea` NO se publicaban. **No hubo corrupción ni descuadre en PostgreSQL**: el dato
+operativo era impecable y lo que estaba mal eran las CONSULTAS del ETL. Las tablas conservaron el
+dato de la corrida anterior y los informes siguieron sirviendo cifras coherentes — el patrón de
+carga atómica y los 49 controles funcionando como se diseñaron. Bitácora completa en
+`docs/estrategico/CORRECCIONES_DISENO_ETL.md`, **Fase 6, correcciones C6.1 a C6.5** (que es una
+clase NUEVA de supuesto fallido: no falló el diseño en papel, falló una medición que **era cierta**
+y dejó de serlo cuando alguien usó el sistema).
+
+**La causa, que es UNA y se manifestó en tres sitios**: el 2026-08-16 se registró una compra real
+—**OC 920**— recibida en **DOS ACTOS** (11 unidades aceptadas + 1 rechazada por «Caja dañada» a las
+20:16; la que faltaba a las 20:19). Todo correcto: 1 factura, 1 CxP, y
+`orden_compra_detalle.cantidad_recibida = 12 = 11 + 1`. Pero **`recepcion_mercancia` NO tiene UNIQUE
+sobre `orden_compra_id`** y el backend permite recibir en varios actos, así que el «máx.
+recepciones por OC = 1» que el ETL tenía medido y documentado era una **casualidad del seed**, no una
+garantía del motor. Aparte, tres variantes creadas desde la pantalla (2427-2429) nacieron **sin
+`peso_kg`**, porque el formulario no capturaba ese campo.
+
+Las huellas que permitieron localizarlo en minutos: **+$2.415,00** de descuadre = el total EXACTO de
+la OC 920 contado dos veces, y **+$1.020,00** = el subtotal EXACTO de la línea 2.957 duplicada.
+
+Si vas a tocar esto:
+1. **`fact_orden_compra` usa la RECEPCIÓN CANÓNICA** (`_RECEPCION_CANONICA`): la ÚLTIMA por
+   `(fecha_recepcion, id)`. La última y no la primera porque las unidades de la fila son el TOTAL
+   recibido, y emparejar ese total con la fecha de la primera afirmaría que las 12 estaban en bodega
+   cuando solo había 11. Consecuencia declarada para COM-05/COM-06: **la promesa se juzga contra la
+   orden COMPLETA**. `estado` NO se filtra (las 134.563 recepciones son 'confirmada'); si aparece una
+   'anulada', el filtro entra **en la extracción Y en los controles a la vez** o dejan de hablar del
+   mismo conjunto.
+2. **El fan-out puede estar DENTRO de un LATERAL y el control de grano no lo ve**: la subconsulta
+   sigue devolviendo una fila por orden, así que `count(*)` vs `countDistinct(id)` pasa en verde. Lo
+   cazó la igualdad exacta de `lineas` contra `count(*) FROM orden_compra_detalle`. Ahora lo pedido y
+   lo recibido salen del detalle de la ORDEN y el rechazo de `recepcion_detalle`, en LATERAL
+   separados.
+3. **`fact_compra_linea` AGREGA la recepción por línea** (`_RECEPCION_AGREGADA`), no la elige: una
+   línea puede recibirse en varios actos y lo recibido es la SUMA. Tres detalles no obvios:
+   `lineas_recepcion` (un `count`) sustituye a `rd.id IS NOT NULL` porque **un `SUM` sobre cero filas
+   es NULL y no distingue «recibí 0» de «no hubo recepción»**; el MOTIVO no se puede sumar y se toma
+   el de la recepción que rechazó (y entre varias, la última por `id`); y **«completa» es propiedad
+   de la LÍNEA** medida sobre el total —por fila de recepción, la 2.957 no era completa en NINGUNA de
+   sus dos, cuando se sirvió entera—.
+4. **SEIS consultas DE LOS PROPIOS CONTROLES llevaban el supuesto dentro** (3 en las tareas, 3 en
+   `validar_dwh.py`): con un `JOIN recepcion_mercancia` a secas, el control **acusaba a la tabla de un
+   descuadre que estaba en el control**. Se movieron al grano correcto. **Eso NO es relajar un
+   control** —siguen exigiendo igualdad exacta al centavo y siguen detectando fan-out—: se corrigió
+   su GRANO, no su umbral. Distingue siempre las dos cosas.
+5. **`dim_producto.peso_kg` es ahora `Nullable(Decimal(10,3))`**. `InvalidOperation:
+   [ConversionSyntax]` en una carga = **NULL contra una columna Decimal no-Nullable**:
+   `clickhouse_connect` hace `int(Decimal(str(x)) * mult)` y con `x = None` eso es `Decimal('None')`.
+   El mensaje **no nombra columna, ni fila, ni tabla** — se localiza reproduciéndolo en aislamiento.
+   Se arregla con `Nullable`, **nunca** con `COALESCE(...,0)` (C3B.5: cero y «no hay dato» no son lo
+   mismo). **Y una columna más allá estaba la misma trampa, hoy CERRADA en sus dos mitades**
+   (2026-08-17): `margen_catalogo_pct` sale de `NULLIF(precio, 0)` y rompía igual con `precio = 0`.
+   Como el CHECK del motor es `precio >= 0` —**el cero es LEGAL para PostgreSQL**— la guarda va en la
+   aplicación: `CatalogoAdminService.precioValidado()` exige precio **estrictamente positivo y no
+   nulo** al crear Y al editar (la CAUSA); y la columna es ahora
+   **`Nullable(Decimal(6,2))`** (el SÍNTOMA), para que el vector que no pasa por la app —un script de
+   siembra— publique un margen NULL en vez de abortar la carga. Probado con el caso real: sembrando
+   `precio = 0` directo en PostgreSQL, `dim_producto` publica con `margen = NULL` donde antes moría.
+   **Las DOS columnas Nullable de `dim_producto` son la misma lección: una columna no-Nullable en el
+   almacén es una apuesta sobre datos que la aplicación no garantiza.** Ficha **C-19** en
+   `DEUDA_TECNICA.md`, ya en la sección de resueltas.
+6. **Una regla de escape hay que reimplementarla COMPLETA en el control.** El de motivos traducía el
+   sinónimo pero no el escape a `'Otro'`, y con «Caja dañada» (motivo nuevo, el campo es TEXTO LIBRE)
+   PostgreSQL decía «Caja dañada» donde el almacén dice «Otro». Además cuadraba **por coincidencia**:
+   7 crudos − 1 sinónimo = 6, y 5 canónicos + 'Otro' = 6; con dos motivos nuevos habría fallado.
+   «Caja dañada» **se deja en `'Otro'` a propósito**: fusionar dos frases humanas es criterio de
+   Compras, no del ETL (C3.3).
+
+Verificación: DAG completo **22/22 tareas `success` en 12 min 02 s**, 0 abortadas, **49/49 controles
+exactos** (confirmado en la bitácora del DAG y re-ejecutando `validar_dwh` aparte); kardex con **0
+enlaces rotos** y 0 cadenas mal arrancadas leyendo por `(fecha_creacion, id)`, cierre vs
+`inventario` **11.407/11.407 posiciones, 0 descuadradas**; 3 pantallas de informes en Chrome
+headless sin aviso de fallo y consola limpia; defensas intactas (**34** `trg_horario_*`, **95**
+políticas RLS, **3** `trg_kardex_*`). Conteos operativos **idénticos antes y después**.
+
+**`peso_kg` YA SE CAPTURA EN EL ALTA DE VARIANTE (2026-08-17, `CatalogoAdminService`)**: la causa
+raíz del punto 5 no era del ETL sino de la aplicación — **`crearVariante` y `editarVariante` no
+tenían el campo**, ni `VarianteReq`, así que TODA variante creada desde la pantalla nacía sin peso y
+no había forma de arreglarla. El daño de verdad no era el ETL: **`VentasService.pesoTotalPedido` es
+TODO-O-NADA por diseño** (un total parcial distorsionaría el costo por kg en silencio), así que UNA
+línea sin peso deja el peso del pedido ENTERO en NULL y el flete se cobra **solo con `costo_base`,
+sin el cargo por kilo**. Una variante mal dada de alta subfactura el envío de todos los pedidos que
+la incluyan, sin un error en ningún log.
+
+La regla es **asimétrica a propósito**: en el **ALTA** el peso es **OBLIGATORIO** (400 con el motivo,
+vía `IllegalArgumentException`) y en la **EDICIÓN** es **OPCIONAL y omitirlo CONSERVA** el que
+hubiera (`COALESCE(?, peso_kg)`) — porque ese método ya era una actualización parcial y porque así
+la pantalla puede RELLENAR las variantes que hoy lo tienen vacío **sin script de migración**. Lo que
+se rechaza siempre es `0` o negativo: para «no lo sé» ya está el NULL que la columna admite, y un `0`
+reintroduciría el fallo por la puerta de atrás porque `pesoTotalPedido` filtra por **`peso_kg <= 0`**,
+no por `IS NULL`. La exigencia es de la APLICACIÓN, no del motor: la columna sigue NULLABLE y tiene
+que seguirlo (1.221 variantes históricas se poblaron con el script 54). UI: campo *Peso* en
+`variante-dialog`, columna **PESO** en la grilla que marca `sin peso` en rojo, y aviso dentro del
+diálogo solo en las variantes que YA venían vacías (`pesoOriginal` se captura al abrir, o el aviso
+desaparecería al teclear el primer dígito); precarga a `null` y no a `0`, para que el campo salga
+vacío en vez de con un peso afirmado. Probado end-to-end contra el sistema corriendo: alta sin peso /
+con `0` / con `-1,5` → **400**; con `1.234` → **201**; editar omitiendo → peso **conservado** mientras
+`precio` sí cambia; editar con `0` → 400 sin modificar nada; y en navegador **«Aceptar» deshabilitado
+con el peso vacío**. **Quedan 3 variantes sin peso a propósito** (2427, 2428, 2429): no se inventaron
+los valores —meter un número plausible cobraría el flete mal *y* sin aviso— y ahora se corrigen desde
+la pantalla. OJO: el javadoc de `pesoTotalPedido` **está desactualizado** (afirma que `peso_kg` está
+NULL en las 1.221 variantes, falso desde el script 54) — ficha **C-20** en `DEUDA_TECNICA.md`.
+
+**LA CARTERA ABRÍA CON LOS TRES INDICADORES SIN CALCULAR (2026-08-17, solo código, sin script)**:
+OTD-VEN-01 (`/api/informes/ventas/cartera-pedidos`) mostraba **«No calculado»** en los tres KPI
+—«Pedidos en el filtro», «Monto total» y «Monto aún en proceso»— al abrir la pantalla. **No era un
+fallo, era el diseño mordiendo a la escala nueva**: por encima del tope de conteo los importes no se
+calculan a propósito, y con el filtro vacío el conjunto son los **2.999.995** pedidos. La cifra que
+justifica ese tope **se re-midió y sigue viva**: sumar bajo RLS cuesta **4,58 s** (4.577 / 4.565 /
+4.598 ms; como superusuario son 190 ms, o sea el coste ES la RLS).
+
+**El arreglo es un filtro por defecto, no calcular más**: estado sintético **`en_curso`** = la
+negación de los cuatro terminales, que es lo que significa «cartera» — de los 3 M de pedidos
+**2.641.189 están entregados** y son historia. En curso son **75.139**, muy por debajo del tope, así
+que los tres indicadores salen EXACTOS. Mismo patrón que el `pendientes` de SOP-01: el defecto lo
+declara `valorInicial` en la definición del frontend y el servicio solo lo acepta y lo traduce, para
+que un `GET` sin `estado` siga significando «sin filtro» y no mienta. La opción «Todos los estados»
+sigue ahí y ahora **se llama «Todos los estados (sin importes)»**, que es la advertencia en el sitio
+donde se toma la decisión.
+
+Si vas a tocar esto: (1) **la traducción a SQL NO es la forma obvia**. `ep.codigo NOT IN <terminales>`
+es correcto y tarda **4,6 s**, porque va contra la tabla UNIDA y el planificador no puede empujarlo a
+`idx_pedido_estado`: Parallel Seq Scan de los 3 M. Filtrando por la columna indexada del propio
+pedido con **`p.estado_pedido_id = ANY(?::bigint[])`** el plan pasa a Bitmap Index Scan y baja a
+**~200 ms, unas 20×** (la pantalla completa: **10,5 s → 0,48 s**). La subconsulta
+`estado_pedido_id IN (SELECT id … WHERE codigo NOT IN …)` **no sirve**: se resuelve como semi-join y
+vuelve a los 4,58 s. (2) Va con **un solo parámetro LIGADO** (el array como texto `{1,2,3}`) y no con
+un `IN (?,?,?)` cuyos placeholders habría que construir — así no se arma SQL por concatenación
+(regla 2) y el cast explícito cumple la 8. (3) **Los ids se RESUELVEN desde los códigos en cada
+consulta, jamás se escriben**: durante el desarrollo se probó con `(2,3,4,5,6,7)` deducida del
+`orden` de la tabla y el **id 6 es `entregado`** (2.641.189 pedidos), así que el «filtro de cartera»
+devolvía la tabla entera y volvía a los 4,2 s **sin dar error**. Los ids reales no siguen el orden
+del proceso: `facturado` es 9 y `preparado` 10, posteriores a `entregado`. (4) La lista de terminales
+vive en **UNA** constante (`TERMINALES_SQL`) que usan el filtro Y el KPI «Monto aún en proceso»: si
+se separan, la pantalla enseña un total de cartera que no cuadra con el importe de al lado. (5) Con
+`en_curso` puesto, «Monto total» y «Monto aún en proceso» dan **lo mismo a propósito** —todos los
+pedidos del conjunto están en proceso—, no es un bug.
+Verificado: **0,48-0,76 s** con el defecto y con `canal=web`, cifras contrastadas al centavo contra
+PostgreSQL (**75.139 / $13.486.538,26** y **40.921 / $7.481.996,72**, Δ = 0); en navegador la
+pantalla abre con los tres calculados y al elegir «Todos los estados» vuelven a «No calculado» **con
+la explicación visible**, que es el comportamiento correcto; los 10 endpoints de Ventas siguen en 200
+y un `estado=inventado` sigue dando **400** por lista blanca.
+
+**META DE VENTAS DEL MES VIGENTE (2026-08-17, dos filas de datos, sin script)**: OTD-VEN-15 daba
+**409** («No hay meta de ventas vigente para 8/2026») porque `meta_venta` llegaba solo hasta
+2026-07. Se fijó la meta de agosto de 2026 en **$3.650.000** para `ventas` y `general` —base: el
+facturado de agosto de 2025, $3.645.915,16, redondeado— **por `POST /api/gerencia/metas`** y no con
+un INSERT, para que `fijada_por` saliera del JWT y pasara por las validaciones del servicio (ids 212
+y 213; `meta_venta` 133 → 135). El informe responde 200 con avance **92,0 %** (real $3.357.913,35,
+falta $292.086,65), verificado en navegador con la barra pintada. **Dos avisos que quedaron como
+deuda**: las **133 metas históricas siguen a la escala PREVIA** a la carga masiva y dan avances del
+**874 % al 1.756 %** (media 1.469,7 %; 19 de 19 por encima del 500 %) — ficha **C-21**, se decidió
+NO reescribirlas porque una meta es una decisión con fecha; y la columna «días corridos» del informe
+**engaña** (17/31 junto a un 92 % que ya es de mes cerrado, porque la carga escribió agosto entero
+hasta el día 31) — ficha **C-22**. Si vas a fijar más metas: el `venta_real` del informe es el
+facturado TOTAL del mes y **no distingue departamento**, así que dos departamentos con metas
+distintas son solo dos denominadores sobre el mismo numerador.
 
 **Deuda técnica conocida** (tablas huérfanas, requieren bloque dedicado):
 

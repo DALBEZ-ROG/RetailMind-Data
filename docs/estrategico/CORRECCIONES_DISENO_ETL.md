@@ -2,8 +2,9 @@
 
 > Documento vivo. Acompaña a `DISENO_ETL_CLICKHOUSE.md` **y a
 > `DISENO_NIVEL_ESTRATEGICO.md`**, y los **corrige**; no los sustituye.
-> Última actualización: **2026-08-01** (Fase E3 — la **alerta de abandono de cliente**, el segundo
-> y último modelo del nivel estratégico y la tabla 21 del almacén).
+> Última actualización: **2026-08-17** (Fase 6 — las cinco correcciones que provocó el **USO real de
+> la aplicación**: una orden recibida en dos actos y un producto sin peso. Clase nueva de supuesto
+> fallido; ver la cabecera de la Fase 6).
 
 ---
 
@@ -23,7 +24,7 @@ como si fuera verdad. Esta bitácora cierra ese hueco.
 
 ### El patrón que se repite
 
-De los **57 supuestos fallidos** registrados, la mayoría comparte una forma:
+De los **62 supuestos fallidos** registrados, la mayoría comparte una forma:
 
 > El diseño afirma que una relación es **1:1** o que una columna **siempre está poblada**, y los
 > datos reales tienen un puñado de excepciones —dos, seis, ciento setenta y seis— que no rompen
@@ -109,6 +110,11 @@ están aquí rompían algo.
 | [CE4.6](#ce46-el-recorte-del-vendedor-no-puede-hacerse-con-el-mismo-mecanismo-de-otd-ven-02) | E3 | «el mismo mecanismo de OTD-VEN-02» (§5.2.8) | 🟠 el almacén no tiene `vendedor_id` |
 | [CE4.7](#ce47-la-foto-fechada-no-acumula-historia--y-el-backtest-no-la-necesita) | E3 | Sin `fecha_calculo` el backtest no tiene contra qué medirse (§5.2.7) | 🟡 justificación falsa de una columna correcta |
 | [CE4.8](#ce48-las-dependencias-declaradas-no-producen-dos-columnas-que-la-propia-tabla-exige) | E3 | `depende_de = {fact_pedido, dim_cliente}` (§5.2.5) | 🟠 **dos columnas de contexto a cero, en silencio** |
+| [C6.1](#c61-una-orden-de-compra-puede-tener-dos-recepciones-y-ya-las-tiene) | 6 | «máx. recepciones por OC = 1» (medido, C3.1) | 🔴 **el grano se rompe: +1 orden, +$2.415** |
+| [C6.2](#c62-el-lateral-de-agregados-fanea-por-dentro-y-el-conteo-de-filas-no-lo-ve) | 6 | «No hay fan-out posible» en el LATERAL del detalle | 🔴 **+4 líneas y +48 unidades en una tabla con el grano correcto** |
+| [C6.3](#c63-recepcion_detalle-no-es-11-con-la-línea-de-la-orden) | 6 | `recepcion_detalle` es 1:1 con `orden_compra_detalle` | 🔴 **+1 fila, +12 uds, +$1.020** |
+| [C6.4](#c64-un-null-legítimo-contra-una-columna-decimal-no-nullable-tumba-la-carga-sin-decir-dónde) | 6 | `peso_kg` siempre poblada (lo estaba, en el seed) | 🔴 **la tabla no se publica y el error no nombra la columna** |
+| [C6.5](#c65-el-control-de-motivos-reimplementaba-el-mapa-pero-no-la-regla-de-escape) | 6 | El control traduce el sinónimo y con eso basta | 🟠 **control que acierta por casualidad** |
 
 ---
 
@@ -2422,6 +2428,185 @@ autor de un pedido (`pedido JOIN usuario ON u.id = p.vendedor_id`), que además 
 correcta: un vendedor dado de alta que nunca vendió no puede colisionar en una cartera que no
 existe. No es un supuesto fallido del diseño —el diseño no habla de esto— pero sí una restricción
 que la fase siguiente encontrará igual.
+
+---
+
+# Fase 6 — cuando el USO de la aplicación invalida una medición
+
+> **Esta fase es de una clase distinta a las cinco anteriores y por eso se separa.** En las Fases 1
+> a E3 el supuesto fallido era del DISEÑO: algo escrito en papel que los datos desmintieron la
+> primera vez que se midió. Aquí no. Aquí el supuesto **se midió, era CIERTO, se documentó con su
+> cifra… y dejó de ser cierto después**, porque alguien usó la aplicación como está diseñada para
+> usarse.
+>
+> Las tres primeras entradas son **la misma causa raíz vista en tres sitios**: el 2026-08-16 se
+> registró una compra real (OC 920) recibida en **dos actos** —11 unidades aceptadas y 1 rechazada
+> por «Caja dañada», y al día siguiente la que faltaba—. El dato operativo es **impecable**: una
+> sola factura, una sola cuenta por pagar, y `orden_compra_detalle.cantidad_recibida = 12 = 11 + 1`.
+> Lo que se rompió fue el ETL, que en tres consultas distintas daba por hecho que una orden se
+> recibe de una vez.
+>
+> **La lección que generaliza**: una medición del tipo «hoy esta relación es 1:1» no es una
+> propiedad del esquema, es una **foto de los datos**. `recepcion_mercancia` no tiene UNIQUE sobre
+> `orden_compra_id` y el backend permite recibir en varios actos; el 1:1 era una casualidad del
+> seed. Cuando un docstring diga «verificado: máx. 1», hay que leerlo como «hoy hay 1, y el motor
+> no lo impide». La red que lo atrapó —igualdad exacta al centavo y control de grano— funcionó
+> exactamente como se diseñó: **la corrida abortó, las tablas conservaron el dato del día anterior
+> y ningún informe mostró una cifra inventada**.
+
+## C6.1 · Una orden de compra puede tener DOS recepciones, y ya las tiene
+
+| | |
+|---|---|
+| **Fase** | 6 (`fact_orden_compra`) |
+| **El diseño decía** | No el diseño: **la corrección C3.1 de este mismo archivo**, que midió «máx. recepciones por OC = 1» y sobre esa cifra autorizó un `LEFT JOIN recepcion_mercancia`. |
+
+**La realidad.** La OC 920 (`OC-20260816-114031`, emitida el 2026-08-16) tiene **dos** recepciones
+`confirmada`: la 897 del 20:16 y la 898 del 20:19. El `LEFT JOIN` devolvía **134.591 filas para
+134.590 órdenes** y con ellas: +1 en `con_recepcion`, `con_factura`, `con_ambos` y `con_esperada`,
+**+$2.415,00** en `total_ordenes` y el total de la factura, la CxP y el saldo contados dos veces.
+
+**Cómo se resolvió.** Constante `_RECEPCION_CANONICA`: la **última** recepción por
+`(fecha_recepcion, id)`, vía `LEFT JOIN LATERAL … LIMIT 1`. La última y no la primera porque las
+unidades de la fila son el TOTAL recibido (12), y emparejar ese total con la fecha de la primera
+recepción afirmaría que las 12 estaban en bodega cuando solo había 11. Las **tres** cifras de plazo
+del control (`pares_comparables`, `cumplieron`, `suma_dias_ciclo`) y las del control independiente
+de `validar_dwh.py` se movieron al mismo grano: escritas con un `JOIN recepcion_mercancia` a secas,
+aportaban dos pares para esa orden y **acusaban a la tabla de un descuadre que estaba en el propio
+control**. Hoy la elección no cambia ni un número —las dos recepciones son del mismo día— pero
+queda declarada porque la próxima vez sí lo cambiará.
+
+**Qué habría roto.** OTD-COM-05 (`/cumplimiento-plazo`) y COM-06 (`/ciclo-compra`) cuentan órdenes
+puntuales sobre una base que declaran; con la orden duplicada, una orden aporta **dos** veredictos.
+Y OTD-COM-04 / GER-02 habrían inventado $2.415,00 de gasto: una cifra demasiado pequeña para verse
+en $418 M y suficiente para que la balanza no cuadre nunca contra contabilidad.
+
+---
+
+## C6.2 · El LATERAL de agregados «sin fan-out posible» fanea por dentro
+
+| | |
+|---|---|
+| **Fase** | 6 (`fact_orden_compra`) |
+| **El diseño decía** | El docstring del módulo: «`lineas`, `unidades_pedidas`, `unidades_recibidas` y `unidades_rechazadas` se calculan en un LATERAL sobre el detalle. **No hay fan-out posible**». |
+
+**La realidad.** El LATERAL unía `orden_compra_detalle` con `recepcion_detalle`, y la línea 2.957 de
+la OC 920 tiene **dos** líneas de recepción. Dentro del LATERAL eso duplica la línea: `lineas`
+contaba **3** donde hay 2, y `unidades_pedidas` sumaba la línea dos veces. Combinado con C6.1 (la
+fila entera repetida), el descuadre final fue **+4 líneas, +48 unidades pedidas, +48 recibidas y +1
+rechazada**.
+
+Lo instructivo es que **el control de grano NO lo habría visto solo**: `count(*)` vs
+`countDistinct(orden_compra_id)` mira la fila, y este fan-out ocurre *dentro* de una subconsulta que
+sigue devolviendo una fila por orden. Lo atrapó la igualdad exacta de `lineas` contra
+`count(*) FROM orden_compra_detalle`.
+
+**Cómo se resolvió.** Dos LATERAL separados, según de qué documento es cada cifra: lo **pedido y lo
+recibido** salen del detalle de la ORDEN (una fila por línea, pase lo que pase) y el **rechazo** de
+`recepcion_detalle`, sumado sobre todas las recepciones de la orden.
+
+**Qué habría roto.** OTD-COM-11 (`/entregas-incompletas`) compara pedido contra recibido por línea:
+con la línea duplicada, una entrega completa aparece como servida al 200 %. Y el tablero T-6
+(Abastecimiento) ordena proveedores por cumplimiento sobre esas mismas unidades.
+
+---
+
+## C6.3 · `recepcion_detalle` no es 1:1 con la línea de la orden
+
+| | |
+|---|---|
+| **Fase** | 6 (`fact_compra_linea`) |
+| **El diseño decía** | El docstring: «Verificado antes de confiar en el LEFT JOIN: `recepcion_detalle` es **estrictamente 1:1** con `orden_compra_detalle` donde existe (0 líneas con dos recepciones, 2.855 distintas sobre 2.855 filas)». |
+
+**La realidad.** Hay **una** línea con dos: la 2.957. La tabla salió con **715.137 filas para
+715.136 líneas**, +12 unidades pedidas y **+$1.020,00** de subtotal.
+
+**Cómo se resolvió.** La recepción entra **AGREGADA** por línea (`_RECEPCION_AGREGADA`), no elegida:
+una línea puede recibirse en varios actos y lo recibido es la SUMA de todos — que es exactamente lo
+que mide el control (`SUM(cantidad_recibida) FROM recepcion_detalle`). Tres detalles que no son
+obvios:
+
+* **`lineas_recepcion` (un `count`) sustituye a `rd.id IS NOT NULL`** como prueba de «esta línea tuvo
+  recepción». Un `SUM` sobre cero filas devuelve NULL y no distingue «recibí 0» de «no hubo
+  recepción» — la misma trampa que C3B.5 documentó para el LEFT JOIN de ClickHouse, aquí en
+  PostgreSQL.
+* **El motivo no se puede sumar**: se toma el de la recepción que de verdad rechazó y, entre varias,
+  la última por `id`.
+* **«Completa» es propiedad de la LÍNEA, medida sobre el total recibido.** Por fila de recepción, la
+  línea 2.957 —12 pedidas, servidas 11 + 1— no era completa en *ninguna* de sus dos recepciones,
+  cuando la verdad es que se sirvió entera. Se corrigió la CONSULTA del control (en la tarea y en
+  `validar_dwh.py`), no su umbral: sigue siendo igualdad exacta.
+
+**Qué habría roto.** OTD-COM-07 (`/rechazos`) reparte 186 unidades rechazadas entre motivos y
+proveedores; una línea de más desplaza el reparto. Y OTD-COM-12 (`/evolucion-costo`) es una serie
+por `(variante, proveedor)` resuelta con `lagInFrame` sobre el orden físico: **dos filas idénticas
+consecutivas inyectan una variación de precio del 0 % que no ocurrió**, y ese informe existe para
+detectar exactamente lo contrario.
+
+---
+
+## C6.4 · Un NULL legítimo contra una columna Decimal no-Nullable tumba la carga sin decir dónde
+
+| | |
+|---|---|
+| **Fase** | 6 (`dim_producto`) |
+| **El diseño decía** | §4.2 lista `peso_kg Decimal(10,3)` sin `Nullable`, y en el seed la columna estaba poblada en las 1.221 variantes (script 54), así que la omisión no se notó. |
+
+**La realidad.** `producto_variante.peso_kg` **es NULLABLE en PostgreSQL**, y la aplicación creó tres
+variantes sin peso (ids 2427, 2428 y 2429, el 2026-08-12 y el 2026-08-16). La carga falló tres
+corridas seguidas con:
+
+    InvalidOperation: [<class 'decimal.ConversionSyntax'>]
+
+que **no nombra la columna, ni la fila, ni la tabla**. La causa exacta: `clickhouse_connect` escribe
+una columna Decimal con `int(Decimal(str(x)) * mult)`, y con `x = None` eso es `Decimal('None')`.
+Reproducido en aislamiento antes de tocar nada.
+
+**Cómo se resolvió.** `peso_kg Nullable(Decimal(10,3))`. **No** con `COALESCE(peso_kg, 0)`: por la
+lección de C3B.5, un 0 es una afirmación —«no pesa»— y la verdad aquí es «no se sabe». Ninguna
+consulta de informe ni de tablero lee esta columna (verificado), así que el NULL no propaga a
+ninguna aritmética.
+
+**Sigue latente una columna más allá**: `margen_catalogo_pct` sale de un `NULLIF(pv.precio, 0)` y
+sería NULL —rompiendo la carga igual— si una variante tuviera `precio = 0`. Hoy ninguna la tiene y
+**la aplicación no lo valida**.
+
+**Qué habría roto.** Nada en pantalla, y eso es lo interesante: el patrón de carga atómica hizo su
+trabajo y `dim_producto` conservó las 6.221 filas del día anterior. Pero las tres variantes nuevas
+—y con ellas todo lo que se les comprara o vendiera— quedaban **invisibles para el almacén entero**,
+porque `dim_producto` es la dimensión contra la que resuelven `fact_venta_linea`,
+`fact_compra_linea`, `fact_resena` y `fact_devolucion_linea`. Un producto que se vende y no aparece
+en ningún informe es peor que un informe vacío: el vacío se ve.
+
+---
+
+## C6.5 · El control de motivos reimplementaba el mapa pero NO la regla de escape
+
+| | |
+|---|---|
+| **Fase** | 6 (`fact_compra_linea`, `validar_dwh.py`) |
+| **El diseño decía** | §5.3 declara la regla de escape («lo no previsto cae en `'Otro'` y se registra»), y el control la reimplementa «a propósito, para que no sea una tautología» — pero solo tradujo el **sinónimo**, dejando pasar cualquier otro valor tal cual. |
+
+**La realidad.** `motivo_rechazo` es TEXTO LIBRE y la aplicación escribió uno nuevo el 2026-08-16:
+**«Caja dañada»**. Los motivos crudos pasaron de 6 a **7**. Python lo mandó a `'Otro'` y lo registró
+—la regla de escape funcionó— pero el control decía «Caja dañada» donde el almacén dice «Otro» y
+**fallaba por no expresar la regla completa**, no por un error de carga.
+
+Y había una casualidad debajo: `motivos_normalizados` daba **6** (7 crudos − 1 sinónimo) contra los
+**6** del destino (5 canónicos + `Otro`). **Cuadraba por coincidencia.** Con dos motivos nuevos
+habría dado 7 contra 6.
+
+**Cómo se resolvió.** La lista blanca de los cinco canónicos **más** el escape a `'Otro'`, escrita
+en SQL en los dos sitios, independiente de la de Python. No es aflojar el control: si Python mandara
+un motivo real a `'Otro'`, o metiera uno inventado en un cubo canónico, la fila sigue delatándolo.
+El motivo nuevo **se deja en `'Otro'` a propósito**: decidir que «Caja dañada» es «Empaque danado en
+transito» es una opinión sobre lo que quiso decir una persona, y el criterio del proyecto (C3.3) es
+que quitar decoración de máquina es limpieza pero fusionar dos frases humanas es criterio. Queda
+reportado para que Compras lo decida.
+
+**Qué habría roto.** OTD-COM-07 muestra los motivos como categorías. Sin la regla en el control,
+cada frase nueva que teclee un usuario de bodega aborta la corrida de `fact_compra_linea` —no por un
+defecto real— y el almacén se queda con el dato de ayer hasta que alguien edite el mapa.
 
 ---
 

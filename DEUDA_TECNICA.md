@@ -2,10 +2,23 @@
 
 Registro de lo que este sistema **no** hace, o hace apoyado en algo que puede romperse.
 Reestructurado el **2026-08-07** a partir del levantamiento del 2026-08-06.
-Última incorporación: **2026-08-11**. Entraron **C-17** (la serie de la década es
-demasiado regular y el modelo de previsión no supera al ingenuo) y **C-18** (constantes
-de configuración dimensionadas para el volumen anterior).
-Recuento vigente: **A = 0 · B = 28 · C = 17**.
+Última incorporación: **2026-08-17**. Entraron **C-19** (`margen_catalogo_pct` repetía el
+fallo de `peso_kg` si alguna variante tenía `precio = 0`) y **C-20** (el javadoc de
+`pesoTotalPedido` afirma un hecho de datos que dejó de ser cierto), las dos de la sesión
+que reparó el ETL tras las pruebas manuales del 12-16 de agosto — ver **Fase 6, C6.1 a
+C6.5** en `docs/estrategico/CORRECCIONES_DISENO_ETL.md`. **C-19 se cerró el mismo día**, en
+sus dos mitades (guarda de `precio > 0` en el servicio + columna `Nullable`), y está en la
+sección **D** con su verificación. Ese mismo 2026-08-17 entraron además **C-21** (las 133 metas
+de venta sembradas quedaron dimensionadas para el volumen previo: avances del 874 % al 1.756 %)
+y **C-22** («días corridos» engaña porque la carga escribió el mes completo por delante de hoy),
+las dos al fijar la meta del mes vigente.
+Recuento vigente: **A = 0 · B = 28 · C = 20**.
+
+> **Corrección estructural del 2026-08-17**: **C-17** y **C-18** estaban físicamente
+> DEBAJO del encabezado `# D. Resuelto (histórico)` aunque se contaban como vigentes y
+> describen fragilidades vivas. El encabezado se movió detrás de ellas; ninguna entrada
+> cambió de contenido ni de categoría. Si el recuento de la cabecera y el sitio donde
+> vive una ficha se contradicen, manda el recuento — pero conviene arreglar el sitio.
 
 > **Las cifras del sistema cambiaron el 2026-08-10/11** con la carga masiva a 2.999.991
 > pedidos en una década (2025-2034). Toda entrada anterior a esa fecha que cite conteos
@@ -759,8 +772,6 @@ Funciona hoy. Apoyado en algo que puede romperse sin aviso. **15 entradas.**
 
 ---
 
-# D. Resuelto (histórico)
-
 ### C-17 · La serie de la década es demasiado regular, y el modelo de previsión no supera al ingenuo
 
 **Qué pasa.** Tras la carga masiva, cada mes de los diez años vale casi exactamente
@@ -804,6 +815,110 @@ arrancaban con `desde=2025-01-01` / `hasta=2026-12-31` escritos a mano en
 recortaban al 20 % **con aspecto de estar completo**. Un filtro por defecto que caduca no
 falla: miente. Corregido dejándolo vacío (el backend omite la condición y sirve la serie
 entera, y medido no cuesta más).
+
+### C-20 · El javadoc de `pesoTotalPedido` afirma un hecho de datos que dejó de ser cierto
+
+- **Qué es**: el comentario del método que calcula el peso del envío declara «*Cobertura
+  verificada vía MCP 2026-07-22: `peso_kg` está NULL en las 1221 variantes, así que hoy todo
+  envío nace con peso NULL; el cálculo queda listo para cuando el catálogo capture pesos*».
+  **Es falso desde el script 54** (2026-07-23, el día siguiente), que cargó el peso de las
+  1.221; hoy lo tienen **6.221 de 6.224**. Es decir: el javadoc dice que la funcionalidad
+  está dormida cuando lleva casi un mes viva y cobrando flete por kilo.
+- **Dónde**: `retailmind-backend/src/main/java/com/retailmind/ventas/VentasService.java`,
+  javadoc de `pesoTotalPedido()` (~línea 200).
+- **Si no se toca**: el código funciona — esto no cambia una sola cifra. El daño es de
+  DECISIÓN, y no es hipotético: quien lea ese comentario concluye que el cálculo por peso no
+  está en uso, y a partir de ahí puede tratar `peso_kg` como un campo opcional sin
+  consecuencias (que es precisamente el razonamiento que dejó el campo fuera del formulario
+  de alta de variante hasta el 2026-08-17), o dar por muerto un cálculo que sí factura. Un
+  comentario que afirma un hecho de datos envejece con los datos, y este ya indujo el error
+  una vez.
+- **Costaría**: reescribir el párrafo. Minutos. Lo que **no** es gratis es la clase de
+  problema: es el mismo envejecimiento silencioso que este archivo documenta en su propia
+  cabecera y en C6.1/C6.3 —«verificado: máx. 1»—, y la regla que sale de ahí es que
+  **una medición citada en un comentario lleva su fecha Y su método, y se relee antes de
+  apoyarse en ella**.
+- **Sustentación**: **Sí** — es el ejemplo más limpio del archivo de que la documentación es
+  superficie de fallo: no rompió el sistema, orientó mal a quien lo escribió después. Se
+  registra en vez de corregirse al paso porque la sesión que lo encontró estaba acotada al
+  ETL y al alta de variante, y tocar `VentasService` quedaba fuera de su alcance.
+- **Verificado** (2026-08-17): `SELECT count(*), count(*) FILTER (WHERE peso_kg IS NULL) FROM
+  producto_variante` → **6.224 / 3**; las tres sin peso son las variantes 2427, 2428 y 2429,
+  creadas desde la aplicación el 2026-08-12 y el 2026-08-16, **no** las 1.221 del comentario.
+  El script que las pobló es `retailmind/sql/postgres/54_*` (ver la entrada «Carga de datos
+  maestros» del histórico).
+
+### C-21 · Las metas de venta sembradas quedaron dimensionadas para el volumen anterior
+
+- **Qué es**: las **133 metas** de `meta_venta` (2025-01 → 2026-07, 7 departamentos) se sembraron
+  con el script 84, cuando el sistema tenía 4.083 pedidos. Tras la carga masiva la venta mensual
+  pasó a los millones y esas metas se quedaron **entre 9 y 18 veces por debajo**, así que
+  OTD-VEN-15 mide contra ellas y da porcentajes absurdos: sobre los 19 meses con meta del
+  departamento `ventas`, el avance va del **874,5 % al 1.756,3 %**, media **1.469,7 %**, y los
+  **19 de 19** superan el 500 %. Ejemplo: julio de 2026, meta $235.000 contra $3.009.351,82
+  facturados.
+- **Dónde**: tabla `meta_venta` (133 filas con marca `[SEED-BC]` / `[SEED-OP]`); el informe que las
+  lee es `InformesVentasService.avanceMeta` (OTD-VEN-15), que compara contra
+  `sum(factura_venta.total)` no anulada del mes.
+- **Si no se toca**: los meses PASADOS de OTD-VEN-15 siguen mostrando avances de cuatro cifras.
+  No hay riesgo de dato corrupto —la meta es un objetivo, no un hecho— pero el informe no sirve
+  para el mes que no sea el vigente, y un porcentaje de 1.469 % en pantalla es de los que hacen
+  dudar del sistema entero en una demostración. **El mes VIGENTE sí está bien**: el 2026-08 se
+  fijó a mano el 2026-08-17 en $3.650.000 (base: el facturado de agosto de 2025, $3.645.915,16),
+  y da un avance creíble del **92,0 %**.
+- **Costaría**: reescalar las 133 filas es una **migración de datos**, no un cambio de código:
+  exige respaldo previo, un criterio de reescalado por departamento y su `99_revert_*.sql`, con
+  el agravante de que cada departamento tiene su propia base (compras factura, logística entrega,
+  soporte atiende…) y no todas escalan igual. Se decidió **no hacerlo** y registrar la deuda: es
+  el mismo criterio que con C-18 —la clase de problema es «constante dimensionada para el volumen
+  anterior»— y reescribir 19 meses de objetivos históricos es reescribir historia.
+- **Sustentación**: **Sí** — una meta es una decisión de negocio con fecha, y falsearla hacia
+  atrás para que el gráfico quede bonito es peor que enseñar que el sistema creció 15× y los
+  objetivos no se actualizaron. Lo que sí se hizo es que el mes vigente tenga meta REAL, fijada
+  por la aplicación y con su base escrita en `notas`.
+- **Verificado** (2026-08-17): 19 meses con meta de `ventas`, avance mín. **874,5 %**, máx.
+  **1.756,3 %**, media **1.469,7 %**, y 19 de 19 por encima del 500 %; `meta_venta` pasó de
+  **133 a 135** filas (las dos nuevas son 2026-08 `ventas` y `general`, ids 212 y 213, ambas
+  `fijada_por` = admin y creadas por `POST /api/gerencia/metas`, no por INSERT directo).
+  OTD-VEN-15 del mes vigente responde **200** con meta $3.650.000,00 · real $3.357.913,35 ·
+  avance **92,0 %** · falta $292.086,65 (antes daba **409**), confirmado en navegador con la
+  barra de avance pintada.
+
+### C-22 · «Días corridos» engaña porque la carga escribió el mes COMPLETO por delante de hoy
+
+- **Qué es**: OTD-VEN-15 muestra `dias_transcurridos` / `dias_del_periodo` —hoy **17 / 31**— junto
+  al avance del **92,0 %**. La lectura natural es «vamos al 92 % y queda media mes», o sea muy por
+  encima del ritmo. Es **falsa**: la carga masiva escribió la década entera, así que agosto de 2026
+  ya tiene sus **19.973 facturas hasta el 2026-08-31**. El 92 % no es el avance a 17 días, es el
+  resultado del mes CERRADO.
+- **Dónde**: `InformesVentasService.avanceMeta`, columnas `dias_transcurridos` y
+  `dias_del_periodo` (calculadas con `current_date`), y la pantalla genérica que las pinta.
+- **Si no se toca**: cualquier lectura de ritmo sobre el mes vigente está mal en un factor de
+  ~1,8 (31/17), y el error se DISFRAZA de buena noticia. Es la misma familia que la nota de
+  OTD-GER-01 —«el seed llega al 2026-07-22 y consultar hoy sale vacío»— pero al revés: aquí el
+  dato futuro sobra en lugar de faltar.
+- **Costaría**: poco, y hay dos caminos que NO son equivalentes: (a) declarar la salvedad en
+  pantalla («el período ya está facturado por completo; los días corridos no indican ritmo»),
+  que es honesto y cuesta un campo; o (b) medir los días contra el **último día con factura del
+  período** en vez de contra `current_date`, que arregla el número pero enmascara que el dato es
+  sintético. Se prefiere (a) mientras el sistema viva de datos sembrados.
+- **Sustentación**: **Sí** — es el recordatorio de que un sistema con datos FUTUROS rompe todo
+  indicador que dé por hecho que «hoy» es la frontera de lo conocido. Vale para cualquier
+  informe que compare lo transcurrido con lo acumulado.
+- **Verificado** (2026-08-17): `min(fecha_emision)` / `max(fecha_emision)` de las facturas de
+  agosto de 2026 → **2026-08-01 00:01:43** y **2026-08-31 23:58:26**, 19.973 facturas; la
+  respuesta del informe trae `dias_transcurridos = 17` y `dias_del_periodo = 31` con
+  `current_date = 2026-08-17`. Septiembre de 2026 ya tiene **$3.885.030,17** facturados.
+
+---
+
+# D. Resuelto (histórico)
+
+## Resuelto — C-19: el margen de catálogo ya no puede tumbar la carga (2026-08-17, sin script)
+
+| Ítem original | Resolución |
+|---------------|------------|
+| **C-19 · `margen_catalogo_pct` repetía el fallo de `peso_kg` si alguna variante tenía `precio = 0`**: `dim_producto` declaraba la columna `Decimal(6,2)` **no-Nullable** y la calculaba con `ROUND(((precio − costo) / NULLIF(precio, 0)) * 100, 2)`. El `NULLIF` evita la división por cero, pero **su resultado es NULL**, y un NULL contra una columna Decimal no-Nullable **aborta la carga entera** con `InvalidOperation: [ConversionSyntax]` — un mensaje que no nombra tabla, ni fila, ni columna. El hueco era alcanzable porque **ni `crearVariante` ni `editarVariante` validaban `precio`** y el CHECK del motor es `producto_variante_precio_check CHECK (precio >= 0)`: **el cero es legal para PostgreSQL**. La única barrera era el frontend, o sea la pantalla lo impedía y **la API no**. Con `dim_producto` sin publicar se congelan además `fact_venta_linea`, `fact_compra_linea`, `fact_resena` y `fact_devolucion_linea` en lo que a producto se refiere, porque es la dimensión contra la que resuelven. | **RESUELTO EN LAS DOS MITADES, en ese orden — primero la causa alcanzable, después el síntoma.** (1) **La causa**: `CatalogoAdminService.precioValidado()` exige precio **estrictamente positivo y no nulo** al crear Y al editar, con `IllegalArgumentException` → 400 y un mensaje que explica el porqué (no el importe: la publicación de la dimensión). `costo` NO se valida a propósito —un costo 0 es legítimo y no entra en ningún denominador— y el margen negativo se sigue admitiendo (5 variantes hoy). (2) **El síntoma**: `margen_catalogo_pct Nullable(Decimal(6,2))`, el mismo arreglo que `peso_kg`, **nunca** un `COALESCE(..., 0)` — un margen de 0 % es una afirmación y la verdad es «indefinido» (C3B.5). Con eso, el vector que NO pasa por la aplicación —un script de siembra, un `UPDATE` a mano— deja de ser un fallo: publica un margen NULL en vez de abortar. **Verificado con el caso real, no en teoría**: se sembró `precio = 0` **directamente en PostgreSQL** (el vector que quedaba), se corrió la carga y publicó **6.225 filas** con `margen_catalogo_pct = NULL` para esa variante en vez de abortar; se borró la fila y se recargó a **6.224**. Antes de eso, las 8 pruebas por API de la guarda de precio (alta y edición × `0` / negativo / ausente / válido) dieron **400·400·400·201** y **400·400·400·200**, conservando el `peso_kg` de la fila. Tipo publicado confirmado en `system.columns`: `Nullable(Decimal(6, 2))`. **Los 49 controles cuadran exactamente** tras el cambio (importa porque `dim_producto` entra en tres controles CRUZADOS del almacén). Barrido previo de lectores de la columna: **cero** en `.java` y `.py` fuera de su propio DDL, que es lo que hacía el cambio de tipo inocuo. |
 
 ## Resuelto — A-3: `fact_eventos` en solo lectura (2026-08-07, sin script)
 
