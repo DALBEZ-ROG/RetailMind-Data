@@ -146,7 +146,8 @@ public class CatalogoAdminService {
                 FROM producto p LEFT JOIN marca m ON m.id = p.marca_id
                 WHERE p.id = ?""", id);
         producto.put("variantes", pg.queryForList("""
-                SELECT pv.id, pv.sku, pv.precio, pv.costo, pv.es_predeterminada, pv.activo,
+                SELECT pv.id, pv.sku, pv.precio, pv.costo, pv.peso_kg,
+                       pv.es_predeterminada, pv.activo,
                        COALESCE((SELECT string_agg(a.nombre || ': ' || va.valor, ', ' ORDER BY a.nombre)
                                  FROM variante_valor_atributo vva
                                  JOIN valor_atributo va ON va.id = vva.valor_atributo_id
@@ -198,21 +199,122 @@ public class CatalogoAdminService {
 
     // ── Variantes ────────────────────────────────────────────────────────
 
+    /**
+     * `peso_kg` es OBLIGATORIO en el alta, y esa exigencia es de la aplicación y
+     * no del motor: la columna es NULLABLE en PostgreSQL y lo seguirá siendo
+     * (hay 1.221 variantes históricas que se poblaron con el script 54).
+     *
+     * El motivo es que un peso ausente NO degrada solo esa variante: sale caro en
+     * el pedido COMPLETO. `VentasService.pesoTotalPedido` es TODO-O-NADA por
+     * diseño —un total parcial distorsionaría el costo por kg en silencio—, así
+     * que UNA línea sin peso deja el peso del pedido entero en NULL y el envío se
+     * cobra solo con `costo_base`, **sin el cargo por kilo**. Es decir: una
+     * variante mal dada de alta subfactura el flete de todos los pedidos que la
+     * incluyan, sin un error en ningún log.
+     *
+     * Hasta el 2026-08-17 el campo NO EXISTÍA en este servicio ni en el
+     * `VarianteReq` del controlador, de modo que **toda** variante creada desde la
+     * pantalla nacía sin peso. Se descubrió porque las tres que se crearon
+     * probando (ids 2427-2429) tumbaron la carga de `dim_producto` en el DWH
+     * —NULL contra una columna `Decimal` no-Nullable— y no porque nadie notara el
+     * flete mal cobrado, que es el daño de verdad.
+     */
     @Transactional
     public long crearVariante(long productoId, String sku, BigDecimal precio, BigDecimal costo,
-                              String codigoBarras, boolean esPredeterminada) {
+                              String codigoBarras, boolean esPredeterminada, BigDecimal pesoKg) {
         return idDe(pg.queryForObject("""
                 INSERT INTO producto_variante
-                    (producto_id, sku, precio, costo, codigo_barras, es_predeterminada)
-                VALUES (?, ?, ?, ?, ?, ?) RETURNING id""",
-                Long.class, productoId, sku, precio, costo, codigoBarras, esPredeterminada));
+                    (producto_id, sku, precio, costo, codigo_barras, es_predeterminada, peso_kg)
+                VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id""",
+                Long.class, productoId, sku, precioValidado(precio), costo, codigoBarras,
+                esPredeterminada, pesoExigido(pesoKg)));
     }
 
+    /**
+     * En la edición `pesoKg` es OPCIONAL y omitirlo CONSERVA el que hubiera
+     * (`COALESCE(?, peso_kg)`), en vez de borrarlo. Dos razones:
+     *
+     *  * este método ya era una actualización parcial —solo tocaba sku, precio y
+     *    costo de las quince columnas de la tabla—, así que conservar es lo
+     *    coherente con lo que la pantalla espera;
+     *  * y así la pantalla puede RELLENAR el peso de las variantes que hoy lo
+     *    tienen en NULL sin necesidad de un script de migración.
+     *
+     * Lo que no se puede es ponerlo a cero o en negativo: eso lo rechaza
+     * `pesoValidado`. Para «no lo sé» ya está el NULL que la columna admite; un 0
+     * sería una afirmación —«no pesa»— y además `pesoTotalPedido` lo trata igual
+     * que un NULL (`peso_kg <= 0`), con lo que reintroduciría el mismo fallo por
+     * la puerta de atrás.
+     */
     @Transactional
-    public void editarVariante(long id, String sku, BigDecimal precio, BigDecimal costo) {
+    public void editarVariante(long id, String sku, BigDecimal precio, BigDecimal costo,
+                               BigDecimal pesoKg) {
         exigir(pg.update("""
-                UPDATE producto_variante SET sku = ?, precio = ?, costo = ? WHERE id = ?""",
-                sku, precio, costo, id), "producto_variante", id);
+                UPDATE producto_variante
+                SET sku = ?, precio = ?, costo = ?, peso_kg = COALESCE(?, peso_kg)
+                WHERE id = ?""",
+                sku, precioValidado(precio), costo, pesoValidado(pesoKg), id),
+                "producto_variante", id);
+    }
+
+    /**
+     * `precio` tiene que ser ESTRICTAMENTE positivo, tanto al crear como al editar.
+     *
+     * El motor NO lo impide: el CHECK es `producto_variante_precio_check
+     * CHECK (precio >= 0)`, o sea **el cero es legal para PostgreSQL**, y hasta el
+     * 2026-08-17 este servicio no lo miraba. La pantalla sí
+     * (`variante-dialog.component.ts`, `precio > 0`), con lo que el hueco solo era
+     * alcanzable por API — que es exactamente la clase de hueco que no se ve.
+     *
+     * Lo que un precio 0 rompe, y no es el catálogo: `dim_producto` calcula
+     * `margen_catalogo_pct` con `ROUND(((precio − costo) / NULLIF(precio, 0)) * 100, 2)`.
+     * Con precio 0 ese `NULLIF` devuelve NULL, y un NULL contra una columna
+     * `Decimal(6,2)` **no-Nullable** del almacén **aborta la carga entera** con
+     * `InvalidOperation: [ConversionSyntax]` — un mensaje que no nombra la tabla, ni
+     * la fila, ni la columna. Es el MISMO fallo que `peso_kg` provocó el 2026-08-16
+     * (ficha C-19 de `DEUDA_TECNICA.md`, corrección C6.4 de
+     * `docs/estrategico/CORRECCIONES_DISENO_ETL.md`), una columna más allá.
+     *
+     * O sea: esta guarda de dos líneas no protege un importe, protege la
+     * publicación de la dimensión contra la que resuelven `fact_venta_linea`,
+     * `fact_compra_linea`, `fact_resena` y `fact_devolucion_linea`.
+     *
+     * `costo` NO se valida aquí a propósito: un costo 0 es legítimo (muestra,
+     * obsequio) y no entra en ningún denominador. Que el costo supere al precio
+     * también se admite —margen negativo, que es un remate real— y hoy pasa en 5
+     * variantes.
+     */
+    private static BigDecimal precioValidado(BigDecimal precio) {
+        if (precio == null) {
+            throw new IllegalArgumentException("El precio es obligatorio.");
+        }
+        if (precio.signum() <= 0) {
+            throw new IllegalArgumentException(
+                    "El precio debe ser mayor que cero (llegó " + precio.toPlainString()
+                    + "). Sin un precio positivo el margen de catálogo queda indefinido y la "
+                    + "carga del almacén no puede publicar la dimensión de producto.");
+        }
+        return precio;
+    }
+
+    /** Alta: el peso es obligatorio. Ver el javadoc de `crearVariante`. */
+    private static BigDecimal pesoExigido(BigDecimal pesoKg) {
+        if (pesoKg == null) {
+            throw new IllegalArgumentException(
+                    "El peso en kg es obligatorio: sin él, el costo de envío de todo pedido "
+                    + "que incluya esta variante se calcula sin el cargo por kilo.");
+        }
+        return pesoValidado(pesoKg);
+    }
+
+    /** Edición: si viene, tiene que ser positivo; si no viene, se conserva. */
+    private static BigDecimal pesoValidado(BigDecimal pesoKg) {
+        if (pesoKg != null && pesoKg.signum() <= 0) {
+            throw new IllegalArgumentException(
+                    "El peso en kg debe ser mayor que cero (llegó " + pesoKg.toPlainString()
+                    + "). Un peso de 0 no se distingue de «sin peso» al calcular el envío.");
+        }
+        return pesoKg;
     }
 
     @Transactional

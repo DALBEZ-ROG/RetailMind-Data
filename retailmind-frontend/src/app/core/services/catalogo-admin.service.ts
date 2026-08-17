@@ -19,6 +19,12 @@ export interface VarianteBody {
    */
   codigoBarras?: string | null;
   esPredeterminada?: boolean;
+  /**
+   * Obligatorio al CREAR (el backend devuelve 400 sin él) y opcional al editar,
+   * donde omitirlo conserva el valor que hubiera. Sin peso, el costo de envío de
+   * todo pedido que incluya la variante se calcula sin el cargo por kilo.
+   */
+  pesoKg?: number | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -57,7 +63,9 @@ export class CatalogoAdminService {
   crearVariante(productoId: number, body: VarianteBody): Observable<{ id: number }> {
     return this.http.post<{ id: number }>(`${this.base}/productos/${productoId}/variantes`, body);
   }
-  editarVariante(id: number, body: { sku: string; precio: number; costo: number }): Observable<unknown> {
+  editarVariante(id: number,
+                 body: { sku: string; precio: number; costo: number; pesoKg?: number | null }
+                ): Observable<unknown> {
     return this.http.put(`${this.base}/variantes/${id}`, body);
   }
   activarVariante(id: number, activo: boolean): Observable<unknown> {

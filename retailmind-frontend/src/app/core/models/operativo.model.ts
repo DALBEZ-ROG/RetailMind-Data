@@ -30,6 +30,9 @@ export interface PaginaProductos {
 }
 export interface VarianteAdmin {
   id: number; sku: string; precio: number; costo: number;
+  /** NULL en las variantes dadas de alta antes del 2026-08-17, cuando la
+   *  pantalla no permitía capturarlo. Hoy es obligatorio al crear. */
+  peso_kg: number | null;
   es_predeterminada: boolean; activo: boolean; atributos: string;
 }
 export interface MarcaAdmin {

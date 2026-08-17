@@ -146,6 +146,24 @@
           <th mat-header-cell *matHeaderCellDef>Costo</th>
           <td mat-cell *matCellDef="let v">{{ v.costo | currency:'USD' }}</td>
         </ng-container>
+        <!--
+          Un peso vacío no es un hueco cosmético: `pesoTotalPedido` es todo-o-nada,
+          así que una sola variante sin peso hace que el flete de CUALQUIER pedido
+          que la incluya se cobre sin el cargo por kilo. Por eso se marca en rojo
+          en la grilla y no solo dentro del diálogo.
+        -->
+        <ng-container matColumnDef="peso">
+          <th mat-header-cell *matHeaderCellDef>Peso</th>
+          <td mat-cell *matCellDef="let v">
+            <span *ngIf="v.peso_kg != null; else sinPeso">{{ v.peso_kg }} kg</span>
+            <ng-template #sinPeso>
+              <span class="estado-chip error" matTooltip="Sin peso el envío se cobra solo con la
+                    tarifa base, sin el cargo por kilo. Modifica la variante para indicarlo.">
+                sin peso
+              </span>
+            </ng-template>
+          </td>
+        </ng-container>
         <ng-container matColumnDef="estado">
           <th mat-header-cell *matHeaderCellDef>Estado</th>
           <td mat-cell *matCellDef="let v">

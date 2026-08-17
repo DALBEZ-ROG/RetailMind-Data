@@ -28,8 +28,15 @@ public class CatalogoAdminController {
     public record MarcaReq(String nombre, String slug, String descripcion) {}
     public record ProductoReq(String nombre, String slug, Long marcaId, String descripcionCorta,
                               String descripcion, Boolean publicado, List<Long> categoriaIds) {}
+    /**
+     * `pesoKg` es OBLIGATORIO al crear y OPCIONAL al editar (omitirlo conserva el
+     * que hubiera). La regla y su porqué viven en `CatalogoAdminService`: sin peso,
+     * `pesoTotalPedido` deja en NULL el peso del pedido ENTERO y el flete se cobra
+     * sin el cargo por kilo.
+     */
     public record VarianteReq(String sku, BigDecimal precio, BigDecimal costo,
-                              String codigoBarras, Boolean esPredeterminada) {}
+                              String codigoBarras, Boolean esPredeterminada,
+                              BigDecimal pesoKg) {}
     public record ActivoReq(boolean activo) {}
     public record AtributoReq(String codigo, String nombre, String tipo) {}
     public record ValorAtributoReq(String valor) {}
@@ -127,13 +134,13 @@ public class CatalogoAdminController {
     @PostMapping("/productos/{productoId}/variantes")
     public ResponseEntity<?> crearVariante(@PathVariable long productoId, @RequestBody VarianteReq r) {
         long id = servicio.crearVariante(productoId, r.sku(), r.precio(), r.costo(),
-                r.codigoBarras(), Boolean.TRUE.equals(r.esPredeterminada()));
+                r.codigoBarras(), Boolean.TRUE.equals(r.esPredeterminada()), r.pesoKg());
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("id", id));
     }
 
     @PutMapping("/variantes/{id}")
     public ResponseEntity<?> editarVariante(@PathVariable long id, @RequestBody VarianteReq r) {
-        servicio.editarVariante(id, r.sku(), r.precio(), r.costo());
+        servicio.editarVariante(id, r.sku(), r.precio(), r.costo(), r.pesoKg());
         return ResponseEntity.ok(Map.of("success", true));
     }
 

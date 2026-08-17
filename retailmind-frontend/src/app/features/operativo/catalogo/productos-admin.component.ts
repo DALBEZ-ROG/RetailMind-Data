@@ -79,7 +79,7 @@ export class ProductosAdminComponent implements OnInit, OnDestroy {
   varianteSeleccionada: VarianteAdmin | null = null;
 
   columnas = ['nombre', 'marca', 'variantes', 'publicado', 'activo'];
-  readonly columnasVariante = ['sku', 'atributos', 'precio', 'costo', 'estado'];
+  readonly columnasVariante = ['sku', 'atributos', 'precio', 'costo', 'peso', 'estado'];
 
   constructor(private catalogo: CatalogoAdminService, private snackBar: MatSnackBar,
               private dialog: MatDialog, private confirmar: ConfirmService) {}
@@ -303,7 +303,7 @@ export class ProductosAdminComponent implements OnInit, OnDestroy {
   private guardarVariante(productoId: number, original: VarianteAdmin,
                           res: VarianteDialogResultado): void {
     this.catalogo.editarVariante(original.id,
-        { sku: res.sku, precio: res.precio, costo: res.costo }).pipe(
+        { sku: res.sku, precio: res.precio, costo: res.costo, pesoKg: res.pesoKg }).pipe(
       switchMap(() => res.activo === original.activo
         ? of(null)
         : this.catalogo.activarVariante(original.id, res.activo))
