@@ -82,21 +82,14 @@ public class CatalogoAdminService {
 
     // ── Productos ────────────────────────────────────────────────────────
 
-    @Transactional(readOnly = true)
-    public List<Map<String, Object>> listarProductos() {
-        return pg.queryForList("""
-                SELECT p.id, p.nombre, p.slug, p.descripcion_corta, p.publicado, p.activo,
-                       m.nombre AS marca,
-                       (SELECT count(*) FROM producto_variante pv WHERE pv.producto_id = p.id) AS variantes
-                FROM producto p LEFT JOIN marca m ON m.id = p.marca_id
-                ORDER BY p.nombre""");
-    }
-
     /**
-     * Búsqueda paginada del catálogo (LIMIT/OFFSET). El listado completo
-     * ({@link #listarProductos()}) se mantiene para compatibilidad, pero la
-     * pantalla de productos usa esta variante: con ~1.200 productos el
-     * frontend ya no puede renderizar todo de una vez.
+     * Búsqueda paginada del catálogo (LIMIT/OFFSET). Es la ÚNICA forma de
+     * listar productos, y la que la pantalla usa desde siempre.
+     *
+     * El listado completo sin paginar (`listarProductos`) se retiró el
+     * 2026-08-19 con su endpoint — defecto D-04: devolvía los 6.217 productos
+     * en cada llamada y no lo consumía nadie. El motivo por el que existía
+     * («compatibilidad») se escribió cuando el catálogo tenía ~1.200.
      */
     @Transactional(readOnly = true)
     public Map<String, Object> buscarProductos(String q, Long marcaId, Long categoriaId,

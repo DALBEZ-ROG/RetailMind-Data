@@ -93,8 +93,20 @@ public class CatalogoAdminController {
     }
 
     // ── Productos ────────────────────────────────────────────────────────
-    @GetMapping("/productos")
-    public List<Map<String, Object>> productos() { return servicio.listarProductos(); }
+    //
+    // `GET /productos` (el listado COMPLETO, sin paginar) se RETIRÓ el
+    // 2026-08-19 — defecto D-04 del plan de pruebas. Devolvía los 6.217
+    // productos en cada llamada y **no lo consumía nadie**: ni el frontend, ni
+    // otro servicio, ni un guion, ni la documentación (verificado). Su javadoc
+    // decía «se mantiene para compatibilidad» desde cuando el catálogo tenía
+    // ~1.200 productos; hoy son 6.217 y sigue creciendo.
+    //
+    // Lo que queda es `/productos/buscar`, que es lo que la pantalla usa desde
+    // siempre. Se retira en vez de paginarlo porque cambiar la forma de la
+    // respuesta —de lista a sobre— sería el mismo riesgo sin la ventaja de
+    // eliminar la trampa: un endpoint sin tope es una invitación a construir
+    // encima. Mismo criterio que la retirada de `/api/gestion/fact-eventos`
+    // (deuda A-3).
 
     /** Búsqueda paginada: q busca en nombre/slug/marca/SKU de variante. */
     @GetMapping("/productos/buscar")

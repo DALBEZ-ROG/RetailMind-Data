@@ -34,7 +34,6 @@ export class CatalogoAdminService {
   constructor(private http: HttpClient) {}
 
   // Productos
-  productos(): Observable<ProductoAdmin[]> { return this.http.get<ProductoAdmin[]>(`${this.base}/productos`); }
 
   /** Búsqueda paginada server-side (LIMIT/OFFSET): la usa la pantalla de productos. */
   buscarProductos(q: string, marcaId: number | null, categoriaId: number | null,
