@@ -423,6 +423,48 @@ def _validar(client, corrida: uuid.UUID) -> bool:
         return False
 
 
+#: Prefijo con el que se sella la identidad del ORIGEN en la bitácora.
+#: La aplicación lo busca por este prefijo exacto (`InformeCompuestoServiceBase`).
+SELLO_ORIGEN = "origen="
+
+
+def identidad_del_origen() -> str:
+    """
+    Identifica de forma inequívoca la base PostgreSQL de la que salió esta carga.
+
+    ── POR QUÉ HACE FALTA (defecto D-07) ────────────────────────────────────
+    Un informe compuesto lee ClickHouse. Si el almacén quedara desalineado de la
+    base operativa —restaurado de otra copia, backend repuntado a otra base, ETL
+    parado mucho tiempo— **el informe seguiría respondiendo 200 con cifras
+    perfectamente formadas de OTRO conjunto de datos**, y nada lo detectaría. Se
+    comprobó midiendo: con PostgreSQL vacío, los compuestos publicaban 14.333.990
+    unidades vendidas.
+    La frescura ya estaba resuelta (`datosAl`); lo que faltaba era la
+    CORRESPONDENCIA. Este sello es la mitad del ETL: deja escrito de dónde vino
+    el dato para que quien lo lea pueda comprobar que habla de su propia base.
+
+    ── QUÉ SE USA COMO IDENTIDAD ────────────────────────────────────────────
+    El `system_identifier` de `pg_control_system()`: un entero de 64 bits que
+    PostgreSQL genera en el `initdb` y que es **único por CLÚSTER**. No sirve el
+    nombre de la base a secas —dos clústeres distintos tienen su `retailmind`, y
+    ése es justo el escenario peligroso—, así que van los dos juntos.
+
+    Nunca lanza: si no se puede leer, devuelve una marca de desconocido y la
+    corrida sigue. Un sello de auditoría no puede tumbar una carga que funcionó.
+    """
+    try:
+        from etl.dwh.conexiones import get_pg_connection
+        with get_pg_connection() as conexion:
+            with conexion.cursor() as cur:
+                cur.execute(
+                    "SELECT current_database(), system_identifier FROM pg_control_system()")
+                base, identificador = cur.fetchone()
+        return f"{SELLO_ORIGEN}{base}@{identificador}"
+    except Exception as e:                                   # noqa: BLE001
+        logger.warning("No se pudo sellar la identidad del origen: %s", e)
+        return f"{SELLO_ORIGEN}desconocido"
+
+
 def _cerrar(client, resultado: ResultadoCorrida) -> None:
     """Marcador de cierre: es lo que apaga el «en curso» de la aplicación."""
     fallidas = [t for t in resultado.tareas if t.resultado != bitacora.RESULTADO_EXITO]
@@ -439,6 +481,10 @@ def _cerrar(client, resultado: ResultadoCorrida) -> None:
         if resultado.validacion_ejecutada and not resultado.validacion_ok:
             partes.append("la validación final NO cuadra")
         mensaje = "Fallo parcial: " + " | ".join(partes)
+
+    # El sello de origen va SIEMPRE, cuadre o no la corrida: si algo salió mal,
+    # saber de qué base salió es todavía más útil.
+    mensaje = f"{mensaje} · {identidad_del_origen()}"
 
     bitacora.registrar(
         tarea=TAREA_CORRIDA, inicio=bitacora.ahora(),

@@ -313,7 +313,116 @@ public abstract class InformeCompuestoServiceBase extends InformeServiceBase {
         if (datosAl != null) {
             sobre.put("datosAl", datosAl);
         }
+        avisarSiElAlmacenNoEsDeEstaBase(sobre);
         return sobre;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // ¿El almacén habla de ESTA base? (defecto D-07)
+    // ─────────────────────────────────────────────────────────────────────
+
+    /** Prefijo con el que el ETL sella su origen en `etl_ejecucion.mensaje`. */
+    private static final String SELLO_ORIGEN = "origen=";
+
+    /** Identidad de la base operativa de este backend. Se calcula UNA vez. */
+    private volatile String identidadPropia;
+    /** Identidad sellada por el ETL. Se relee de tanto en tanto, no por petición. */
+    private volatile String identidadDelAlmacen;
+    private volatile long releerDesde;
+
+    /** Cada cuánto se vuelve a mirar el sello del almacén (5 minutos). */
+    private static final long VIGENCIA_MS = 5 * 60 * 1000L;
+
+    /**
+     * Añade una salvedad si el almacén NO corresponde a la base operativa.
+     *
+     * ── EL PROBLEMA ──────────────────────────────────────────────────────
+     * `datosAl` responde «¿de cuándo es este dato?», y eso ya estaba resuelto.
+     * Faltaba la otra pregunta: **«¿este dato es de MI base?»**. Si el almacén
+     * quedara desalineado —restaurado de otra copia, backend repuntado a otra
+     * base, dos entornos compartiendo ClickHouse— los 43 informes compuestos
+     * seguirían respondiendo 200 con cifras perfectamente formadas de otro
+     * conjunto de datos, y **nada lo detectaría**. Se comprobó midiendo: con
+     * PostgreSQL vacío, los compuestos publicaban 14.333.990 unidades vendidas.
+     *
+     * ── CÓMO SE RESUELVE ─────────────────────────────────────────────────
+     * El ETL sella en su bitácora el `system_identifier` del clúster de origen
+     * (único por `initdb`, así que dos clústeres con una base `retailmind` cada
+     * uno no se confunden) más el nombre de la base. Aquí se compara con la
+     * identidad de la conexión propia.
+     *
+     * ── POR QUÉ AVISA Y NO FALLA ─────────────────────────────────────────
+     * Porque un almacén ajeno **no es un error del sistema**: es una condición
+     * de despliegue, y quien está mirando la pantalla necesita el dato con la
+     * advertencia mucho más que un 500. La salvedad se pinta encima de la
+     * cifra, como las de costo vigente o muestra débil.
+     *
+     * Silencioso ante lo desconocido: si el ETL no selló (bitácora de antes de
+     * esta versión) no se afirma nada. Una advertencia que salta sin motivo
+     * deja de leerse, y entonces tampoco sirve cuando el motivo es real.
+     */
+    private void avisarSiElAlmacenNoEsDeEstaBase(Map<String, Object> sobre) {
+        try {
+            String propia = identidadPropia();
+            String almacen = identidadDelAlmacen();
+            if (propia == null || almacen == null || almacen.equals(propia)) {
+                return;
+            }
+            sobre.put("origenCoherente", false);
+            sobre.put("salvedad",
+                    "ATENCIÓN: el almacén de analítica se cargó desde OTRA base de datos "
+                    + "(" + almacen + ") y este sistema opera sobre " + propia + ". Las cifras "
+                    + "de este informe NO corresponden a los datos que ves en las pantallas "
+                    + "de operación. Vuelve a ejecutar el ETL contra esta base antes de "
+                    + "tomar cualquier decisión con ellas.");
+        } catch (Exception e) {                       // noqa: nunca rompe el informe
+            logger.debug("No se pudo comprobar la correspondencia del almacén: {}", e.toString());
+        }
+    }
+
+    /** `base@system_identifier` de la conexión operativa de este backend. */
+    private String identidadPropia() {
+        if (identidadPropia == null) {
+            identidadPropia = pg.queryForObject(
+                    "SELECT current_database() || '@' || system_identifier FROM pg_control_system()",
+                    String.class);
+        }
+        return identidadPropia;
+    }
+
+    /**
+     * `base@system_identifier` que el ETL dejó sellado en su última corrida.
+     *
+     * Se cachea cinco minutos: preguntarlo en cada informe añadiría una consulta
+     * a ClickHouse por petición para un dato que cambia una vez al día.
+     */
+    private String identidadDelAlmacen() {
+        long ahora = System.currentTimeMillis();
+        if (identidadDelAlmacen != null && ahora < releerDesde) {
+            return identidadDelAlmacen;
+        }
+        String mensaje = ch.queryForObject("""
+                SELECT argMax(mensaje, inicio) FROM %s.etl_ejecucion
+                 WHERE tarea = 'corrida' AND resultado != 'en_curso'
+                """.formatted(DWH), String.class);
+        releerDesde = ahora + VIGENCIA_MS;
+        identidadDelAlmacen = extraerOrigen(mensaje);
+        return identidadDelAlmacen;
+    }
+
+    /** Saca `base@identificador` del mensaje sellado, o null si no lo lleva. */
+    static String extraerOrigen(String mensaje) {
+        if (mensaje == null) {
+            return null;
+        }
+        int i = mensaje.indexOf(SELLO_ORIGEN);
+        if (i < 0) {
+            return null;                       // corrida anterior al sellado
+        }
+        String cola = mensaje.substring(i + SELLO_ORIGEN.length()).trim();
+        int corte = cola.indexOf(' ');
+        String valor = corte > 0 ? cola.substring(0, corte) : cola;
+        return valor.isBlank() || valor.startsWith("desconocido") ? null : valor;
     }
 
     // ── Paginación sobre ClickHouse ──────────────────────────────────────

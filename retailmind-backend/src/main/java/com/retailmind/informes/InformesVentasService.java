@@ -517,9 +517,37 @@ public class InformesVentasService extends InformeServiceBase {
                 a, m, a, m, a, m);
 
         if (items.isEmpty()) {
-            // Sin meta fijada el informe no puede mentir: 409 con el motivo.
-            throw new IllegalStateException("No hay meta de ventas vigente para " + m + "/" + a
-                    + ". Fíjala en Gerencia → Metas de Venta para poder medir el avance.");
+            /*
+             * SIN META NO SE INVENTA UN AVANCE, PERO TAMPOCO SE NIEGA LA PANTALLA.
+             *
+             * Hasta el 2026-08-19 esto lanzaba un 409, y era defendible: sin meta
+             * no hay avance que medir. Pero un 409 es un GUARDIA DE ESTADO —«tu
+             * acción choca con la situación actual»— y aquí no hay acción: el
+             * usuario está MIRANDO un informe. En una instalación nueva no hay
+             * meta de NINGÚN mes, así que la pantalla abría rota el primer día
+             * (defecto D-06, destapado al probar el estado E0).
+             *
+             * El resto del catálogo ya resuelve la ausencia de dato de otra
+             * forma, y ésta es la coherente: 200, conjunto vacío, los KPI SIN
+             * CALCULAR —null, no cero, que se leería como «vendimos 0» — y una
+             * salvedad que dice qué falta y dónde arreglarlo. Es el mismo patrón
+             * de OTD-GER-01, que emite su fila «Día sin movimiento», y de
+             * OTD-LOG-11, que declara los envíos sin tarifar.
+             *
+             * Lo que NO cambia: sin meta no se publica ningún avance. Un 0 % o
+             * un 100 % serían igual de falsos.
+             */
+            Map<String, Object> vacio = sobre(List.of());
+            vacio.put("anio", a);
+            vacio.put("mes", m);
+            vacio.put("salvedad", "No hay meta de ventas fijada para " + m + "/" + a
+                    + ", así que el avance no se calcula: sin meta no hay contra qué medir. "
+                    + "Fíjala en Gerencia → Metas de Venta y esta pantalla se llena sola.");
+            return conResumen(vacio, List.of(
+                    kpi("Meta del período", null, "moneda"),
+                    kpi("Venta real acumulada", null, "moneda"),
+                    kpi("Avance", null, "porcentaje"),
+                    kpi("Falta para la meta", null, "moneda")));
         }
 
         // Fila de referencia para las tarjetas: la meta del departamento Ventas
