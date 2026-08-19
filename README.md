@@ -232,8 +232,16 @@ docker-compose logs -f clickhouse
 # Detener todo
 docker-compose down
 
-# Detener y eliminar volúmenes (CUIDADO: borra datos)
-docker-compose down -v
+# NUNCA uses `down -v`.
+#
+# El `-v` destruye los volúmenes, y con ellos la base `retailmind` entera
+# (2.999.995 pedidos) y el `fact_eventos` de ClickHouse — 2.823.245 filas
+# IRREPRODUCIBLES, por lo que su volumen va declarado `external: true`.
+# No hay forma de regenerarlas.
+#
+# Para parar sin perder nada, las dos líneas de arriba bastan:
+#   docker compose stop      (para los contenedores)
+#   docker compose down      (los elimina; los volúmenes SOBREVIVEN)
 
 # Generar datos sintéticos para semana N
 # → Usar el módulo "Administración ETL" en la web
