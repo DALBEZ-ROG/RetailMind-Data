@@ -1,0 +1,30 @@
+# compose.e0.yml — Un backend GEMELO apuntando a la base E0 (vacía).
+#
+# Va en un servicio y un puerto APARTE (8082) en vez de repuntar el backend de
+# demo, para que el sistema vivo siga en pie mientras se prueba E0. Comparte la
+# misma imagen ya construida: E0 se prueba con EL MISMO binario que produccion,
+# que es el punto entero del ejercicio.
+services:
+  backend-e0:
+    image: retailmind-backend:latest   # la MISMA imagen que el backend de demo
+    profiles: ["e0"]
+    ports: ["8082:8080"]
+    environment:
+      POSTGRES_DATASOURCE_URL: jdbc:postgresql://postgres:5432/retailmind_pruebas
+      POSTGRES_DATASOURCE_USERNAME: retailmind_app
+      POSTGRES_DATASOURCE_PASSWORD: ${PG_APP_PASSWORD:?falta PG_APP_PASSWORD}
+      CLICKHOUSE_DATASOURCE_URL: jdbc:ch://clickhouse:8123/retailmind?compress=0
+      CLICKHOUSE_DATASOURCE_USERNAME: ${CH_USER}
+      CLICKHOUSE_DATASOURCE_PASSWORD: ${CH_PASSWORD}
+      CH_HOST: clickhouse
+      CH_PORT: "8123"
+      CH_DATABASE: retailmind
+      CH_USER: ${CH_USER}
+      CH_PASSWORD: ${CH_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?falta JWT_SECRET}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      DWH_CRON: "-"
+      DWH_ZONA: America/Guayaquil
+    depends_on:
+      postgres: { condition: service_healthy }
+    networks: [retailmind]
