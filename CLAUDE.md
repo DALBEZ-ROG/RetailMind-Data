@@ -233,7 +233,7 @@ mal de antes:
 | pedidos | 4.083 | **2.999.995** |
 | líneas de pedido | 10.384 | **7.622.438** |
 | hitos de historial | 24.610 | **20.215.662** |
-| movimientos de kardex | 23.289 | **8.008.403** |
+| movimientos de kardex | **13.310** (ver nota) | **8.008.403** |
 | posiciones de inventario | 1.406 | **11.407** (todas cuadradas) |
 | facturas de venta | 3.887 | **2.855.380** |
 | clientes · variantes | 72 · 1.221 | **50.072 · 6.224** |
@@ -242,8 +242,21 @@ mal de antes:
 | ventana temporal | 2025-01 → 2026-07 | **2025-01 → 2034-12** |
 | ticket medio | $1.400,06 | **$182,09** |
 
-Dos advertencias sobre esta tabla, porque las dos son trampas para la próxima
+Tres advertencias sobre esta tabla, porque las tres son trampas para la próxima
 sesión:
+
+- **El kardex «antes de la carga» NO eran 23.289**, como decía esta tabla hasta
+  el 2026-08-19: eran **13.310**. La cifra vieja incluía los **10.000
+  movimientos de la Fase 0** —o sea, la primera fase de la carga masiva se
+  estaba contando en la columna del ANTES: 13.310 + 10.000 = 23.310—. Lo
+  destapó montar el estado E2 del plan de pruebas desde el volcado del
+  2026-08-03 (anterior a la carga) y contrastarlo contra esta tabla: seis
+  medidas cuadraron exactas y ésta salió al 57 %. Y el propio archivo ya se
+  contradecía: el bloque de la **Fase 3B** dice
+  `fact_movimiento_inventario` (**13.287**) para ese mismo período.
+  **Al medir el «antes» de una carga, filtra por el tramo de ids reservado**
+  (`id < 900.000.000`), que es el criterio de procedencia que esta misma
+  sección declara — no por la fecha ni de memoria.
 
 - **El «modelo del DWH» NO son 32,60 M filas ni 1,92 GiB**, como decía esta tabla
   hasta hoy. El modelo publicado son **26.971.498 filas en 21 tablas / 1,47 GiB**,
@@ -1470,6 +1483,95 @@ NO reescribirlas porque una meta es una decisión con fecha; y la columna «día
 hasta el día 31) — ficha **C-22**. Si vas a fijar más metas: el `venta_real` del informe es el
 facturado TOTAL del mes y **no distingue departamento**, así que dos departamentos con metas
 distintas son solo dos denominadores sobre el mismo numerador.
+
+
+**PLAN DE PRUEBAS Y SUS SEIS DEFECTOS GRAVES (2026-08-18/19, script 111 + código)**: el sistema
+tenía **cero pruebas automatizadas** —`src/test/` vacío, 0 `.spec.ts`— y todo lo verificado hasta
+entonces eran guiones de una sesión que comprobaban CIFRAS, no COMPORTAMIENTO. El plan vive en
+`docs/PLAN_DE_PRUEBAS.md` (13 suites) y el arnés ejecutable en `pruebas/` (ver su README); los
+defectos, en `docs/pruebas/DEFECTOS.md`. **El eje que lo estructura son los CUATRO ESTADOS DE
+DATOS** —E0 vacía · E1 mínima · E2 sembrada · E3 masiva—, porque el sistema falla de formas
+distintas y excluyentes según cuántas filas tenga: E0 destapa división por cero, 404 donde debería
+haber lista vacía y controles que cuadran comparando 0 con 0; E3 destapa conteos bajo RLS y filtros
+que no llegan al índice. **Las 13 suites implementadas y los CUATRO estados ejecutados.**
+
+**E2 se monta desde `deploy/postgres/initdb/01_retailmind.dump`** (2026-08-03 20:25) con
+`pruebas/estados/montar_e2.sh`: la contenerización fue el 3 de agosto y la carga masiva el 10/11,
+así que ese volcado es una FOTO REAL del seed y no hace falta revertir fases. Dos avisos: (1) el
+volcado trae el ESQUEMA de esa fecha y el código ha avanzado — el script **87** creó
+`rol_personalizado` el día 6 y la consulta de login la une, así que sin aplicarlo **nadie entra**,
+con un `bad SQL grammar` que no parece un problema de esquema; el montador aplica el DDL posterior
+(86, 87, 88, 91, 106, 110, 111) y deja fuera los de DATOS (92-105), que convertirían E2 en E3; (2)
+**E2 es el único estado con ORÁCULO** —sus cifras están publicadas aquí— y por eso destapó que la
+del kardex estaba mal (ver la tercera advertencia de la tabla de la carga masiva).
+
+**LOS DOCE DEFECTOS ESTÁN CERRADOS Y VERIFICADOS.** Los seis S2 y seis S3. Dos de los S3
+merecen mención porque su corrección es una regla reutilizable: **D-06** cambió el 409 de
+«no hay meta» por un 200 con salvedad y los KPI en **null y no en cero** —un 0 % se lee como
+«vendimos nada» cuando lo cierto es «no hay contra qué medir»—, porque **un 409 es un guardia
+de ACCIÓN y aquí el usuario está MIRANDO**; y **D-07** cerró el hueco de que nada comprobaba
+que el almacén correspondiera a la base operativa: el ETL sella ahora el `system_identifier`
+del clúster de origen en `etl_ejecucion` (único por `initdb`; el nombre de la base NO basta,
+porque dos clústeres tienen su propia `retailmind` y ése es el escenario peligroso) y
+`InformeCompuestoServiceBase` lo contrasta contra su propia conexión, publicando
+`origenCoherente: false` con una salvedad que nombra las dos bases. Avisa y no falla —un
+almacén ajeno es una condición de despliegue, no un error—, y calla ante lo desconocido, para
+que la advertencia siga significando algo el día que salte de verdad.
+
+Los **seis defectos S2**, todos corregidos y verificados:
+1. **Una familia entera de errores de cliente salía como 500.** `GlobalExceptionHandler` no extiende
+   `ResponseEntityExceptionHandler`, así que toda excepción de Spring Web no declarada caía en el
+   manejador genérico. Faltaban SEIS: parámetro obligatorio ausente, cuerpo ilegible, parte
+   multipart ausente, Content-Type no soportado, `@Valid` fallido y archivo demasiado grande.
+   `/api/gerencia/metas/vigente` daba **500 a sus cuatro roles**.
+2. **El login no dejaba rastro de un fallo interno**: un solo `catch (Exception)` devolvía
+   «Credenciales incorrectas» sin registrar nada, así que una instalación mal configurada era
+   indistinguible de una contraseña mal tecleada. Ahora el rechazo esperado y el fallo inesperado
+   van por `catch` separados; **la respuesta al cliente no cambia**.
+3. **La restricción horaria se había vuelto a estrechar** (C-11 reincidiendo): `grp_analista` los
+   LUNES 07:00-17:30 y `grp_bodega` los domingos hasta `23:59` — la trampa del intervalo
+   semiabierto. **Invisible hasta que llega el día**, y `fuera_horario` bloquea el LOGIN entero.
+   Restaurado con el script 90.
+4. **`docker compose down -v` estaba ofrecido como comando de rutina en el README**, con un
+   «(CUIDADO)» entre paréntesis. Un paréntesis no es una barrera.
+5. **D-11 · el predicado de RLS se evaluaba una vez POR FILA** — ver el bloque siguiente.
+6. **D-09 · la red logística no se podía dar de alta** — ver el bloque siguiente.
+
+**D-11 — EL PREDICADO DE RLS SE EVALUABA POR FILA (script 111)**: la misma consulta, el mismo
+índice y los mismos datos costaban **5 ms como superusuario y 4.056 ms bajo rol** — 810×, con
+**2.936.358 buffers frente a 107**. La causa NO era la RLS ni un índice ausente: era que
+`esta_en_horario(fn_grupo_actual())` —que no depende de la fila: es función del ROL y del RELOJ— se
+evaluaba una vez por cada fila examinada, y cada llamada lee `grupo_horario`. El script **111**
+envuelve esas llamadas en un subselect escalar (`(SELECT esta_en_horario(...))`), lo que las
+convierte en un **InitPlan** evaluado UNA vez por consulta. **La seguridad no cambia: el predicado
+es el mismo, solo cambia cuántas veces se calcula.** Se reescribieron las 95 políticas con tres
+guardias (número de políticas, conservación de rol/comando/predicado, y que la compuerta siga
+discriminando). Resultado: la consulta patrón **4.056 → 180 ms**, y los ocho informes lentos de E3
+bajo el umbral **sin tocar una sola consulta de informe** (costo-envío 17,1 → 2,07 s; avance-meta
+8,4 → 0,32 s; kardex 49,7 → 0,10 s, éste además con `paginarConTope`). Si vas a tocar esto: (1)
+**no faltaba un índice** —`idx_factura_venta_fecha_cubriente` existe y es el correcto—; (2) **no es
+la RLS en sí**: reproducido en una tabla sintética, con `USING (true)` el plan usa el índice y lee
+241 buffers, con la llamada a función 7.556; (3) **`LEAKPROOF` NO lo arregla** — se probó marcando
+las dos funciones y el plan no se movió ni un buffer; se revirtieron a `NOT LEAKPROOF`, porque no
+se deja tocado un atributo de seguridad que no aporta nada.
+
+**D-09 — LA RED LOGÍSTICA NO SE PODÍA DAR DE ALTA (pantalla `/operativo/red`, solo ADMIN)**:
+`bodega`, `transportista`, `metodo_envio`, `zona_envio` y `tarifa_envio` **no tenían ni un solo
+`INSERT INTO` en todo `src/main`** — únicamente lecturas. Sostienen el ciclo de venta entero (sin
+bodega no se puede crear un pedido; sin zona ni tarifa el checkout no asigna transportista), así
+que una instalación nueva no podía tomar un pedido hasta que alguien ejecutara SQL, y una en marcha
+no podía abrir una segunda bodega ni contratar un transportista sin un DBA — mientras la pantalla
+de transferencias entre bodegas funcionaba con un operando que no se podía crear. **No hizo falta
+ni un GRANT ni un script**: el motor ya los concedía a `grp_administrador`; el hueco era solo de
+aplicación. `SecurityConfig` tampoco se tocó (`/api/admin/**` ya reserva la rama). Paquete
+`admin/red/` + una pantalla de cinco pestañas —son tablas de CONFIGURACIÓN que solo tienen sentido
+juntas— enganchada en los cuatro puntos de la regla 6. **Baja lógica, nunca borrado**: lo
+referencian pedidos, envíos y kardex históricos. Validaciones que el motor no impone: costos no
+negativos, peso máximo mayor que el mínimo, plazo coherente, y **una zona de ciudad debe declarar
+su provincia** o nunca llega a aplicarse. Verificado en navegador (14 comprobaciones, incluido que
+GERENTE no ve el enlace y el guard lo rechaza) y, sobre todo, con
+`pruebas/p05_puesta_en_marcha.py` (**13/13**): desde una base con CERO bodegas se puso el sistema
+en marcha **sin una línea de SQL**, hasta crear un pedido real.
 
 **Deuda técnica conocida** (tablas huérfanas, requieren bloque dedicado):
 
