@@ -239,7 +239,7 @@ public class InformesInventarioService extends InformeServiceBase {
         Object[] args = conLimites(
                 new Object[] { q, q, q, bod, bod, tp, tp, nat, nat }, ts);
 
-        Map<String, Object> res = paginar("""
+        Map<String, Object> res = paginarConTope("""
                 SELECT mi.id, mi.fecha_creacion, pv.sku, p.nombre AS producto,
                        b.nombre AS bodega,
                        tm.codigo AS tipo_codigo, tm.nombre AS tipo, tm.naturaleza,
@@ -247,7 +247,40 @@ public class InformesInventarioService extends InformeServiceBase {
                        mi.stock_anterior, mi.stock_nuevo,
                        mi.referencia_tipo, mi.referencia_id, mi.observacion
                 """ + from + " ORDER BY mi.fecha_creacion DESC, mi.id DESC",
-                "SELECT count(*) " + from, args, page, size);
+                from, args, page, size);
+
+        /*
+         * LOS CUATRO KPI SOLO SE CALCULAN SI EL CONJUNTO CABE EN EL TOPE.
+         *
+         * Mismo tratamiento que OTD-VEN-01, y por la misma medición: el kardex
+         * son 8.008.403 movimientos, y bajo RLS el `count(*)` de la cabecera
+         * cuesta 12.445 ms él solo (medido con EXPLAIN ANALYZE: hash join en
+         * paralelo sobre los 8 M, 8.016.414 buffers). La consulta de agregados
+         * recorre EL MISMO conjunto otra vez, así que la pantalla sin filtros
+         * tardaba 24,8 s — dos escaneos completos.
+         *
+         * Acotar solo el conteo habría bajado a ~12 s y nada más. Y los
+         * agregados no se pueden acotar: la suma de las entradas de 200.000
+         * movimientos ARBITRARIOS de 8 M no es «las unidades que entraron
+         * aproximadamente», es un número sin significado. Así que por encima
+         * del tope no se calculan, se devuelven vacíos y el informe DICE por
+         * qué. Con cualquier filtro puesto —producto, bodega, tipo o fechas,
+         * que es para lo que está la pantalla— el conjunto baja del tope y los
+         * cuatro son exactos.
+         */
+        if (conteoAcotado(res)) {
+            res.put("salvedad", "El filtro actual abarca más de "
+                    + com.retailmind.comun.Paginacion.TOPE_CONTEO
+                    + " movimientos, así que el total de la cabecera es un MÍNIMO y las"
+                    + " unidades no se calculan: sumarlas exigiría recorrer los 8.008.403"
+                    + " movimientos del kardex en cada apertura. Acota por producto, bodega,"
+                    + " tipo o fechas y las cuatro cifras salen exactas.");
+            return conResumen(res, List.of(
+                    kpi("Movimientos", null, "numero"),
+                    kpi("Unidades que entraron", null, "numero"),
+                    kpi("Unidades que salieron", null, "numero"),
+                    kpi("Movimiento neto", null, "numero")));
+        }
 
         Map<String, Object> tot = pg.queryForMap("""
                 SELECT count(*) AS movimientos,

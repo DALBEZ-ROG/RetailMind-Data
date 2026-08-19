@@ -261,7 +261,7 @@ public class InformesLogisticaService extends InformeServiceBase {
                 """ + filtroDia("e.fecha_despacho", ts);
         Object[] args = conLimites(new Object[] { est, est, tr, tr, q, q, q, q, q, q }, ts);
 
-        Map<String, Object> res = paginar("""
+        Map<String, Object> res = paginarConTope("""
                 SELECT e.id, e.numero, e.estado, e.numero_guia,
                        t.nombre AS transportista, me.nombre AS metodo_envio,
                        p.numero AS pedido, p.canal,
@@ -279,7 +279,27 @@ public class InformesLogisticaService extends InformeServiceBase {
                        nv.novedades_abiertas
                 """ + tabla + novedades + filtro
                 + " ORDER BY e.fecha_despacho DESC NULLS LAST, e.id DESC",
-                "SELECT count(*) " + tabla + filtro, args, page, size);
+                tabla + filtro, args, page, size);
+
+        // Mismo tratamiento que OTD-VEN-01 y OTD-INV-03: `envio` son 2.110.096
+        // filas y la pantalla sin filtros hacía DOS recorridos completos —el
+        // conteo y los cinco `count(… FILTER …)`—, 20,9 s medidos aislados.
+        // Los cinco KPI no se pueden acotar (un recuento de estados sobre
+        // 200.000 envíos arbitrarios de 2,1 M no significa nada), así que por
+        // encima del tope no se calculan y el informe dice por qué.
+        if (conteoAcotado(res)) {
+            res.put("salvedad", "El filtro actual abarca más de "
+                    + com.retailmind.comun.Paginacion.TOPE_CONTEO
+                    + " envíos, así que el total de la cabecera es un MÍNIMO y los recuentos"
+                    + " por estado no se calculan. Acota por estado, transportista o fechas"
+                    + " y las cinco cifras salen exactas.");
+            return conResumen(res, List.of(
+                    kpi("Envíos", null, "numero"),
+                    kpi("En camino", null, "numero"),
+                    kpi("Atrasados", null, "numero"),
+                    kpi("Entregados", null, "numero"),
+                    kpi("Fallidos o devueltos", null, "numero")));
+        }
 
         Map<String, Object> tot = pg.queryForMap("""
                 SELECT count(*) AS envios,
