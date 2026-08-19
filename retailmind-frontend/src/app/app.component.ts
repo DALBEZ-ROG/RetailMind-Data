@@ -104,7 +104,8 @@ export class AppComponent {
     '/operativo/resenas/preguntas': 'Preguntas de Productos',
     '/operativo/horarios': 'Horarios de Acceso',
     '/operativo/seguridad/accesos': 'Intentos de Acceso',
-    '/operativo/seguridad/permisos': 'Permisos del Motor'
+    '/operativo/seguridad/permisos': 'Permisos del Motor',
+    '/operativo/red': 'Red Logística'
   };
 
   constructor(
@@ -145,6 +146,7 @@ export class AppComponent {
   // Visibilidad de las secciones operativas del sidebar. Delegan en
   // NavPermissionsService (matriz ROLES_POR_PERMISO de core/navigation):
   // el mismo punto único de verdad que usa el dashboard de inicio.
+  get canRedLogistica(): boolean { return this.nav.can('redLogistica'); }
   get canCatalogo(): boolean   { return this.nav.can('catalogo'); }
   get canCompras(): boolean    { return this.nav.can('compras'); }
   get canFacturasCompra(): boolean { return this.nav.can('facturasCompra'); }

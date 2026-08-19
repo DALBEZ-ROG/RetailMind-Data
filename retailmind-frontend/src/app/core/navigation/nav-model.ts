@@ -43,6 +43,7 @@ export type PermisoNav =
   | 'tableroGobierno'     // T-7, tablero de dirección (OE-10, DATO SENSIBLE)
   | 'accesos'          // intentos de acceso al sistema (OTD-GER-09, script 53)
   | 'permisosMotor'    // mapa de privilegios del motor y GRANT/REVOKE (script 86)
+  | 'redLogistica'     // bodegas, transportistas, zonas y tarifas de envío (D-09)
   | 'tickets'          // tickets de soporte
   | 'categoriasTicket' // categorías de ticket
   | 'faq'              // preguntas frecuentes
@@ -140,6 +141,11 @@ export const ROLES_POR_PERMISO: Record<PermisoNav, readonly string[]> = {
   // completo de quién puede qué (media hoja de ruta para saltarse la
   // segregación), sino que EJECUTA GRANT y REVOKE reales contra PostgreSQL.
   permisosMotor:    ['ADMIN'],
+  // Red logística: da de alta bodegas, transportistas, zonas y tarifas. Es
+  // configuración de la que depende TODO el ciclo de venta —sin bodega no hay
+  // pedido, sin zona ni tarifa el checkout no asigna transportista—, así que
+  // se reserva a ADMIN, igual que la línea `/api/admin/**` de SecurityConfig.
+  redLogistica:     ['ADMIN'],
   // SOPORTE (9º rol, script 37): bandeja de tickets + FAQ; nada más
   tickets:          ['ADMIN', 'GERENTE', 'CLIENTE', 'SOPORTE'],
   categoriasTicket: ['ADMIN'],
@@ -468,7 +474,10 @@ export const DASHBOARD_AREAS: AreaNav[] = [
         icono: 'login', ruta: '/operativo/seguridad/accesos', permiso: 'accesos' },
       { titulo: 'Permisos del Motor',
         descripcion: 'Roles, privilegios de tabla y columna, políticas RLS y GRANT/REVOKE en vivo',
-        icono: 'shield', ruta: '/operativo/seguridad/permisos', permiso: 'permisosMotor' }
+        icono: 'shield', ruta: '/operativo/seguridad/permisos', permiso: 'permisosMotor' },
+      { titulo: 'Red Logística',
+        descripcion: 'Bodegas, transportistas, métodos, zonas y tarifas de envío',
+        icono: 'hub', ruta: '/operativo/red', permiso: 'redLogistica' }
     ]
   },
   {

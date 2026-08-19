@@ -1,0 +1,390 @@
+<div class="pantalla-operativa">
+
+  <header class="cabecera">
+    <div>
+      <h1>Red logística</h1>
+      <p class="subtitulo">
+        Bodegas, transportistas, métodos, zonas y tarifas de envío. Es lo que el
+        ciclo de venta necesita para funcionar: sin una bodega no se puede crear
+        un pedido, y sin zona y tarifa el checkout no encuentra transportista.
+      </p>
+    </div>
+    <button mat-stroked-button (click)="cargarTodo()" [disabled]="cargando">
+      <mat-icon>refresh</mat-icon> Actualizar
+    </button>
+  </header>
+
+  <mat-tab-group animationDuration="0ms" (selectedTabChange)="cerrar()">
+
+    <!-- ─────────────────────────── BODEGAS ─────────────────────────── -->
+    <mat-tab label="Bodegas">
+      <div class="cuerpo-pestana">
+        <button mat-flat-button color="primary" (click)="abrirAlta('bodegas')">
+          <mat-icon>add</mat-icon> Nueva bodega
+        </button>
+
+        <div class="formulario" *ngIf="formAbierto === 'bodegas'">
+          <h3>{{ editando ? 'Editar bodega' : 'Nueva bodega' }}</h3>
+          <div class="campos">
+            <mat-form-field><mat-label>Código</mat-label>
+              <input matInput [(ngModel)]="modelo.codigo" maxlength="20"></mat-form-field>
+            <mat-form-field><mat-label>Nombre</mat-label>
+              <input matInput [(ngModel)]="modelo.nombre" maxlength="120"></mat-form-field>
+            <mat-form-field><mat-label>Ciudad</mat-label>
+              <mat-select [(ngModel)]="modelo.ciudadId">
+                <mat-option [value]="null">— sin ciudad —</mat-option>
+                <mat-option *ngFor="let c of refs.ciudades" [value]="c.id">{{ c.nombre }}</mat-option>
+              </mat-select></mat-form-field>
+            <mat-form-field><mat-label>Dirección</mat-label>
+              <input matInput [(ngModel)]="modelo.direccion"></mat-form-field>
+            <mat-form-field><mat-label>Teléfono</mat-label>
+              <input matInput [(ngModel)]="modelo.telefono"></mat-form-field>
+            <mat-checkbox [(ngModel)]="modelo.esPrincipal"
+                          matTooltip="La bodega que el sistema elige por defecto. Solo puede haber una: al marcar ésta, la anterior deja de serlo.">
+              Bodega principal
+            </mat-checkbox>
+          </div>
+          <div class="acciones-form">
+            <button mat-flat-button color="primary" (click)="guardar()"
+                    [disabled]="guardando || !modelo.codigo || !modelo.nombre">Guardar</button>
+            <button mat-button (click)="cerrar()">Cancelar</button>
+          </div>
+        </div>
+
+        <table mat-table [dataSource]="bodegas" class="tabla">
+          <ng-container matColumnDef="codigo">
+            <th mat-header-cell *matHeaderCellDef>Código</th>
+            <td mat-cell *matCellDef="let b">{{ b.codigo }}</td></ng-container>
+          <ng-container matColumnDef="nombre">
+            <th mat-header-cell *matHeaderCellDef>Nombre</th>
+            <td mat-cell *matCellDef="let b">{{ b.nombre }}</td></ng-container>
+          <ng-container matColumnDef="ciudad">
+            <th mat-header-cell *matHeaderCellDef>Ciudad</th>
+            <td mat-cell *matCellDef="let b">{{ b.ciudad || '—' }}</td></ng-container>
+          <ng-container matColumnDef="direccion">
+            <th mat-header-cell *matHeaderCellDef>Dirección</th>
+            <td mat-cell *matCellDef="let b">{{ b.direccion || '—' }}</td></ng-container>
+          <ng-container matColumnDef="principal">
+            <th mat-header-cell *matHeaderCellDef>Principal</th>
+            <td mat-cell *matCellDef="let b">
+              <mat-icon *ngIf="b.es_principal" class="icono-si">star</mat-icon>
+              <span *ngIf="!b.es_principal">—</span></td></ng-container>
+          <ng-container matColumnDef="inventario">
+            <th mat-header-cell *matHeaderCellDef>Posiciones</th>
+            <td mat-cell *matCellDef="let b">{{ b.posiciones_inventario }}</td></ng-container>
+          <ng-container matColumnDef="acciones">
+            <th mat-header-cell *matHeaderCellDef>Acciones</th>
+            <td mat-cell *matCellDef="let b">
+              <button mat-icon-button (click)="abrirEdicion('bodegas', b)" matTooltip="Editar">
+                <mat-icon>edit</mat-icon></button>
+              <button mat-icon-button (click)="alternarActivo('bodegas', b)"
+                      [matTooltip]="b.activo ? 'Desactivar' : 'Activar'">
+                <mat-icon>{{ b.activo ? 'toggle_on' : 'toggle_off' }}</mat-icon></button>
+            </td></ng-container>
+          <tr mat-header-row *matHeaderRowDef="colBodegas"></tr>
+          <tr mat-row *matRowDef="let fila; columns: colBodegas;"
+              [class.fila-inactiva]="!fila.activo"></tr>
+        </table>
+        <p class="vacio" *ngIf="!cargando && bodegas.length === 0">
+          Todavía no hay ninguna bodega. Sin al menos una no se puede registrar un pedido.
+        </p>
+      </div>
+    </mat-tab>
+
+    <!-- ──────────────────────── TRANSPORTISTAS ─────────────────────── -->
+    <mat-tab label="Transportistas">
+      <div class="cuerpo-pestana">
+        <button mat-flat-button color="primary" (click)="abrirAlta('transportistas')">
+          <mat-icon>add</mat-icon> Nuevo transportista
+        </button>
+
+        <div class="formulario" *ngIf="formAbierto === 'transportistas'">
+          <h3>{{ editando ? 'Editar transportista' : 'Nuevo transportista' }}</h3>
+          <div class="campos">
+            <mat-form-field><mat-label>Nombre</mat-label>
+              <input matInput [(ngModel)]="modelo.nombre" maxlength="120"></mat-form-field>
+            <mat-form-field><mat-label>RUC</mat-label>
+              <input matInput [(ngModel)]="modelo.ruc"></mat-form-field>
+            <mat-form-field><mat-label>Teléfono</mat-label>
+              <input matInput [(ngModel)]="modelo.telefono"></mat-form-field>
+            <mat-form-field><mat-label>Correo</mat-label>
+              <input matInput [(ngModel)]="modelo.email"></mat-form-field>
+            <mat-form-field><mat-label>Sitio web</mat-label>
+              <input matInput [(ngModel)]="modelo.sitioWeb"></mat-form-field>
+            <mat-form-field><mat-label>URL de seguimiento</mat-label>
+              <input matInput [(ngModel)]="modelo.urlSeguimiento"></mat-form-field>
+          </div>
+          <div class="acciones-form">
+            <button mat-flat-button color="primary" (click)="guardar()"
+                    [disabled]="guardando || !modelo.nombre">Guardar</button>
+            <button mat-button (click)="cerrar()">Cancelar</button>
+          </div>
+        </div>
+
+        <table mat-table [dataSource]="transportistas" class="tabla">
+          <ng-container matColumnDef="nombre">
+            <th mat-header-cell *matHeaderCellDef>Nombre</th>
+            <td mat-cell *matCellDef="let t">{{ t.nombre }}</td></ng-container>
+          <ng-container matColumnDef="ruc">
+            <th mat-header-cell *matHeaderCellDef>RUC</th>
+            <td mat-cell *matCellDef="let t">{{ t.ruc || '—' }}</td></ng-container>
+          <ng-container matColumnDef="telefono">
+            <th mat-header-cell *matHeaderCellDef>Teléfono</th>
+            <td mat-cell *matCellDef="let t">{{ t.telefono || '—' }}</td></ng-container>
+          <ng-container matColumnDef="email">
+            <th mat-header-cell *matHeaderCellDef>Correo</th>
+            <td mat-cell *matCellDef="let t">{{ t.email || '—' }}</td></ng-container>
+          <ng-container matColumnDef="metodos">
+            <th mat-header-cell *matHeaderCellDef>Métodos</th>
+            <td mat-cell *matCellDef="let t">{{ t.metodos }}</td></ng-container>
+          <ng-container matColumnDef="acciones">
+            <th mat-header-cell *matHeaderCellDef>Acciones</th>
+            <td mat-cell *matCellDef="let t">
+              <button mat-icon-button (click)="abrirEdicion('transportistas', t)" matTooltip="Editar">
+                <mat-icon>edit</mat-icon></button>
+              <button mat-icon-button (click)="alternarActivo('transportistas', t)"
+                      [matTooltip]="t.activo ? 'Desactivar' : 'Activar'">
+                <mat-icon>{{ t.activo ? 'toggle_on' : 'toggle_off' }}</mat-icon></button>
+            </td></ng-container>
+          <tr mat-header-row *matHeaderRowDef="colTransportistas"></tr>
+          <tr mat-row *matRowDef="let fila; columns: colTransportistas;"
+              [class.fila-inactiva]="!fila.activo"></tr>
+        </table>
+        <p class="vacio" *ngIf="!cargando && transportistas.length === 0">
+          Todavía no hay transportistas.
+        </p>
+      </div>
+    </mat-tab>
+
+    <!-- ───────────────────────── MÉTODOS ───────────────────────────── -->
+    <mat-tab label="Métodos de envío">
+      <div class="cuerpo-pestana">
+        <button mat-flat-button color="primary" (click)="abrirAlta('metodos')">
+          <mat-icon>add</mat-icon> Nuevo método
+        </button>
+
+        <div class="formulario" *ngIf="formAbierto === 'metodos'">
+          <h3>{{ editando ? 'Editar método' : 'Nuevo método' }}</h3>
+          <div class="campos">
+            <mat-form-field><mat-label>Código</mat-label>
+              <input matInput [(ngModel)]="modelo.codigo" maxlength="20"></mat-form-field>
+            <mat-form-field><mat-label>Nombre</mat-label>
+              <input matInput [(ngModel)]="modelo.nombre" maxlength="120"></mat-form-field>
+            <mat-form-field><mat-label>Transportista</mat-label>
+              <mat-select [(ngModel)]="modelo.transportistaId">
+                <mat-option [value]="null">— sin transportista —</mat-option>
+                <mat-option *ngFor="let t of refs.transportistas" [value]="t.id">{{ t.nombre }}</mat-option>
+              </mat-select></mat-form-field>
+            <mat-form-field><mat-label>Días mínimo</mat-label>
+              <input matInput type="number" min="0" [(ngModel)]="modelo.diasEntregaMin"></mat-form-field>
+            <mat-form-field><mat-label>Días máximo</mat-label>
+              <input matInput type="number" min="0" [(ngModel)]="modelo.diasEntregaMax"></mat-form-field>
+            <mat-form-field><mat-label>Orden</mat-label>
+              <input matInput type="number" [(ngModel)]="modelo.orden"></mat-form-field>
+            <mat-form-field class="ancho"><mat-label>Descripción</mat-label>
+              <input matInput [(ngModel)]="modelo.descripcion"></mat-form-field>
+          </div>
+          <div class="acciones-form">
+            <button mat-flat-button color="primary" (click)="guardar()"
+                    [disabled]="guardando || !modelo.codigo || !modelo.nombre">Guardar</button>
+            <button mat-button (click)="cerrar()">Cancelar</button>
+          </div>
+        </div>
+
+        <table mat-table [dataSource]="metodos" class="tabla">
+          <ng-container matColumnDef="codigo">
+            <th mat-header-cell *matHeaderCellDef>Código</th>
+            <td mat-cell *matCellDef="let m">{{ m.codigo }}</td></ng-container>
+          <ng-container matColumnDef="nombre">
+            <th mat-header-cell *matHeaderCellDef>Nombre</th>
+            <td mat-cell *matCellDef="let m">{{ m.nombre }}</td></ng-container>
+          <ng-container matColumnDef="transportista">
+            <th mat-header-cell *matHeaderCellDef>Transportista</th>
+            <td mat-cell *matCellDef="let m">{{ m.transportista || '—' }}</td></ng-container>
+          <ng-container matColumnDef="plazo">
+            <th mat-header-cell *matHeaderCellDef>Plazo</th>
+            <td mat-cell *matCellDef="let m">{{ plazoDeMetodo(m) }}</td></ng-container>
+          <ng-container matColumnDef="orden">
+            <th mat-header-cell *matHeaderCellDef>Orden</th>
+            <td mat-cell *matCellDef="let m">{{ m.orden }}</td></ng-container>
+          <ng-container matColumnDef="acciones">
+            <th mat-header-cell *matHeaderCellDef>Acciones</th>
+            <td mat-cell *matCellDef="let m">
+              <button mat-icon-button (click)="abrirEdicion('metodos', m)" matTooltip="Editar">
+                <mat-icon>edit</mat-icon></button>
+              <button mat-icon-button (click)="alternarActivo('metodos', m)"
+                      [matTooltip]="m.activo ? 'Desactivar' : 'Activar'">
+                <mat-icon>{{ m.activo ? 'toggle_on' : 'toggle_off' }}</mat-icon></button>
+            </td></ng-container>
+          <tr mat-header-row *matHeaderRowDef="colMetodos"></tr>
+          <tr mat-row *matRowDef="let fila; columns: colMetodos;"
+              [class.fila-inactiva]="!fila.activo"></tr>
+        </table>
+        <p class="vacio" *ngIf="!cargando && metodos.length === 0">
+          Todavía no hay métodos de envío.
+        </p>
+      </div>
+    </mat-tab>
+
+    <!-- ────────────────────────── ZONAS ────────────────────────────── -->
+    <mat-tab label="Zonas">
+      <div class="cuerpo-pestana">
+        <button mat-flat-button color="primary" (click)="abrirAlta('zonas')">
+          <mat-icon>add</mat-icon> Nueva zona
+        </button>
+
+        <div class="formulario" *ngIf="formAbierto === 'zonas'">
+          <h3>{{ editando ? 'Editar zona' : 'Nueva zona' }}</h3>
+          <p class="ayuda">
+            El envío se resuelve por ESPECIFICIDAD: primero se busca una zona de la
+            ciudad de la dirección, luego de su provincia, y por último del país. Una
+            zona de ciudad debe indicar también su provincia, o nunca llega a aplicarse.
+          </p>
+          <div class="campos">
+            <mat-form-field><mat-label>Nombre</mat-label>
+              <input matInput [(ngModel)]="modelo.nombre" maxlength="120"></mat-form-field>
+            <mat-form-field><mat-label>País</mat-label>
+              <mat-select [(ngModel)]="modelo.paisId"
+                          (selectionChange)="modelo.provinciaId = null; modelo.ciudadId = null">
+                <mat-option *ngFor="let p of refs.paises" [value]="p.id">{{ p.nombre }}</mat-option>
+              </mat-select></mat-form-field>
+            <mat-form-field><mat-label>Provincia</mat-label>
+              <mat-select [(ngModel)]="modelo.provinciaId"
+                          (selectionChange)="modelo.ciudadId = null"
+                          [disabled]="!modelo.paisId">
+                <mat-option [value]="null">— todo el país —</mat-option>
+                <mat-option *ngFor="let p of provinciasDelPais()" [value]="p.id">{{ p.nombre }}</mat-option>
+              </mat-select></mat-form-field>
+            <mat-form-field><mat-label>Ciudad</mat-label>
+              <mat-select [(ngModel)]="modelo.ciudadId" [disabled]="!modelo.provinciaId">
+                <mat-option [value]="null">— toda la provincia —</mat-option>
+                <mat-option *ngFor="let c of ciudadesDeProvincia()" [value]="c.id">{{ c.nombre }}</mat-option>
+              </mat-select></mat-form-field>
+            <mat-form-field class="ancho"><mat-label>Descripción</mat-label>
+              <input matInput [(ngModel)]="modelo.descripcion"></mat-form-field>
+          </div>
+          <div class="acciones-form">
+            <button mat-flat-button color="primary" (click)="guardar()"
+                    [disabled]="guardando || !modelo.nombre || !modelo.paisId">Guardar</button>
+            <button mat-button (click)="cerrar()">Cancelar</button>
+          </div>
+        </div>
+
+        <table mat-table [dataSource]="zonas" class="tabla">
+          <ng-container matColumnDef="nombre">
+            <th mat-header-cell *matHeaderCellDef>Nombre</th>
+            <td mat-cell *matCellDef="let z">{{ z.nombre }}</td></ng-container>
+          <ng-container matColumnDef="nivel">
+            <th mat-header-cell *matHeaderCellDef>Nivel</th>
+            <td mat-cell *matCellDef="let z">{{ z.nivel }}</td></ng-container>
+          <ng-container matColumnDef="ambito">
+            <th mat-header-cell *matHeaderCellDef>Ámbito</th>
+            <td mat-cell *matCellDef="let z">{{ ambitoDeZona(z) }}</td></ng-container>
+          <ng-container matColumnDef="tarifas">
+            <th mat-header-cell *matHeaderCellDef>Tarifas</th>
+            <td mat-cell *matCellDef="let z">{{ z.tarifas }}</td></ng-container>
+          <ng-container matColumnDef="acciones">
+            <th mat-header-cell *matHeaderCellDef>Acciones</th>
+            <td mat-cell *matCellDef="let z">
+              <button mat-icon-button (click)="abrirEdicion('zonas', z)" matTooltip="Editar">
+                <mat-icon>edit</mat-icon></button>
+              <button mat-icon-button (click)="alternarActivo('zonas', z)"
+                      [matTooltip]="z.activo ? 'Desactivar' : 'Activar'">
+                <mat-icon>{{ z.activo ? 'toggle_on' : 'toggle_off' }}</mat-icon></button>
+            </td></ng-container>
+          <tr mat-header-row *matHeaderRowDef="colZonas"></tr>
+          <tr mat-row *matRowDef="let fila; columns: colZonas;"
+              [class.fila-inactiva]="!fila.activo"></tr>
+        </table>
+        <p class="vacio" *ngIf="!cargando && zonas.length === 0">
+          Todavía no hay zonas de envío. Sin al menos una, el checkout no puede asignar transportista.
+        </p>
+      </div>
+    </mat-tab>
+
+    <!-- ───────────────────────── TARIFAS ───────────────────────────── -->
+    <mat-tab label="Tarifas">
+      <div class="cuerpo-pestana">
+        <button mat-flat-button color="primary" (click)="abrirAlta('tarifas')">
+          <mat-icon>add</mat-icon> Nueva tarifa
+        </button>
+
+        <div class="formulario" *ngIf="formAbierto === 'tarifas'">
+          <h3>{{ editando ? 'Editar tarifa' : 'Nueva tarifa' }}</h3>
+          <p class="ayuda">
+            El flete se cobra como <strong>costo base + costo por kilo × peso del pedido</strong>.
+            Si alguna variante del pedido no tiene peso, el peso total queda sin
+            determinar y solo se cobra el costo base.
+          </p>
+          <div class="campos">
+            <mat-form-field><mat-label>Zona</mat-label>
+              <mat-select [(ngModel)]="modelo.zonaEnvioId">
+                <mat-option *ngFor="let z of refs.zonas" [value]="z.id">{{ z.nombre }}</mat-option>
+              </mat-select></mat-form-field>
+            <mat-form-field><mat-label>Método</mat-label>
+              <mat-select [(ngModel)]="modelo.metodoEnvioId">
+                <mat-option *ngFor="let m of refs.metodos" [value]="m.id">{{ m.nombre }}</mat-option>
+              </mat-select></mat-form-field>
+            <mat-form-field><mat-label>Costo base</mat-label>
+              <input matInput type="number" min="0" step="0.01" [(ngModel)]="modelo.costoBase"></mat-form-field>
+            <mat-form-field><mat-label>Costo por kg</mat-label>
+              <input matInput type="number" min="0" step="0.01" [(ngModel)]="modelo.costoPorKg"></mat-form-field>
+            <mat-form-field><mat-label>Peso mínimo (kg)</mat-label>
+              <input matInput type="number" min="0" step="0.001" [(ngModel)]="modelo.pesoMinKg"></mat-form-field>
+            <mat-form-field><mat-label>Peso máximo (kg)</mat-label>
+              <input matInput type="number" min="0" step="0.001" [(ngModel)]="modelo.pesoMaxKg"></mat-form-field>
+            <mat-form-field><mat-label>Envío gratis desde</mat-label>
+              <input matInput type="number" min="0" step="0.01" [(ngModel)]="modelo.envioGratisDesde"></mat-form-field>
+          </div>
+          <div class="acciones-form">
+            <button mat-flat-button color="primary" (click)="guardar()"
+                    [disabled]="guardando || !modelo.zonaEnvioId || !modelo.metodoEnvioId
+                                || modelo.costoBase === null || modelo.costoBase === undefined">
+              Guardar</button>
+            <button mat-button (click)="cerrar()">Cancelar</button>
+          </div>
+        </div>
+
+        <table mat-table [dataSource]="tarifas" class="tabla">
+          <ng-container matColumnDef="zona">
+            <th mat-header-cell *matHeaderCellDef>Zona</th>
+            <td mat-cell *matCellDef="let t">{{ t.zona }}</td></ng-container>
+          <ng-container matColumnDef="metodo">
+            <th mat-header-cell *matHeaderCellDef>Método</th>
+            <td mat-cell *matCellDef="let t">{{ t.metodo }}
+              <small *ngIf="t.transportista"> · {{ t.transportista }}</small></td></ng-container>
+          <ng-container matColumnDef="costoBase">
+            <th mat-header-cell *matHeaderCellDef>Costo base</th>
+            <td mat-cell *matCellDef="let t">{{ t.costo_base | currency:'USD':'symbol':'1.2-2' }}</td></ng-container>
+          <ng-container matColumnDef="costoPorKg">
+            <th mat-header-cell *matHeaderCellDef>Por kg</th>
+            <td mat-cell *matCellDef="let t">{{ t.costo_por_kg | currency:'USD':'symbol':'1.2-2' }}</td></ng-container>
+          <ng-container matColumnDef="tramo">
+            <th mat-header-cell *matHeaderCellDef>Tramo</th>
+            <td mat-cell *matCellDef="let t">{{ tramoDeTarifa(t) }}</td></ng-container>
+          <ng-container matColumnDef="gratisDesde">
+            <th mat-header-cell *matHeaderCellDef>Gratis desde</th>
+            <td mat-cell *matCellDef="let t">
+              {{ t.envio_gratis_desde != null
+                 ? (t.envio_gratis_desde | currency:'USD':'symbol':'1.2-2') : '—' }}</td></ng-container>
+          <ng-container matColumnDef="acciones">
+            <th mat-header-cell *matHeaderCellDef>Acciones</th>
+            <td mat-cell *matCellDef="let t">
+              <button mat-icon-button (click)="abrirEdicion('tarifas', t)" matTooltip="Editar">
+                <mat-icon>edit</mat-icon></button>
+              <button mat-icon-button (click)="alternarActivo('tarifas', t)"
+                      [matTooltip]="t.activo ? 'Desactivar' : 'Activar'">
+                <mat-icon>{{ t.activo ? 'toggle_on' : 'toggle_off' }}</mat-icon></button>
+            </td></ng-container>
+          <tr mat-header-row *matHeaderRowDef="colTarifas"></tr>
+          <tr mat-row *matRowDef="let fila; columns: colTarifas;"
+              [class.fila-inactiva]="!fila.activo"></tr>
+        </table>
+        <p class="vacio" *ngIf="!cargando && tarifas.length === 0">
+          Todavía no hay tarifas. Sin una tarifa activa el checkout no puede calcular el flete.
+        </p>
+      </div>
+    </mat-tab>
+
+  </mat-tab-group>
+</div>

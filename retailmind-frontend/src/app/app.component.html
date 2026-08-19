@@ -160,6 +160,14 @@
         <span>Permisos del Motor</span>
       </a>
 
+      <!-- Red logística (defecto D-09): SOLO ADMIN. Da de alta lo que el ciclo
+           de venta necesita para existir — sin bodega no se puede crear un
+           pedido, y sin zona ni tarifa el checkout no asigna transportista. -->
+      <a *ngIf="canRedLogistica" class="nav-item" routerLink="/operativo/red" routerLinkActive="active">
+        <mat-icon>hub</mat-icon>
+        <span>Red Logística</span>
+      </a>
+
       <ng-container *ngIf="canCompras">
         <a class="nav-item" routerLink="/operativo/compras/ordenes" routerLinkActive="active">
           <mat-icon>shopping_cart_checkout</mat-icon>

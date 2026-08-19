@@ -461,6 +461,19 @@ export const routes: Routes = [
       import('./features/operativo/seguridad/permisos-motor.component')
         .then(m => m.PermisosMotorComponent)
   },
+  // ── Red logística (defecto D-09): bodegas, transportistas, métodos, zonas y
+  //    tarifas de envío. Estas cinco tablas sostienen el ciclo de venta entero
+  //    y hasta ahora SOLO se podían poblar con scripts de siembra: no existía
+  //    ni un endpoint de escritura, así que una instalación nueva no podía
+  //    tomar un pedido —hace falta una bodega— sin que alguien corriera SQL.
+  //    ADMIN, espejando la línea `/api/admin/**` de SecurityConfig.
+  {
+    path: 'operativo/red',
+    canActivate: [authGuard, roleGuard(['ADMIN'])],
+    loadComponent: () =>
+      import('./features/operativo/red/red-logistica.component')
+        .then(m => m.RedLogisticaComponent)
+  },
   // ── Módulo marketing (lectura ADMIN/GERENTE; escrituras solo ADMIN, espeja SecurityConfig)
   {
     path: 'operativo/marketing/cupones',
