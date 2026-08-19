@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -35,6 +37,8 @@ import jakarta.servlet.http.HttpServletRequest;
 @RequestMapping("/api/auth")
 public class AuthController {
 
+    private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
+
     private final AuthService authService;
     private final PostgresUserRepository usuarioRepo;
     private final UsuarioAdminService usuarioAdmin;
@@ -58,10 +62,28 @@ public class AuthController {
             LoginResponseDTO response = authService.login(request, ipCliente(http),
                     http.getHeader("User-Agent"));
             return ResponseEntity.ok(response);
+        } catch (LoginFallidoException e) {
+            // Rechazo ESPERADO (correo inexistente, contraseña incorrecta,
+            // usuario inactivo, fuera de horario). El motivo detallado ya fue a
+            // log_acceso; al cliente va la respuesta genérica de siempre.
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "Credenciales incorrectas"));
         } catch (Exception e) {
-            // Respuesta GENÉRICA e idéntica para todo fallo (correo inexistente,
-            // contraseña incorrecta, usuario inactivo, fuera de horario): el
-            // motivo detallado va a log_acceso, nunca al cliente.
+            // Fallo INESPERADO: la base no responde, falta una tabla, el secreto
+            // del JWT es inválido…
+            //
+            // Antes caía en el mismo `catch` que el rechazo esperado y salía
+            // como «Credenciales incorrectas» SIN ESCRIBIR NADA en ningún log.
+            // Un sistema recién instalado con un problema de configuración era
+            // por tanto indistinguible de una contraseña mal tecleada, y no
+            // dejaba una sola línea con la que empezar a mirar. Se descubrió
+            // justo así: probando el arranque contra una base vacía.
+            //
+            // La RESPUESTA al cliente no cambia —sigue siendo genérica, que es
+            // lo correcto para no filtrar si el correo existe—; lo que cambia es
+            // que el operador tiene ahora el motivo en el log del servidor.
+            logger.error("Fallo INESPERADO al autenticar a '{}': {}",
+                    request.getUsername(), e.toString(), e);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("error", "Credenciales incorrectas"));
         }

@@ -11,6 +11,12 @@ import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -198,6 +204,96 @@ public class GlobalExceptionHandler {
                 "El parametro «" + ex.getName() + "» no admite el valor enviado.",
                 request.getRequestURI());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    /**
+     * Falta un parámetro OBLIGATORIO de la consulta
+     * (p. ej. {@code /api/gerencia/metas/vigente} sin {@code anio}).
+     *
+     * Es el cuarto miembro de la misma familia de arriba y se quedó fuera: el
+     * endpoint respondía **500** a los cuatro roles que lo pueden usar, así que
+     * una petición incompleta del navegador se leía como «el servidor está
+     * roto». Un parámetro que falta es culpa de la petición: 400.
+     */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiErrorDTO> handleParametroAusente(MissingServletRequestParameterException ex,
+                                                               HttpServletRequest request) {
+        logger.warn("Parametro obligatorio ausente en {}: {}", request.getRequestURI(), ex.getParameterName());
+        ApiErrorDTO error = new ApiErrorDTO(
+                400, "Bad Request",
+                "Falta el parametro obligatorio «" + ex.getParameterName() + "».",
+                request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    /** Falta una parte obligatoria de un multipart (la carga de CSV del ETL). */
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ApiErrorDTO> handleParteAusente(MissingServletRequestPartException ex,
+                                                           HttpServletRequest request) {
+        logger.warn("Parte multipart ausente en {}: {}", request.getRequestURI(), ex.getRequestPartName());
+        ApiErrorDTO error = new ApiErrorDTO(
+                400, "Bad Request",
+                "Falta el archivo «" + ex.getRequestPartName() + "» en la peticion.",
+                request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    /**
+     * Cuerpo ilegible: JSON malformado, vacío, o un tipo que no encaja con el
+     * DTO. Afecta a los 18 controladores con {@code @RequestBody}.
+     *
+     * El mensaje NO incluye el detalle de Jackson a propósito: nombra la clase
+     * del DTO y la ruta del campo, que es estructura interna. Se registra en el
+     * log, que es donde sirve.
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiErrorDTO> handleCuerpoIlegible(HttpMessageNotReadableException ex,
+                                                             HttpServletRequest request) {
+        logger.warn("Cuerpo ilegible en {}: {}", request.getRequestURI(), ex.getMessage());
+        ApiErrorDTO error = new ApiErrorDTO(
+                400, "Bad Request",
+                "El cuerpo de la peticion no es un JSON valido o no coincide con el formato esperado.",
+                request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    /** Content-Type no soportado por la ruta: 415, no 500. */
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ApiErrorDTO> handleTipoNoSoportado(HttpMediaTypeNotSupportedException ex,
+                                                              HttpServletRequest request) {
+        logger.warn("Content-Type no soportado en {}: {}", request.getRequestURI(), ex.getContentType());
+        ApiErrorDTO error = new ApiErrorDTO(
+                415, "Unsupported Media Type",
+                "El tipo de contenido enviado no esta soportado en esta ruta.",
+                request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).body(error);
+    }
+
+    /** Validación de bean (@Valid) fallida: 400 con los campos que fallaron. */
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ApiErrorDTO> handleValidacion(MethodArgumentNotValidException ex,
+                                                         HttpServletRequest request) {
+        String campos = ex.getBindingResult().getFieldErrors().stream()
+                .map(f -> f.getField() + ": " + f.getDefaultMessage())
+                .collect(java.util.stream.Collectors.joining("; "));
+        logger.warn("Validacion fallida en {}: {}", request.getRequestURI(), campos);
+        ApiErrorDTO error = new ApiErrorDTO(
+                400, "Bad Request",
+                campos.isBlank() ? "Los datos enviados no son validos." : campos,
+                request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    /** Archivo subido por encima del tope configurado. */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiErrorDTO> handleArchivoGrande(MaxUploadSizeExceededException ex,
+                                                            HttpServletRequest request) {
+        logger.warn("Archivo demasiado grande en {}", request.getRequestURI());
+        ApiErrorDTO error = new ApiErrorDTO(
+                413, "Payload Too Large",
+                "El archivo enviado supera el tamano maximo permitido.",
+                request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(error);
     }
 
     @ExceptionHandler(Exception.class)
