@@ -1,99 +1,116 @@
-<div class="rec-container">
+<div class="shop-scope recos">
 
-  <!-- ── HEADER ──────────────────────────────────────────────────────────── -->
-  <div class="rec-header" [class.rec-header-popular]="!esPersonalizado">
-    <div class="rec-header-text">
-      <h2 class="rec-title">
-        <mat-icon>{{ iconoHeader }}</mat-icon>
-        {{ tituloHeader }}
-      </h2>
-      <p class="rec-subtitle">{{ subtituloHeader }}</p>
-      <div class="header-meta">
-        <!-- Chip de categoría favorita solo si es personalizado -->
-        <mat-chip *ngIf="esPersonalizado && categoriaFavorita" class="chip-categoria">
-          <mat-icon>category</mat-icon>
-          {{ categoriaFavorita }}
-        </mat-chip>
-        <!-- Badge de populares cuando es fallback -->
-        <mat-chip *ngIf="!esPersonalizado" class="chip-popular">
-          <mat-icon>local_fire_department</mat-icon>
-          Top ventas
-        </mat-chip>
-        <span class="query-ms">⚡ {{ queryMs }} ms</span>
+  <nav class="tienda-migas">
+    <a routerLink="/shop">Tienda</a>
+    <mat-icon>chevron_right</mat-icon>
+    <span class="miga-actual">Recomendaciones</span>
+  </nav>
+
+  <header class="recos-hero">
+    <div class="rh-texto">
+      <span class="rh-kicker">
+        <mat-icon>{{ icono }}</mat-icon>
+        {{ esPersonalizado ? 'Personalizado' : 'Populares' }}
+      </span>
+      <h1>{{ titulo }}</h1>
+      <p>{{ subtitulo }}</p>
+      <div class="rh-datos">
+        <span *ngIf="esPersonalizado && categoriaFavorita">
+          <mat-icon>category</mat-icon> Tu departamento favorito: <strong>{{ categoriaFavorita }}</strong>
+        </span>
+        <span *ngIf="totalEventos">
+          <mat-icon>timeline</mat-icon> {{ totalEventos | number }} interacciones tuyas analizadas
+        </span>
+        <span *ngIf="!loading">
+          <mat-icon>bolt</mat-icon> calculado en {{ queryMs }} ms
+        </span>
       </div>
     </div>
-  </div>
+    <div class="rh-arte" aria-hidden="true"><mat-icon>{{ icono }}</mat-icon></div>
+  </header>
 
-  <!-- ── LOADING ──────────────────────────────────────────────────────────── -->
-  <div class="loading-center" *ngIf="loading">
-    <mat-spinner diameter="48"></mat-spinner>
-    <p>{{ esPersonalizado ? 'Analizando tu historial...' : 'Cargando productos populares...' }}</p>
-  </div>
+  <!-- La lista no es personalizada: la pantalla lo DICE, no lo disimula -->
+  <p class="aviso-origen" *ngIf="!loading && !esPersonalizado && recomendaciones.length">
+    <mat-icon>info</mat-icon>
+    {{ mensajeFallback || 'Todavía no hay historial suficiente para personalizar: mientras tanto, estos son los productos más vendidos.' }}
+  </p>
 
-  <!-- ── AVISO pocos datos (solo cuando esPersonalizado pasa a ser false y hay productos) ── -->
-  <div class="fallback-notice" *ngIf="!loading && !esPersonalizado && recomendaciones.length > 0">
-    <mat-icon>info_outline</mat-icon>
-    <span>{{ mensajeFallback }}</span>
-  </div>
-
-  <!-- ── GRID DE PRODUCTOS ─────────────────────────────────────────────────── -->
-  <ng-container *ngIf="!loading && recomendaciones.length > 0">
-
-    <div class="rec-grid">
-      <mat-card class="rec-card"
-                [class.rec-card-popular]="!esPersonalizado"
-                *ngFor="let p of recomendaciones"
-                (click)="verProducto(p.productoId)">
-
-        <!-- Badge dinámico -->
-        <div class="rec-badge" [class.badge-popular]="!esPersonalizado">
-          {{ esPersonalizado ? 'RECOMENDADO' : '🔥 POPULAR' }}
-        </div>
-
-        <!-- Badge de ventas solo en modo popular -->
-        <div class="ventas-badge" *ngIf="!esPersonalizado && p.totalCompras > 0">
-          {{ p.totalCompras | number }} compras
-        </div>
-
-        <div class="rec-image">
-          <mat-icon class="rec-icon">{{ getCategoryIcon(p.categoriaId) }}</mat-icon>
-        </div>
-
-        <mat-card-content class="rec-content">
-          <p class="rec-brand">{{ p.brand }}</p>
-          <h4 class="rec-name">{{ p.nombre }}</h4>
-          <p class="rec-categoria">{{ p.categoriaNombre }}</p>
-          <p class="rec-price">${{ p.price | number:'1.2-2' }}</p>
-        </mat-card-content>
-
-        <mat-card-actions class="rec-actions">
-          <button mat-raised-button color="primary" class="btn-carrito"
-                  (click)="agregarAlCarrito(p, $event)">
-            <mat-icon>add_shopping_cart</mat-icon>
-            Agregar
-          </button>
-          <button mat-icon-button class="btn-wishlist"
-                  (click)="toggleWishlist(p, $event)"
-                  [matTooltip]="isInWishlist(p.productoId) ? 'Quitar de wishlist' : 'Agregar a wishlist'">
-            <mat-icon [class.wishlist-active]="isInWishlist(p.productoId)">
-              {{ isInWishlist(p.productoId) ? 'favorite' : 'favorite_border' }}
-            </mat-icon>
-          </button>
-        </mat-card-actions>
-
-      </mat-card>
+  <!-- Cargando -->
+  <div class="grid" *ngIf="loading">
+    <div class="esqueleto" *ngFor="let s of [1,2,3,4,5,6]">
+      <div class="esq-lienzo"></div>
+      <div class="esq-linea corta"></div>
+      <div class="esq-linea larga"></div>
+      <div class="esq-linea precio"></div>
+      <div class="esq-boton"></div>
     </div>
+  </div>
 
-  </ng-container>
+  <!-- Productos -->
+  <div class="grid" *ngIf="!loading && recomendaciones.length">
+    <article class="p-card" *ngFor="let p of recomendaciones; trackBy: trackByProducto"
+             [class.agotado]="p.stock === 0"
+             (click)="verProducto(p.productoId)">
 
-  <!-- ── VACÍO ─────────────────────────────────────────────────────────────── -->
-  <div class="empty-state" *ngIf="!loading && recomendaciones.length === 0">
-    <mat-icon class="empty-icon">inventory_2</mat-icon>
-    <h3>No se encontraron productos disponibles</h3>
-    <button mat-raised-button color="primary" (click)="irATienda()">
-      <mat-icon>storefront</mat-icon>
-      Explorar tienda
+      <div class="p-card-lienzo" [style.background]="paleta(p).fondo">
+        <mat-icon [style.color]="paleta(p).tinta">{{ paleta(p).icono }}</mat-icon>
+
+        <div class="p-card-cintas">
+          <span class="cinta cinta-reco">
+            <mat-icon>{{ icono }}</mat-icon>
+            {{ esPersonalizado ? 'Para ti' : 'Popular' }}
+          </span>
+          <span class="cinta cinta-agotado" *ngIf="p.stock === 0">
+            <mat-icon>block</mat-icon> Agotado
+          </span>
+        </div>
+
+        <button class="p-card-corazon" [class.activo]="ui.estaEnWishlist(p.productoId)"
+                (click)="toggleWishlist(p, $event)"
+                [matTooltip]="ui.estaEnWishlist(p.productoId) ? 'Quitar de mi lista' : 'Guardar en mi lista'"
+                [attr.aria-label]="ui.estaEnWishlist(p.productoId) ? 'Quitar de mi lista de deseos' : 'Guardar en mi lista de deseos'">
+          <mat-icon>{{ ui.estaEnWishlist(p.productoId) ? 'favorite' : 'favorite_border' }}</mat-icon>
+        </button>
+      </div>
+
+      <div class="p-card-cuerpo">
+        <span class="p-marca">{{ p.brand || 'Sin marca' }}</span>
+        <h3 class="p-nombre">{{ p.nombre }}</h3>
+        <span class="p-categoria">
+          <mat-icon>{{ paleta(p).icono }}</mat-icon> {{ p.categoriaNombre || 'Sin categoría' }}
+        </span>
+        <div class="p-precio">
+          <span class="simbolo">$</span>
+          <span class="entero">{{ p.price | number:'1.2-2' }}</span>
+        </div>
+        <span class="p-stock" [class.hay]="p.stock > 5" [class.poco]="p.stock > 0 && p.stock <= 5"
+              [class.no]="p.stock === 0">
+          {{ p.stock === 0 ? 'Sin stock'
+             : (p.stock === 1 ? '1 disponible' : p.stock + ' disponibles') }}
+        </span>
+      </div>
+
+      <div class="p-card-acciones">
+        <button class="btn-agregar" [disabled]="p.stock === 0" (click)="agregarAlCarrito(p, $event)">
+          <mat-icon>add_shopping_cart</mat-icon>
+          {{ p.stock === 0 ? 'No disponible' : 'Agregar' }}
+        </button>
+        <button class="btn-ghost" (click)="verProducto(p.productoId); $event.stopPropagation()"
+                matTooltip="Ver ficha del producto" aria-label="Ver ficha del producto">
+          <mat-icon>visibility</mat-icon>
+        </button>
+      </div>
+    </article>
+  </div>
+
+  <!-- Vacío -->
+  <div class="tienda-vacio" *ngIf="!loading && recomendaciones.length === 0">
+    <mat-icon class="vacio-icono">explore_off</mat-icon>
+    <h3>Todavía no hay nada que recomendarte</h3>
+    <p>Explora el catálogo y visita algunos productos: las recomendaciones se
+      construyen con lo que vas mirando.</p>
+    <button class="btn-agregar" style="max-width:230px" (click)="irATienda()">
+      <mat-icon>storefront</mat-icon> Explorar la tienda
     </button>
   </div>
-
 </div>

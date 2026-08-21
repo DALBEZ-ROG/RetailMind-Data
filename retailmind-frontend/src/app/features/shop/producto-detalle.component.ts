@@ -1,47 +1,45 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
-import { MatCardModule } from '@angular/material/card';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { Subscription } from 'rxjs';
 import { ShopService } from './shop.service';
+import { ShopUiService } from './shop-ui.service';
+import { paletaCategoria, PaletaCategoria } from './catalogo-visual';
 import { AuthService } from '../../core/services/auth.service';
 import { mensajeError } from '../../core/services/api-error.util';
 
-const CATEGORY_ICONS: Record<number, string> = {
-  1: 'devices', 2: 'shopping_basket', 3: 'sports_soccer', 4: 'watch',
-  5: 'spa', 6: 'home', 7: 'directions_walk', 8: 'checkroom',
-  9: 'checkroom', 10: 'checkroom', 11: 'category'
-};
-
 /**
- * Detalle de producto de la tienda (PostgreSQL). El id de la ruta es el id
- * de la VARIANTE. Los similares salen del catálogo PG (misma categoría y
- * rango de precio); el evento "view" va a ClickHouse best-effort.
+ * Ficha de producto de la tienda (PostgreSQL). El id de la ruta es el id de la
+ * VARIANTE, que es la clave que usan carrito, wishlist y pedido_detalle.
+ *
+ * La pantalla se organiza como una ficha de comercio: lienzo a la izquierda,
+ * descripción en el centro y CAJA DE COMPRA a la derecha. La caja repite el
+ * precio y el stock a propósito —ya están en el centro— porque es donde se
+ * decide, y bajar la vista para comprobar el precio antes de pulsar «agregar»
+ * es exactamente el momento en que se abandona una compra.
  */
 @Component({
   selector: 'app-producto-detalle',
   standalone: true,
   imports: [
-    CommonModule, FormsModule, MatCardModule, MatButtonModule,
-    MatIconModule, MatFormFieldModule, MatInputModule,
-    MatSnackBarModule, MatProgressSpinnerModule
+    CommonModule, FormsModule, RouterLink, MatButtonModule, MatIconModule,
+    MatSnackBarModule, MatTooltipModule
   ],
   templateUrl: './producto-detalle.component.html',
-  styleUrl: './producto-detalle.component.scss'
+  styleUrls: ['./shop-shared.scss', './producto-detalle.component.scss']
 })
 export class ProductoDetalleComponent implements OnInit, OnDestroy {
 
   producto: any = null;
   cantidad = 1;
   loading = true;
-  enWishlist = false;
+  noEncontrado = false;
+  agregando = false;
 
   similares: any[] = [];
   loadingSimilares = false;
@@ -53,12 +51,14 @@ export class ProductoDetalleComponent implements OnInit, OnDestroy {
     private route: ActivatedRoute,
     private router: Router,
     private shopService: ShopService,
+    public ui: ShopUiService,
     private authService: AuthService,
     private snackBar: MatSnackBar
   ) {}
 
   ngOnInit(): void {
-    // Subscribe to paramMap so navigating similar→similar reloads everything
+    // Se escucha el paramMap y no una lectura única: navegar de un «similar» a
+    // otro cambia el parámetro sin recrear el componente.
     this.routeSub = this.route.paramMap.subscribe(params => {
       const id = params.get('id');
       if (id) {
@@ -66,6 +66,7 @@ export class ProductoDetalleComponent implements OnInit, OnDestroy {
         this.cargarProducto(id);
       }
     });
+    this.ui.refrescarTodo();
   }
 
   ngOnDestroy(): void {
@@ -75,11 +76,12 @@ export class ProductoDetalleComponent implements OnInit, OnDestroy {
   private resetState(): void {
     this.producto = null;
     this.loading = true;
-    this.enWishlist = false;
+    this.noEncontrado = false;
     this.similares = [];
     this.loadingSimilares = false;
     this.similaresMsLabel = '';
     this.cantidad = 1;
+    window.scrollTo({ top: 0 });
   }
 
   private cargarProducto(id: string): void {
@@ -88,10 +90,9 @@ export class ProductoDetalleComponent implements OnInit, OnDestroy {
         this.producto = p;
         this.loading = false;
         this.registrarView(id);
-        this.checkWishlist(p.productoId);
         this.cargarSimilares(id);
       },
-      error: () => { this.loading = false; }
+      error: () => { this.loading = false; this.noEncontrado = true; }
     });
   }
 
@@ -100,25 +101,12 @@ export class ProductoDetalleComponent implements OnInit, OnDestroy {
     const t0 = Date.now();
     this.shopService.getSimilares(productoId).subscribe({
       next: (items) => {
-        this.similares = items;
-        this.similaresMsLabel = `⚡ ${Date.now() - t0} ms`;
+        this.similares = items || [];
+        this.similaresMsLabel = `${Date.now() - t0} ms`;
         this.loadingSimilares = false;
       },
       error: () => { this.loadingSimilares = false; }
     });
-  }
-
-  agregarSimilarAlCarrito(productoId: number, event: Event): void {
-    event.stopPropagation();
-    this.shopService.agregarAlCarrito(productoId, 1).subscribe({
-      next: () => this.snackBar.open('Agregado al carrito ✓', 'OK',
-        { duration: 2000, panelClass: ['snack-success'] }),
-      error: (e) => this.snackBar.open(mensajeError(e, 'Error al agregar'), 'Cerrar', { duration: 2000 })
-    });
-  }
-
-  verSimilar(productoId: number): void {
-    this.router.navigate(['/shop/producto', productoId]);
   }
 
   private registrarView(productId: string): void {
@@ -132,51 +120,97 @@ export class ProductoDetalleComponent implements OnInit, OnDestroy {
     }).subscribe({ next: () => {}, error: () => {} });
   }
 
-  private checkWishlist(productoId: number): void {
-    this.shopService.getWishlist().subscribe({
-      next: (items) => this.enWishlist = items.some(i => Number(i.productoId) === Number(productoId)),
-      error: () => {}
-    });
+  // ── Presentación ─────────────────────────────────────────────────────────
+  get paleta(): PaletaCategoria {
+    return paletaCategoria(this.producto?.categoriaNombre, this.producto?.categoriaId);
   }
 
-  agregarAlCarrito(): void {
-    if (!this.producto) return;
+  paletaDe(p: any): PaletaCategoria {
+    return paletaCategoria(p?.categoriaNombre, p?.categoriaId);
+  }
+
+  get enWishlist(): boolean {
+    return this.producto ? this.ui.estaEnWishlist(this.producto.productoId) : false;
+  }
+
+  get subtotalLinea(): number {
+    return Number(this.producto?.price || 0) * this.cantidad;
+  }
+
+  /** Tope del selector de cantidad: nunca por encima del stock ni de 10. */
+  get maxCantidad(): number {
+    return Math.max(1, Math.min(Number(this.producto?.stock || 0), 10));
+  }
+
+  get opcionesCantidad(): number[] {
+    return Array.from({ length: this.maxCantidad }, (_, i) => i + 1);
+  }
+
+  // ── Acciones ─────────────────────────────────────────────────────────────
+  agregarAlCarrito(irAlPago = false): void {
+    if (!this.producto || this.agregando) return;
+    this.agregando = true;
     this.shopService.agregarAlCarrito(this.producto.productoId, this.cantidad).subscribe({
-      next: () => this.snackBar.open('Agregado al carrito ✓', 'OK',
-        { duration: 2000, panelClass: ['snack-success'] }),
-      error: (e) => this.snackBar.open(mensajeError(e, 'Error al agregar'), 'Cerrar',
-        { duration: 3000, panelClass: ['snack-error'] })
+      next: () => {
+        this.agregando = false;
+        this.ui.refrescarCarrito();
+        if (irAlPago) { this.router.navigate(['/shop/checkout']); return; }
+        this.snackBar.open(`${this.cantidad} × «${this.producto.nombre}» en el carrito`,
+          'Ver carrito', { duration: 3500, panelClass: ['snack-success'] })
+          .onAction().subscribe(() => this.router.navigate(['/shop/carrito']));
+      },
+      error: (e) => {
+        this.agregando = false;
+        this.snackBar.open(mensajeError(e, 'No se pudo agregar al carrito'), 'Cerrar',
+          { duration: 3500, panelClass: ['snack-error'] });
+      }
     });
   }
 
   toggleWishlist(): void {
     if (!this.producto) return;
-    const productoId = this.producto.productoId;
+    const id = Number(this.producto.productoId);
 
     if (this.enWishlist) {
-      this.shopService.eliminarDeWishlist(productoId).subscribe({
+      this.shopService.eliminarDeWishlist(id).subscribe({
         next: () => {
-          this.enWishlist = false;
-          this.snackBar.open('Eliminado de wishlist', 'OK', { duration: 2000 });
+          this.ui.marcarWishlist(id, false);
+          this.snackBar.open('Quitado de tu lista de deseos', 'OK', { duration: 2000 });
         },
-        error: (e) => this.snackBar.open(mensajeError(e, 'Error'), 'Cerrar', { duration: 2000 })
+        error: (e) => this.snackBar.open(mensajeError(e, 'No se pudo quitar'), 'Cerrar', { duration: 2500 })
       });
     } else {
-      this.shopService.agregarAWishlist(productoId).subscribe({
+      this.shopService.agregarAWishlist(id).subscribe({
         next: () => {
-          this.enWishlist = true;
-          this.snackBar.open('Agregado a wishlist ❤️', 'OK', { duration: 2000 });
+          this.ui.marcarWishlist(id, true);
+          this.snackBar.open('Guardado en tu lista de deseos', 'OK', { duration: 2000 });
         },
-        error: (e) => this.snackBar.open(mensajeError(e, 'Error'), 'OK', { duration: 2000 })
+        error: (e) => this.snackBar.open(mensajeError(e, 'Ya está en tu lista'), 'OK', { duration: 2500 })
       });
     }
   }
 
-  volver(): void {
-    this.router.navigate(['/shop']);
+  agregarSimilar(p: any, event: Event): void {
+    event.stopPropagation();
+    this.shopService.agregarAlCarrito(p.productoId, 1).subscribe({
+      next: () => {
+        this.ui.refrescarCarrito();
+        this.snackBar.open('Agregado al carrito', 'OK', { duration: 2000, panelClass: ['snack-success'] });
+      },
+      error: (e) => this.snackBar.open(mensajeError(e, 'No se pudo agregar'), 'Cerrar', { duration: 2500 })
+    });
   }
 
-  getCategoryIcon(catId: number): string {
-    return CATEGORY_ICONS[catId] || 'inventory_2';
+  verSimilar(productoId: number): void {
+    this.router.navigate(['/shop/producto', productoId]);
+  }
+
+  /** Vuelve al catálogo dentro del departamento del producto. */
+  verCategoria(): void {
+    this.router.navigate(['/shop'], { queryParams: { cat: this.producto?.categoriaId || null } });
+  }
+
+  volver(): void {
+    this.router.navigate(['/shop']);
   }
 }

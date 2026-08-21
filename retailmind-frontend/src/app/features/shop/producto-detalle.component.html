@@ -1,93 +1,212 @@
-<div class="detalle-container" *ngIf="producto">
-  <button mat-button (click)="volver()" class="btn-volver">
-    <mat-icon>arrow_back</mat-icon> Volver a la tienda
-  </button>
+<div class="shop-scope ficha">
 
-  <div class="detalle-grid">
-    <div class="detalle-image">
-      <mat-icon class="big-icon">{{ getCategoryIcon(producto.categoriaId) }}</mat-icon>
+  <!-- Cargando -->
+  <div class="ficha-grid" *ngIf="loading">
+    <div class="esqueleto"><div class="esq-lienzo"></div></div>
+    <div class="esq-col">
+      <div class="esq-linea corta"></div>
+      <div class="esq-linea larga"></div>
+      <div class="esq-linea precio"></div>
+      <div class="esq-linea larga"></div>
+      <div class="esq-linea larga"></div>
     </div>
-
-    <div class="detalle-info">
-      <span class="detalle-brand">{{ producto.brand }}</span>
-      <h1 class="detalle-name">{{ producto.nombre }}</h1>
-      <span class="detalle-category">
-        <mat-icon>{{ getCategoryIcon(producto.categoriaId) }}</mat-icon>
-        {{ producto.categoriaNombre }}
-      </span>
-
-      <p class="detalle-price">${{ producto.price | number:'1.2-2' }}</p>
-
-      <p class="detalle-description">{{ producto.descripcion }}</p>
-
-      <div class="detalle-stock">
-        <mat-icon>inventory</mat-icon>
-        {{ producto.stock }} unidades disponibles
-      </div>
-
-      <div class="detalle-actions">
-        <div class="qty-wrapper">
-          <label class="qty-label">Cantidad</label>
-          <div class="qty-control">
-            <button class="qty-btn" (click)="cantidad > 1 ? cantidad = cantidad - 1 : null">−</button>
-            <input type="number" class="qty-input" [(ngModel)]="cantidad" min="1" [max]="producto.stock">
-            <button class="qty-btn" (click)="cantidad < producto.stock ? cantidad = cantidad + 1 : null">+</button>
-          </div>
-        </div>
-
-        <button class="btn-add-cart" (click)="agregarAlCarrito()">
-          <mat-icon>add_shopping_cart</mat-icon>
-          Agregar al carrito
-        </button>
-
-        <button class="btn-wishlist-premium" [class.active]="enWishlist" (click)="toggleWishlist()">
-          <mat-icon>{{ enWishlist ? 'favorite' : 'favorite_border' }}</mat-icon>
-          {{ enWishlist ? 'En Wishlist' : 'Wishlist' }}
-        </button>
-      </div>
-    </div>
+    <div class="esqueleto"><div class="esq-boton" style="height:220px"></div></div>
   </div>
 
-  <!-- Sección: Productos similares -->
-  <div class="similares-section">
-    <div class="similares-header">
-      <mat-icon class="similares-flame">local_fire_department</mat-icon>
-      <h3 class="similares-title">Productos similares</h3>
-      <span class="similares-ms" *ngIf="similaresMsLabel">{{ similaresMsLabel }}</span>
-    </div>
+  <!-- No existe / no publicado -->
+  <div class="tienda-vacio" *ngIf="!loading && noEncontrado">
+    <mat-icon class="vacio-icono">search_off</mat-icon>
+    <h3>Este producto ya no está disponible</h3>
+    <p>Puede que se haya despublicado del catálogo o que el enlace esté equivocado.</p>
+    <button class="btn-ghost" (click)="volver()">
+      <mat-icon>storefront</mat-icon> Volver a la tienda
+    </button>
+  </div>
 
-    <div class="similares-loading" *ngIf="loadingSimilares">
-      <mat-spinner diameter="32" color="warn"></mat-spinner>
-    </div>
+  <ng-container *ngIf="!loading && producto">
 
-    <div class="similares-grid" *ngIf="!loadingSimilares && similares.length > 0">
-      <mat-card class="similar-card" *ngFor="let s of similares" (click)="verSimilar(s.productoId)">
-        <div class="similar-hot-badge">🔥 Similar</div>
-        <div class="similar-image">
-          <mat-icon class="similar-icon">{{ getCategoryIcon(s.categoriaId) }}</mat-icon>
+    <nav class="tienda-migas">
+      <a routerLink="/shop">Tienda</a>
+      <mat-icon>chevron_right</mat-icon>
+      <a (click)="verCategoria()">{{ producto.categoriaNombre || 'Catálogo' }}</a>
+      <mat-icon>chevron_right</mat-icon>
+      <span class="miga-actual">{{ producto.nombre }}</span>
+    </nav>
+
+    <div class="ficha-grid">
+
+      <!-- Lienzo -->
+      <div class="lienzo-col">
+        <div class="lienzo" [style.background]="paleta.fondo">
+          <mat-icon [style.color]="paleta.tinta">{{ paleta.icono }}</mat-icon>
+          <span class="lienzo-cinta" *ngIf="producto.stock === 0">Agotado</span>
         </div>
-        <mat-card-content class="similar-content">
-          <p class="similar-brand">{{ s.brand }}</p>
-          <p class="similar-name">{{ s.nombre }}</p>
-          <p class="similar-price">${{ s.price | number:'1.2-2' }}</p>
-        </mat-card-content>
-        <mat-card-actions class="similar-actions">
-          <button mat-raised-button class="btn-similar-cart"
-                  (click)="agregarSimilarAlCarrito(s.productoId, $event)">
-            <mat-icon>add_shopping_cart</mat-icon>
-            Agregar
+        <p class="lienzo-nota">
+          <mat-icon>image_not_supported</mat-icon>
+          Este catálogo aún no tiene fotografías cargadas; se muestra el símbolo
+          del departamento.
+        </p>
+      </div>
+
+      <!-- Descripción -->
+      <div class="info-col">
+        <span class="ficha-marca">{{ producto.brand || 'Sin marca' }}</span>
+        <h1 class="ficha-nombre">{{ producto.nombre }}</h1>
+
+        <div class="ficha-meta">
+          <button class="meta-chip" (click)="verCategoria()">
+            <mat-icon>{{ paleta.icono }}</mat-icon> {{ producto.categoriaNombre || 'Sin categoría' }}
           </button>
-        </mat-card-actions>
-      </mat-card>
+          <span class="meta-chip inerte"><mat-icon>qr_code_2</mat-icon> SKU {{ producto.sku }}</span>
+        </div>
+
+        <div class="ficha-precio">
+          <span class="simbolo">$</span>
+          <span class="valor">{{ producto.price | number:'1.2-2' }}</span>
+          <span class="iva">IVA incluido en el total al pagar</span>
+        </div>
+
+        <div class="ficha-disponibilidad" [class.poco]="producto.stock > 0 && producto.stock <= 5"
+             [class.no]="producto.stock === 0">
+          <mat-icon>{{ producto.stock > 0 ? 'inventory_2' : 'remove_shopping_cart' }}</mat-icon>
+          <ng-container *ngIf="producto.stock > 5">En stock — {{ producto.stock }} unidades disponibles</ng-container>
+          <ng-container *ngIf="producto.stock > 0 && producto.stock <= 5">
+            ¡Quedan solo {{ producto.stock }} unidades!
+          </ng-container>
+          <ng-container *ngIf="producto.stock === 0">Sin stock por ahora</ng-container>
+        </div>
+
+        <section class="ficha-bloque">
+          <h2>Descripción</h2>
+          <p class="ficha-desc">{{ producto.descripcion || 'Este producto todavía no tiene una descripción cargada.' }}</p>
+        </section>
+
+        <section class="ficha-bloque">
+          <h2>Detalles</h2>
+          <dl class="tabla-detalles">
+            <div><dt>Marca</dt><dd>{{ producto.brand || '—' }}</dd></div>
+            <div><dt>Departamento</dt><dd>{{ producto.categoriaNombre || '—' }}</dd></div>
+            <div><dt>Código (SKU)</dt><dd>{{ producto.sku }}</dd></div>
+            <div><dt>Vendido por</dt><dd>RetailMind</dd></div>
+            <div><dt>Entrega</dt><dd>Transportista asignado por zona al confirmar el pedido</dd></div>
+          </dl>
+        </section>
+
+        <!-- Opiniones: la reseña exige compra verificada, así que la pantalla
+             no promete un formulario, lleva al módulo que sí lo valida. -->
+        <section class="ficha-bloque opiniones">
+          <h2>Opiniones y preguntas</h2>
+          <p>Solo se puede reseñar un producto que se haya comprado y recibido:
+            así toda opinión publicada es de una compra verificada.</p>
+          <div class="opiniones-acciones">
+            <a class="btn-ghost" [routerLink]="['/operativo/resenas']"
+               [queryParams]="{ productoId: producto.productoId }">
+              <mat-icon>rate_review</mat-icon> Escribir o ver reseñas
+            </a>
+            <a class="btn-ghost" routerLink="/operativo/resenas/preguntas">
+              <mat-icon>question_answer</mat-icon> Preguntas sobre productos
+            </a>
+          </div>
+        </section>
+      </div>
+
+      <!-- Caja de compra -->
+      <aside class="compra-col">
+        <div class="caja-compra">
+          <div class="caja-precio">
+            <span class="simbolo">$</span>{{ producto.price | number:'1.2-2' }}
+          </div>
+
+          <div class="caja-estado" [class.no]="producto.stock === 0">
+            {{ producto.stock > 0 ? 'Disponible' : 'No disponible' }}
+          </div>
+
+          <p class="caja-envio">
+            <mat-icon>local_shipping</mat-icon>
+            El costo de envío se calcula con tu dirección: la zona decide el
+            transportista y la tarifa.
+          </p>
+
+          <label class="caja-cantidad" *ngIf="producto.stock > 0">
+            <span>Cantidad</span>
+            <select class="campo-tienda" [(ngModel)]="cantidad">
+              <option *ngFor="let n of opcionesCantidad" [ngValue]="n">{{ n }}</option>
+            </select>
+          </label>
+
+          <div class="caja-subtotal" *ngIf="producto.stock > 0 && cantidad > 1">
+            Subtotal: <strong>${{ subtotalLinea | number:'1.2-2' }}</strong>
+          </div>
+
+          <button class="btn-agregar bloque" [disabled]="producto.stock === 0 || agregando"
+                  (click)="agregarAlCarrito(false)">
+            <mat-icon>add_shopping_cart</mat-icon>
+            {{ agregando ? 'Agregando…' : 'Agregar al carrito' }}
+          </button>
+
+          <button class="btn-comprar" [disabled]="producto.stock === 0 || agregando"
+                  (click)="agregarAlCarrito(true)">
+            <mat-icon>bolt</mat-icon> Comprar ahora
+          </button>
+
+          <button class="btn-ghost bloque" [class.deseado]="enWishlist" (click)="toggleWishlist()">
+            <mat-icon>{{ enWishlist ? 'favorite' : 'favorite_border' }}</mat-icon>
+            {{ enWishlist ? 'En mi lista de deseos' : 'Guardar en mi lista' }}
+          </button>
+
+          <ul class="caja-sellos">
+            <li><mat-icon>verified_user</mat-icon> Pago protegido y simulado para la demo</li>
+            <li><mat-icon>receipt_long</mat-icon> Factura electrónica al confirmar</li>
+            <li><mat-icon>assignment_return</mat-icon> Devolución dentro de 30 días desde la entrega</li>
+            <li><mat-icon>support_agent</mat-icon>
+              <a routerLink="/operativo/soporte/tickets">¿Dudas? Abre un ticket</a>
+            </li>
+          </ul>
+        </div>
+      </aside>
     </div>
 
-    <p class="similares-empty" *ngIf="!loadingSimilares && similares.length === 0">
-      No se encontraron productos similares.
-    </p>
-  </div>
+    <!-- Similares -->
+    <section class="similares">
+      <h2 class="tienda-titulo-seccion">
+        <mat-icon>dashboard_customize</mat-icon>
+        Productos similares
+        <span class="titulo-cola" *ngIf="similaresMsLabel">calculado en {{ similaresMsLabel }}</span>
+      </h2>
 
-</div>
+      <div class="grid-similares" *ngIf="loadingSimilares">
+        <div class="esqueleto" *ngFor="let s of [1,2,3,4,5]">
+          <div class="esq-lienzo"></div>
+          <div class="esq-linea corta"></div>
+          <div class="esq-linea larga"></div>
+          <div class="esq-linea precio"></div>
+        </div>
+      </div>
 
-<div class="loading" *ngIf="loading">
-  <p>Cargando producto...</p>
+      <div class="grid-similares" *ngIf="!loadingSimilares && similares.length">
+        <article class="p-card" *ngFor="let s of similares" (click)="verSimilar(s.productoId)">
+          <div class="p-card-lienzo" [style.background]="paletaDe(s).fondo">
+            <mat-icon [style.color]="paletaDe(s).tinta">{{ paletaDe(s).icono }}</mat-icon>
+          </div>
+          <div class="p-card-cuerpo">
+            <span class="p-marca">{{ s.brand }}</span>
+            <h3 class="p-nombre">{{ s.nombre }}</h3>
+            <div class="p-precio">
+              <span class="simbolo">$</span>
+              <span class="entero">{{ s.price | number:'1.2-2' }}</span>
+            </div>
+          </div>
+          <div class="p-card-acciones">
+            <button class="btn-agregar" (click)="agregarSimilar(s, $event)">
+              <mat-icon>add_shopping_cart</mat-icon> Agregar
+            </button>
+          </div>
+        </article>
+      </div>
+
+      <p class="sin-similares" *ngIf="!loadingSimilares && !similares.length">
+        No encontramos productos similares en el catálogo.
+      </p>
+    </section>
+  </ng-container>
 </div>

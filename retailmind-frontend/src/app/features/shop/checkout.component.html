@@ -1,80 +1,121 @@
-<div class="checkout-container">
-  <h2 class="checkout-title">
-    <mat-icon>shopping_cart_checkout</mat-icon>
-    Finalizar compra
-  </h2>
+<div class="shop-scope checkout">
 
-  <!-- Compra confirmada: el pedido nació PAGADO -->
-  <mat-card class="success-card" *ngIf="exito">
-    <mat-card-content>
-      <mat-icon class="success-icon">check_circle</mat-icon>
-      <h3>¡Gracias por tu compra!</h3>
-      <p class="success-orden">Pedido <strong>{{ exito.ordenId }}</strong></p>
-      <div class="success-chips">
-        <span class="chip chip-pagado"><mat-icon>paid</mat-icon> PAGADO</span>
-        <span class="chip chip-pagado" *ngIf="exito.facturaNumero">
-          <mat-icon>receipt</mat-icon> FACTURADO
-        </span>
-        <span class="chip">{{ exito.metodoPago }} · {{ exito.referenciaPago }}</span>
-        <span class="chip chip-descuento" *ngIf="exito.descuento > 0">
-          <mat-icon>confirmation_number</mat-icon>
+  <nav class="tienda-migas" *ngIf="!exito">
+    <a routerLink="/shop">Tienda</a>
+    <mat-icon>chevron_right</mat-icon>
+    <a routerLink="/shop/carrito">Mi carrito</a>
+    <mat-icon>chevron_right</mat-icon>
+    <span class="miga-actual">Finalizar compra</span>
+  </nav>
+
+  <!-- ── Compra confirmada: el pedido nació PAGADO ────────────────────────── -->
+  <div class="exito" *ngIf="exito">
+    <div class="exito-cabecera">
+      <mat-icon class="exito-icono">check_circle</mat-icon>
+      <div>
+        <h1>¡Gracias por tu compra!</h1>
+        <p>Pedido <strong>{{ exito.ordenId }}</strong> · pagado y facturado en un solo paso.</p>
+      </div>
+    </div>
+
+    <div class="exito-tarjetas">
+      <div class="et">
+        <span class="et-rotulo">Estado</span>
+        <span class="et-valor ok">PAGADO</span>
+        <span class="et-pie" *ngIf="exito.facturaNumero">Factura {{ exito.facturaNumero }}</span>
+      </div>
+      <div class="et">
+        <span class="et-rotulo">Total pagado</span>
+        <span class="et-valor">{{ exito.total | currency:'USD' }}</span>
+        <span class="et-pie" *ngIf="exito.descuento > 0">
           {{ exito.cuponCodigo ? 'Cupón ' + exito.cuponCodigo : 'Descuento' }}
           −{{ exito.descuento | currency:'USD' }}
         </span>
-        <span class="chip">Total {{ exito.total | currency:'USD' }}</span>
       </div>
-      <div class="success-chips" *ngIf="exito.facturaNumero || exito.transportista">
-        <span class="chip" *ngIf="exito.facturaNumero">
-          Factura {{ exito.facturaNumero }} (emitida automáticamente)
+      <div class="et">
+        <span class="et-rotulo">Pago</span>
+        <span class="et-valor chico">{{ exito.metodoPago }}</span>
+        <span class="et-pie">{{ exito.referenciaPago }}</span>
+      </div>
+      <div class="et" *ngIf="exito.transportista">
+        <span class="et-rotulo">Envío</span>
+        <span class="et-valor chico">{{ exito.transportista }}</span>
+        <span class="et-pie" *ngIf="exito.diasEntregaMin">
+          Llega en {{ exito.diasEntregaMin }}–{{ exito.diasEntregaMax }} días
         </span>
-        <span class="chip" *ngIf="exito.transportista">
-          <mat-icon>local_shipping</mat-icon> Envío con {{ exito.transportista }}
-          <ng-container *ngIf="exito.diasEntregaMin">
-            · llega en {{ exito.diasEntregaMin }}-{{ exito.diasEntregaMax }} días
-          </ng-container>
-        </span>
       </div>
-      <p class="success-sub">Bodega ya está preparando tu pedido; puedes seguir su
-        estado, la guía de envío y la factura en <strong>Mis Pedidos</strong>.</p>
-      <div class="success-actions">
-        <button mat-raised-button color="primary" *ngIf="exito.facturaId"
-                (click)="descargarFactura()">
-          <mat-icon>picture_as_pdf</mat-icon> Descargar factura
-        </button>
-        <a mat-raised-button color="primary" routerLink="/operativo/ventas/mis-pedidos">
-          <mat-icon>shopping_basket</mat-icon> Ver mis pedidos
-        </a>
-        <button mat-stroked-button color="primary" (click)="seguirComprando()">
-          <mat-icon>storefront</mat-icon> Seguir comprando
-        </button>
-      </div>
-    </mat-card-content>
-  </mat-card>
+    </div>
 
+    <p class="exito-sub">
+      <mat-icon>inventory</mat-icon>
+      Bodega ya está preparando tu pedido. Puedes seguir su estado, la guía de
+      envío y la factura desde <strong>Pedidos y Devoluciones</strong>.
+    </p>
+
+    <div class="exito-acciones">
+      <button class="btn-agregar" *ngIf="exito.facturaId" (click)="descargarFactura()">
+        <mat-icon>picture_as_pdf</mat-icon> Descargar factura
+      </button>
+      <!-- Lleva el NÚMERO del pedido recién hecho: la lista abre buscándolo,
+           en vez de dejar al cliente rastreándolo entre diez años de historial
+           (el catálogo de demostración tiene pedidos fechados hasta 2034, así
+           que «el más reciente» no es el que acaba de comprar). -->
+      <a class="btn-ghost" [routerLink]="['/operativo/ventas/mis-pedidos']"
+         [queryParams]="{ q: exito.ordenId }">
+        <mat-icon>shopping_basket</mat-icon> Ver este pedido
+      </a>
+      <a class="btn-ghost" routerLink="/operativo/ventas/mis-pedidos">
+        <mat-icon>list_alt</mat-icon> Todos mis pedidos
+      </a>
+      <button class="btn-ghost" (click)="seguirComprando()">
+        <mat-icon>storefront</mat-icon> Seguir comprando
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Formulario de pago ───────────────────────────────────────────────── -->
   <div class="checkout-grid" *ngIf="!exito && !loading && items.length">
-    <div class="checkout-pasos">
+
+    <!-- Columna izquierda: los pasos, empezando por la dirección de envío -->
+    <div class="pasos">
 
       <!-- 1 · Dirección de envío -->
-      <mat-card class="paso-card">
-        <div class="paso-header">
+      <section class="paso tienda-panel">
+        <header class="paso-cabecera">
           <span class="paso-num">1</span>
-          <h3><mat-icon>local_shipping</mat-icon> Dirección de envío</h3>
-        </div>
-        <mat-radio-group class="dir-list" [(ngModel)]="direccionId">
-          <mat-radio-button class="dir-item" *ngFor="let d of direcciones" [value]="d.id">
-            <div class="dir-texto">
-              <strong>{{ d.destinatario }}</strong>
-              <span *ngIf="d.alias" class="dir-alias">{{ d.alias }}</span>
-              <div>{{ d.callePrincipal }}<span *ngIf="d.numero"> {{ d.numero }}</span><span *ngIf="d.calleSecundaria"> y {{ d.calleSecundaria }}</span></div>
-              <div class="dir-sub">{{ d.ciudad }}<span *ngIf="d.telefono"> · Tel. {{ d.telefono }}</span></div>
-            </div>
-          </mat-radio-button>
-        </mat-radio-group>
-        <p class="hint-vacio" *ngIf="!direcciones.length">Aún no tienes direcciones guardadas: agrega una para continuar.</p>
+          <h2><mat-icon>local_shipping</mat-icon> Dirección de envío</h2>
+          <span class="paso-pista">La zona de esta dirección decide transportista y tarifa</span>
+        </header>
 
-        <button mat-stroked-button color="primary" *ngIf="!mostrarNuevaDireccion"
+        <div class="dirs" *ngIf="direcciones.length">
+          <label class="dir" *ngFor="let d of direcciones" [class.elegida]="direccionId === d.id">
+            <input type="radio" name="dir" [value]="d.id" [(ngModel)]="direccionId">
+            <span class="dir-marca"></span>
+            <span class="dir-cuerpo">
+              <span class="dir-linea1">
+                <strong>{{ d.destinatario }}</strong>
+                <em class="dir-alias" *ngIf="d.alias">{{ d.alias }}</em>
+                <em class="dir-pred" *ngIf="d.esPredeterminada">Predeterminada</em>
+              </span>
+              <span class="dir-calle">
+                {{ d.callePrincipal }}<ng-container *ngIf="d.numero"> {{ d.numero }}</ng-container><ng-container *ngIf="d.calleSecundaria"> y {{ d.calleSecundaria }}</ng-container>
+              </span>
+              <span class="dir-sub">
+                {{ d.ciudad }}<ng-container *ngIf="d.telefono"> · Tel. {{ d.telefono }}</ng-container>
+              </span>
+              <span class="dir-ref" *ngIf="d.referencia">Referencia: {{ d.referencia }}</span>
+            </span>
+          </label>
+        </div>
+
+        <p class="hint-vacio" *ngIf="!direcciones.length">
+          <mat-icon>info</mat-icon>
+          Todavía no tienes direcciones guardadas. Agrega una para poder continuar.
+        </p>
+
+        <button class="btn-ghost" *ngIf="!mostrarNuevaDireccion"
                 (click)="mostrarNuevaDireccion = true">
-          <mat-icon>add_location_alt</mat-icon> Agregar nueva dirección
+          <mat-icon>add_location_alt</mat-icon> Agregar una dirección nueva
         </button>
 
         <div class="nueva-dir" *ngIf="mostrarNuevaDireccion">
@@ -115,57 +156,62 @@
             </mat-form-field>
           </div>
           <div class="acciones-inline">
-            <button mat-raised-button color="primary" [disabled]="guardandoDireccion"
-                    (click)="guardarDireccion()">
+            <button class="btn-agregar" [disabled]="guardandoDireccion" (click)="guardarDireccion()">
               <mat-icon>save</mat-icon> {{ guardandoDireccion ? 'Guardando…' : 'Guardar dirección' }}
             </button>
-            <button mat-button *ngIf="direcciones.length" (click)="mostrarNuevaDireccion = false">Cancelar</button>
+            <button class="btn-ghost" *ngIf="direcciones.length"
+                    (click)="mostrarNuevaDireccion = false">Cancelar</button>
           </div>
         </div>
-      </mat-card>
+      </section>
 
-      <!-- 2 · Cupón de descuento (validado en backend, script 40) -->
-      <mat-card class="paso-card">
-        <div class="paso-header">
+      <!-- 2 · Cupón -->
+      <section class="paso tienda-panel">
+        <header class="paso-cabecera">
           <span class="paso-num">2</span>
-          <h3><mat-icon>confirmation_number</mat-icon> Cupón de descuento</h3>
-        </div>
+          <h2><mat-icon>confirmation_number</mat-icon> Cupón de descuento</h2>
+          <span class="paso-pista">Opcional · lo valida el servidor</span>
+        </header>
+
         <div class="cupon-row" *ngIf="!cuponAplicado">
-          <mat-form-field appearance="outline" class="cupon-field">
-            <mat-label>Código de cupón (opcional)</mat-label>
-            <input matInput [(ngModel)]="cupon" (keyup.enter)="aplicarCupon()">
-          </mat-form-field>
-          <button mat-stroked-button color="primary" [disabled]="validandoCupon"
-                  (click)="aplicarCupon()">
+          <input class="campo-tienda" [(ngModel)]="cupon" (keyup.enter)="aplicarCupon()"
+                 placeholder="Escribe tu código (por ejemplo, BIENVENIDA10)"
+                 aria-label="Código de cupón">
+          <button class="btn-ghost" [disabled]="validandoCupon || !cupon.trim()" (click)="aplicarCupon()">
             {{ validandoCupon ? 'Validando…' : 'Aplicar' }}
           </button>
         </div>
-        <p class="cupon-error" *ngIf="cuponError"><mat-icon>error_outline</mat-icon> {{ cuponError }}</p>
+
+        <p class="cupon-error" *ngIf="cuponError">
+          <mat-icon>error_outline</mat-icon> {{ cuponError }}
+        </p>
+
         <div class="cupon-aplicado" *ngIf="cuponAplicado">
           <mat-icon>check_circle</mat-icon>
           <span>Cupón <strong>{{ cuponAplicado.codigo }}</strong> aplicado:
             −{{ descuentoCupon | currency:'USD' }}</span>
-          <button mat-button color="warn" (click)="quitarCupon()">
-            <mat-icon>close</mat-icon> Quitar
-          </button>
+          <button class="enlace-quitar" (click)="quitarCupon()">Quitar</button>
         </div>
-      </mat-card>
+      </section>
 
-      <!-- 3 · Método de pago (SIMULADO: sin cobro real) -->
-      <mat-card class="paso-card">
-        <div class="paso-header">
+      <!-- 3 · Método de pago -->
+      <section class="paso tienda-panel">
+        <header class="paso-cabecera">
           <span class="paso-num">3</span>
-          <h3><mat-icon>credit_card</mat-icon> Método de pago</h3>
+          <h2><mat-icon>credit_card</mat-icon> Método de pago</h2>
+          <span class="paso-pista">Simulado: no se realiza ningún cobro real</span>
+        </header>
+
+        <div class="metodos">
+          <label class="metodo" *ngFor="let m of metodos" [class.elegido]="metodoPagoId === m.id">
+            <input type="radio" name="metodo" [value]="m.id" [(ngModel)]="metodoPagoId">
+            <mat-icon>{{ m.tipo === 'tarjeta' ? 'credit_card' : 'account_balance' }}</mat-icon>
+            <span>{{ m.nombre }}</span>
+          </label>
         </div>
-        <mat-radio-group class="metodo-list" [(ngModel)]="metodoPagoId">
-          <mat-radio-button *ngFor="let m of metodos" [value]="m.id">
-            <mat-icon class="metodo-icon">{{ m.tipo === 'tarjeta' ? 'credit_card' : 'account_balance' }}</mat-icon>
-            {{ m.nombre }}
-          </mat-radio-button>
-        </mat-radio-group>
 
         <!-- Tarjeta simulada: solo se guardan marca + últimos 4 dígitos -->
-        <div class="tarjeta-form" *ngIf="esTarjeta">
+        <div class="pago-form" *ngIf="esTarjeta">
           <div class="form-grid">
             <mat-form-field appearance="outline" class="span-2">
               <mat-label>Número de tarjeta *</mat-label>
@@ -191,79 +237,95 @@
               <mat-hint *ngIf="tarjeta.cvv && !cvvValido">3 o 4 dígitos</mat-hint>
             </mat-form-field>
           </div>
-          <p class="pago-nota"><mat-icon>lock</mat-icon>
-            Pago simulado para la demo: no se realiza ningún cobro real y solo
-            guardamos la marca y los últimos 4 dígitos como referencia.</p>
+          <p class="pago-nota">
+            <mat-icon>lock</mat-icon>
+            Pago simulado para la demostración: no se realiza ningún cobro real y
+            solo se guardan la marca y los últimos 4 dígitos como referencia.
+            El número completo y el CVV nunca salen de esta pantalla.
+          </p>
         </div>
 
-        <div class="tarjeta-form" *ngIf="metodoSeleccionado && !esTarjeta">
-          <mat-form-field appearance="outline" class="span-2" style="width:100%;">
+        <div class="pago-form" *ngIf="metodoSeleccionado && !esTarjeta">
+          <mat-form-field appearance="outline" style="width:100%;">
             <mat-label>Referencia de la transferencia (opcional)</mat-label>
             <input matInput [(ngModel)]="referenciaTransferencia" placeholder="N.º de comprobante">
           </mat-form-field>
-          <p class="pago-nota"><mat-icon>lock</mat-icon>
-            Transferencia simulada para la demo: el pago se confirma al instante.</p>
+          <p class="pago-nota">
+            <mat-icon>lock</mat-icon>
+            Transferencia simulada para la demostración: el pago se confirma al instante.
+          </p>
         </div>
-      </mat-card>
+      </section>
     </div>
 
-    <!-- Resumen del pedido -->
-    <mat-card class="resumen-card">
-      <h3><mat-icon>receipt_long</mat-icon> Resumen del pedido</h3>
-      <div class="resumen-item" *ngFor="let i of items">
-        <span class="ri-nombre">{{ i.nombre }} <span class="ri-cant">×{{ i.cantidad }}</span>
-          <span class="ri-promo" *ngIf="i.descuentoPromo > 0">
-            <mat-icon>local_offer</mat-icon> {{ i.promocion }}
-          </span>
-        </span>
-        <span class="ri-precio">
-          <span class="ri-tachado" *ngIf="i.descuentoPromo > 0">
-            {{ i.precioUnitario * i.cantidad | currency:'USD' }}
-          </span>
-          {{ i.precioUnitario * i.cantidad - (i.descuentoPromo || 0) | currency:'USD' }}
-        </span>
-      </div>
-      <mat-divider></mat-divider>
-      <div class="resumen-linea"><span>Subtotal</span><span>{{ subtotal | currency:'USD' }}</span></div>
-      <div class="resumen-linea linea-descuento" *ngIf="descuentoPromos > 0">
-        <span>Promociones</span><span>−{{ descuentoPromos | currency:'USD' }}</span>
-      </div>
-      <div class="resumen-linea linea-descuento" *ngIf="cuponAplicado">
-        <span>Cupón {{ cuponAplicado.codigo }}</span><span>−{{ descuentoCupon | currency:'USD' }}</span>
-      </div>
-      <div class="resumen-linea"><span>IVA (15%)</span><span>{{ impuesto | currency:'USD' }}</span></div>
-      <div class="resumen-linea"><span>Envío</span><span>Gratis</span></div>
-      <div class="resumen-total"><span>Total</span><span>{{ total | currency:'USD' }}</span></div>
+    <!-- Columna derecha: el resumen -->
+    <aside class="resumen-col">
+      <div class="resumen tienda-panel">
+        <h2><mat-icon>receipt_long</mat-icon> Resumen del pedido</h2>
 
-      <!-- Rechazo del pago (OTD-VEN-12): motivo claro + reintento sin perder nada -->
-      <div *ngIf="errorPago" class="glass-card" role="alert"
-           style="border: 1px solid rgba(244, 67, 54, 0.5); background: rgba(244, 67, 54, 0.08);
-                  border-radius: 12px; padding: 12px 16px; margin: 10px 0; display: flex;
-                  gap: 10px; align-items: flex-start;">
-        <mat-icon style="color: #e53935;">error_outline</mat-icon>
-        <div>
-          <strong style="color: #e53935;">{{ errorPago }}</strong>
-          <div style="font-size: 12px; opacity: 0.8; margin-top: 4px;">
-            No se realizó ningún cobro y tu carrito sigue intacto: corrige los datos
-            de la tarjeta o elige otro método y vuelve a pulsar «Pagar».
+        <div class="ri" *ngFor="let i of items">
+          <span class="ri-mini" [style.background]="paleta(i).fondo">
+            <mat-icon [style.color]="paleta(i).tinta">{{ paleta(i).icono }}</mat-icon>
+          </span>
+          <span class="ri-texto">
+            <span class="ri-nombre">{{ i.nombre }}</span>
+            <span class="ri-cant">Cantidad: {{ i.cantidad }}</span>
+            <span class="ri-promo" *ngIf="i.descuentoPromo > 0">
+              <mat-icon>local_offer</mat-icon> {{ i.promocion }}
+            </span>
+          </span>
+          <span class="ri-precio">
+            <span class="ri-tachado" *ngIf="i.descuentoPromo > 0">
+              {{ i.precioUnitario * i.cantidad | currency:'USD' }}
+            </span>
+            {{ i.precioUnitario * i.cantidad - (i.descuentoPromo || 0) | currency:'USD' }}
+          </span>
+        </div>
+
+        <div class="separador"></div>
+
+        <div class="linea"><span>Subtotal</span><span>{{ subtotal | currency:'USD' }}</span></div>
+        <div class="linea descuento" *ngIf="descuentoPromos > 0">
+          <span>Promociones</span><span>−{{ descuentoPromos | currency:'USD' }}</span>
+        </div>
+        <div class="linea descuento" *ngIf="cuponAplicado">
+          <span>Cupón {{ cuponAplicado.codigo }}</span><span>−{{ descuentoCupon | currency:'USD' }}</span>
+        </div>
+        <div class="linea"><span>IVA (15 %)</span><span>{{ impuesto | currency:'USD' }}</span></div>
+        <div class="linea"><span>Envío</span><span class="gratis">Gratis</span></div>
+        <div class="linea total"><span>Total</span><span>{{ total | currency:'USD' }}</span></div>
+
+        <!-- Rechazo del pago (OTD-VEN-12): motivo claro y reintento sin perder nada -->
+        <div class="error-pago" *ngIf="errorPago" role="alert">
+          <mat-icon>error_outline</mat-icon>
+          <div>
+            <strong>{{ errorPago }}</strong>
+            <p>No se realizó ningún cobro y tu carrito sigue intacto: corrige los
+              datos de la tarjeta o elige otro método y vuelve a pulsar «Pagar».</p>
           </div>
         </div>
-      </div>
 
-      <button mat-raised-button color="accent" class="btn-confirmar"
-              [disabled]="!puedeConfirmar" (click)="confirmar()">
-        <mat-icon>lock</mat-icon>
-        {{ procesando ? 'Procesando pago…' : (errorPago ? 'Reintentar pago' : 'Pagar y confirmar pedido') }}
-      </button>
-      <p class="confirmar-hint" *ngIf="!direccionId">Selecciona una dirección de envío</p>
-      <p class="confirmar-hint" *ngIf="direccionId && esTarjeta && !tarjetaValida">Completa los datos de la tarjeta</p>
-      <button mat-button class="btn-volver" (click)="volverAlCarrito()">
-        <mat-icon>arrow_back</mat-icon> Volver al carrito
-      </button>
-    </mat-card>
+        <button class="btn-pagar" [disabled]="!puedeConfirmar" (click)="confirmar()">
+          <mat-icon>lock</mat-icon>
+          {{ procesando ? 'Procesando pago…' : (errorPago ? 'Reintentar pago' : 'Pagar y confirmar pedido') }}
+        </button>
+
+        <p class="pista-bloqueo" *ngIf="!direccionId">
+          <mat-icon>arrow_upward</mat-icon> Selecciona una dirección de envío para continuar
+        </p>
+        <p class="pista-bloqueo" *ngIf="direccionId && esTarjeta && !tarjetaValida">
+          <mat-icon>arrow_upward</mat-icon> Completa los datos de la tarjeta
+        </p>
+
+        <button class="enlace-volver" (click)="volverAlCarrito()">
+          <mat-icon>arrow_back</mat-icon> Volver al carrito
+        </button>
+      </div>
+    </aside>
   </div>
 
-  <div class="empty-state" *ngIf="loading">
+  <div class="cargando" *ngIf="loading">
     <mat-spinner diameter="42"></mat-spinner>
+    <p>Preparando tu compra…</p>
   </div>
 </div>

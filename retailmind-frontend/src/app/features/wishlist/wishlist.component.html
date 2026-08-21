@@ -1,35 +1,101 @@
-<div class="wishlist-container">
-  <h2 class="page-title">
-    <mat-icon>favorite</mat-icon>
-    Mi Wishlist
-  </h2>
+<div class="shop-scope deseos">
 
-  <!-- Empty state -->
-  <div class="empty-state" *ngIf="!loading && items.length === 0">
-    <mat-icon>favorite_border</mat-icon>
-    <p>Tu wishlist esta vacia.</p>
-    <p class="empty-hint">Agrega productos que te gusten!</p>
+  <nav class="tienda-migas">
+    <a routerLink="/shop">Tienda</a>
+    <mat-icon>chevron_right</mat-icon>
+    <span class="miga-actual">Mi lista de deseos</span>
+  </nav>
+
+  <header class="deseos-cabecera tienda-panel" *ngIf="!loading">
+    <div class="dc-texto">
+      <h1><mat-icon>favorite</mat-icon> Mi lista de deseos</h1>
+      <p *ngIf="items.length">
+        {{ items.length }} {{ items.length === 1 ? 'producto guardado' : 'productos guardados' }} ·
+        {{ disponibles }} con stock · valor de lista ${{ valorTotal | number:'1.2-2' }}
+      </p>
+      <p *ngIf="!items.length">Aquí se guardan los productos que quieres comprar más tarde.</p>
+    </div>
+    <button class="btn-agregar" *ngIf="disponibles > 0" (click)="agregarDisponibles()">
+      <mat-icon>add_shopping_cart</mat-icon>
+      {{ disponibles === 1 ? 'Agregar el disponible al carrito'
+                           : 'Agregar los ' + disponibles + ' disponibles al carrito' }}
+    </button>
+  </header>
+
+  <!-- Cargando -->
+  <div class="grid" *ngIf="loading">
+    <div class="esqueleto" *ngFor="let s of [1,2,3,4]">
+      <div class="esq-lienzo"></div>
+      <div class="esq-linea corta"></div>
+      <div class="esq-linea larga"></div>
+      <div class="esq-linea precio"></div>
+      <div class="esq-boton"></div>
+    </div>
   </div>
 
-  <!-- Grid de productos -->
-  <div class="wishlist-grid" *ngIf="items.length > 0">
-    <mat-card class="wishlist-card" *ngFor="let item of items">
-      <div class="card-image" (click)="verProducto(item.productoId)">
-        <mat-icon class="product-icon">{{ getCategoryIcon(item.categoriaId) }}</mat-icon>
+  <!-- Vacía -->
+  <div class="tienda-vacio" *ngIf="!loading && items.length === 0">
+    <mat-icon class="vacio-icono">favorite_border</mat-icon>
+    <h3>Tu lista de deseos está vacía</h3>
+    <p>Pulsa el corazón de cualquier producto del catálogo y lo encontrarás aquí,
+      con su precio y su disponibilidad al día.</p>
+    <button class="btn-agregar" style="max-width:230px" (click)="irATienda()">
+      <mat-icon>storefront</mat-icon> Explorar el catálogo
+    </button>
+  </div>
+
+  <!-- Productos guardados -->
+  <div class="grid" *ngIf="!loading && items.length">
+    <article class="p-card" *ngFor="let item of items; trackBy: trackByItem"
+             [class.agotado]="item.stock === 0"
+             (click)="verProducto(item.productoId)">
+
+      <div class="p-card-lienzo" [style.background]="paleta(item).fondo">
+        <mat-icon [style.color]="paleta(item).tinta">{{ paleta(item).icono }}</mat-icon>
+
+        <div class="p-card-cintas">
+          <span class="cinta cinta-agotado" *ngIf="item.stock === 0">
+            <mat-icon>block</mat-icon> Agotado
+          </span>
+          <span class="cinta cinta-ultimas" *ngIf="item.stock > 0 && item.stock <= 5">
+            <mat-icon>bolt</mat-icon> {{ item.stock === 1 ? 'Última unidad' : 'Últimas ' + item.stock }}
+          </span>
+        </div>
+
+        <button class="p-card-corazon activo" (click)="eliminar(item, $event)"
+                matTooltip="Quitar de mi lista" aria-label="Quitar de mi lista de deseos">
+          <mat-icon>favorite</mat-icon>
+        </button>
       </div>
-      <mat-card-content>
-        <p class="item-brand">{{ item.brand }}</p>
-        <h3 class="item-name">{{ item.nombre }}</h3>
-        <p class="item-price">${{ item.price | number:'1.2-2' }}</p>
-      </mat-card-content>
-      <mat-card-actions>
-        <button mat-raised-button color="primary" (click)="agregarAlCarrito(item)">
-          <mat-icon>add_shopping_cart</mat-icon> Al carrito
+
+      <div class="p-card-cuerpo">
+        <span class="p-marca">{{ item.brand || 'Sin marca' }}</span>
+        <h3 class="p-nombre">{{ item.nombre }}</h3>
+        <div class="p-precio">
+          <span class="simbolo">$</span>
+          <span class="entero">{{ item.price | number:'1.2-2' }}</span>
+        </div>
+        <span class="p-stock" [class.hay]="item.stock > 5" [class.poco]="item.stock > 0 && item.stock <= 5"
+              [class.no]="item.stock === 0">
+          {{ item.stock === 0 ? 'Sin stock por ahora'
+             : (item.stock === 1 ? '1 disponible' : item.stock + ' disponibles') }}
+        </span>
+        <span class="p-guardado" *ngIf="item.fechaAgregado">
+          <mat-icon>schedule</mat-icon> Guardado el {{ item.fechaAgregado | slice:0:10 }}
+        </span>
+      </div>
+
+      <div class="p-card-acciones">
+        <button class="btn-agregar" [disabled]="item.stock === 0 || moviendo.has(item.productoId)"
+                (click)="agregarAlCarrito(item, $event)">
+          <mat-icon>add_shopping_cart</mat-icon>
+          {{ item.stock === 0 ? 'No disponible' : 'Al carrito' }}
         </button>
-        <button mat-icon-button class="btn-remove" (click)="eliminarDeWishlist(item.productoId)">
-          <mat-icon>heart_broken</mat-icon>
+        <button class="btn-ghost" (click)="eliminar(item, $event)"
+                matTooltip="Quitar de la lista" aria-label="Quitar de la lista">
+          <mat-icon>delete_outline</mat-icon>
         </button>
-      </mat-card-actions>
-    </mat-card>
+      </div>
+    </article>
   </div>
 </div>

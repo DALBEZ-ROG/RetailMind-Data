@@ -1,73 +1,171 @@
-<div class="carrito-container">
-  <h2 class="carrito-title">
-    <mat-icon>shopping_bag</mat-icon>
-    Mi Carrito
-  </h2>
+<div class="shop-scope carrito">
+
+  <nav class="tienda-migas">
+    <a routerLink="/shop">Tienda</a>
+    <mat-icon>chevron_right</mat-icon>
+    <span class="miga-actual">Mi carrito</span>
+  </nav>
+
+  <!-- Cargando -->
+  <div class="carrito-cuerpo" *ngIf="loading">
+    <div class="tienda-panel col-items">
+      <div class="esqueleto-linea" *ngFor="let s of [1,2,3]">
+        <div class="esq-lienzo"></div>
+        <div class="esq-col">
+          <div class="esq-linea larga"></div>
+          <div class="esq-linea corta"></div>
+          <div class="esq-linea precio"></div>
+        </div>
+      </div>
+    </div>
+    <div class="tienda-panel col-resumen"><div class="esq-boton"></div></div>
+  </div>
 
   <!-- Carrito vacío -->
-  <div class="empty-state" *ngIf="!loading && items.length === 0">
-    <mat-icon>remove_shopping_cart</mat-icon>
-    <p>Tu carrito esta vacio</p>
-    <button mat-raised-button color="primary" (click)="seguirComprando()">
+  <div class="tienda-vacio" *ngIf="!loading && items.length === 0">
+    <mat-icon class="vacio-icono">remove_shopping_cart</mat-icon>
+    <h3>Tu carrito está vacío</h3>
+    <p>Explora el catálogo y agrega productos: verás aquí el precio con las
+      promociones vigentes ya aplicadas.</p>
+    <button class="btn-agregar" style="max-width:230px" (click)="seguirComprando()">
       <mat-icon>storefront</mat-icon> Ir a la tienda
     </button>
   </div>
 
-  <!-- Items del carrito -->
-  <div class="carrito-items" *ngIf="items.length > 0">
-    <mat-card class="item-card" *ngFor="let item of items">
-      <div class="item-row">
-        <div class="item-info">
-          <h4 class="item-name">{{ item.nombre }}</h4>
-          <p class="item-brand">{{ item.brand }}</p>
-          <div class="item-qty" style="display: flex; align-items: center; gap: 4px;">
-            <button mat-icon-button (click)="cambiarCantidad(item, -1)" aria-label="Menos">
-              <mat-icon>remove_circle_outline</mat-icon>
-            </button>
-            <span><strong>{{ item.cantidad }}</strong></span>
-            <button mat-icon-button (click)="cambiarCantidad(item, 1)"
-                    [disabled]="item.stock !== undefined && item.cantidad >= item.stock"
-                    aria-label="Más">
-              <mat-icon>add_circle_outline</mat-icon>
-            </button>
+  <!-- Carrito con líneas -->
+  <div class="carrito-cuerpo" *ngIf="!loading && items.length > 0">
+
+    <!-- Columna izquierda: las líneas -->
+    <section class="col-items">
+      <div class="tienda-panel bloque-items">
+        <header class="items-cabecera">
+          <h1>Mi carrito</h1>
+          <span>{{ items.length }} {{ items.length === 1 ? 'producto' : 'productos' }} · {{ unidades }} {{ unidades === 1 ? 'unidad' : 'unidades' }}</span>
+        </header>
+
+        <article class="linea" *ngFor="let item of items; trackBy: trackByItem"
+                 [class.ocupada]="estaOcupado(item)">
+          <div class="linea-lienzo" [style.background]="paleta(item).fondo"
+               (click)="verProducto(item.productoId)">
+            <mat-icon [style.color]="paleta(item).tinta">{{ paleta(item).icono }}</mat-icon>
           </div>
+
+          <div class="linea-datos">
+            <span class="linea-marca">{{ item.brand || 'Sin marca' }}</span>
+            <h3 class="linea-nombre" (click)="verProducto(item.productoId)">{{ item.nombre }}</h3>
+
+            <span class="linea-stock" [class.poco]="item.stock > 0 && item.stock <= 5"
+                  [class.no]="item.stock === 0">
+              <mat-icon>{{ item.stock > 0 ? 'check_circle' : 'error_outline' }}</mat-icon>
+              {{ item.stock === 0 ? 'Sin stock'
+                 : 'En stock (' + item.stock + (item.stock === 1 ? ' disponible)' : ' disponibles)') }}
+            </span>
+
+            <span class="linea-promo" *ngIf="item.descuentoPromo > 0">
+              <mat-icon>local_offer</mat-icon> {{ item.promocion }}
+            </span>
+
+            <div class="linea-controles">
+              <div class="stepper">
+                <button (click)="cambiarCantidad(item, -1)" [disabled]="estaOcupado(item)"
+                        [attr.aria-label]="'Quitar una unidad de ' + item.nombre">
+                  <mat-icon>{{ item.cantidad === 1 ? 'delete_outline' : 'remove' }}</mat-icon>
+                </button>
+                <span class="stepper-valor">{{ item.cantidad }}</span>
+                <button (click)="cambiarCantidad(item, 1)"
+                        [disabled]="estaOcupado(item) || (item.stock !== undefined && item.cantidad >= item.stock)"
+                        [attr.aria-label]="'Agregar una unidad de ' + item.nombre">
+                  <mat-icon>add</mat-icon>
+                </button>
+              </div>
+
+              <button class="enlace-accion" (click)="eliminarItem(item)" [disabled]="estaOcupado(item)">
+                <mat-icon>delete_outline</mat-icon> Eliminar
+              </button>
+              <span class="sep">|</span>
+              <button class="enlace-accion" (click)="guardarParaDespues(item)" [disabled]="estaOcupado(item)"
+                      matTooltip="Lo mueve a tu lista de deseos y lo saca del carrito">
+                <mat-icon>favorite_border</mat-icon> Guardar para después
+              </button>
+            </div>
+          </div>
+
+          <div class="linea-importe">
+            <span class="importe-final">${{ lineaTotal(item) | number:'1.2-2' }}</span>
+            <span class="importe-tachado" *ngIf="item.descuentoPromo > 0">
+              ${{ item.precioUnitario * item.cantidad | number:'1.2-2' }}
+            </span>
+            <span class="importe-unitario">${{ item.precioUnitario | number:'1.2-2' }} c/u</span>
+          </div>
+        </article>
+
+        <footer class="items-pie">
+          <button class="btn-ghost" (click)="seguirComprando()">
+            <mat-icon>arrow_back</mat-icon> Seguir comprando
+          </button>
+          <span class="pie-subtotal">
+            Subtotal ({{ unidades }} {{ unidades === 1 ? 'unidad' : 'unidades' }}): <strong>${{ subtotal | number:'1.2-2' }}</strong>
+          </span>
+        </footer>
+      </div>
+
+      <!-- Sugerencias -->
+      <div class="sugerencias" *ngIf="sugerencias.length">
+        <h2 class="tienda-titulo-seccion">
+          <mat-icon>auto_awesome</mat-icon> También te puede interesar
+        </h2>
+        <div class="sug-fila">
+          <article class="d-card" *ngFor="let s of sugerencias" (click)="verProducto(s.productoId)">
+            <div class="d-lienzo" [style.background]="paleta(s).fondo">
+              <mat-icon [style.color]="paleta(s).tinta">{{ paleta(s).icono }}</mat-icon>
+            </div>
+            <div class="d-cuerpo">
+              <span class="d-marca">{{ s.brand }}</span>
+              <span class="d-nombre">{{ s.nombre }}</span>
+              <span class="d-precio">${{ s.price | number:'1.2-2' }}</span>
+              <button class="btn-ghost mini" (click)="agregarSugerencia(s, $event)">
+                <mat-icon>add_shopping_cart</mat-icon> Agregar
+              </button>
+            </div>
+          </article>
         </div>
-        <div class="item-price">
-          <span class="promo-chip" *ngIf="item.descuentoPromo > 0">
-            <mat-icon>local_offer</mat-icon> {{ item.promocion }}
-          </span>
-          <span class="price">
-            ${{ item.precioUnitario * item.cantidad - (item.descuentoPromo || 0) | number:'1.2-2' }}
-          </span>
-          <span class="price-original" *ngIf="item.descuentoPromo > 0">
-            ${{ item.precioUnitario * item.cantidad | number:'1.2-2' }}
-          </span>
-          <span class="unit-price">
-            ${{ (item.descuentoPromo > 0 ? item.precioFinal : item.precioUnitario) | number:'1.2-2' }} c/u
-          </span>
+      </div>
+    </section>
+
+    <!-- Columna derecha: el resumen, que acompaña al desplazamiento -->
+    <aside class="col-resumen">
+      <div class="tienda-panel resumen">
+        <h2>Resumen del pedido</h2>
+
+        <div class="fila"><span>Productos ({{ unidades }})</span><span>${{ bruto | number:'1.2-2' }}</span></div>
+        <div class="fila ahorro" *ngIf="ahorroPromos > 0">
+          <span><mat-icon>local_offer</mat-icon> Promociones</span>
+          <span>−${{ ahorroPromos | number:'1.2-2' }}</span>
         </div>
-        <button mat-icon-button color="warn" (click)="eliminarItem(item.productoId)">
-          <mat-icon>delete</mat-icon>
+        <div class="fila total"><span>Subtotal</span><span>${{ subtotal | number:'1.2-2' }}</span></div>
+
+        <p class="nota">
+          <mat-icon>info</mat-icon>
+          El IVA y el costo de envío se calculan en el siguiente paso, cuando
+          elijas la dirección: el envío depende de la zona de entrega.
+        </p>
+
+        <button class="btn-agregar grande" (click)="finalizarCompra()">
+          <mat-icon>lock</mat-icon> Proceder al pago
         </button>
-      </div>
-    </mat-card>
 
-    <mat-divider></mat-divider>
+        <div class="sellos">
+          <span><mat-icon>verified_user</mat-icon> Pago protegido</span>
+          <span><mat-icon>assignment_return</mat-icon> Devolución en 30 días</span>
+          <span><mat-icon>receipt_long</mat-icon> Factura electrónica inmediata</span>
+        </div>
 
-    <!-- Total y checkout -->
-    <div class="carrito-footer">
-      <div class="total-section">
-        <span class="promo-chip" *ngIf="ahorroPromos > 0">
-          <mat-icon>local_offer</mat-icon> Ahorras ${{ ahorroPromos | number:'1.2-2' }} en promociones
-        </span>
-        <span class="total-label">Total:</span>
-        <span class="total-amount">${{ total | number:'1.2-2' }}</span>
+        <div class="ahorro-destacado" *ngIf="ahorroPromos > 0">
+          <mat-icon>savings</mat-icon>
+          Estás ahorrando <strong>${{ ahorroPromos | number:'1.2-2' }}</strong> con las
+          promociones vigentes. ¿Tienes un cupón? Se aplica en el pago.
+        </div>
       </div>
-      <button mat-raised-button color="accent" class="btn-checkout"
-              (click)="finalizarCompra()">
-        <mat-icon>payment</mat-icon>
-        Proceder al pago
-      </button>
-    </div>
+    </aside>
   </div>
 </div>

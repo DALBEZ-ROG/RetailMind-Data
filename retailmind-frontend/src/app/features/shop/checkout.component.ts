@@ -2,17 +2,16 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
-import { MatRadioModule } from '@angular/material/radio';
-import { MatDividerModule } from '@angular/material/divider';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ShopService } from './shop.service';
+import { ShopUiService } from './shop-ui.service';
+import { PaletaCategoria } from './catalogo-visual';
 import { VentasService } from '../../core/services/ventas.service';
 import { mensajeError } from '../../core/services/api-error.util';
 
@@ -27,12 +26,12 @@ import { mensajeError } from '../../core/services/api-error.util';
   selector: 'app-checkout',
   standalone: true,
   imports: [
-    CommonModule, FormsModule, RouterLink, MatCardModule, MatButtonModule,
+    CommonModule, FormsModule, RouterLink, MatButtonModule,
     MatIconModule, MatFormFieldModule, MatInputModule, MatSelectModule,
-    MatRadioModule, MatDividerModule, MatSnackBarModule, MatProgressSpinnerModule
+    MatSnackBarModule, MatProgressSpinnerModule
   ],
   templateUrl: './checkout.component.html',
-  styleUrl: './checkout.component.scss'
+  styleUrls: ['./shop-shared.scss', './checkout.component.scss']
 })
 export class CheckoutComponent implements OnInit {
 
@@ -74,12 +73,14 @@ export class CheckoutComponent implements OnInit {
 
   constructor(
     private shop: ShopService,
+    public ui: ShopUiService,
     private ventas: VentasService,
     private router: Router,
     private snackBar: MatSnackBar
   ) {}
 
   ngOnInit(): void {
+    this.ui.cargarCategorias();
     this.shop.getCarrito().subscribe({
       next: items => {
         this.items = items;
@@ -94,7 +95,14 @@ export class CheckoutComponent implements OnInit {
     this.shop.getDirecciones().subscribe({
       next: dirs => {
         this.direcciones = dirs;
-        const pred = dirs.find(d => d.esPredeterminada) || dirs[0];
+        // Manda la que el cliente eligió en la barra superior; si no eligió
+        // ninguna, la predeterminada, y si tampoco la hay, la primera. El
+        // orden importa: llegar al pago y encontrar OTRA dirección distinta de
+        // la que dice la barra es la forma más rápida de perder la confianza.
+        const elegida = this.ui.direccionElegidaId;
+        const pred = dirs.find(d => Number(d.id) === elegida)
+                  || dirs.find(d => d.esPredeterminada)
+                  || dirs[0];
         this.direccionId = pred ? pred.id : null;
         this.mostrarNuevaDireccion = !dirs.length;
       },
@@ -227,6 +235,11 @@ export class CheckoutComponent implements OnInit {
           next: dirs => { this.direcciones = dirs; this.direccionId = r.id; },
           error: () => {}
         });
+        // La barra superior tiene su propia copia de la lista: si no se le
+        // avisa, sigue anunciando la dirección vieja mientras el pago usa la
+        // nueva.
+        this.ui.cargarDirecciones(true);
+        this.ui.elegirDireccion(r.id);
       },
       error: e => {
         this.guardandoDireccion = false;
@@ -283,6 +296,8 @@ export class CheckoutComponent implements OnInit {
         mensajeError(e, 'No se pudo descargar la factura'), 'Cerrar', { duration: 4500 })
     });
   }
+
+  paleta(p: any): PaletaCategoria { return this.ui.paleta(p); }
 
   volverAlCarrito(): void { this.router.navigate(['/shop/carrito']); }
   seguirComprando(): void { this.router.navigate(['/shop']); }

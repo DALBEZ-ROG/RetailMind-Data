@@ -1,39 +1,33 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
-import { MatCardModule } from '@angular/material/card';
+import { Router, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatChipsModule } from '@angular/material/chips';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { MatBadgeModule } from '@angular/material/badge';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ShopService } from '../shop/shop.service';
+import { ShopUiService } from '../shop/shop-ui.service';
+import { PaletaCategoria } from '../shop/catalogo-visual';
 import { mensajeError } from '../../core/services/api-error.util';
-
-const CATEGORY_ICONS: Record<number, string> = {
-  1: 'devices', 2: 'shopping_basket', 3: 'sports_soccer', 4: 'watch',
-  5: 'spa', 6: 'home', 7: 'directions_walk', 8: 'checkroom',
-  9: 'checkroom', 10: 'checkroom', 11: 'category'
-};
 
 /**
  * Recomendaciones: la señal viene de ClickHouse (eventos) y los productos de
  * PostgreSQL. Si la analítica está apagada, el backend degrada a destacados
- * del catálogo y lo avisa con mensajeFallback (nunca 500).
+ * del catálogo y lo avisa con `mensajeFallback` (nunca 500).
+ *
+ * La pantalla DICE de dónde sale lo que enseña —recomendación personalizada o
+ * lo más vendido— porque son dos cosas distintas y el cliente no tiene otra
+ * forma de saber cuál está viendo.
  */
 @Component({
   selector: 'app-recomendaciones',
   standalone: true,
   imports: [
-    CommonModule,
-    MatCardModule, MatButtonModule, MatIconModule,
-    MatChipsModule, MatProgressSpinnerModule,
-    MatSnackBarModule, MatBadgeModule, MatTooltipModule
+    CommonModule, RouterLink, MatButtonModule, MatIconModule,
+    MatSnackBarModule, MatTooltipModule
   ],
   templateUrl: './recomendaciones.component.html',
-  styleUrl: './recomendaciones.component.scss'
+  styleUrls: ['../shop/shop-shared.scss', './recomendaciones.component.scss']
 })
 export class RecomendacionesComponent implements OnInit {
 
@@ -45,70 +39,68 @@ export class RecomendacionesComponent implements OnInit {
   queryMs = 0;
   loading = true;
 
-  private wishlistIds = new Set<number>();
-
   constructor(
     private shopService: ShopService,
+    public ui: ShopUiService,
     private snackBar: MatSnackBar,
     private router: Router
   ) {}
 
   ngOnInit(): void {
+    this.ui.cargarCategorias();
+    this.ui.refrescarTodo();
     this.cargarRecomendaciones();
-    this.cargarWishlist();
   }
 
   private cargarRecomendaciones(): void {
     const t0 = Date.now();
     this.shopService.getRecomendaciones().subscribe({
       next: (data) => {
-        this.recomendaciones  = data.recomendaciones  || [];
+        this.recomendaciones = data.recomendaciones || [];
         this.categoriaFavorita = data.categoriaFavorita || '';
-        this.totalEventos     = data.totalEventos      || 0;
-        this.esPersonalizado  = data.esPersonalizado   ?? false;
-        this.mensajeFallback  = data.mensajeFallback   || '';
-        this.queryMs          = Date.now() - t0;
-        this.loading          = false;
+        this.totalEventos = data.totalEventos || 0;
+        this.esPersonalizado = data.esPersonalizado ?? false;
+        this.mensajeFallback = data.mensajeFallback || '';
+        this.queryMs = Date.now() - t0;
+        this.loading = false;
       },
       error: (e) => {
         this.loading = false;
-        this.snackBar.open(mensajeError(e, 'Error al cargar recomendaciones'), 'Cerrar', { duration: 3000 });
+        this.snackBar.open(mensajeError(e, 'No se pudieron cargar las recomendaciones'),
+          'Cerrar', { duration: 3500 });
       }
-    });
-  }
-
-  private cargarWishlist(): void {
-    this.shopService.getWishlist().subscribe({
-      next: (items) => items.forEach(i => this.wishlistIds.add(Number(i.productoId))),
-      error: () => {}
     });
   }
 
   agregarAlCarrito(producto: any, event: Event): void {
     event.stopPropagation();
     this.shopService.agregarAlCarrito(producto.productoId, 1).subscribe({
-      next: () => this.snackBar.open('Agregado al carrito ✓', 'OK',
-          { duration: 2000, panelClass: ['snack-success'] }),
-      error: (e) => this.snackBar.open(mensajeError(e, 'Error al agregar'), 'Cerrar', { duration: 2000 })
+      next: () => {
+        this.ui.refrescarCarrito();
+        this.snackBar.open(`«${producto.nombre}» agregado al carrito`, 'Ver carrito',
+          { duration: 3000, panelClass: ['snack-success'] })
+          .onAction().subscribe(() => this.router.navigate(['/shop/carrito']));
+      },
+      error: (e) => this.snackBar.open(mensajeError(e, 'No se pudo agregar'), 'Cerrar', { duration: 2500 })
     });
   }
 
   toggleWishlist(producto: any, event: Event): void {
     event.stopPropagation();
     const id = Number(producto.productoId);
-    if (this.wishlistIds.has(id)) {
+    if (this.ui.estaEnWishlist(id)) {
       this.shopService.eliminarDeWishlist(id).subscribe({
         next: () => {
-          this.wishlistIds.delete(id);
-          this.snackBar.open('Eliminado de wishlist', 'OK', { duration: 1500 });
+          this.ui.marcarWishlist(id, false);
+          this.snackBar.open('Quitado de tu lista de deseos', 'OK', { duration: 1800 });
         },
         error: () => {}
       });
     } else {
       this.shopService.agregarAWishlist(id).subscribe({
         next: () => {
-          this.wishlistIds.add(id);
-          this.snackBar.open('Agregado a wishlist ❤️', 'OK', { duration: 1500 });
+          this.ui.marcarWishlist(id, true);
+          this.snackBar.open('Guardado en tu lista de deseos', 'OK', { duration: 1800 });
         },
         error: () => {}
       });
@@ -123,30 +115,24 @@ export class RecomendacionesComponent implements OnInit {
     this.router.navigate(['/shop']);
   }
 
-  isInWishlist(id: number): boolean {
-    return this.wishlistIds.has(Number(id));
+  paleta(p: any): PaletaCategoria {
+    return this.ui.paleta(p);
   }
 
-  getCategoryIcon(catId: number): string {
-    return CATEGORY_ICONS[catId] || 'inventory_2';
+  trackByProducto(_i: number, p: any): number { return p.productoId; }
+
+  // ── Rótulos, que dependen del ORIGEN de la lista ─────────────────────────
+  get titulo(): string {
+    return this.esPersonalizado ? 'Recomendado para ti' : 'Lo más vendido de la tienda';
   }
 
-  get pocosDatos(): boolean {
-    return this.totalEventos < 10;
-  }
-
-  // Títulos dinámicos según si es personalizado o no
-  get tituloHeader(): string {
-    return this.esPersonalizado ? 'Recomendado para ti' : 'Productos Destacados';
-  }
-
-  get subtituloHeader(): string {
+  get subtitulo(): string {
     return this.esPersonalizado
-      ? 'Basado en tu historial de navegación en RetailMind Shop'
-      : 'Selección del catálogo de RetailMind Shop';
+      ? 'Salido de los productos que has visitado en RetailMind'
+      : 'Selección del catálogo mientras tu historial toma forma';
   }
 
-  get iconoHeader(): string {
-    return this.esPersonalizado ? 'recommend' : 'trending_up';
+  get icono(): string {
+    return this.esPersonalizado ? 'recommend' : 'local_fire_department';
   }
 }

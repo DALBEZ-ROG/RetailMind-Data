@@ -1,108 +1,59 @@
-.wishlist-container { padding: 24px; max-width: 1100px; margin: 0 auto; }
+// ═════════════════════════════════════════════════════════════════════════════
+// LISTA DE DESEOS — misma tarjeta que el catálogo (shop-shared.scss).
+// Aquí solo vive la cabecera y la rejilla propia de la pantalla.
+// ═════════════════════════════════════════════════════════════════════════════
 
-.page-title {
-  display: flex; align-items: center; gap: 10px;
-  font-size: 1.5rem; font-weight: 800; color: #e91e63; margin-bottom: 24px;
-  mat-icon { font-size: 28px; width: 28px; height: 28px; }
-}
+:host { display: block; }
 
-.wishlist-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
-}
+.deseos-cabecera {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 18px 20px;
+  margin-bottom: 18px;
 
-.wishlist-card {
-  border-radius: 16px !important;
-  overflow: hidden;
-  box-shadow: var(--shadow-soft) !important;
-  transition: var(--transition);
-  background: white;
+  .dc-texto { flex: 1; min-width: 240px; }
 
-  &:hover {
-    transform: translateY(-6px);
-    box-shadow: var(--shadow-strong) !important;
-  }
-
-  .card-image {
-    height: 180px;
+  h1 {
     display: flex;
     align-items: center;
-    justify-content: center;
-    background: linear-gradient(135deg, #fce4ec, #f8bbd0);
-    cursor: pointer;
-    position: relative;
+    gap: 9px;
+    margin: 0 0 4px;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -.5px;
 
-    mat-icon {
-      font-size: 56px;
-      width: 56px;
-      height: 56px;
-      color: #e91e63;
-      opacity: 0.5;
-    }
+    mat-icon { color: #e0245e; font-size: 24px; width: 24px; height: 24px; }
   }
 
-  .card-body {
-    padding: 16px 18px;
-
-    .card-marca {
-      font-size: 10px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 1.5px;
-      color: #546e7a;
-      margin: 0 0 4px;
-    }
-
-    .card-nombre {
-      font-size: 15px;
-      font-weight: 700;
-      color: #1a237e;
-      margin: 0 0 8px;
-      line-height: 1.3;
-    }
-
-    .card-precio {
-      font-size: 20px;
-      font-weight: 800;
-      background: var(--primary-gradient);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      margin: 0 0 14px;
-    }
-
-    .card-actions {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-    }
+  p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--tienda-texto-2);
   }
+
+  .btn-agregar { flex: 0 0 auto; height: 42px; padding: 0 18px; }
 }
 
-// Legacy support
-.card-image {
-  height: 180px; display: flex; align-items: center; justify-content: center;
-  background: linear-gradient(135deg, #fce4ec, #f8bbd0);
-  cursor: pointer;
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(214px, 1fr));
+  gap: 16px;
 }
 
-.product-icon { font-size: 56px; width: 56px; height: 56px; color: #e91e63; opacity: 0.5; }
-.item-brand { font-size: 10px; font-weight: 700; color: #546e7a; text-transform: uppercase; letter-spacing: 1.5px; margin: 8px 0 4px; }
-.item-name { font-size: 15px; font-weight: 700; color: #1a237e; margin: 0 0 8px; line-height: 1.3; }
-.item-price { font-size: 20px; font-weight: 800; background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0; }
+.p-guardado {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--tienda-texto-3);
 
-mat-card-actions { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px !important; }
-.btn-remove { color: #e91e63 !important; }
-
-.empty-state {
-  text-align: center; padding: 80px 20px; color: var(--text-light);
-  > mat-icon { font-size: 64px; width: 64px; height: 64px; display: block; margin: 0 auto 16px; color: #f8bbd0; }
-  p { margin: 4px 0; }
-  .empty-hint { font-size: 0.9rem; }
+  mat-icon { font-size: 13px; width: 13px; height: 13px; }
 }
 
-::ng-deep .snack-success { --mdc-snackbar-container-color: #2e7d32; --mdc-snackbar-supporting-text-color: white; }
-
-@media (max-width: 900px) { .wishlist-grid { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 600px) { .wishlist-grid { grid-template-columns: 1fr; } }
+@media (max-width: 700px) {
+  .grid { grid-template-columns: repeat(auto-fill, minmax(158px, 1fr)); gap: 12px; }
+  .deseos-cabecera .btn-agregar { width: 100%; }
+}
