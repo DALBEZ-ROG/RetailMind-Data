@@ -614,6 +614,44 @@ async function casosDialogos(page) {
   await casosDialogos(page);
 
   // ── Cliente: tienda y perfil ───────────────────────────────────────────────
+  // ── El alta de cliente, que se ve SIN sesión ───────────────────────
+  // Va en una pestaña limpia y no en la del admin: `/registro` avisa a quien ya
+  // entró y esconde el formulario, así que barrerlo con sesión abierta mediría
+  // una pantalla vacía y daría verde por no haber mirado.
+  console.log('\n── Barrido: el alta de cliente (sin sesión)');
+  const pageR = await browser.newPage();
+  await pageR.setViewport({ width: 1500, height: 950 });
+  pageR.on('console', m => {
+    if (m.type() !== 'error') { return; }
+    const t = m.text();
+    if (!RUIDO.some(r => r.test(t))) { errores.push(t); }
+  });
+  pageR.on('pageerror', e => errores.push('pageerror: ' + e.message));
+
+  // El localStorage es POR ORIGEN y lo comparten todas las pestañas, así que
+  // esta hereda la sesión del admin y /registro le enseña el aviso de «ya hay
+  // una sesión abierta» en vez del formulario. Se suelta antes de mirar.
+  await irA(pageR, '/login');
+  await pageR.evaluate(() => localStorage.clear());
+  await irA(pageR, '/registro');
+  await barrer(pageR, 'Registro · datos personales');
+
+  // Al paso 2 se llega rellenando el nombre, que es lo único obligatorio.
+  await pageR.evaluate(() => {
+    const n = document.querySelector('input[placeholder="María"]');
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')
+      .set.call(n, 'Prueba');
+    n.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await pausa(400);
+  await pageR.evaluate(() => {
+    [...document.querySelectorAll('button')]
+      .find(e => /continuar/i.test(e.textContent))?.click();
+  });
+  await pausa(1200);
+  await barrer(pageR, 'Registro · correo y contraseña');
+  await pageR.close();
+
   console.log('\n── Barrido: la tienda y el perfil, con el rol CLIENTE');
   const pageC = await browser.newPage();
   await pageC.setViewport({ width: 1600, height: 1000 });
