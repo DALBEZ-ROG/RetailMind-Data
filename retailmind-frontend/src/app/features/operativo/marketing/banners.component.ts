@@ -24,6 +24,8 @@ import {
 } from './banner-dialog.component';
 import { vigenciaDe, FiltroVigencia } from './vigencia.util';
 
+import { CampoTextoDirective } from '../../../core/validacion';
+
 type FiltroEstado = 'todos' | 'activos' | 'eliminados';
 
 /**
@@ -35,7 +37,9 @@ type FiltroEstado = 'todos' | 'activos' | 'eliminados';
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule,
-    MatTooltipModule, MatDialogModule, AccionesRegistroComponent],
+    MatTooltipModule, MatDialogModule, AccionesRegistroComponent,
+    CampoTextoDirective
+  ],
   templateUrl: './banners.component.html',
   styleUrl: '../operativo-shared.scss'
 })

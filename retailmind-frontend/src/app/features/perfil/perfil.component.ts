@@ -18,6 +18,8 @@ import { ConfirmService } from '../../core/services/confirm.service';
 import { mensajeError } from '../../core/services/api-error.util';
 import { CodigoLegiblePipe } from '../../core/pipes/etiquetas.pipe';
 
+import { CampoTextoDirective } from '../../core/validacion';
+
 /**
  * Perfil sobre PostgreSQL. Para el CLIENTE: datos de la tabla cliente
  * (RLS: su fila), estadísticas reales de pedidos/wishlist y CRUD de
@@ -32,7 +34,9 @@ import { CodigoLegiblePipe } from '../../core/pipes/etiquetas.pipe';
     MatCardModule, MatButtonModule, MatIconModule,
     MatFormFieldModule, MatInputModule, MatSelectModule,
     MatChipsModule, MatCheckboxModule, MatProgressSpinnerModule,
-    MatSnackBarModule, MatTooltipModule, CodigoLegiblePipe],
+    MatSnackBarModule, MatTooltipModule, CodigoLegiblePipe,
+    CampoTextoDirective
+  ],
   templateUrl: './perfil.component.html',
   styleUrl: './perfil.component.scss'
 })

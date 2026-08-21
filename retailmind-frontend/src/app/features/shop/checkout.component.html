@@ -122,19 +122,19 @@
           <div class="form-grid">
             <mat-form-field appearance="outline">
               <mat-label>Destinatario *</mat-label>
-              <input matInput [(ngModel)]="nuevaDireccion.destinatario">
+              <input appTexto="nombre" matInput [(ngModel)]="nuevaDireccion.destinatario">
             </mat-form-field>
             <mat-form-field appearance="outline">
               <mat-label>Calle principal *</mat-label>
-              <input matInput [(ngModel)]="nuevaDireccion.callePrincipal">
+              <input appTexto="nombre" matInput [(ngModel)]="nuevaDireccion.callePrincipal">
             </mat-form-field>
             <mat-form-field appearance="outline">
               <mat-label>Calle secundaria</mat-label>
-              <input matInput [(ngModel)]="nuevaDireccion.calleSecundaria">
+              <input appTexto="nombre" matInput [(ngModel)]="nuevaDireccion.calleSecundaria">
             </mat-form-field>
             <mat-form-field appearance="outline">
               <mat-label>Número</mat-label>
-              <input matInput [(ngModel)]="nuevaDireccion.numero">
+              <input appTexto="numeroCasa" matInput [(ngModel)]="nuevaDireccion.numero">
             </mat-form-field>
             <mat-form-field appearance="outline">
               <mat-label>Ciudad *</mat-label>
@@ -144,15 +144,15 @@
             </mat-form-field>
             <mat-form-field appearance="outline">
               <mat-label>Teléfono</mat-label>
-              <input matInput [(ngModel)]="nuevaDireccion.telefono">
+              <input appTexto="telefono" matInput [(ngModel)]="nuevaDireccion.telefono">
             </mat-form-field>
             <mat-form-field appearance="outline">
               <mat-label>Referencia</mat-label>
-              <input matInput [(ngModel)]="nuevaDireccion.referencia">
+              <input appTexto="libre" matInput [(ngModel)]="nuevaDireccion.referencia">
             </mat-form-field>
             <mat-form-field appearance="outline">
               <mat-label>Alias (Casa, Oficina…)</mat-label>
-              <input matInput [(ngModel)]="nuevaDireccion.alias">
+              <input appTexto="nombre" matInput [(ngModel)]="nuevaDireccion.alias">
             </mat-form-field>
           </div>
           <div class="acciones-inline">
@@ -174,7 +174,7 @@
         </header>
 
         <div class="cupon-row" *ngIf="!cuponAplicado">
-          <input class="campo-tienda" [(ngModel)]="cupon" (keyup.enter)="aplicarCupon()"
+          <input appTexto="codigo" class="campo-tienda" [(ngModel)]="cupon" (keyup.enter)="aplicarCupon()"
                  placeholder="Escribe tu código (por ejemplo, BIENVENIDA10)"
                  aria-label="Código de cupón">
           <button class="btn-ghost" [disabled]="validandoCupon || !cupon.trim()" (click)="aplicarCupon()">
@@ -222,7 +222,7 @@
             </mat-form-field>
             <mat-form-field appearance="outline" class="span-2">
               <mat-label>Titular de la tarjeta *</mat-label>
-              <input matInput [(ngModel)]="tarjeta.titular" autocomplete="off">
+              <input appTexto="nombre" matInput [(ngModel)]="tarjeta.titular" autocomplete="off">
             </mat-form-field>
             <mat-form-field appearance="outline">
               <mat-label>Vencimiento (MM/AA) *</mat-label>
@@ -232,7 +232,7 @@
             </mat-form-field>
             <mat-form-field appearance="outline">
               <mat-label>CVV *</mat-label>
-              <input matInput [(ngModel)]="tarjeta.cvv" type="password" maxlength="4"
+              <input appTexto="digitos" matInput [(ngModel)]="tarjeta.cvv" type="password" maxlength="4"
                      inputmode="numeric" autocomplete="off">
               <mat-hint *ngIf="tarjeta.cvv && !cvvValido">3 o 4 dígitos</mat-hint>
             </mat-form-field>
@@ -248,7 +248,7 @@
         <div class="pago-form" *ngIf="metodoSeleccionado && !esTarjeta">
           <mat-form-field appearance="outline" style="width:100%;">
             <mat-label>Referencia de la transferencia (opcional)</mat-label>
-            <input matInput [(ngModel)]="referenciaTransferencia" placeholder="N.º de comprobante">
+            <input appTexto="referencia" matInput [(ngModel)]="referenciaTransferencia" placeholder="N.º de comprobante">
           </mat-form-field>
           <p class="pago-nota">
             <mat-icon>lock</mat-icon>

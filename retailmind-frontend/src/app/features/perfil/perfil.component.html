@@ -82,15 +82,15 @@
           <div class="form-grid">
             <mat-form-field appearance="outline">
               <mat-label>Nombre</mat-label>
-              <input matInput [(ngModel)]="datos.nombre" required>
+              <input appTexto="nombre" exigido matInput [(ngModel)]="datos.nombre" required>
             </mat-form-field>
             <mat-form-field appearance="outline">
               <mat-label>Apellido</mat-label>
-              <input matInput [(ngModel)]="datos.apellido">
+              <input appTexto="nombre" matInput [(ngModel)]="datos.apellido">
             </mat-form-field>
             <mat-form-field appearance="outline">
               <mat-label>Teléfono</mat-label>
-              <input matInput [(ngModel)]="datos.telefono">
+              <input appTexto="telefono" matInput [(ngModel)]="datos.telefono">
             </mat-form-field>
             <!-- Los valores son los EXACTOS que admite `cliente_genero_check`
                  en la base. Antes eran F/M/O, que ni se podían guardar (400 de
@@ -149,23 +149,23 @@
             <div class="form-grid">
               <mat-form-field appearance="outline">
                 <mat-label>Alias (ej. Casa, Oficina)</mat-label>
-                <input matInput [(ngModel)]="dir.alias">
+                <input appTexto="nombre" matInput [(ngModel)]="dir.alias">
               </mat-form-field>
               <mat-form-field appearance="outline">
                 <mat-label>Destinatario</mat-label>
-                <input matInput [(ngModel)]="dir.destinatario" required>
+                <input appTexto="nombre" exigido matInput [(ngModel)]="dir.destinatario" required>
               </mat-form-field>
               <mat-form-field appearance="outline">
                 <mat-label>Calle principal</mat-label>
-                <input matInput [(ngModel)]="dir.callePrincipal" required>
+                <input appTexto="nombre" exigido matInput [(ngModel)]="dir.callePrincipal" required>
               </mat-form-field>
               <mat-form-field appearance="outline">
                 <mat-label>Calle secundaria</mat-label>
-                <input matInput [(ngModel)]="dir.calleSecundaria">
+                <input appTexto="nombre" matInput [(ngModel)]="dir.calleSecundaria">
               </mat-form-field>
               <mat-form-field appearance="outline">
                 <mat-label>Número</mat-label>
-                <input matInput [(ngModel)]="dir.numero">
+                <input appTexto="numeroCasa" matInput [(ngModel)]="dir.numero">
               </mat-form-field>
               <mat-form-field appearance="outline">
                 <mat-label>Ciudad</mat-label>
@@ -175,11 +175,11 @@
               </mat-form-field>
               <mat-form-field appearance="outline">
                 <mat-label>Código postal</mat-label>
-                <input matInput [(ngModel)]="dir.codigoPostal">
+                <input appTexto="postal" matInput [(ngModel)]="dir.codigoPostal">
               </mat-form-field>
               <mat-form-field appearance="outline">
                 <mat-label>Teléfono de contacto</mat-label>
-                <input matInput [(ngModel)]="dir.telefono">
+                <input appTexto="telefono" matInput [(ngModel)]="dir.telefono">
               </mat-form-field>
               <mat-form-field appearance="outline">
                 <mat-label>Tipo</mat-label>
@@ -191,7 +191,7 @@
               </mat-form-field>
               <mat-form-field appearance="outline">
                 <mat-label>Referencia</mat-label>
-                <input matInput [(ngModel)]="dir.referencia">
+                <input appTexto="libre" matInput [(ngModel)]="dir.referencia">
               </mat-form-field>
             </div>
             <mat-checkbox [(ngModel)]="dir.esPredeterminada">Dirección predeterminada</mat-checkbox>

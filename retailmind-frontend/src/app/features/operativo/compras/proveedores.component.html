@@ -80,7 +80,7 @@
       <div class="form-grid">
         <mat-form-field appearance="outline" style="grid-column: 1 / -1;">
           <mat-label>Producto (variante)</mat-label>
-          <input matInput [(ngModel)]="productoBusqueda"
+          <input appTexto="libre" matInput [(ngModel)]="productoBusqueda"
                  (ngModelChange)="buscarProducto($event)"
                  [matAutocomplete]="autoProducto"
                  [disabled]="editandoId !== null"
@@ -96,19 +96,19 @@
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Costo (USD)</mat-label>
-          <input matInput type="number" min="0" step="0.01" [(ngModel)]="form.costo">
+          <input appNumero="dinero" matInput type="number" min="0" step="0.01" [(ngModel)]="form.costo">
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Plazo de entrega (días)</mat-label>
-          <input matInput type="number" min="0" [(ngModel)]="form.tiempoEntregaDias">
+          <input appNumero="entero" matInput type="number" min="0" [(ngModel)]="form.tiempoEntregaDias">
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Cantidad mínima</mat-label>
-          <input matInput type="number" min="1" [(ngModel)]="form.cantidadMinima">
+          <input appNumero="entero" matInput type="number" min="1" [(ngModel)]="form.cantidadMinima">
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Código del proveedor (opcional)</mat-label>
-          <input matInput [(ngModel)]="form.codigoProveedor" maxlength="50">
+          <input appTexto="codigo" matInput [(ngModel)]="form.codigoProveedor" maxlength="50">
         </mat-form-field>
         <mat-checkbox [(ngModel)]="form.esPreferido" style="align-self: center;">
           Proveedor preferido para este producto (solo uno por producto)

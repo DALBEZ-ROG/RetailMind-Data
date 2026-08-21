@@ -40,7 +40,7 @@
                              [(value)]="l.varianteId"></app-select-buscable>
         <mat-form-field appearance="outline">
           <mat-label>Cantidad</mat-label>
-          <input matInput type="number" min="1" [(ngModel)]="l.cantidad">
+          <input appNumero="entero" matInput type="number" min="1" [(ngModel)]="l.cantidad">
         </mat-form-field>
         <span class="stat-chip chip-info">{{ (l.cantidad || 0) * precioDe(l.varianteId) | currency:'USD' }}</span>
         <button mat-icon-button color="warn" (click)="quitarLinea(i)" [disabled]="lineas.length === 1"
@@ -77,7 +77,7 @@
     <div class="form-grid">
       <mat-form-field appearance="outline">
         <mat-label>Buscar (número de pedido o cliente)</mat-label>
-        <input matInput [(ngModel)]="q" (ngModelChange)="alBuscar()" placeholder="PED-… / nombre">
+        <input appTexto="libre" matInput [(ngModel)]="q" (ngModelChange)="alBuscar()" placeholder="PED-… / nombre">
         <mat-icon matSuffix>search</mat-icon>
         <mat-hint>Un pedido recién creado no sale en la primera página: búscalo por su número</mat-hint>
       </mat-form-field>
@@ -257,11 +257,11 @@
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Monto (vacío = saldo completo)</mat-label>
-          <input matInput type="number" min="0.01" [(ngModel)]="montoCobro">
+          <input appNumero="dinero" matInput type="number" min="0.01" [(ngModel)]="montoCobro">
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Referencia (transferencia, voucher…)</mat-label>
-          <input matInput [(ngModel)]="referenciaCobro">
+          <input appTexto="referencia" matInput [(ngModel)]="referenciaCobro">
         </mat-form-field>
       </div>
       <div class="form-actions">
@@ -356,7 +356,7 @@
     </div>
     <mat-form-field appearance="outline" style="width: 100%;">
       <mat-label>Agregar una nota u observación…</mat-label>
-      <textarea matInput rows="2" [(ngModel)]="nuevaNota"></textarea>
+      <textarea appTexto="libre" matInput rows="2" [(ngModel)]="nuevaNota"></textarea>
     </mat-form-field>
     <div class="form-actions">
       <mat-checkbox [(ngModel)]="notaVisibleCliente">Visible para el cliente</mat-checkbox>

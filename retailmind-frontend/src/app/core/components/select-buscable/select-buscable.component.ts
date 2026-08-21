@@ -7,6 +7,7 @@ import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatIconModule } from '@angular/material/icon';
 import { Observable, Subject, Subscription, debounceTime, distinctUntilChanged, switchMap } from 'rxjs';
 
+import { CampoTextoDirective } from '../../validacion';
 export interface OpcionBuscable { id: number; texto: string; }
 
 /**
@@ -32,11 +33,13 @@ export interface OpcionBuscable { id: number; texto: string; }
   selector: 'app-select-buscable',
   standalone: true,
   imports: [CommonModule, FormsModule, MatFormFieldModule, MatInputModule,
-    MatAutocompleteModule, MatIconModule],
+    MatAutocompleteModule, MatIconModule,
+    CampoTextoDirective
+  ],
   template: `
     <mat-form-field appearance="outline" class="sb-field">
       <mat-label>{{ label }}</mat-label>
-      <input matInput [matAutocomplete]="auto" [placeholder]="placeholder"
+      <input appTexto="libre" matInput [matAutocomplete]="auto" [placeholder]="placeholder"
              [disabled]="disabled" [ngModel]="entrada"
              (ngModelChange)="alEscribir($event)">
       <mat-icon matSuffix class="sb-icon">search</mat-icon>

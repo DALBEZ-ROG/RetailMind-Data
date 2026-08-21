@@ -12,6 +12,8 @@ import {
 } from '../../../core/components/modo-form/modo-form.component';
 import { CategoriaAdmin } from '../../../core/models/operativo.model';
 
+import { CampoTextoDirective } from '../../../core/validacion';
+
 export interface CategoriaDialogData {
   categoria?: CategoriaAdmin;
   /** Candidatas a padre (sin la propia categoría, para no crear un ciclo). */
@@ -29,7 +31,9 @@ export interface CategoriaDialogResultado {
   selector: 'app-categoria-dialog',
   standalone: true,
   imports: [CommonModule, FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule,
-    MatSelectModule, MatCheckboxModule, MatIconModule, ModoFormComponent],
+    MatSelectModule, MatCheckboxModule, MatIconModule, ModoFormComponent,
+    CampoTextoDirective
+  ],
   template: `
     <h2 mat-dialog-title>
       <mat-icon>category</mat-icon>
@@ -41,12 +45,12 @@ export interface CategoriaDialogResultado {
       <div class="grid">
         <mat-form-field appearance="outline">
           <mat-label>Nombre</mat-label>
-          <input matInput [(ngModel)]="form.nombre" (blur)="autoSlug()"
+          <input appTexto="nombre" exigido matInput [(ngModel)]="form.nombre" (blur)="autoSlug()"
                  [disabled]="soloLectura" required>
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Slug</mat-label>
-          <input matInput [(ngModel)]="form.slug" [disabled]="soloLectura" required>
+          <input appTexto="slug" exigido matInput [(ngModel)]="form.slug" [disabled]="soloLectura" required>
         </mat-form-field>
         <!-- El padre solo se fija al crear: el endpoint de edición no lo cambia.
              Fuera del alta se muestra deshabilitado para poder CONSULTARLO. -->
@@ -60,7 +64,7 @@ export interface CategoriaDialogResultado {
         </mat-form-field>
         <mat-form-field appearance="outline" class="ancho">
           <mat-label>Descripción</mat-label>
-          <input matInput [(ngModel)]="form.descripcion" [disabled]="soloLectura">
+          <input appTexto="libre" matInput [(ngModel)]="form.descripcion" [disabled]="soloLectura">
         </mat-form-field>
       </div>
 

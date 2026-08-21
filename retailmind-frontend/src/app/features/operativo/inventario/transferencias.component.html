@@ -25,11 +25,11 @@
       </mat-form-field>
       <mat-form-field appearance="outline">
         <mat-label>Cantidad</mat-label>
-        <input matInput type="number" min="1" [(ngModel)]="cantidad">
+        <input appNumero="entero" matInput type="number" min="1" [(ngModel)]="cantidad">
       </mat-form-field>
       <mat-form-field appearance="outline">
         <mat-label>Observación</mat-label>
-        <input matInput [(ngModel)]="observacion">
+        <input appTexto="libre" matInput [(ngModel)]="observacion">
       </mat-form-field>
     </div>
     <div class="form-actions">

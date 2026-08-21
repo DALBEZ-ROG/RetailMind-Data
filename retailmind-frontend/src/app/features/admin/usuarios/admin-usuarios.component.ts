@@ -24,6 +24,8 @@ import {
   UsuarioDialogComponent, UsuarioDialogData, UsuarioDialogResultado
 } from './usuario-dialog.component';
 
+import { CampoTextoDirective } from '../../../core/validacion';
+
 type FiltroEstado = 'todos' | 'activos' | 'eliminados';
 
 /** Correo del administrador semilla (DataInitializer.ADMIN_EMAIL). */
@@ -44,7 +46,9 @@ const ADMIN_SEMILLA = 'admin@retailmind.com';
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatPaginatorModule,
-    MatSnackBarModule, MatTooltipModule, MatDialogModule, AccionesRegistroComponent],
+    MatSnackBarModule, MatTooltipModule, MatDialogModule, AccionesRegistroComponent,
+    CampoTextoDirective
+  ],
   templateUrl: './admin-usuarios.component.html',
   styleUrl: '../../operativo/operativo-shared.scss'
 })

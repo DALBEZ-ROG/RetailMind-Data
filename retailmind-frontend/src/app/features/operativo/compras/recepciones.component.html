@@ -18,7 +18,7 @@
       </mat-form-field>
       <mat-form-field appearance="outline">
         <mat-label>Observación</mat-label>
-        <input matInput [(ngModel)]="observacion">
+        <input appTexto="libre" matInput [(ngModel)]="observacion">
       </mat-form-field>
     </div>
   </div>
@@ -47,7 +47,7 @@
           <th mat-header-cell *matHeaderCellDef>Recibir ahora</th>
           <td mat-cell *matCellDef="let l">
             <mat-form-field appearance="outline" class="celda-input" subscriptSizing="dynamic">
-              <input matInput type="number" min="0" [(ngModel)]="l.aRecibir">
+              <input appNumero="entero" matInput type="number" min="0" [(ngModel)]="l.aRecibir">
             </mat-form-field>
           </td>
         </ng-container>
@@ -57,7 +57,7 @@
           <th mat-header-cell *matHeaderCellDef>Defectuosa (rechazo)</th>
           <td mat-cell *matCellDef="let l">
             <mat-form-field appearance="outline" class="celda-input" subscriptSizing="dynamic">
-              <input matInput type="number" min="0" [(ngModel)]="l.rechazada">
+              <input appNumero="entero" matInput type="number" min="0" [(ngModel)]="l.rechazada">
             </mat-form-field>
           </td>
         </ng-container>
@@ -65,7 +65,7 @@
           <th mat-header-cell *matHeaderCellDef>Motivo del rechazo</th>
           <td mat-cell *matCellDef="let l">
             <mat-form-field appearance="outline" subscriptSizing="dynamic" style="width:180px;">
-              <input matInput [(ngModel)]="l.motivoRechazo" placeholder="Ej. caja dañada"
+              <input appTexto="libre" matInput [(ngModel)]="l.motivoRechazo" placeholder="Ej. caja dañada"
                      [disabled]="!l.rechazada">
             </mat-form-field>
           </td>

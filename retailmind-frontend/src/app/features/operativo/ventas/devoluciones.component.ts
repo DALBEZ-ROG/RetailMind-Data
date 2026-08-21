@@ -21,6 +21,8 @@ import {
 } from '../../../core/models/operativo.model';
 import { CodigoLegiblePipe } from '../../../core/pipes/etiquetas.pipe';
 
+import { CampoTextoDirective } from '../../../core/validacion';
+
 /**
  * Tablero RMA / logística inversa. Una sola pantalla para todo el pipeline;
  * cada rol ve SOLO sus acciones (el backend + la BD son la fuente de verdad):
@@ -35,7 +37,9 @@ import { CodigoLegiblePipe } from '../../../core/pipes/etiquetas.pipe';
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule, MatTooltipModule,
-    MatPaginatorModule, CodigoLegiblePipe],
+    MatPaginatorModule, CodigoLegiblePipe,
+    CampoTextoDirective
+  ],
   templateUrl: './devoluciones.component.html',
   styleUrl: '../operativo-shared.scss'
 })

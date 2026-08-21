@@ -15,6 +15,8 @@ import { PaginaServidor } from '../../../core/services/pagina-servidor.util';
 import { mensajeError } from '../../../core/services/api-error.util';
 import { PreparacionRow, DetalleLogistico } from '../../../core/models/operativo.model';
 
+import { CampoTextoDirective } from '../../../core/validacion';
+
 /**
  * Preparación de pedidos (picking/empaque) — pantalla de BODEGA (script 39).
  * Cola: pedidos FACTURADOS (por tomar) y EN PREPARACIÓN (picking en curso).
@@ -27,7 +29,9 @@ import { PreparacionRow, DetalleLogistico } from '../../../core/models/operativo
   selector: 'app-preparacion-pedidos',
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
-    MatPaginatorModule, MatSnackBarModule, MatFormFieldModule, MatInputModule],
+    MatPaginatorModule, MatSnackBarModule, MatFormFieldModule, MatInputModule,
+    CampoTextoDirective
+  ],
   templateUrl: './preparacion-pedidos.component.html',
   styleUrl: '../operativo-shared.scss'
 })

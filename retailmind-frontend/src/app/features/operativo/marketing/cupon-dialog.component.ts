@@ -12,6 +12,8 @@ import {
 } from '../../../core/components/modo-form/modo-form.component';
 import { CuponRow } from '../../../core/models/operativo.model';
 
+import { CampoNumeroDirective, CampoTextoDirective } from '../../../core/validacion';
+
 export interface CuponDialogData {
   cupon?: CuponRow;
   modo: ModoFormulario;
@@ -30,7 +32,9 @@ export interface CuponDialogResultado {
   selector: 'app-cupon-dialog',
   standalone: true,
   imports: [CommonModule, FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule,
-    MatSelectModule, MatCheckboxModule, MatIconModule, ModoFormComponent],
+    MatSelectModule, MatCheckboxModule, MatIconModule, ModoFormComponent,
+    CampoNumeroDirective, CampoTextoDirective
+  ],
   template: `
     <h2 mat-dialog-title>
       <mat-icon>confirmation_number</mat-icon>
@@ -42,7 +46,7 @@ export interface CuponDialogResultado {
       <div class="grid">
         <mat-form-field appearance="outline">
           <mat-label>Código</mat-label>
-          <input matInput [(ngModel)]="form.codigo" maxlength="50"
+          <input appTexto="codigo" exigido matInput [(ngModel)]="form.codigo" maxlength="50"
                  style="text-transform: uppercase;" [disabled]="soloLectura" required>
         </mat-form-field>
         <mat-form-field appearance="outline">
@@ -53,21 +57,21 @@ export interface CuponDialogResultado {
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Valor {{ form.tipoDescuento === 'porcentaje' ? '(%)' : '(USD)' }}</mat-label>
-          <input matInput type="number" min="0" [(ngModel)]="form.valor" [disabled]="soloLectura">
+          <input appNumero="dinero" matInput type="number" min="0" [(ngModel)]="form.valor" [disabled]="soloLectura">
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Monto mínimo del pedido</mat-label>
-          <input matInput type="number" min="0" [(ngModel)]="form.montoMinimoPedido"
+          <input appNumero="dinero" matInput type="number" min="0" [(ngModel)]="form.montoMinimoPedido"
                  [disabled]="soloLectura">
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Usos máximos (vacío = ilimitado)</mat-label>
-          <input matInput type="number" min="1" [(ngModel)]="form.usosMaximos"
+          <input appNumero="entero" matInput type="number" min="1" [(ngModel)]="form.usosMaximos"
                  [disabled]="soloLectura">
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Usos por cliente</mat-label>
-          <input matInput type="number" min="1" [(ngModel)]="form.usosPorCliente"
+          <input appNumero="entero" matInput type="number" min="1" [(ngModel)]="form.usosPorCliente"
                  [disabled]="soloLectura">
         </mat-form-field>
         <mat-form-field appearance="outline">
@@ -81,7 +85,7 @@ export interface CuponDialogResultado {
         </mat-form-field>
         <mat-form-field appearance="outline" class="ancho">
           <mat-label>Descripción</mat-label>
-          <input matInput [(ngModel)]="form.descripcion" [disabled]="soloLectura">
+          <input appTexto="libre" matInput [(ngModel)]="form.descripcion" [disabled]="soloLectura">
         </mat-form-field>
       </div>
 

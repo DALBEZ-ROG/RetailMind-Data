@@ -14,6 +14,8 @@ import { ShopUiService } from './shop-ui.service';
 import { paletaCategoria, PaletaCategoria } from './catalogo-visual';
 import { mensajeError } from '../../core/services/api-error.util';
 
+import { CampoNumeroDirective, CampoTextoDirective } from '../../core/validacion';
+
 /** Un tramo de precio de los accesos rápidos del panel de filtros. */
 interface TramoPrecio {
   etiqueta: string;
@@ -44,7 +46,8 @@ interface TramoPrecio {
   standalone: true,
   imports: [
     CommonModule, FormsModule, RouterLink, MatButtonModule, MatIconModule,
-    MatPaginatorModule, MatSnackBarModule, MatTooltipModule
+    MatPaginatorModule, MatSnackBarModule, MatTooltipModule,
+    CampoNumeroDirective, CampoTextoDirective
   ],
   templateUrl: './shop.component.html',
   styleUrls: ['./shop-shared.scss', './shop.component.scss']

@@ -10,6 +10,8 @@ import {
   ModoFormComponent, ModoFormulario
 } from '../../../core/components/modo-form/modo-form.component';
 
+import { CampoTextoDirective } from '../../../core/validacion';
+
 export interface RolDialogData {
   modo: ModoFormulario;
   /** Los 9 códigos del sistema, para elegir a cuál imita en las rutas. */
@@ -35,7 +37,9 @@ export interface RolDialogResultado {
   selector: 'app-rol-dialog',
   standalone: true,
   imports: [CommonModule, FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule,
-    MatSelectModule, MatIconModule, ModoFormComponent],
+    MatSelectModule, MatIconModule, ModoFormComponent,
+    CampoTextoDirective
+  ],
   template: `
     <h2 mat-dialog-title>
       <mat-icon>badge</mat-icon>
@@ -64,7 +68,7 @@ export interface RolDialogResultado {
 
       <mat-form-field appearance="outline">
         <mat-label>Nombre</mat-label>
-        <input matInput [(ngModel)]="nombre" placeholder="Rol de prueba" maxlength="100">
+        <input appTexto="nombre" matInput [(ngModel)]="nombre" placeholder="Rol de prueba" maxlength="100">
       </mat-form-field>
 
       <mat-form-field appearance="outline">

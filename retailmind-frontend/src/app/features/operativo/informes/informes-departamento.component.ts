@@ -27,6 +27,8 @@ import { definicionDepartamento } from './definiciones/catalogo-informes';
 import { ActualizacionAlmacenComponent } from './actualizacion-almacen.component';
 import { PrevisionGraficoComponent, PuntoPrevision } from './prevision-grafico.component';
 
+import { CampoNumeroDirective, CampoTextoDirective } from '../../../core/validacion';
+
 /**
  * PANTALLA GENÉRICA de informes tácticos — sirve a los seis departamentos.
  *
@@ -50,7 +52,9 @@ import { PrevisionGraficoComponent, PuntoPrevision } from './prevision-grafico.c
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule,
     MatTooltipModule, MatPaginatorModule, MatProgressBarModule,
-    ActualizacionAlmacenComponent, PrevisionGraficoComponent],
+    ActualizacionAlmacenComponent, PrevisionGraficoComponent,
+    CampoNumeroDirective, CampoTextoDirective
+  ],
   templateUrl: './informes-departamento.component.html',
   // `informes-piloto.scss` va SOLO aquí. `informes.scss` lo comparte
   // `tablero.component.ts`, así que las reglas del piloto puestas allí

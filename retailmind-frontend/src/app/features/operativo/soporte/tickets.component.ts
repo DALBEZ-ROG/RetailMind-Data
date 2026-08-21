@@ -26,6 +26,8 @@ import {
 import { SelectBuscableComponent } from '../../../core/components/select-buscable/select-buscable.component';
 import { CodigoLegiblePipe } from '../../../core/pipes/etiquetas.pipe';
 
+import { CampoTextoDirective } from '../../../core/validacion';
+
 /** Espeja las transiciones del backend (SoporteService.TRANSICIONES). */
 const TRANSICIONES: Record<string, string[]> = {
   abierto: ['en_proceso', 'cerrado'],
@@ -49,7 +51,9 @@ const TRANSICIONES: Record<string, string[]> = {
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatAutocompleteModule,
     MatCheckboxModule, MatSnackBarModule, MatTooltipModule, MatButtonToggleModule,
-    MatPaginatorModule, SelectBuscableComponent, CodigoLegiblePipe],
+    MatPaginatorModule, SelectBuscableComponent, CodigoLegiblePipe,
+    CampoTextoDirective
+  ],
   templateUrl: './tickets.component.html',
   styleUrl: '../operativo-shared.scss'
 })

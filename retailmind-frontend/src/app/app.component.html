@@ -58,7 +58,7 @@
         <option [ngValue]="null">Todo</option>
         <option *ngFor="let c of categoriasTienda" [ngValue]="c.categoriaId">{{ c.nombre }}</option>
       </select>
-      <input class="tb-campo" type="search" [(ngModel)]="busquedaTienda"
+      <input appTexto="libre" class="tb-campo" type="search" [(ngModel)]="busquedaTienda"
              (keyup.enter)="buscarEnTienda()"
              placeholder="Buscar productos, marcas o SKU"
              aria-label="Buscar en la tienda">

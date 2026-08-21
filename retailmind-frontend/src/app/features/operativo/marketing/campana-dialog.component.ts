@@ -11,6 +11,8 @@ import {
 } from '../../../core/components/modo-form/modo-form.component';
 import { CampanaRow } from '../../../core/models/operativo.model';
 
+import { CampoNumeroDirective, CampoTextoDirective } from '../../../core/validacion';
+
 export interface CampanaDialogData {
   campana?: CampanaRow;
   modo: ModoFormulario;
@@ -32,7 +34,9 @@ export interface CampanaDialogResultado {
   selector: 'app-campana-dialog',
   standalone: true,
   imports: [CommonModule, FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule,
-    MatSelectModule, MatIconModule, ModoFormComponent],
+    MatSelectModule, MatIconModule, ModoFormComponent,
+    CampoNumeroDirective, CampoTextoDirective
+  ],
   template: `
     <h2 mat-dialog-title>
       <mat-icon>campaign</mat-icon>
@@ -44,7 +48,7 @@ export interface CampanaDialogResultado {
       <div class="grid">
         <mat-form-field appearance="outline" class="ancho">
           <mat-label>Nombre</mat-label>
-          <input matInput [(ngModel)]="form.nombre" [disabled]="soloLectura" required>
+          <input appTexto="nombre" exigido matInput [(ngModel)]="form.nombre" [disabled]="soloLectura" required>
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Canal</mat-label>
@@ -54,7 +58,7 @@ export interface CampanaDialogResultado {
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Presupuesto (USD)</mat-label>
-          <input matInput type="number" min="0" [(ngModel)]="form.presupuesto"
+          <input appNumero="dinero" matInput type="number" min="0" [(ngModel)]="form.presupuesto"
                  [disabled]="soloLectura">
         </mat-form-field>
         <mat-form-field appearance="outline">
@@ -79,7 +83,7 @@ export interface CampanaDialogResultado {
 
         <mat-form-field appearance="outline" class="ancho">
           <mat-label>Descripción</mat-label>
-          <input matInput [(ngModel)]="form.descripcion" [disabled]="soloLectura">
+          <input appTexto="libre" matInput [(ngModel)]="form.descripcion" [disabled]="soloLectura">
         </mat-form-field>
       </div>
 

@@ -105,7 +105,7 @@
       <div class="form-grid">
         <mat-form-field appearance="outline">
           <mat-label>Monto a pagar</mat-label>
-          <input matInput type="number" min="0.01" [max]="cuentaPago.saldo_pendiente" [(ngModel)]="montoPago">
+          <input appNumero="dinero" matInput type="number" min="0.01" [max]="cuentaPago.saldo_pendiente" [(ngModel)]="montoPago">
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Método de pago</mat-label>
@@ -115,7 +115,7 @@
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Referencia (transferencia, cheque…)</mat-label>
-          <input matInput [(ngModel)]="referenciaPago">
+          <input appTexto="referencia" matInput [(ngModel)]="referenciaPago">
         </mat-form-field>
       </div>
       <div class="form-actions">

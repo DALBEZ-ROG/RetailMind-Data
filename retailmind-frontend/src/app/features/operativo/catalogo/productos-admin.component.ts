@@ -28,6 +28,8 @@ import {
   VarianteDialogComponent, VarianteDialogData, VarianteDialogResultado
 } from './variante-dialog.component';
 
+import { CampoTextoDirective } from '../../../core/validacion';
+
 /**
  * Catálogo maestro — MÓDULO DE REFERENCIA del patrón de interfaz
  * (docs/PATRON_UI.md). Cumple las cinco reglas:
@@ -49,7 +51,9 @@ import {
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule,
-    MatTooltipModule, MatPaginatorModule, MatDialogModule, AccionesRegistroComponent],
+    MatTooltipModule, MatPaginatorModule, MatDialogModule, AccionesRegistroComponent,
+    CampoTextoDirective
+  ],
   templateUrl: './productos-admin.component.html',
   styleUrl: '../operativo-shared.scss'
 })

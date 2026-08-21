@@ -25,6 +25,8 @@ import {
 } from '../../../core/models/operativo.model';
 import { CodigoLegiblePipe } from '../../../core/pipes/etiquetas.pipe';
 
+import { CampoNumeroDirective, CampoTextoDirective } from '../../../core/validacion';
+
 interface LineaPedido { varianteId: number | null; cantidad: number; }
 
 @Component({
@@ -32,7 +34,9 @@ interface LineaPedido { varianteId: number | null; cantidad: number; }
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatCheckboxModule,
-    MatSnackBarModule, MatTooltipModule, MatPaginatorModule, SelectBuscableComponent, CodigoLegiblePipe],
+    MatSnackBarModule, MatTooltipModule, MatPaginatorModule, SelectBuscableComponent, CodigoLegiblePipe,
+    CampoNumeroDirective, CampoTextoDirective
+  ],
   templateUrl: './pedidos-venta.component.html',
   styleUrl: '../operativo-shared.scss'
 })

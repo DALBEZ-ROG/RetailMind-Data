@@ -11,6 +11,8 @@ import {
 } from '../../../core/components/modo-form/modo-form.component';
 import { MarcaAdmin } from '../../../core/models/operativo.model';
 
+import { CampoTextoDirective } from '../../../core/validacion';
+
 export interface MarcaDialogData {
   /** Presente en 'actualizar' y 'consulta': todos los campos llegan precargados. */
   marca?: MarcaAdmin;
@@ -27,7 +29,9 @@ export interface MarcaDialogResultado {
   selector: 'app-marca-dialog',
   standalone: true,
   imports: [CommonModule, FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule,
-    MatCheckboxModule, MatIconModule, ModoFormComponent],
+    MatCheckboxModule, MatIconModule, ModoFormComponent,
+    CampoTextoDirective
+  ],
   template: `
     <h2 mat-dialog-title>
       <mat-icon>sell</mat-icon>
@@ -39,16 +43,16 @@ export interface MarcaDialogResultado {
       <div class="grid">
         <mat-form-field appearance="outline">
           <mat-label>Nombre</mat-label>
-          <input matInput [(ngModel)]="form.nombre" (blur)="autoSlug()"
+          <input appTexto="nombre" exigido matInput [(ngModel)]="form.nombre" (blur)="autoSlug()"
                  [disabled]="soloLectura" required>
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Slug</mat-label>
-          <input matInput [(ngModel)]="form.slug" [disabled]="soloLectura" required>
+          <input appTexto="slug" exigido matInput [(ngModel)]="form.slug" [disabled]="soloLectura" required>
         </mat-form-field>
         <mat-form-field appearance="outline" class="ancho">
           <mat-label>Descripción</mat-label>
-          <input matInput [(ngModel)]="form.descripcion" [disabled]="soloLectura">
+          <input appTexto="libre" matInput [(ngModel)]="form.descripcion" [disabled]="soloLectura">
         </mat-form-field>
       </div>
 

@@ -49,7 +49,7 @@
              el catálogo tiene miles de variantes y no se carga completo -->
         <mat-form-field appearance="outline">
           <mat-label>Producto relacionado (opcional)</mat-label>
-          <input matInput [(ngModel)]="productoBusqueda"
+          <input appTexto="libre" matInput [(ngModel)]="productoBusqueda"
                  (ngModelChange)="buscarProducto($event)"
                  [matAutocomplete]="autoProducto"
                  placeholder="Busca por nombre o SKU…">
@@ -67,11 +67,11 @@
         </mat-form-field>
         <mat-form-field appearance="outline" style="grid-column: 1 / -1;">
           <mat-label>Asunto</mat-label>
-          <input matInput [(ngModel)]="form.asunto" maxlength="200">
+          <input appTexto="libre" matInput [(ngModel)]="form.asunto" maxlength="200">
         </mat-form-field>
         <mat-form-field appearance="outline" style="grid-column: 1 / -1;">
           <mat-label>Descripción del problema</mat-label>
-          <textarea matInput rows="3" [(ngModel)]="form.descripcion"></textarea>
+          <textarea appTexto="libre" matInput rows="3" [(ngModel)]="form.descripcion"></textarea>
         </mat-form-field>
       </div>
       <div class="form-actions">
@@ -329,7 +329,7 @@
       </p>
       <mat-form-field appearance="outline" style="width: 100%;">
         <mat-label>Escribe una respuesta…</mat-label>
-        <textarea matInput rows="3" [(ngModel)]="nuevoMensaje"></textarea>
+        <textarea appTexto="libre" matInput rows="3" [(ngModel)]="nuevoMensaje"></textarea>
       </mat-form-field>
       <div class="form-actions">
         <mat-checkbox *ngIf="!esCliente" [(ngModel)]="esInterno">

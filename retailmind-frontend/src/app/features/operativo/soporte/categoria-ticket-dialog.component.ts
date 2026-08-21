@@ -12,6 +12,8 @@ import {
 } from '../../../core/components/modo-form/modo-form.component';
 import { CategoriaTicketRow } from '../../../core/models/operativo.model';
 
+import { CampoTextoDirective } from '../../../core/validacion';
+
 export interface CategoriaTicketDialogData {
   categoria?: CategoriaTicketRow;
   modo: ModoFormulario;
@@ -26,7 +28,9 @@ export interface CategoriaTicketDialogResultado {
   selector: 'app-categoria-ticket-dialog',
   standalone: true,
   imports: [CommonModule, FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule,
-    MatSelectModule, MatCheckboxModule, MatIconModule, ModoFormComponent],
+    MatSelectModule, MatCheckboxModule, MatIconModule, ModoFormComponent,
+    CampoTextoDirective
+  ],
   template: `
     <h2 mat-dialog-title>
       <mat-icon>category</mat-icon>
@@ -38,7 +42,7 @@ export interface CategoriaTicketDialogResultado {
       <div class="grid">
         <mat-form-field appearance="outline">
           <mat-label>Nombre</mat-label>
-          <input matInput [(ngModel)]="form.nombre" [disabled]="soloLectura" required>
+          <input appTexto="nombre" exigido matInput [(ngModel)]="form.nombre" [disabled]="soloLectura" required>
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Prioridad por defecto</mat-label>
@@ -49,7 +53,7 @@ export interface CategoriaTicketDialogResultado {
         </mat-form-field>
         <mat-form-field appearance="outline" class="ancho">
           <mat-label>Descripción</mat-label>
-          <input matInput [(ngModel)]="form.descripcion" [disabled]="soloLectura">
+          <input appTexto="libre" matInput [(ngModel)]="form.descripcion" [disabled]="soloLectura">
         </mat-form-field>
       </div>
 

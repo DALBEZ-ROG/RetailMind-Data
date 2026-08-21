@@ -10,7 +10,7 @@
     <div class="form-grid">
       <mat-form-field appearance="outline" style="grid-column: span 2;">
         <mat-label>Buscar</mat-label>
-        <input matInput [(ngModel)]="busqueda" (ngModelChange)="alEscribirBusqueda($event)"
+        <input appTexto="libre" matInput [(ngModel)]="busqueda" (ngModelChange)="alEscribirBusqueda($event)"
                placeholder="Nombre, slug, SKU o marca…">
         <mat-icon matSuffix>search</mat-icon>
       </mat-form-field>

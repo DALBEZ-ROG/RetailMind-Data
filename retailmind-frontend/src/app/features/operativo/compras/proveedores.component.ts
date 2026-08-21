@@ -20,6 +20,8 @@ import {
   ProveedorFichaRow, ProductoProveedorRow, ProductoCompraRef
 } from '../../../core/models/operativo.model';
 
+import { CampoNumeroDirective, CampoTextoDirective } from '../../../core/validacion';
+
 /**
  * Ficha del proveedor + sección "Productos que ofrece" (OTD-COM-10, script 51):
  * costo pactado, plazo de entrega, cantidad mínima y proveedor preferido por
@@ -33,7 +35,9 @@ import {
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatAutocompleteModule, MatCheckboxModule,
-    MatSnackBarModule, MatTooltipModule, MatPaginatorModule],
+    MatSnackBarModule, MatTooltipModule, MatPaginatorModule,
+    CampoNumeroDirective, CampoTextoDirective
+  ],
   templateUrl: './proveedores.component.html',
   styleUrl: '../operativo-shared.scss'
 })

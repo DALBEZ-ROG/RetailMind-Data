@@ -17,13 +17,17 @@ import {
   BodegaRef, VarianteRef, StockRow, AjusteRow, AjusteResultado
 } from '../../../core/models/operativo.model';
 
+import { CampoNumeroDirective, CampoTextoDirective } from '../../../core/validacion';
+
 /** CU-O-16: ajuste manual de stock por conteo físico o merma (BODEGA/ADMIN). */
 @Component({
   selector: 'app-ajustes',
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule, MatTooltipModule,
-    SelectBuscableComponent],
+    SelectBuscableComponent,
+    CampoNumeroDirective, CampoTextoDirective
+  ],
   templateUrl: './ajustes.component.html',
   styleUrl: '../operativo-shared.scss'
 })

@@ -22,6 +22,8 @@ import {
   SuscriptorDialogComponent, SuscriptorDialogData, SuscriptorDialogResultado
 } from './suscriptor-dialog.component';
 
+import { CampoTextoDirective } from '../../../core/validacion';
+
 type FiltroEstado = 'todos' | 'activos' | 'eliminados';
 type FiltroConfirmado = 'todos' | 'si' | 'no';
 
@@ -38,7 +40,9 @@ type FiltroConfirmado = 'todos' | 'si' | 'no';
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule,
-    MatTooltipModule, MatDialogModule, AccionesRegistroComponent],
+    MatTooltipModule, MatDialogModule, AccionesRegistroComponent,
+    CampoTextoDirective
+  ],
   templateUrl: './newsletter.component.html',
   styleUrl: '../operativo-shared.scss'
 })

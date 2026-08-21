@@ -8,7 +8,7 @@
       <div class="filtros-container" style="background:white">
         <div class="search-bar-container" style="width:100%">
           <mat-icon class="search-icon">search</mat-icon>
-          <input class="search-input" placeholder="Buscar por User ID..."
+          <input appTexto="alfanumerico" class="search-input" placeholder="Buscar por User ID..."
                  [ngModel]="searchTerm" (ngModelChange)="onSearchChange($event)">
         </div>
         <button class="btn-limpiar" *ngIf="searchTerm" (click)="clearFilters()">

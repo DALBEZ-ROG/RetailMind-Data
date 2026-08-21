@@ -16,12 +16,16 @@ import {
   BodegaRef, VarianteRef, StockRow, TransferenciaRow
 } from '../../../core/models/operativo.model';
 
+import { CampoNumeroDirective, CampoTextoDirective } from '../../../core/validacion';
+
 @Component({
   selector: 'app-transferencias',
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule,
-    SelectBuscableComponent],
+    SelectBuscableComponent,
+    CampoNumeroDirective, CampoTextoDirective
+  ],
   templateUrl: './transferencias.component.html',
   styleUrl: '../operativo-shared.scss'
 })

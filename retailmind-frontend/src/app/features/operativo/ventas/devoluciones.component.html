@@ -142,7 +142,7 @@
                   </mat-select>
                 </mat-form-field>
                 <mat-form-field appearance="outline" subscriptSizing="dynamic" style="width:170px; margin-left:6px;">
-                  <input matInput placeholder="Nota" [(ngModel)]="inspeccion[it.id].nota">
+                  <input appTexto="libre" matInput placeholder="Nota" [(ngModel)]="inspeccion[it.id].nota">
                 </mat-form-field>
               </ng-container>
               <ng-template #pendiente><span class="stat-chip">pendiente</span></ng-template>
@@ -174,7 +174,7 @@
         </button>
         <mat-form-field appearance="outline" subscriptSizing="dynamic" style="width:240px;">
           <mat-label>Motivo del rechazo</mat-label>
-          <input matInput [(ngModel)]="motivoRechazo">
+          <input appTexto="libre" matInput [(ngModel)]="motivoRechazo">
         </mat-form-field>
         <button class="btn-limpiar" (click)="rechazar()" [disabled]="procesando">
           <mat-icon>cancel</mat-icon> Rechazar
@@ -184,7 +184,7 @@
       <ng-container *ngIf="esDespacho && detalle.estado === 'aprobada'">
         <mat-form-field appearance="outline" subscriptSizing="dynamic" style="width:240px;">
           <mat-label>Observación</mat-label>
-          <input matInput [(ngModel)]="observacion">
+          <input appTexto="libre" matInput [(ngModel)]="observacion">
         </mat-form-field>
         <button class="btn-aplicar" (click)="transito()" [disabled]="procesando">
           <mat-icon>local_shipping</mat-icon> Marcar en tránsito (Despacho)
@@ -194,7 +194,7 @@
       <ng-container *ngIf="(esDespacho || esBodega) && detalle.estado === 'en_transito'">
         <mat-form-field appearance="outline" subscriptSizing="dynamic" style="width:240px;">
           <mat-label>Observación</mat-label>
-          <input matInput [(ngModel)]="observacion">
+          <input appTexto="libre" matInput [(ngModel)]="observacion">
         </mat-form-field>
         <button class="btn-aplicar" (click)="recepcion()" [disabled]="procesando">
           <mat-icon>move_to_inbox</mat-icon> Confirmar recepción en almacén
@@ -215,7 +215,7 @@
         </mat-form-field>
         <mat-form-field appearance="outline" subscriptSizing="dynamic" style="width:180px;">
           <mat-label>Referencia</mat-label>
-          <input matInput [(ngModel)]="referenciaReembolso">
+          <input appTexto="referencia" matInput [(ngModel)]="referenciaReembolso">
         </mat-form-field>
         <button class="btn-aplicar" (click)="reembolsar()" [disabled]="procesando">
           <mat-icon>payments</mat-icon> Reembolsar {{ montoReembolsable | currency:'USD' }}

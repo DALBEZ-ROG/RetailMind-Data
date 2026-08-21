@@ -23,6 +23,8 @@ import {
   ProveedorRef, BodegaRef, VarianteRef, OrdenCompraRow, OrdenCompraDetalle
 } from '../../../core/models/operativo.model';
 
+import { CampoNumeroDirective, CampoTextoDirective } from '../../../core/validacion';
+
 interface LineaOrden { varianteId: number | null; cantidad: number; precioUnitario: number; }
 
 @Component({
@@ -30,7 +32,9 @@ interface LineaOrden { varianteId: number | null; cantidad: number; precioUnitar
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule, MatTooltipModule,
-    MatPaginatorModule, SelectBuscableComponent],
+    MatPaginatorModule, SelectBuscableComponent,
+    CampoNumeroDirective, CampoTextoDirective
+  ],
   templateUrl: './ordenes-compra.component.html',
   styleUrl: '../operativo-shared.scss'
 })

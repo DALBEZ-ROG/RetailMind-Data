@@ -18,6 +18,8 @@ import { AuthService } from '../../../core/services/auth.service';
 import { mensajeError } from '../../../core/services/api-error.util';
 import { ProveedorRef } from '../../../core/models/operativo.model';
 
+import { CampoNumeroDirective, CampoTextoDirective } from '../../../core/validacion';
+
 /**
  * Devolución a proveedor (script 45) — espejo del RMA hacia el proveedor.
  * BODEGA identifica el defectuoso (inspección RMA + rechazo en recepción +
@@ -30,7 +32,9 @@ import { ProveedorRef } from '../../../core/models/operativo.model';
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatCheckboxModule, MatFormFieldModule, MatInputModule, MatSelectModule,
-    MatTooltipModule, MatSnackBarModule, MatPaginatorModule],
+    MatTooltipModule, MatSnackBarModule, MatPaginatorModule,
+    CampoNumeroDirective, CampoTextoDirective
+  ],
   templateUrl: './devoluciones-proveedor.component.html',
   styleUrl: '../operativo-shared.scss'
 })

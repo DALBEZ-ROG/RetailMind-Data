@@ -21,7 +21,7 @@
       </div>
       <mat-form-field appearance="outline">
         <mat-label>Observación</mat-label>
-        <input matInput [(ngModel)]="observacion">
+        <input appTexto="libre" matInput [(ngModel)]="observacion">
       </mat-form-field>
     </div>
 
@@ -95,7 +95,7 @@
       </div>
       <mat-form-field appearance="outline">
         <mat-label>Observación de la entrega</mat-label>
-        <input matInput [(ngModel)]="observacionEntrega">
+        <input appTexto="libre" matInput [(ngModel)]="observacionEntrega">
       </mat-form-field>
     </div>
     <div class="form-actions">
@@ -146,7 +146,7 @@
           </mat-form-field>
           <mat-form-field appearance="outline">
             <mat-label>Descripción de lo ocurrido</mat-label>
-            <input matInput [(ngModel)]="descripcionNovedad">
+            <input appTexto="libre" matInput [(ngModel)]="descripcionNovedad">
           </mat-form-field>
         </div>
         <div class="form-actions">
@@ -171,7 +171,7 @@
         <div class="form-grid">
           <mat-form-field appearance="outline">
             <mat-label>Observación de la resolución</mat-label>
-            <input matInput [(ngModel)]="observacionResolucion">
+            <input appTexto="libre" matInput [(ngModel)]="observacionResolucion">
           </mat-form-field>
         </div>
         <div class="form-actions">

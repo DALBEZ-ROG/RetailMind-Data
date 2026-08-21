@@ -19,6 +19,8 @@ import { ConfirmService } from '../../../core/services/confirm.service';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
 
+import { CampoTextoDirective } from '../../../core/validacion';
+
 @Component({
   selector: 'app-gestion-datos',
   standalone: true,
@@ -27,7 +29,8 @@ import { environment } from '../../../../environments/environment';
     MatButtonModule, MatIconModule, MatPaginatorModule,
     MatFormFieldModule, MatInputModule, MatSelectModule,
     MatCheckboxModule, MatCardModule, MatSnackBarModule,
-    MatTooltipModule, MatDividerModule, MatChipsModule
+    MatTooltipModule, MatDividerModule, MatChipsModule,
+    CampoTextoDirective
   ],
   templateUrl: './gestion-datos.component.html',
   styleUrl: './gestion-datos.component.scss'

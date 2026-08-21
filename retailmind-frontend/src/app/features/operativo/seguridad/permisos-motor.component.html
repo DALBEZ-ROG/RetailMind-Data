@@ -124,7 +124,7 @@
         <div class="editor-filtros" *ngIf="rolEditor">
           <mat-form-field appearance="outline">
             <mat-label>Buscar tabla</mat-label>
-            <input matInput [(ngModel)]="filtroTablaEditor"
+            <input appTexto="alfanumerico" matInput [(ngModel)]="filtroTablaEditor"
                    (ngModelChange)="aplicarFiltroEditor()" placeholder="pedido, factura…">
             <mat-icon matSuffix>search</mat-icon>
           </mat-form-field>
@@ -383,7 +383,7 @@
           </mat-form-field>
           <mat-form-field appearance="outline">
             <mat-label>Tabla</mat-label>
-            <input matInput [(ngModel)]="filtroTabla" (change)="cargarPermisos()"
+            <input appTexto="alfanumerico" matInput [(ngModel)]="filtroTabla" (change)="cargarPermisos()"
                    placeholder="nombre exacto, p. ej. pedido">
           </mat-form-field>
           <mat-form-field appearance="outline">
@@ -541,7 +541,7 @@
         <div class="form-grid">
           <mat-form-field appearance="outline">
             <mat-label>Tabla</mat-label>
-            <input matInput [(ngModel)]="filtroPoliticaTabla" (change)="filtrarPoliticas()"
+            <input appTexto="alfanumerico" matInput [(ngModel)]="filtroPoliticaTabla" (change)="filtrarPoliticas()"
                    placeholder="nombre exacto, p. ej. pedido">
           </mat-form-field>
         </div>

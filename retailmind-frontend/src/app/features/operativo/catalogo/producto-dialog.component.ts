@@ -13,6 +13,8 @@ import {
 import { MarcaAdmin, CategoriaAdmin, ProductoDetalleAdmin } from '../../../core/models/operativo.model';
 import { ProductoBody } from '../../../core/services/catalogo-admin.service';
 
+import { CampoTextoDirective } from '../../../core/validacion';
+
 export interface ProductoDialogData {
   marcas: MarcaAdmin[];
   categorias: CategoriaAdmin[];
@@ -39,7 +41,9 @@ export type ProductoDialogResultado = ProductoBody & { activo: boolean };
   selector: 'app-producto-dialog',
   standalone: true,
   imports: [CommonModule, FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule,
-    MatSelectModule, MatCheckboxModule, MatIconModule, ModoFormComponent],
+    MatSelectModule, MatCheckboxModule, MatIconModule, ModoFormComponent,
+    CampoTextoDirective
+  ],
   template: `
     <h2 mat-dialog-title>
       <mat-icon>inventory_2</mat-icon>
@@ -51,12 +55,12 @@ export type ProductoDialogResultado = ProductoBody & { activo: boolean };
       <div class="grid">
         <mat-form-field appearance="outline">
           <mat-label>Nombre</mat-label>
-          <input matInput [(ngModel)]="form.nombre" (blur)="autoSlug()"
+          <input appTexto="nombre" exigido matInput [(ngModel)]="form.nombre" (blur)="autoSlug()"
                  [disabled]="soloLectura" required>
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Slug</mat-label>
-          <input matInput [(ngModel)]="form.slug" [disabled]="soloLectura" required>
+          <input appTexto="slug" exigido matInput [(ngModel)]="form.slug" [disabled]="soloLectura" required>
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Marca</mat-label>
@@ -73,11 +77,11 @@ export type ProductoDialogResultado = ProductoBody & { activo: boolean };
         </mat-form-field>
         <mat-form-field appearance="outline" class="ancho">
           <mat-label>Descripción corta</mat-label>
-          <input matInput [(ngModel)]="form.descripcionCorta" [disabled]="soloLectura">
+          <input appTexto="libre" matInput [(ngModel)]="form.descripcionCorta" [disabled]="soloLectura">
         </mat-form-field>
         <mat-form-field appearance="outline" class="ancho">
           <mat-label>Descripción</mat-label>
-          <textarea matInput rows="3" [(ngModel)]="form.descripcion" [disabled]="soloLectura"></textarea>
+          <textarea appTexto="libre" matInput rows="3" [(ngModel)]="form.descripcion" [disabled]="soloLectura"></textarea>
         </mat-form-field>
       </div>
 

@@ -26,11 +26,11 @@
       </mat-form-field>
       <mat-form-field appearance="outline">
         <mat-label>Cantidad</mat-label>
-        <input matInput type="number" min="1" [(ngModel)]="cantidad">
+        <input appNumero="entero" matInput type="number" min="1" [(ngModel)]="cantidad">
       </mat-form-field>
       <mat-form-field appearance="outline">
         <mat-label>Motivo (obligatorio)</mat-label>
-        <input matInput [(ngModel)]="motivo" placeholder="Ej.: conteo físico 2026-07, merma por daño">
+        <input appTexto="libre" matInput [(ngModel)]="motivo" placeholder="Ej.: conteo físico 2026-07, merma por daño">
       </mat-form-field>
     </div>
     <div class="form-actions">
@@ -46,11 +46,11 @@
         <span class="stat-chip chip-info">{{ s.bodega }}: {{ s.stock_actual }}</span>
         <mat-form-field appearance="outline">
           <mat-label>Stock mínimo</mat-label>
-          <input matInput type="number" min="0" [(ngModel)]="s.stock_minimo">
+          <input appNumero="entero" matInput type="number" min="0" [(ngModel)]="s.stock_minimo">
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Stock máximo (opcional)</mat-label>
-          <input matInput type="number" min="1" [(ngModel)]="s.stock_maximo">
+          <input appNumero="entero" matInput type="number" min="1" [(ngModel)]="s.stock_maximo">
         </mat-form-field>
         <button mat-icon-button color="primary" matTooltip="Guardar niveles mín/máx"
                 (click)="guardarNiveles(s)">
@@ -121,7 +121,7 @@
       <p style="opacity: 0.8;">Se registrará un contramovimiento en el kardex que revierte el stock.</p>
       <mat-form-field appearance="outline" style="width: 100%;">
         <mat-label>Motivo de la anulación (obligatorio)</mat-label>
-        <input matInput [(ngModel)]="motivoAnulacion" placeholder="Ej.: ajuste registrado por error">
+        <input appTexto="libre" matInput [(ngModel)]="motivoAnulacion" placeholder="Ej.: ajuste registrado por error">
       </mat-form-field>
       <div class="form-actions">
         <button class="btn-aplicar" [disabled]="!motivoAnulacion.trim()" (click)="anularAjuste()">

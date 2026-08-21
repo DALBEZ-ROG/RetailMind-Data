@@ -12,6 +12,8 @@ import {
 } from '../../../core/components/modo-form/modo-form.component';
 import { MetaVentaRow } from '../../../core/models/operativo.model';
 
+import { CampoNumeroDirective, CampoTextoDirective } from '../../../core/validacion';
+
 export interface MetaDialogData {
   meta?: MetaVentaRow;
   modo: ModoFormulario;
@@ -33,7 +35,9 @@ export interface MetaDialogResultado {
   selector: 'app-meta-dialog',
   standalone: true,
   imports: [CommonModule, FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule,
-    MatSelectModule, MatCheckboxModule, MatIconModule, ModoFormComponent],
+    MatSelectModule, MatCheckboxModule, MatIconModule, ModoFormComponent,
+    CampoNumeroDirective, CampoTextoDirective
+  ],
   template: `
     <h2 mat-dialog-title>
       <mat-icon>flag</mat-icon>
@@ -45,7 +49,7 @@ export interface MetaDialogResultado {
       <div class="grid">
         <mat-form-field appearance="outline">
           <mat-label>Año</mat-label>
-          <input matInput type="number" min="2000" max="2100" [(ngModel)]="form.anio"
+          <input appNumero="entero" matInput type="number" min="2000" max="2100" [(ngModel)]="form.anio"
                  [disabled]="soloLectura">
           <!-- Sin validación de futuro: se cargan metas de meses pasados (histórico) -->
           <mat-hint>Admite períodos pasados (metas históricas)</mat-hint>
@@ -65,12 +69,12 @@ export interface MetaDialogResultado {
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Monto de la meta (USD)</mat-label>
-          <input matInput type="number" min="0.01" step="0.01" [(ngModel)]="form.montoMeta"
+          <input appNumero="dinero" matInput type="number" min="0.01" step="0.01" [(ngModel)]="form.montoMeta"
                  [disabled]="soloLectura" required>
         </mat-form-field>
         <mat-form-field appearance="outline" class="ancho">
           <mat-label>Notas (opcional)</mat-label>
-          <input matInput [(ngModel)]="form.notas" maxlength="500" [disabled]="soloLectura">
+          <input appTexto="libre" matInput [(ngModel)]="form.notas" maxlength="500" [disabled]="soloLectura">
         </mat-form-field>
       </div>
 

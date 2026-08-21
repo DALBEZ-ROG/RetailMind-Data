@@ -20,7 +20,7 @@
        es demasiado estrecha para mostrar la suya (media query en el SCSS). -->
   <div class="busqueda-movil">
     <mat-icon>search</mat-icon>
-    <input #campoBusqueda class="campo-tienda" [(ngModel)]="busqueda"
+    <input appTexto="libre" #campoBusqueda class="campo-tienda" [(ngModel)]="busqueda"
            (ngModelChange)="onBusquedaCambia()"
            placeholder="Buscar productos, marcas o SKU" aria-label="Buscar en el catálogo">
     <button *ngIf="busqueda" class="limpiar-inline" (click)="quitarBusqueda()" aria-label="Limpiar búsqueda">
@@ -117,7 +117,7 @@
           <mat-icon>{{ panel.marcas ? 'expand_less' : 'expand_more' }}</mat-icon>
         </button>
         <div class="grupo-cuerpo" *ngIf="panel.marcas">
-          <input class="campo-tienda" [(ngModel)]="marcaFiltro"
+          <input appTexto="libre" class="campo-tienda" [(ngModel)]="marcaFiltro"
                  placeholder="Buscar marca…" aria-label="Buscar marca">
           <div class="lista-scroll marcas">
             <button class="opcion" [class.activa]="!marcaSeleccionada"
@@ -150,10 +150,10 @@
             {{ t.etiqueta }}
           </button>
           <div class="rango-manual">
-            <input class="campo-tienda" type="number" min="0" [(ngModel)]="precioMinBorrador"
+            <input appNumero="dinero" class="campo-tienda" type="number" min="0" [(ngModel)]="precioMinBorrador"
                    placeholder="Mín" aria-label="Precio mínimo">
             <span class="guion">–</span>
-            <input class="campo-tienda" type="number" min="0" [(ngModel)]="precioMaxBorrador"
+            <input appNumero="dinero" class="campo-tienda" type="number" min="0" [(ngModel)]="precioMaxBorrador"
                    placeholder="Máx" aria-label="Precio máximo">
             <button class="btn-ir" (click)="aplicarRangoManual()" aria-label="Aplicar rango de precio">
               <mat-icon>arrow_forward</mat-icon>

@@ -14,6 +14,8 @@ import {
 } from '../../../core/components/select-buscable/select-buscable.component';
 import { ResenaRow } from '../../../core/models/operativo.model';
 
+import { CampoTextoDirective } from '../../../core/validacion';
+
 export interface ResenaDialogData {
   resena?: ResenaRow;
   modo: ModoFormulario;
@@ -50,7 +52,9 @@ export interface ResenaDialogResultado {
   selector: 'app-resena-dialog',
   standalone: true,
   imports: [CommonModule, FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule,
-    MatSelectModule, MatIconModule, ModoFormComponent, SelectBuscableComponent],
+    MatSelectModule, MatIconModule, ModoFormComponent, SelectBuscableComponent,
+    CampoTextoDirective
+  ],
   template: `
     <h2 mat-dialog-title>
       <mat-icon>rate_review</mat-icon>
@@ -96,12 +100,12 @@ export interface ResenaDialogResultado {
 
         <mat-form-field appearance="outline" class="ancho">
           <mat-label>Título (opcional)</mat-label>
-          <input matInput [(ngModel)]="form.titulo" maxlength="150"
+          <input appTexto="libre" matInput [(ngModel)]="form.titulo" maxlength="150"
                  [disabled]="contenidoBloqueado">
         </mat-form-field>
         <mat-form-field appearance="outline" class="ancho">
           <mat-label>Comentario (opcional)</mat-label>
-          <textarea matInput rows="3" [(ngModel)]="form.comentario"
+          <textarea appTexto="libre" matInput rows="3" [(ngModel)]="form.comentario"
                     [disabled]="contenidoBloqueado"></textarea>
         </mat-form-field>
       </div>

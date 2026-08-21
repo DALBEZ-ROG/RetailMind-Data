@@ -51,7 +51,7 @@
     <div class="form-grid">
       <mat-form-field appearance="outline">
         <mat-label>Buscar (número, cliente o pedido)</mat-label>
-        <input matInput [(ngModel)]="q" (ngModelChange)="alBuscar()" placeholder="FV-… / nombre / PED-…">
+        <input appTexto="libre" matInput [(ngModel)]="q" (ngModelChange)="alBuscar()" placeholder="FV-… / nombre / PED-…">
       </mat-form-field>
     </div>
     <div class="table-wrapper" *ngIf="facturas.length; else vacio">

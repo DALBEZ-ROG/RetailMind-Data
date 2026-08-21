@@ -11,6 +11,8 @@ import {
 } from '../../../core/components/modo-form/modo-form.component';
 import { SuscriptorRow } from '../../../core/models/operativo.model';
 
+import { CampoTextoDirective } from '../../../core/validacion';
+
 export interface SuscriptorDialogData {
   suscriptor?: SuscriptorRow;
   modo: ModoFormulario;
@@ -34,7 +36,9 @@ export interface SuscriptorDialogResultado {
   selector: 'app-suscriptor-dialog',
   standalone: true,
   imports: [CommonModule, FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule,
-    MatCheckboxModule, MatIconModule, ModoFormComponent],
+    MatCheckboxModule, MatIconModule, ModoFormComponent,
+    CampoTextoDirective
+  ],
   template: `
     <h2 mat-dialog-title>
       <mat-icon>mail</mat-icon>
@@ -45,7 +49,7 @@ export interface SuscriptorDialogResultado {
     <mat-dialog-content>
       <mat-form-field appearance="outline" class="ancho">
         <mat-label>Email</mat-label>
-        <input matInput type="email" [(ngModel)]="form.email" maxlength="255"
+        <input appTexto="email" exigido matInput type="email" [(ngModel)]="form.email" maxlength="255"
                [disabled]="!esNuevo" required>
         <mat-hint *ngIf="!esNuevo">El email identifica al suscriptor y no se cambia</mat-hint>
       </mat-form-field>

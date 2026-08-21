@@ -16,6 +16,8 @@ import { AccesosService } from '../../../core/services/accesos.service';
 import { mensajeError } from '../../../core/services/api-error.util';
 import { LogAccesoRow } from '../../../core/models/operativo.model';
 
+import { CampoTextoDirective } from '../../../core/validacion';
+
 /** Etiquetas legibles de log_acceso.motivo_fallo (OTD-GER-09, script 53). */
 const MOTIVOS: Record<string, string> = {
   email_no_registrado: 'Correo no registrado',
@@ -34,7 +36,9 @@ const MOTIVOS: Record<string, string> = {
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule,
-    MatTooltipModule, MatPaginatorModule],
+    MatTooltipModule, MatPaginatorModule,
+    CampoTextoDirective
+  ],
   templateUrl: './accesos.component.html',
   styleUrl: '../operativo-shared.scss'
 })

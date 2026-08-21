@@ -12,6 +12,8 @@ import {
 import { VarianteAdmin } from '../../../core/models/operativo.model';
 import { VarianteBody } from '../../../core/services/catalogo-admin.service';
 
+import { CampoNumeroDirective, CampoTextoDirective } from '../../../core/validacion';
+
 export interface VarianteDialogData {
   productoNombre: string;
   /** Presente en 'actualizar' y 'consulta' (SKU/precio/costo, precargados). */
@@ -31,7 +33,9 @@ export type VarianteDialogResultado = VarianteBody & { activo: boolean };
   selector: 'app-variante-dialog',
   standalone: true,
   imports: [CommonModule, FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule,
-    MatCheckboxModule, MatIconModule, ModoFormComponent],
+    MatCheckboxModule, MatIconModule, ModoFormComponent,
+    CampoNumeroDirective, CampoTextoDirective
+  ],
   template: `
     <h2 mat-dialog-title>
       <mat-icon>style</mat-icon>
@@ -44,30 +48,30 @@ export type VarianteDialogResultado = VarianteBody & { activo: boolean };
       <div class="grid">
         <mat-form-field appearance="outline">
           <mat-label>SKU</mat-label>
-          <input matInput [(ngModel)]="form.sku" [disabled]="soloLectura" required>
+          <input appTexto="sku" exigido matInput [(ngModel)]="form.sku" [disabled]="soloLectura" required>
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Precio</mat-label>
-          <input matInput type="number" min="0" step="0.01" [(ngModel)]="form.precio"
+          <input appNumero="dinero" matInput type="number" min="0" step="0.01" [(ngModel)]="form.precio"
                  [disabled]="soloLectura" required>
           <span matTextPrefix>$&nbsp;</span>
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Costo</mat-label>
-          <input matInput type="number" min="0" step="0.01" [(ngModel)]="form.costo"
+          <input appNumero="dinero" matInput type="number" min="0" step="0.01" [(ngModel)]="form.costo"
                  [disabled]="soloLectura">
           <span matTextPrefix>$&nbsp;</span>
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Peso</mat-label>
-          <input matInput type="number" min="0.001" step="0.001" [(ngModel)]="form.pesoKg"
+          <input appNumero="decimal" [decimales]="3" matInput type="number" min="0.001" step="0.001" [(ngModel)]="form.pesoKg"
                  [disabled]="soloLectura" required>
           <span matTextSuffix>&nbsp;kg</span>
           <mat-hint *ngIf="!soloLectura">Con él se cobra el flete por kilo</mat-hint>
         </mat-form-field>
         <mat-form-field appearance="outline" *ngIf="esNuevo">
           <mat-label>Código de barras</mat-label>
-          <input matInput [(ngModel)]="form.codigoBarras">
+          <input appTexto="sku" matInput [(ngModel)]="form.codigoBarras">
         </mat-form-field>
       </div>
 

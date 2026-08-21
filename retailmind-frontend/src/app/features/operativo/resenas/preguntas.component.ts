@@ -26,6 +26,8 @@ import {
   PreguntaDialogComponent, PreguntaDialogData, PreguntaDialogResultado
 } from './pregunta-dialog.component';
 
+import { CampoTextoDirective } from '../../../core/validacion';
+
 /** Espeja las transiciones del backend (ResenasService.TRANSICIONES_PREGUNTA). */
 const TRANSICIONES: Record<string, string[]> = {
   pendiente: ['publicada', 'rechazada'],
@@ -51,7 +53,9 @@ const TRANSICIONES: Record<string, string[]> = {
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule, MatTooltipModule,
-    MatDialogModule, SelectBuscableComponent, AccionesRegistroComponent],
+    MatDialogModule, SelectBuscableComponent, AccionesRegistroComponent,
+    CampoTextoDirective
+  ],
   templateUrl: './preguntas.component.html',
   styleUrl: '../operativo-shared.scss'
 })

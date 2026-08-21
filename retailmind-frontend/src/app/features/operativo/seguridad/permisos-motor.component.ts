@@ -31,6 +31,8 @@ import {
 } from './permiso-dialog.component';
 import { RolDialogComponent, RolDialogResultado } from './rol-dialog.component';
 
+import { CampoTextoDirective } from '../../../core/validacion';
+
 /** Fila unificada de la grilla de permisos: de tabla o de columna. */
 interface FilaPermiso {
   clave: string;
@@ -83,7 +85,9 @@ interface FilaEditor {
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatTabsModule, MatTooltipModule,
     MatDialogModule, MatSnackBarModule, MatSlideToggleModule, MatCheckboxModule,
-    MatProgressBarModule, AccionesRegistroComponent, RolGrupoPipe],
+    MatProgressBarModule, AccionesRegistroComponent, RolGrupoPipe,
+    CampoTextoDirective
+  ],
   templateUrl: './permisos-motor.component.html',
   styleUrls: ['../operativo-shared.scss', './permisos-motor.scss']
 })

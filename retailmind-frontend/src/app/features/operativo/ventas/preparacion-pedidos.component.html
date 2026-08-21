@@ -13,7 +13,7 @@
     <div class="form-grid">
       <mat-form-field appearance="outline">
         <mat-label>Buscar (número de pedido o cliente)</mat-label>
-        <input matInput [(ngModel)]="q" (ngModelChange)="alBuscar()" placeholder="PED-… / nombre">
+        <input appTexto="libre" matInput [(ngModel)]="q" (ngModelChange)="alBuscar()" placeholder="PED-… / nombre">
         <mat-icon matSuffix>search</mat-icon>
         <mat-hint>La cola está ordenada de más antiguo a más nuevo</mat-hint>
       </mat-form-field>

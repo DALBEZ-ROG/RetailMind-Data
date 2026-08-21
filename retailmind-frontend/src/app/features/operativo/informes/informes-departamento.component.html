@@ -141,7 +141,7 @@
           <mat-form-field appearance="outline" *ngIf="f.tipo === 'numero'"
                           [subscriptSizing]="selectorVertical ? 'dynamic' : 'fixed'">
             <mat-label>{{ f.etiqueta }}</mat-label>
-            <input matInput type="number" min="0" [(ngModel)]="valores[f.param]"
+            <input appNumero="decimal" [decimales]="2" matInput type="number" min="0" [(ngModel)]="valores[f.param]"
                    (change)="aplicarFiltros()">
           </mat-form-field>
 
@@ -149,7 +149,7 @@
                           [subscriptSizing]="selectorVertical ? 'dynamic' : 'fixed'"
                           [class.campo-ancho]="f.ancho === 'ancho'">
             <mat-label>{{ f.etiqueta }}</mat-label>
-            <input matInput [(ngModel)]="valores[f.param]"
+            <input appTexto="libre" matInput [(ngModel)]="valores[f.param]"
                    (ngModelChange)="f.debounce ? alEscribir() : null"
                    (change)="f.debounce ? null : aplicarFiltros()">
             <mat-icon matSuffix>search</mat-icon>

@@ -26,6 +26,8 @@ import {
 import { definicionTablero } from './definiciones/tableros';
 import { TableroGraficoComponent } from './tablero-grafico.component';
 
+import { CampoTextoDirective } from '../../../core/validacion';
+
 /**
  * Una TARJETA del selector: un elemento del tablero que se puede elegir.
  *
@@ -94,7 +96,9 @@ export interface TarjetaBloque {
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule, MatTooltipModule,
-    TableroGraficoComponent],
+    TableroGraficoComponent,
+    CampoTextoDirective
+  ],
   templateUrl: './tablero.component.html',
   styleUrls: ['../operativo-shared.scss', '../informes/informes.scss', './tableros.scss']
 })

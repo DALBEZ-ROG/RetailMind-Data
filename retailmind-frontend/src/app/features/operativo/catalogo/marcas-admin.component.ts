@@ -22,6 +22,8 @@ import {
   MarcaDialogComponent, MarcaDialogData, MarcaDialogResultado
 } from './marca-dialog.component';
 
+import { CampoTextoDirective } from '../../../core/validacion';
+
 /** Estado por el que se puede filtrar la grilla. */
 type FiltroEstado = 'todos' | 'activos' | 'eliminados';
 
@@ -36,7 +38,9 @@ type FiltroEstado = 'todos' | 'activos' | 'eliminados';
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule,
-    MatTooltipModule, MatDialogModule, AccionesRegistroComponent],
+    MatTooltipModule, MatDialogModule, AccionesRegistroComponent,
+    CampoTextoDirective
+  ],
   templateUrl: './marcas-admin.component.html',
   styleUrl: '../operativo-shared.scss'
 })

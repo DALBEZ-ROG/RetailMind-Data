@@ -27,18 +27,18 @@
           <h3>{{ editando ? 'Editar bodega' : 'Nueva bodega' }}</h3>
           <div class="campos">
             <mat-form-field><mat-label>Código</mat-label>
-              <input matInput [(ngModel)]="modelo.codigo" maxlength="20"></mat-form-field>
+              <input appTexto="codigo" matInput [(ngModel)]="modelo.codigo" maxlength="20"></mat-form-field>
             <mat-form-field><mat-label>Nombre</mat-label>
-              <input matInput [(ngModel)]="modelo.nombre" maxlength="120"></mat-form-field>
+              <input appTexto="nombre" exigido matInput [(ngModel)]="modelo.nombre" maxlength="120"></mat-form-field>
             <mat-form-field><mat-label>Ciudad</mat-label>
               <mat-select [(ngModel)]="modelo.ciudadId">
                 <mat-option [value]="null">— sin ciudad —</mat-option>
                 <mat-option *ngFor="let c of refs.ciudades" [value]="c.id">{{ c.nombre }}</mat-option>
               </mat-select></mat-form-field>
             <mat-form-field><mat-label>Dirección</mat-label>
-              <input matInput [(ngModel)]="modelo.direccion"></mat-form-field>
+              <input appTexto="libre" matInput [(ngModel)]="modelo.direccion"></mat-form-field>
             <mat-form-field><mat-label>Teléfono</mat-label>
-              <input matInput [(ngModel)]="modelo.telefono"></mat-form-field>
+              <input appTexto="telefono" matInput [(ngModel)]="modelo.telefono"></mat-form-field>
             <mat-checkbox [(ngModel)]="modelo.esPrincipal"
                           matTooltip="La bodega que el sistema elige por defecto. Solo puede haber una: al marcar ésta, la anterior deja de serlo.">
               Bodega principal
@@ -102,17 +102,17 @@
           <h3>{{ editando ? 'Editar transportista' : 'Nuevo transportista' }}</h3>
           <div class="campos">
             <mat-form-field><mat-label>Nombre</mat-label>
-              <input matInput [(ngModel)]="modelo.nombre" maxlength="120"></mat-form-field>
+              <input appTexto="nombre" exigido matInput [(ngModel)]="modelo.nombre" maxlength="120"></mat-form-field>
             <mat-form-field><mat-label>RUC</mat-label>
-              <input matInput [(ngModel)]="modelo.ruc"></mat-form-field>
+              <input appTexto="ruc" matInput [(ngModel)]="modelo.ruc"></mat-form-field>
             <mat-form-field><mat-label>Teléfono</mat-label>
-              <input matInput [(ngModel)]="modelo.telefono"></mat-form-field>
+              <input appTexto="telefono" matInput [(ngModel)]="modelo.telefono"></mat-form-field>
             <mat-form-field><mat-label>Correo</mat-label>
-              <input matInput [(ngModel)]="modelo.email"></mat-form-field>
+              <input appTexto="email" matInput [(ngModel)]="modelo.email"></mat-form-field>
             <mat-form-field><mat-label>Sitio web</mat-label>
-              <input matInput [(ngModel)]="modelo.sitioWeb"></mat-form-field>
+              <input appTexto="url" matInput [(ngModel)]="modelo.sitioWeb"></mat-form-field>
             <mat-form-field><mat-label>URL de seguimiento</mat-label>
-              <input matInput [(ngModel)]="modelo.urlSeguimiento"></mat-form-field>
+              <input appTexto="url" matInput [(ngModel)]="modelo.urlSeguimiento"></mat-form-field>
           </div>
           <div class="acciones-form">
             <button mat-flat-button color="primary" (click)="guardar()"
@@ -167,22 +167,22 @@
           <h3>{{ editando ? 'Editar método' : 'Nuevo método' }}</h3>
           <div class="campos">
             <mat-form-field><mat-label>Código</mat-label>
-              <input matInput [(ngModel)]="modelo.codigo" maxlength="20"></mat-form-field>
+              <input appTexto="codigo" matInput [(ngModel)]="modelo.codigo" maxlength="20"></mat-form-field>
             <mat-form-field><mat-label>Nombre</mat-label>
-              <input matInput [(ngModel)]="modelo.nombre" maxlength="120"></mat-form-field>
+              <input appTexto="nombre" exigido matInput [(ngModel)]="modelo.nombre" maxlength="120"></mat-form-field>
             <mat-form-field><mat-label>Transportista</mat-label>
               <mat-select [(ngModel)]="modelo.transportistaId">
                 <mat-option [value]="null">— sin transportista —</mat-option>
                 <mat-option *ngFor="let t of refs.transportistas" [value]="t.id">{{ t.nombre }}</mat-option>
               </mat-select></mat-form-field>
             <mat-form-field><mat-label>Días mínimo</mat-label>
-              <input matInput type="number" min="0" [(ngModel)]="modelo.diasEntregaMin"></mat-form-field>
+              <input appNumero="entero" matInput type="number" min="0" [(ngModel)]="modelo.diasEntregaMin"></mat-form-field>
             <mat-form-field><mat-label>Días máximo</mat-label>
-              <input matInput type="number" min="0" [(ngModel)]="modelo.diasEntregaMax"></mat-form-field>
+              <input appNumero="entero" matInput type="number" min="0" [(ngModel)]="modelo.diasEntregaMax"></mat-form-field>
             <mat-form-field><mat-label>Orden</mat-label>
-              <input matInput type="number" [(ngModel)]="modelo.orden"></mat-form-field>
+              <input appNumero="entero" matInput type="number" [(ngModel)]="modelo.orden"></mat-form-field>
             <mat-form-field class="ancho"><mat-label>Descripción</mat-label>
-              <input matInput [(ngModel)]="modelo.descripcion"></mat-form-field>
+              <input appTexto="libre" matInput [(ngModel)]="modelo.descripcion"></mat-form-field>
           </div>
           <div class="acciones-form">
             <button mat-flat-button color="primary" (click)="guardar()"
@@ -242,7 +242,7 @@
           </p>
           <div class="campos">
             <mat-form-field><mat-label>Nombre</mat-label>
-              <input matInput [(ngModel)]="modelo.nombre" maxlength="120"></mat-form-field>
+              <input appTexto="nombre" exigido matInput [(ngModel)]="modelo.nombre" maxlength="120"></mat-form-field>
             <mat-form-field><mat-label>País</mat-label>
               <mat-select [(ngModel)]="modelo.paisId"
                           (selectionChange)="modelo.provinciaId = null; modelo.ciudadId = null">
@@ -261,7 +261,7 @@
                 <mat-option *ngFor="let c of ciudadesDeProvincia()" [value]="c.id">{{ c.nombre }}</mat-option>
               </mat-select></mat-form-field>
             <mat-form-field class="ancho"><mat-label>Descripción</mat-label>
-              <input matInput [(ngModel)]="modelo.descripcion"></mat-form-field>
+              <input appTexto="libre" matInput [(ngModel)]="modelo.descripcion"></mat-form-field>
           </div>
           <div class="acciones-form">
             <button mat-flat-button color="primary" (click)="guardar()"
@@ -326,15 +326,15 @@
                 <mat-option *ngFor="let m of refs.metodos" [value]="m.id">{{ m.nombre }}</mat-option>
               </mat-select></mat-form-field>
             <mat-form-field><mat-label>Costo base</mat-label>
-              <input matInput type="number" min="0" step="0.01" [(ngModel)]="modelo.costoBase"></mat-form-field>
+              <input appNumero="dinero" matInput type="number" min="0" step="0.01" [(ngModel)]="modelo.costoBase"></mat-form-field>
             <mat-form-field><mat-label>Costo por kg</mat-label>
-              <input matInput type="number" min="0" step="0.01" [(ngModel)]="modelo.costoPorKg"></mat-form-field>
+              <input appNumero="dinero" matInput type="number" min="0" step="0.01" [(ngModel)]="modelo.costoPorKg"></mat-form-field>
             <mat-form-field><mat-label>Peso mínimo (kg)</mat-label>
-              <input matInput type="number" min="0" step="0.001" [(ngModel)]="modelo.pesoMinKg"></mat-form-field>
+              <input appNumero="decimal" [decimales]="3" matInput type="number" min="0" step="0.001" [(ngModel)]="modelo.pesoMinKg"></mat-form-field>
             <mat-form-field><mat-label>Peso máximo (kg)</mat-label>
-              <input matInput type="number" min="0" step="0.001" [(ngModel)]="modelo.pesoMaxKg"></mat-form-field>
+              <input appNumero="decimal" [decimales]="3" matInput type="number" min="0" step="0.001" [(ngModel)]="modelo.pesoMaxKg"></mat-form-field>
             <mat-form-field><mat-label>Envío gratis desde</mat-label>
-              <input matInput type="number" min="0" step="0.01" [(ngModel)]="modelo.envioGratisDesde"></mat-form-field>
+              <input appNumero="dinero" matInput type="number" min="0" step="0.01" [(ngModel)]="modelo.envioGratisDesde"></mat-form-field>
           </div>
           <div class="acciones-form">
             <button mat-flat-button color="primary" (click)="guardar()"

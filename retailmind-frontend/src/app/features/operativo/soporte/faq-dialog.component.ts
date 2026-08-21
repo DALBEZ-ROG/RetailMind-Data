@@ -12,6 +12,8 @@ import {
 } from '../../../core/components/modo-form/modo-form.component';
 import { FaqRow, CategoriaTicketRef } from '../../../core/models/operativo.model';
 
+import { CampoNumeroDirective, CampoTextoDirective } from '../../../core/validacion';
+
 export interface FaqDialogData {
   faq?: FaqRow;
   categorias: CategoriaTicketRef[];
@@ -28,7 +30,9 @@ export interface FaqDialogResultado {
   selector: 'app-faq-dialog',
   standalone: true,
   imports: [CommonModule, FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule,
-    MatSelectModule, MatCheckboxModule, MatIconModule, ModoFormComponent],
+    MatSelectModule, MatCheckboxModule, MatIconModule, ModoFormComponent,
+    CampoNumeroDirective, CampoTextoDirective
+  ],
   template: `
     <h2 mat-dialog-title>
       <mat-icon>quiz</mat-icon>
@@ -47,16 +51,16 @@ export interface FaqDialogResultado {
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Orden</mat-label>
-          <input matInput type="number" min="0" [(ngModel)]="form.orden" [disabled]="soloLectura">
+          <input appNumero="entero" matInput type="number" min="0" [(ngModel)]="form.orden" [disabled]="soloLectura">
           <mat-hint>Menor primero en el centro de ayuda</mat-hint>
         </mat-form-field>
         <mat-form-field appearance="outline" class="ancho">
           <mat-label>Pregunta</mat-label>
-          <input matInput [(ngModel)]="form.pregunta" [disabled]="soloLectura" required>
+          <input appTexto="libre" exigido matInput [(ngModel)]="form.pregunta" [disabled]="soloLectura" required>
         </mat-form-field>
         <mat-form-field appearance="outline" class="ancho">
           <mat-label>Respuesta</mat-label>
-          <textarea matInput rows="5" [(ngModel)]="form.respuesta"
+          <textarea appTexto="libre" exigido matInput rows="5" [(ngModel)]="form.respuesta"
                     [disabled]="soloLectura" required></textarea>
         </mat-form-field>
       </div>

@@ -18,12 +18,16 @@ import { mensajeError } from '../../../core/services/api-error.util';
 import { FacturaVenta, FacturaVentaRow } from '../../../core/models/operativo.model';
 import { CodigoLegiblePipe } from '../../../core/pipes/etiquetas.pipe';
 
+import { CampoTextoDirective } from '../../../core/validacion';
+
 @Component({
   selector: 'app-facturas-venta',
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule,
-    MatTooltipModule, MatPaginatorModule, SelectBuscableComponent, CodigoLegiblePipe],
+    MatTooltipModule, MatPaginatorModule, SelectBuscableComponent, CodigoLegiblePipe,
+    CampoTextoDirective
+  ],
   templateUrl: './facturas-venta.component.html',
   styleUrl: '../operativo-shared.scss'
 })

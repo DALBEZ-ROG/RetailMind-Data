@@ -12,6 +12,8 @@ import {
 } from '../../../core/components/modo-form/modo-form.component';
 import { BannerRow, CampanaRow } from '../../../core/models/operativo.model';
 
+import { CampoNumeroDirective, CampoTextoDirective } from '../../../core/validacion';
+
 export interface BannerDialogData {
   banner?: BannerRow;
   campanas: CampanaRow[];
@@ -30,7 +32,9 @@ export interface BannerDialogResultado {
   selector: 'app-banner-dialog',
   standalone: true,
   imports: [CommonModule, FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule,
-    MatSelectModule, MatCheckboxModule, MatIconModule, ModoFormComponent],
+    MatSelectModule, MatCheckboxModule, MatIconModule, ModoFormComponent,
+    CampoNumeroDirective, CampoTextoDirective
+  ],
   template: `
     <h2 mat-dialog-title>
       <mat-icon>view_carousel</mat-icon>
@@ -42,15 +46,15 @@ export interface BannerDialogResultado {
       <div class="grid">
         <mat-form-field appearance="outline" class="ancho">
           <mat-label>Título</mat-label>
-          <input matInput [(ngModel)]="form.titulo" [disabled]="soloLectura" required>
+          <input appTexto="nombre" exigido matInput [(ngModel)]="form.titulo" [disabled]="soloLectura" required>
         </mat-form-field>
         <mat-form-field appearance="outline" class="ancho">
           <mat-label>URL de la imagen</mat-label>
-          <input matInput [(ngModel)]="form.imagenUrl" [disabled]="soloLectura" required>
+          <input appTexto="url" exigido matInput [(ngModel)]="form.imagenUrl" [disabled]="soloLectura" required>
         </mat-form-field>
         <mat-form-field appearance="outline" class="ancho">
           <mat-label>URL de destino (opcional)</mat-label>
-          <input matInput [(ngModel)]="form.urlDestino" [disabled]="soloLectura">
+          <input appTexto="url" matInput [(ngModel)]="form.urlDestino" [disabled]="soloLectura">
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Posición</mat-label>
@@ -60,7 +64,7 @@ export interface BannerDialogResultado {
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Orden</mat-label>
-          <input matInput type="number" min="0" [(ngModel)]="form.orden" [disabled]="soloLectura">
+          <input appNumero="entero" matInput type="number" min="0" [(ngModel)]="form.orden" [disabled]="soloLectura">
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Campaña (opcional)</mat-label>

@@ -15,6 +15,8 @@ import { PaletaCategoria } from './catalogo-visual';
 import { VentasService } from '../../core/services/ventas.service';
 import { mensajeError } from '../../core/services/api-error.util';
 
+import { CampoTextoDirective } from '../../core/validacion';
+
 /**
  * Checkout ONLINE de la tienda (tipo Amazon): resumen del carrito, dirección
  * de envío, cupón (preparado para la fase de descuentos), método de pago con
@@ -28,7 +30,8 @@ import { mensajeError } from '../../core/services/api-error.util';
   imports: [
     CommonModule, FormsModule, RouterLink, MatButtonModule,
     MatIconModule, MatFormFieldModule, MatInputModule, MatSelectModule,
-    MatSnackBarModule, MatProgressSpinnerModule
+    MatSnackBarModule, MatProgressSpinnerModule,
+    CampoTextoDirective
   ],
   templateUrl: './checkout.component.html',
   styleUrls: ['./shop-shared.scss', './checkout.component.scss']

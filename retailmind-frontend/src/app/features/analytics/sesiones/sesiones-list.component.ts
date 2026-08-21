@@ -14,6 +14,8 @@ import { Subject, Subscription, debounceTime, distinctUntilChanged } from 'rxjs'
 import { SesionService } from '../../../core/services/sesion.service';
 import { Sesion } from '../../../core/models/sesion.model';
 
+import { CampoTextoDirective } from '../../../core/validacion';
+
 @Component({
   selector: 'app-sesiones-list',
   standalone: true,
@@ -28,7 +30,8 @@ import { Sesion } from '../../../core/models/sesion.model';
     MatFormFieldModule,
     MatInputModule,
     MatButtonModule,
-    MatTooltipModule
+    MatTooltipModule,
+    CampoTextoDirective
   ],
   templateUrl: './sesiones-list.component.html',
   styleUrl: './sesiones-list.component.scss'

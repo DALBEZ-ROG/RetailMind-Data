@@ -22,6 +22,8 @@ import {
   CategoriaTicketDialogComponent, CategoriaTicketDialogData, CategoriaTicketDialogResultado
 } from './categoria-ticket-dialog.component';
 
+import { CampoTextoDirective } from '../../../core/validacion';
+
 type FiltroEstado = 'todos' | 'activos' | 'eliminados';
 
 /**
@@ -35,7 +37,9 @@ type FiltroEstado = 'todos' | 'activos' | 'eliminados';
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule,
-    MatTooltipModule, MatDialogModule, AccionesRegistroComponent],
+    MatTooltipModule, MatDialogModule, AccionesRegistroComponent,
+    CampoTextoDirective
+  ],
   templateUrl: './categorias-ticket.component.html',
   styleUrl: '../operativo-shared.scss'
 })

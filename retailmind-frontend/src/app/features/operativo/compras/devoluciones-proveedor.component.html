@@ -23,11 +23,11 @@
       </mat-form-field>
       <mat-form-field appearance="outline">
         <mat-label>Cantidad defectuosa</mat-label>
-        <input matInput type="number" min="1" [(ngModel)]="cantidadDefectuosa">
+        <input appNumero="entero" matInput type="number" min="1" [(ngModel)]="cantidadDefectuosa">
       </mat-form-field>
       <mat-form-field appearance="outline">
         <mat-label>Nota (defecto encontrado)</mat-label>
-        <input matInput [(ngModel)]="notaDefectuoso">
+        <input appTexto="libre" matInput [(ngModel)]="notaDefectuoso">
       </mat-form-field>
     </div>
     <div class="form-actions">
@@ -58,7 +58,7 @@
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Observación</mat-label>
-          <input matInput [(ngModel)]="observacion">
+          <input appTexto="libre" matInput [(ngModel)]="observacion">
         </mat-form-field>
       </ng-container>
     </div>
@@ -281,7 +281,7 @@
       <mat-form-field appearance="outline" subscriptSizing="dynamic" style="width:260px;"
                       *ngIf="detalle.estado !== 'cerrada'">
         <mat-label>Nota</mat-label>
-        <input matInput [(ngModel)]="nota">
+        <input appTexto="libre" matInput [(ngModel)]="nota">
       </mat-form-field>
 
       <button class="btn-aplicar" *ngIf="detalle.estado === 'registrada'"

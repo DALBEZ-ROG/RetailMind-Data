@@ -12,6 +12,8 @@ import {
 } from '../../../core/components/modo-form/modo-form.component';
 import { UsuarioAdminRow, RolRef } from '../../../core/models/operativo.model';
 
+import { CampoTextoDirective } from '../../../core/validacion';
+
 export interface UsuarioDialogData {
   usuario?: UsuarioAdminRow;
   modo: ModoFormulario;
@@ -42,7 +44,9 @@ export interface UsuarioDialogResultado {
   selector: 'app-usuario-dialog',
   standalone: true,
   imports: [CommonModule, FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule,
-    MatSelectModule, MatCheckboxModule, MatIconModule, ModoFormComponent],
+    MatSelectModule, MatCheckboxModule, MatIconModule, ModoFormComponent,
+    CampoTextoDirective
+  ],
   template: `
     <h2 mat-dialog-title>
       <mat-icon>person</mat-icon>
@@ -54,7 +58,7 @@ export interface UsuarioDialogResultado {
       <div class="grid">
         <mat-form-field appearance="outline" class="ancho">
           <mat-label>Correo electrónico (usuario de acceso)</mat-label>
-          <input matInput type="email" [(ngModel)]="form.email"
+          <input appTexto="email" exigido matInput type="email" [(ngModel)]="form.email"
                  [disabled]="!esNuevo" required>
           <mat-hint *ngIf="!esNuevo">
             El correo es la credencial de login y no se puede cambiar.
@@ -69,16 +73,16 @@ export interface UsuarioDialogResultado {
 
         <mat-form-field appearance="outline">
           <mat-label>Nombre</mat-label>
-          <input matInput [(ngModel)]="form.nombre" maxlength="100"
+          <input appTexto="nombre" exigido matInput [(ngModel)]="form.nombre" maxlength="100"
                  [disabled]="soloLectura" required>
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Apellido</mat-label>
-          <input matInput [(ngModel)]="form.apellido" maxlength="100" [disabled]="soloLectura">
+          <input appTexto="nombre" matInput [(ngModel)]="form.apellido" maxlength="100" [disabled]="soloLectura">
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Teléfono (opcional)</mat-label>
-          <input matInput [(ngModel)]="form.telefono" maxlength="30" [disabled]="soloLectura">
+          <input appTexto="telefono" matInput [(ngModel)]="form.telefono" maxlength="30" [disabled]="soloLectura">
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Rol</mat-label>

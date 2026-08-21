@@ -15,6 +15,8 @@ import { Observable } from 'rxjs';
 import { RedLogisticaService } from '../../../core/services/red-logistica.service';
 import { mensajeError } from '../../../core/services/api-error.util';
 
+import { CampoNumeroDirective, CampoTextoDirective } from '../../../core/validacion';
+
 /** Una de las cinco entidades de la red. */
 type Entidad = 'bodegas' | 'transportistas' | 'metodos' | 'zonas' | 'tarifas';
 
@@ -46,7 +48,9 @@ type Entidad = 'bodegas' | 'transportistas' | 'metodos' | 'zonas' | 'tarifas';
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatTabsModule, MatIconModule,
     MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule,
-    MatCheckboxModule, MatSnackBarModule, MatTooltipModule],
+    MatCheckboxModule, MatSnackBarModule, MatTooltipModule,
+    CampoNumeroDirective, CampoTextoDirective
+  ],
   templateUrl: './red-logistica.component.html',
   styleUrl: '../operativo-shared.scss'
 })

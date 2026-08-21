@@ -19,6 +19,8 @@ import { ServerStatusComponent } from './core/components/server-status/server-st
 import { ShopService } from './features/shop/shop.service';
 import { ShopUiService } from './features/shop/shop-ui.service';
 
+import { CampoTextoDirective } from './core/validacion';
+
 @Component({
   selector: 'app-root',
   standalone: true,
@@ -38,7 +40,8 @@ import { ShopUiService } from './features/shop/shop-ui.service';
     MatTooltipModule,
     MatChipsModule,
     MatExpansionModule,
-    ServerStatusComponent
+    ServerStatusComponent,
+    CampoTextoDirective
   ],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss'

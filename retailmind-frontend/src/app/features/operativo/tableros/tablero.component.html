@@ -62,7 +62,7 @@
           <mat-form-field appearance="outline" subscriptSizing="dynamic"
                           *ngIf="f.tipo === 'texto'">
             <mat-label>{{ f.etiqueta }}</mat-label>
-            <input matInput [(ngModel)]="valores[f.param]"
+            <input appTexto="libre" matInput [(ngModel)]="valores[f.param]"
                    (ngModelChange)="f.debounce ? alEscribir() : null"
                    (change)="f.debounce ? null : aplicarFiltros()">
             <mat-icon matSuffix>search</mat-icon>

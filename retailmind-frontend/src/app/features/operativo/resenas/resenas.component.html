@@ -14,7 +14,7 @@
       <div class="form-grid">
         <mat-form-field appearance="outline" style="grid-column: span 2;">
           <mat-label>Buscar</mat-label>
-          <input matInput [(ngModel)]="filtroMiTexto" (ngModelChange)="aplicarFiltrosMias()"
+          <input appTexto="libre" matInput [(ngModel)]="filtroMiTexto" (ngModelChange)="aplicarFiltrosMias()"
                  placeholder="Producto o título de la reseña…">
           <mat-icon matSuffix>search</mat-icon>
         </mat-form-field>
@@ -205,7 +205,7 @@
       <div class="form-grid">
         <mat-form-field appearance="outline" style="grid-column: span 2;">
           <mat-label>Buscar</mat-label>
-          <input matInput [(ngModel)]="filtroTexto" (ngModelChange)="alEscribirFiltro()"
+          <input appTexto="libre" matInput [(ngModel)]="filtroTexto" (ngModelChange)="alEscribirFiltro()"
                  placeholder="Producto, cliente, título o comentario…">
           <mat-icon matSuffix>search</mat-icon>
         </mat-form-field>

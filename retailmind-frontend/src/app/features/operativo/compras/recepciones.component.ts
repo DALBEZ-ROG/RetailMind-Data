@@ -14,6 +14,8 @@ import { ReferenciasService } from '../../../core/services/referencias.service';
 import { mensajeError } from '../../../core/services/api-error.util';
 import { OrdenCompraRow, OrdenCompraDetalle, StockRow } from '../../../core/models/operativo.model';
 
+import { CampoNumeroDirective, CampoTextoDirective } from '../../../core/validacion';
+
 interface LineaRecepcion {
   detalleId: number; sku: string; producto: string; varianteId: number;
   pedida: number; yaRecibida: number; aRecibir: number;
@@ -25,7 +27,9 @@ interface LineaRecepcion {
   selector: 'app-recepciones',
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
-    MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule],
+    MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule,
+    CampoNumeroDirective, CampoTextoDirective
+  ],
   templateUrl: './recepciones.component.html',
   styleUrl: '../operativo-shared.scss'
 })

@@ -11,6 +11,8 @@ import {
 } from '../../../core/components/modo-form/modo-form.component';
 import { ReporteResenaRow } from '../../../core/models/operativo.model';
 
+import { CampoTextoDirective } from '../../../core/validacion';
+
 export interface ReporteDialogData {
   reporte?: ReporteResenaRow;
   modo: ModoFormulario;
@@ -40,7 +42,9 @@ export interface ReporteDialogResultado {
   selector: 'app-reporte-dialog',
   standalone: true,
   imports: [CommonModule, FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule,
-    MatSelectModule, MatIconModule, ModoFormComponent],
+    MatSelectModule, MatIconModule, ModoFormComponent,
+    CampoTextoDirective
+  ],
   template: `
     <h2 mat-dialog-title>
       <mat-icon>flag</mat-icon>
@@ -80,7 +84,7 @@ export interface ReporteDialogResultado {
 
         <mat-form-field appearance="outline" class="ancho">
           <mat-label>Comentario {{ esNuevo ? '(opcional)' : '' }}</mat-label>
-          <textarea matInput rows="2" [(ngModel)]="form.comentario"
+          <textarea appTexto="libre" matInput rows="2" [(ngModel)]="form.comentario"
                     [disabled]="motivoBloqueado"></textarea>
         </mat-form-field>
       </div>

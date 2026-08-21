@@ -6,6 +6,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { AuthService } from '../../core/services/auth.service';
 
+import { CampoTextoDirective } from '../../core/validacion';
+
 @Component({
   selector: 'app-login',
   standalone: true,
@@ -13,7 +15,8 @@ import { AuthService } from '../../core/services/auth.service';
     CommonModule,
     ReactiveFormsModule,
     MatIconModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    CampoTextoDirective
   ],
   templateUrl: './login.component.html',
   styleUrl: './login.component.scss'

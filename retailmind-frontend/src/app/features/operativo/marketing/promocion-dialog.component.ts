@@ -12,6 +12,8 @@ import {
 } from '../../../core/components/modo-form/modo-form.component';
 import { PromocionRow } from '../../../core/models/operativo.model';
 
+import { CampoNumeroDirective, CampoTextoDirective } from '../../../core/validacion';
+
 export interface PromocionDialogData {
   promocion?: PromocionRow;
   modo: ModoFormulario;
@@ -28,7 +30,9 @@ export interface PromocionDialogResultado {
   selector: 'app-promocion-dialog',
   standalone: true,
   imports: [CommonModule, FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule,
-    MatSelectModule, MatCheckboxModule, MatIconModule, ModoFormComponent],
+    MatSelectModule, MatCheckboxModule, MatIconModule, ModoFormComponent,
+    CampoNumeroDirective, CampoTextoDirective
+  ],
   template: `
     <h2 mat-dialog-title>
       <mat-icon>local_offer</mat-icon>
@@ -40,7 +44,7 @@ export interface PromocionDialogResultado {
       <div class="grid">
         <mat-form-field appearance="outline" class="ancho">
           <mat-label>Nombre</mat-label>
-          <input matInput [(ngModel)]="form.nombre" [disabled]="soloLectura" required>
+          <input appTexto="nombre" exigido matInput [(ngModel)]="form.nombre" [disabled]="soloLectura" required>
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Tipo de descuento</mat-label>
@@ -50,7 +54,7 @@ export interface PromocionDialogResultado {
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Valor {{ form.tipoDescuento === 'porcentaje' ? '(%)' : '(USD)' }}</mat-label>
-          <input matInput type="number" min="0" [(ngModel)]="form.valor" [disabled]="soloLectura">
+          <input appNumero="dinero" matInput type="number" min="0" [(ngModel)]="form.valor" [disabled]="soloLectura">
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Vigente desde</mat-label>
@@ -63,11 +67,11 @@ export interface PromocionDialogResultado {
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Prioridad (gana la más alta)</mat-label>
-          <input matInput type="number" min="0" [(ngModel)]="form.prioridad" [disabled]="soloLectura">
+          <input appNumero="entero" matInput type="number" min="0" [(ngModel)]="form.prioridad" [disabled]="soloLectura">
         </mat-form-field>
         <mat-form-field appearance="outline" class="ancho">
           <mat-label>Descripción</mat-label>
-          <input matInput [(ngModel)]="form.descripcion" [disabled]="soloLectura">
+          <input appTexto="libre" matInput [(ngModel)]="form.descripcion" [disabled]="soloLectura">
         </mat-form-field>
       </div>
 

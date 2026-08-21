@@ -24,6 +24,8 @@ import {
 } from './campana-dialog.component';
 import { vigenciaDe, FiltroVigencia } from './vigencia.util';
 
+import { CampoTextoDirective } from '../../../core/validacion';
+
 /**
  * Campañas de marketing, alineada al patrón (docs/PATRON_UI.md).
  *
@@ -42,7 +44,9 @@ import { vigenciaDe, FiltroVigencia } from './vigencia.util';
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule,
-    MatTooltipModule, MatDialogModule, AccionesRegistroComponent],
+    MatTooltipModule, MatDialogModule, AccionesRegistroComponent,
+    CampoTextoDirective
+  ],
   templateUrl: './campanas.component.html',
   styleUrl: '../operativo-shared.scss'
 })

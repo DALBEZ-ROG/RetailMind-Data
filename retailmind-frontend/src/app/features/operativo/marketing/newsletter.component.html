@@ -10,7 +10,7 @@
     <div class="form-grid">
       <mat-form-field appearance="outline" style="grid-column: span 2;">
         <mat-label>Buscar</mat-label>
-        <input matInput [(ngModel)]="filtroTexto" (ngModelChange)="aplicarFiltros()"
+        <input appTexto="libre" matInput [(ngModel)]="filtroTexto" (ngModelChange)="aplicarFiltros()"
                placeholder="Email o cliente…">
         <mat-icon matSuffix>search</mat-icon>
       </mat-form-field>

@@ -115,7 +115,7 @@
   <!-- ═══ TAB 1: Canales ═══ -->
   <div *ngIf="activeTab === 1">
     <div class="dimension-form">
-      <input class="dimension-input" [(ngModel)]="newDimNombre" placeholder="Nombre del canal">
+      <input appTexto="nombre" class="dimension-input" [(ngModel)]="newDimNombre" placeholder="Nombre del canal">
       <button class="btn-agregar" (click)="addDimension('dim-canal')">
         <mat-icon>add</mat-icon> Agregar
       </button>
@@ -136,7 +136,7 @@
   <!-- ═══ TAB 2: Regiones ═══ -->
   <div *ngIf="activeTab === 2">
     <div class="dimension-form">
-      <input class="dimension-input" [(ngModel)]="newDimNombre" placeholder="Nombre de la región">
+      <input appTexto="nombre" class="dimension-input" [(ngModel)]="newDimNombre" placeholder="Nombre de la región">
       <button class="btn-agregar" (click)="addDimension('dim-region')">
         <mat-icon>add</mat-icon> Agregar
       </button>
@@ -157,7 +157,7 @@
   <!-- ═══ TAB 3: Dispositivos ═══ -->
   <div *ngIf="activeTab === 3">
     <div class="dimension-form">
-      <input class="dimension-input" [(ngModel)]="newDimNombre" placeholder="Nombre del dispositivo">
+      <input appTexto="nombre" class="dimension-input" [(ngModel)]="newDimNombre" placeholder="Nombre del dispositivo">
       <button class="btn-agregar" (click)="addDimension('dim-dispositivo')">
         <mat-icon>add</mat-icon> Agregar
       </button>
@@ -178,7 +178,7 @@
   <!-- ═══ TAB 4: Categorías ═══ -->
   <div *ngIf="activeTab === 4">
     <div class="dimension-form">
-      <input class="dimension-input" [(ngModel)]="newDimNombre" placeholder="Nombre de la categoría">
+      <input appTexto="nombre" class="dimension-input" [(ngModel)]="newDimNombre" placeholder="Nombre de la categoría">
       <button class="btn-agregar" (click)="addDimension('dim-categoria')">
         <mat-icon>add</mat-icon> Agregar
       </button>
@@ -199,7 +199,7 @@
   <!-- ═══ TAB 5: Fuentes de Tráfico ═══ -->
   <div *ngIf="activeTab === 5">
     <div class="dimension-form">
-      <input class="dimension-input" [(ngModel)]="newDimNombre" placeholder="Nombre de la fuente">
+      <input appTexto="nombre" class="dimension-input" [(ngModel)]="newDimNombre" placeholder="Nombre de la fuente">
       <button class="btn-agregar" (click)="addDimension('dim-fuente-trafico')">
         <mat-icon>add</mat-icon> Agregar
       </button>

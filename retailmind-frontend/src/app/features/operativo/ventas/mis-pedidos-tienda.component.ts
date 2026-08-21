@@ -22,6 +22,8 @@ import {
 } from '../../../core/models/operativo.model';
 import { CodigoLegiblePipe } from '../../../core/pipes/etiquetas.pipe';
 
+import { CampoNumeroDirective, CampoTextoDirective } from '../../../core/validacion';
+
 /**
  * CU-O-20: MIS PEDIDOS (rol CLIENTE). RLS (app.cliente_id) devuelve solo lo
  * suyo. Además del seguimiento, aquí NACE la devolución RMA: en un pedido
@@ -34,7 +36,9 @@ import { CodigoLegiblePipe } from '../../../core/pipes/etiquetas.pipe';
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink, MatTableModule, MatIconModule,
     MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule,
-    MatSnackBarModule, MatTooltipModule, MatPaginatorModule, CodigoLegiblePipe],
+    MatSnackBarModule, MatTooltipModule, MatPaginatorModule, CodigoLegiblePipe,
+    CampoNumeroDirective, CampoTextoDirective
+  ],
   templateUrl: './mis-pedidos-tienda.component.html',
   styleUrls: ['../operativo-shared.scss', '../../shop/shop-shared.scss',
               './mis-pedidos-tienda.component.scss']

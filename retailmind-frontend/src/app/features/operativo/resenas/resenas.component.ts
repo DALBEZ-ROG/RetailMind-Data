@@ -36,6 +36,8 @@ import {
 } from './reporte-dialog.component';
 import { CodigoLegiblePipe } from '../../../core/pipes/etiquetas.pipe';
 
+import { CampoTextoDirective } from '../../../core/validacion';
+
 /** Espeja las transiciones del backend (ResenasService.TRANSICIONES_RESENA). */
 const TRANSICIONES: Record<string, string[]> = {
   pendiente: ['aprobada', 'rechazada'],
@@ -74,7 +76,9 @@ const TRANSICIONES_REPORTE: Record<string, string[]> = {
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule, MatTooltipModule,
     MatDialogModule, MatPaginatorModule, SelectBuscableComponent, AccionesRegistroComponent,
-    CodigoLegiblePipe],
+    CodigoLegiblePipe,
+    CampoTextoDirective
+  ],
   templateUrl: './resenas.component.html',
   styleUrl: '../operativo-shared.scss'
 })

@@ -24,6 +24,8 @@ import {
   FaqDialogComponent, FaqDialogData, FaqDialogResultado
 } from './faq-dialog.component';
 
+import { CampoTextoDirective } from '../../../core/validacion';
+
 type FiltroEstado = 'todos' | 'activos' | 'eliminados';
 
 /**
@@ -39,7 +41,9 @@ type FiltroEstado = 'todos' | 'activos' | 'eliminados';
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule,
-    MatTooltipModule, MatExpansionModule, MatDialogModule, AccionesRegistroComponent],
+    MatTooltipModule, MatExpansionModule, MatDialogModule, AccionesRegistroComponent,
+    CampoTextoDirective
+  ],
   templateUrl: './faq.component.html',
   styleUrl: '../operativo-shared.scss'
 })

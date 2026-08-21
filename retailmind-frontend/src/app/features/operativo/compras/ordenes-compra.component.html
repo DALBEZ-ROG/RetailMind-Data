@@ -34,7 +34,7 @@
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Observación</mat-label>
-          <input matInput [(ngModel)]="observacion">
+          <input appTexto="libre" matInput [(ngModel)]="observacion">
         </mat-form-field>
       </div>
 
@@ -46,11 +46,11 @@
         </app-select-buscable>
         <mat-form-field appearance="outline">
           <mat-label>Cantidad</mat-label>
-          <input matInput type="number" min="1" [(ngModel)]="l.cantidad">
+          <input appNumero="entero" matInput type="number" min="1" [(ngModel)]="l.cantidad">
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Precio unit.</mat-label>
-          <input matInput type="number" min="0" [(ngModel)]="l.precioUnitario">
+          <input appNumero="dinero" matInput type="number" min="0" [(ngModel)]="l.precioUnitario">
         </mat-form-field>
         <button mat-icon-button color="warn" (click)="quitarLinea(i)" [disabled]="lineas.length === 1"
                 matTooltip="Quitar línea">
@@ -87,7 +87,7 @@
     <div class="form-grid">
       <mat-form-field appearance="outline" style="grid-column: span 2;">
         <mat-label>Buscar</mat-label>
-        <input matInput [(ngModel)]="busqueda" (ngModelChange)="alEscribirBusqueda()"
+        <input appTexto="libre" matInput [(ngModel)]="busqueda" (ngModelChange)="alEscribirBusqueda()"
                placeholder="Nº de orden o proveedor…">
         <mat-icon matSuffix>search</mat-icon>
       </mat-form-field>

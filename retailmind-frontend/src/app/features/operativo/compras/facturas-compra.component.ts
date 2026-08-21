@@ -19,12 +19,16 @@ import {
   OrdenCompraRow, FacturaCompra, CuentaPorPagarRow, CatalogoRef
 } from '../../../core/models/operativo.model';
 
+import { CampoNumeroDirective, CampoTextoDirective } from '../../../core/validacion';
+
 @Component({
   selector: 'app-facturas-compra',
   standalone: true,
   imports: [CommonModule, FormsModule, MatTableModule, MatIconModule, MatButtonModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule, MatTooltipModule,
-    MatPaginatorModule],
+    MatPaginatorModule,
+    CampoNumeroDirective, CampoTextoDirective
+  ],
   templateUrl: './facturas-compra.component.html',
   styleUrl: '../operativo-shared.scss'
 })

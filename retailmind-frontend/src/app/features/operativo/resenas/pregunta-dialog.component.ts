@@ -14,6 +14,8 @@ import {
 } from '../../../core/components/select-buscable/select-buscable.component';
 import { PreguntaProductoRow } from '../../../core/models/operativo.model';
 
+import { CampoTextoDirective } from '../../../core/validacion';
+
 export interface PreguntaDialogData {
   pregunta?: PreguntaProductoRow;
   modo: ModoFormulario;
@@ -47,7 +49,9 @@ export interface PreguntaDialogResultado {
   selector: 'app-pregunta-dialog',
   standalone: true,
   imports: [CommonModule, FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule,
-    MatSelectModule, MatIconModule, ModoFormComponent, SelectBuscableComponent],
+    MatSelectModule, MatIconModule, ModoFormComponent, SelectBuscableComponent,
+    CampoTextoDirective
+  ],
   template: `
     <h2 mat-dialog-title>
       <mat-icon>question_answer</mat-icon>
@@ -67,7 +71,7 @@ export interface PreguntaDialogResultado {
 
         <mat-form-field appearance="outline" class="ancho">
           <mat-label>Pregunta</mat-label>
-          <textarea matInput rows="2" [(ngModel)]="form.pregunta"
+          <textarea appTexto="libre" matInput rows="2" [(ngModel)]="form.pregunta"
                     [disabled]="preguntaBloqueada"></textarea>
         </mat-form-field>
 
@@ -110,7 +114,7 @@ export interface PreguntaDialogResultado {
       <mat-form-field appearance="outline" class="ancho-total"
                       *ngIf="data.esModerador && data.modo === 'actualizar'">
         <mat-label>Publicar una respuesta oficial (opcional)</mat-label>
-        <textarea matInput rows="2" [(ngModel)]="form.respuesta"></textarea>
+        <textarea appTexto="libre" matInput rows="2" [(ngModel)]="form.respuesta"></textarea>
         <mat-hint>Se añade a las anteriores; las respuestas no se editan ni se borran.</mat-hint>
       </mat-form-field>
 
