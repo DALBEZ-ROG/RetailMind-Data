@@ -33,3 +33,7 @@ __pycache__/
 
 # Secretos del modo desarrollo
 application-local.properties
+
+# Salida de las suites de prueba (JSON, Markdown y registros por corrida).
+# Se regenera en cada ejecución y no describe el sistema, sino UNA medición.
+pruebas/informes/
