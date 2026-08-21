@@ -1837,3 +1837,69 @@ perfil, direcciones, carrito, lista de deseos y productos comprados en **200 con
 aislamiento medido con dos cuentas a la vez (**0 pedidos** el nuevo, **80** `maria.lopez`); y
 recorrido en Chrome headless por las 8 pantallas del cliente sin un error de consola. Ficha
 completa en `docs/pruebas/DEFECTOS.md`.
+
+**LA TIENDA SE ABRE AL PÚBLICO Y LOS CLIENTES SE REGISTRAN SOLOS (2026-08-21, script 112 +
+código)**: hasta hoy nadie veía el catálogo sin cuenta y las cuentas solo las creaba un
+administrador — el sistema era un back-office con una tienda dentro. Ahora **el escaparate es
+público** (`/shop` y la ficha de producto, sin guard; `GET /api/catalogo/**` en `permitAll`) y
+**comprar sigue exigiendo cuenta**: al agregar al carrito o pulsar el corazón sale una tarjeta
+flotante con el fondo difuminado que ofrece entrar o **crear una cuenta en cuatro pasos**
+(`/registro`: datos → acceso → dirección → intereses, los dos últimos OPCIONALES).
+
+**Las dos puertas nuevas chocaban con la MISMA pared, y es lo único no obvio de todo el
+bloque**: una petición anónima no trae JWT, así que `PgSessionRoleAspect` no asume rol y la
+transacción corre como `retailmind_app` —LOGIN **NOINHERIT**, sin un solo privilegio de
+negocio—. Abrir la línea de `SecurityConfig` no habría bastado: el catálogo habría muerto con un
+42501 en la primera tabla, y el registro no habría podido escribir nada. La respuesta es la que
+el proyecto ya usa: un **rol de motor para leer** y una **función SECURITY DEFINER para
+escribir**.
+
+Si vas a tocar esto:
+1. **`grp_visitante` es un rol de MOTOR y no de aplicación.** Solo SELECT, y solo sobre las SEIS
+   tablas que el catálogo consulta de verdad (producto, producto_variante, producto_categoria,
+   categoria, marca, inventario). **No lleva fila en `rol`** —nadie inicia sesión como
+   visitante—, y una guardia del script lo comprueba: con esa fila saldría en el desplegable del
+   alta de usuarios. De las seis tablas **solo `inventario` tiene RLS**, así que la quinta pieza
+   del ritual del script 87 se reduce a una política. **Las ventanas de `grupo_horario` SÍ hacen
+   falta aunque no haya login**: esa política llama a `esta_en_horario()`, que devuelve **false**
+   para un rol sin filas — el catálogo se quedaría sin stock, en silencio y sin un error.
+2. **Reutilizar `grp_cliente` para el visitante sería una línea y es la peor idea posible**: ese
+   rol ESCRIBE en carrito, pedido, pago y reseña, y lo único que lo frenaría es `app.cliente_id`,
+   o sea la capa de aplicación — justo lo que este proyecto se niega a usar como barrera.
+3. **El rol NO es un parámetro en ningún punto del alta pública.** Ni el controlador lo lee, ni
+   el servicio lo pasa, ni `fn_registrar_cliente` lo acepta en su firma (hay una guardia que
+   revienta el script si algún día aparece). Por eso `POST /api/auth/register` sigue siendo de
+   ADMIN y no se abrió: aquel SÍ toma el rol del cuerpo, y en abierto sería un
+   `{"rol":"ADMIN"}` de escalada en una línea. Probado: mandando `rol: ADMIN` al alta pública, la
+   cuenta sale CLIENTE y su token recibe 403 en la gestión de usuarios.
+4. **La cuenta se crea al terminar el PASO 2, no al final.** Es lo que hace que «omitir» signifique
+   algo: si se creara al final, saltarse la dirección sería mandarla vacía. Y como los pasos 3 y 4
+   ya van con la sesión recién abierta, **ni la dirección ni los intereses viajan por una ruta
+   anónima** — no hubo que abrir un solo permiso más. Efecto secundario buscado: cerrar el
+   navegador en el paso 3 deja una cuenta usable, no un registro a medias.
+5. **`uq_cliente_identificacion` es UNIQUE sobre (tipo, número)** y el choque salía como el texto
+   genérico del motor («referencia inexistente, duplicado o valor fuera de rango»), que no dice
+   que lo repetido es tu cédula. La función levanta ahora `REGISTRO_IDENT_DUPLICADA` y el
+   servicio lo traduce a un 409 que la nombra. Lo descubrió la suite al correr por SEGUNDA vez:
+   la primera pasó porque la cédula aún no existía.
+6. **El escaparate público destapó cinco llamadas de CLIENTE que el catálogo hacía siempre** —
+   carrito, lista de deseos, direcciones, recomendaciones y la señal de eventos, más los
+   «similares» de la ficha—. Todas llevaban `error: () => {}`, así que los 403 **no se veían en
+   pantalla** mientras ensuciaban la consola y el registro del servidor en cada visita. Se cortan
+   en el origen (`ShopUiService.hayCliente` y dos guardas en la tienda): si no hay cliente, no se
+   pregunta. La suite lo vigila mirando las RESPUESTAS HTTP, no lo pintado.
+7. **El muro no es una barrera de seguridad y no debe leerse como tal.** El login que usa es el
+   de siempre —tiene que serlo: el personal también entra por ahí—; lo que hace es mirar el ROL
+   de la sesión recién abierta y, si no es CLIENTE, llevar a esa persona al sistema interno en
+   vez de devolverla al carrito. Un GERENTE recibe 403 en `/api/carrito` con muro o sin él.
+   El parámetro `?volver=` **solo admite rutas internas**, o sería un redirector abierto.
+8. **El censo de RLS subió y está declarado**: **51 tablas y 98 políticas** (eran 50 y 95). Las
+   nuevas son `cliente_categoria_interes` con sus dos políticas y `pol_visitante_catalogo` sobre
+   `inventario`. P03 exige esos números: al cambiarlos hay que decir de dónde sale cada fila, o la
+   comprobación se vuelve decorativa.
+
+Reversión: `retailmind/sql/postgres/99_revert_tienda_publica.sql` (probado). Verificación:
+**`pruebas/p16_tienda_publica.js`, 47/47** — escaparate sin cuenta, muro con su fondo difuminado
+y su motivo, el desvío del GERENTE, el alta paso a paso, y que lo guardado en los pasos
+opcionales esté de verdad ahí. Sin regresión: **P03 43/43 · P04 126/126 · P11 65/65 · P14 86/86 ·
+P15 85/85**.
