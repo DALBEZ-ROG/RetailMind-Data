@@ -1,195 +1,354 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
-import { Subject } from 'rxjs';
+import { Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { Subject, Subscription } from 'rxjs';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
-import { MatCardModule } from '@angular/material/card';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
-import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { MatBadgeModule } from '@angular/material/badge';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { ShopService } from './shop.service';
+import { ShopUiService } from './shop-ui.service';
+import { paletaCategoria, PaletaCategoria } from './catalogo-visual';
 import { mensajeError } from '../../core/services/api-error.util';
 
-const CATEGORY_ICONS: Record<number, string> = {
-  1: 'devices', 2: 'shopping_basket', 3: 'sports_soccer', 4: 'watch',
-  5: 'spa', 6: 'home', 7: 'directions_walk', 8: 'checkroom',
-  9: 'checkroom', 10: 'checkroom', 11: 'category'
-};
-
-const CATEGORY_COLORS: Record<number, { bg: string; border: string; icon: string }> = {
-  1: { bg: '#e3f2fd', border: '#90caf9', icon: '#1565c0' },
-  2: { bg: '#fff3e0', border: '#ffcc80', icon: '#e65100' },
-  3: { bg: '#e8f5e9', border: '#a5d6a7', icon: '#2e7d32' },
-  4: { bg: '#fff8e1', border: '#ffe082', icon: '#f57f17' },
-  5: { bg: '#fce4ec', border: '#f48fb1', icon: '#880e4f' },
-  6: { bg: '#e0f2f1', border: '#80cbc4', icon: '#00695c' },
-  7: { bg: '#ede7f6', border: '#ce93d8', icon: '#4a148c' },
-  8: { bg: '#e8eaf6', border: '#9fa8da', icon: '#1a237e' }
-};
+/** Un tramo de precio de los accesos rápidos del panel de filtros. */
+interface TramoPrecio {
+  etiqueta: string;
+  min: number | null;
+  max: number | null;
+}
 
 /**
  * Catálogo de la tienda del cliente: productos REALES de PostgreSQL
- * (producto/producto_variante con stock de inventario), con búsqueda y
- * paginación en servidor (~1.200 productos). Solo rol CLIENTE (roleGuard).
+ * (producto/producto_variante con stock de inventario). Solo rol CLIENTE.
+ *
+ * TODO EL ESTADO DE FILTRADO VIVE EN LA URL (`q`, `cat`, `marca`, `min`,
+ * `max`, `page`, `size`). No es cosmético: es lo que permite que el campo de
+ * búsqueda de la barra superior —que está en `app.component`, fuera de este
+ * componente— dispare una búsqueda navegando, que el botón «atrás» del
+ * navegador deshaga un filtro y que un resultado se pueda compartir por enlace.
+ * El componente NUNCA guarda el filtro en un campo y luego consulta: escribe en
+ * la URL y reacciona a lo que la URL diga.
+ *
+ * LO QUE FILTRA EL SERVIDOR Y LO QUE NO. Búsqueda, categoría, marca y rango de
+ * precio los resuelve `/api/catalogo/productos` sobre el catálogo entero. El
+ * ORDEN y el «solo disponibles» NO: el endpoint no los ofrece, así que se
+ * aplican sobre la página ya recibida y la pantalla lo DICE al lado del
+ * control. Es la diferencia entre refinar 6.217 productos y reordenar 24.
  */
 @Component({
   selector: 'app-shop',
   standalone: true,
   imports: [
-    CommonModule, FormsModule, MatCardModule, MatButtonModule,
-    MatIconModule, MatFormFieldModule, MatInputModule, MatSelectModule,
-    MatPaginatorModule, MatSnackBarModule, MatBadgeModule, MatProgressSpinnerModule
+    CommonModule, FormsModule, RouterLink, MatButtonModule, MatIconModule,
+    MatPaginatorModule, MatSnackBarModule, MatTooltipModule
   ],
   templateUrl: './shop.component.html',
-  styleUrl: './shop.component.scss'
+  styleUrls: ['./shop-shared.scss', './shop.component.scss']
 })
 export class ShopComponent implements OnInit, OnDestroy {
 
+  // ── Datos ────────────────────────────────────────────────────────────────
   productos: any[] = [];
+  /** Lo que se pinta: `productos` tras el orden y el «solo disponibles». */
+  vista: any[] = [];
   categorias: any[] = [];
   marcas: string[] = [];
+  destacados: any[] = [];
   totalProductos = 0;
-  page = 0;
-  size = 12;
   loading = false;
+  primeraCarga = true;
 
-  // Filtros (se aplican en el servidor)
+  // ── Filtros del servidor (espejo de la URL) ──────────────────────────────
+  busqueda = '';
   categoriaSeleccionada: number | null = null;
   marcaSeleccionada: string | null = null;
-  busqueda = '';
+  precioMin: number | null = null;
+  precioMax: number | null = null;
+  page = 0;
+  size = 24;
 
-  // Búsqueda fluida: se dispara sola tras una pausa de tipeo (server-side)
+  // ── Refinamientos de la página recibida (no del catálogo) ────────────────
+  orden: 'relevancia' | 'precio_asc' | 'precio_desc' | 'nombre' | 'stock' = 'relevancia';
+  soloDisponibles = false;
+
+  // ── Preferencias de presentación ─────────────────────────────────────────
+  vistaLista = false;
+  filtrosAbiertos = false;      // en móvil el panel se despliega
+  marcaFiltro = '';             // buscador dentro de la lista de marcas
+  panel = { categorias: true, marcas: true, precio: true, disponibilidad: true };
+
+  /** Campos del rango de precio antes de aplicarse (no tocan la URL al teclear). */
+  precioMinBorrador: number | null = null;
+  precioMaxBorrador: number | null = null;
+
+  readonly tramos: TramoPrecio[] = [
+    { etiqueta: 'Hasta $10',      min: null, max: 10 },
+    { etiqueta: '$10 a $30',      min: 10,   max: 30 },
+    { etiqueta: '$30 a $80',      min: 30,   max: 80 },
+    { etiqueta: '$80 a $200',     min: 80,   max: 200 },
+    { etiqueta: '$200 a $500',    min: 200,  max: 500 },
+    { etiqueta: 'Más de $500',    min: 500,  max: null }
+  ];
+
+  @ViewChild('campoBusqueda') campoBusqueda?: ElementRef<HTMLInputElement>;
+
   private readonly busqueda$ = new Subject<string>();
-
-  // Carrito badge
-  carritoCount = 0;
-
-  // Wishlist
-  productosEnWishlist = new Set<number>();
-
-  // Color de categoría activa
-  categoriaColorActiva: { bg: string; border: string; icon: string } | null = null;
+  private readonly subs = new Subscription();
 
   constructor(
     private shopService: ShopService,
+    public ui: ShopUiService,
     private router: Router,
+    private route: ActivatedRoute,
     private snackBar: MatSnackBar
   ) {}
 
   ngOnInit(): void {
-    this.busqueda$.pipe(debounceTime(350), distinctUntilChanged())
-      .subscribe(() => this.buscar());
-    this.loadProductos();
+    // La URL manda: cualquier cambio de parámetro relee el catálogo.
+    this.subs.add(this.route.queryParamMap.subscribe(p => {
+      this.busqueda = p.get('q') || '';
+      this.categoriaSeleccionada = p.get('cat') ? Number(p.get('cat')) : null;
+      this.marcaSeleccionada = p.get('marca') || null;
+      this.precioMin = p.get('min') != null ? Number(p.get('min')) : null;
+      this.precioMax = p.get('max') != null ? Number(p.get('max')) : null;
+      this.page = p.get('page') ? Number(p.get('page')) : 0;
+      this.size = p.get('size') ? Number(p.get('size')) : 24;
+      this.precioMinBorrador = this.precioMin;
+      this.precioMaxBorrador = this.precioMax;
+      this.loadProductos();
+
+      // El atajo de búsqueda de la barra (pantallas estrechas) llega con
+      // `buscar=1`: se pone el cursor en el campo del catálogo y se limpia el
+      // parámetro con `replaceUrl` para que no quede en el historial ni
+      // vuelva a disparar al pulsar «atrás».
+      if (p.get('buscar')) {
+        setTimeout(() => this.campoBusqueda?.nativeElement.focus());
+        this.router.navigate([], {
+          relativeTo: this.route,
+          queryParams: { buscar: null },
+          queryParamsHandling: 'merge',
+          replaceUrl: true
+        });
+      }
+    }));
+
+    // El campo de búsqueda de la propia pantalla (visible solo en pantallas
+    // estrechas, donde la barra superior no lo muestra) navega tras la pausa.
+    this.subs.add(this.busqueda$.pipe(debounceTime(350), distinctUntilChanged())
+      .subscribe(q => this.aplicar({ q: q || null, page: null })));
+
     this.loadCategorias();
     this.loadMarcas();
-    this.loadCarritoCount();
-    this.loadWishlistIds();
+    this.loadDestacados();
+    this.ui.refrescarTodo();
   }
 
   ngOnDestroy(): void {
     this.busqueda$.complete();
+    this.subs.unsubscribe();
   }
 
+  // ── Carga ────────────────────────────────────────────────────────────────
   loadProductos(): void {
     this.loading = true;
     const filters: any = {};
     if (this.categoriaSeleccionada) filters.categoria_id = this.categoriaSeleccionada;
     if (this.marcaSeleccionada) filters.brand = this.marcaSeleccionada;
     if (this.busqueda.trim()) filters.q = this.busqueda.trim();
+    if (this.precioMin != null) filters.min_price = this.precioMin;
+    if (this.precioMax != null) filters.max_price = this.precioMax;
 
     this.shopService.getProductos(this.page, this.size, filters).subscribe({
       next: (res) => {
-        this.productos = res.content;
-        this.totalProductos = res.totalElements;
+        this.productos = res.content || [];
+        this.totalProductos = res.totalElements || 0;
+        this.recalcularVista();
         this.loading = false;
+        this.primeraCarga = false;
       },
       error: (e) => {
         this.loading = false;
+        this.primeraCarga = false;
         this.productos = [];
+        this.vista = [];
         this.snackBar.open(mensajeError(e, 'No se pudo cargar el catálogo'), 'Cerrar', { duration: 4000 });
       }
     });
   }
 
-  buscar(): void {
-    this.page = 0;
-    this.loadProductos();
-  }
-
-  /** Cada tecla alimenta el Subject; buscar() se dispara tras la pausa. */
-  onBusquedaCambia(): void {
-    this.busqueda$.next(this.busqueda.trim());
-  }
-
-  limpiarBusqueda(): void {
-    if (!this.busqueda) return;
-    this.busqueda = '';
-    this.buscar();
-  }
-
-  filtrarMarca(): void {
-    this.page = 0;
-    this.loadProductos();
-  }
-
   loadCategorias(): void {
     this.shopService.getCategorias().subscribe({
-      next: (cats) => this.categorias = cats,
+      next: (cats) => this.categorias = cats || [],
       error: () => {}
     });
   }
 
   loadMarcas(): void {
     this.shopService.getMarcas().subscribe({
-      next: (m) => this.marcas = m,
+      next: (m) => this.marcas = m || [],
       error: () => {}
     });
+  }
+
+  /**
+   * Carrusel de la portada. Sale de `/api/recomendaciones`, que degrada sola a
+   * «populares» cuando ClickHouse no responde, así que el bloque nunca queda
+   * en error: o trae recomendación personalizada o trae destacados.
+   */
+  loadDestacados(): void {
+    this.shopService.getRecomendaciones().subscribe({
+      next: (r) => this.destacados = (r?.recomendaciones || []).slice(0, 8),
+      error: () => this.destacados = []
+    });
+  }
+
+  /** Orden y «solo disponibles» se aplican aquí, sobre la página recibida. */
+  recalcularVista(): void {
+    let lista = this.soloDisponibles
+      ? this.productos.filter(p => Number(p.stock) > 0)
+      : this.productos.slice();
+
+    switch (this.orden) {
+      case 'precio_asc':  lista.sort((a, b) => Number(a.price) - Number(b.price)); break;
+      case 'precio_desc': lista.sort((a, b) => Number(b.price) - Number(a.price)); break;
+      case 'nombre':      lista.sort((a, b) => String(a.nombre).localeCompare(String(b.nombre), 'es')); break;
+      case 'stock':       lista.sort((a, b) => Number(b.stock) - Number(a.stock)); break;
+    }
+    this.vista = lista;
+  }
+
+  // ── Escritura del filtro en la URL ───────────────────────────────────────
+  /** Fusiona parámetros; `null` borra el parámetro de la URL. */
+  private aplicar(cambios: Record<string, any>): void {
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: cambios,
+      queryParamsHandling: 'merge'
+    });
+  }
+
+  onBusquedaCambia(): void {
+    this.busqueda$.next(this.busqueda.trim());
+  }
+
+  filtrarCategoria(catId: number | null): void {
+    const nueva = this.categoriaSeleccionada === catId ? null : catId;
+    this.aplicar({ cat: nueva, page: null });
+  }
+
+  filtrarMarca(m: string | null): void {
+    const nueva = this.marcaSeleccionada === m ? null : m;
+    this.aplicar({ marca: nueva, page: null });
+  }
+
+  aplicarTramo(t: TramoPrecio): void {
+    const yaActivo = this.precioMin === t.min && this.precioMax === t.max;
+    this.aplicar({
+      min: yaActivo ? null : t.min,
+      max: yaActivo ? null : t.max,
+      page: null
+    });
+  }
+
+  tramoActivo(t: TramoPrecio): boolean {
+    return this.precioMin === t.min && this.precioMax === t.max;
+  }
+
+  aplicarRangoManual(): void {
+    const min = this.precioMinBorrador;
+    const max = this.precioMaxBorrador;
+    if (min != null && max != null && min > max) {
+      this.snackBar.open('El precio mínimo no puede ser mayor que el máximo', 'OK', { duration: 3000 });
+      return;
+    }
+    this.aplicar({ min: min ?? null, max: max ?? null, page: null });
+  }
+
+  quitarBusqueda(): void { this.aplicar({ q: null, page: null }); }
+  quitarCategoria(): void { this.aplicar({ cat: null, page: null }); }
+  quitarMarca(): void { this.aplicar({ marca: null, page: null }); }
+  quitarPrecio(): void { this.aplicar({ min: null, max: null, page: null }); }
+
+  limpiarTodo(): void {
+    this.soloDisponibles = false;
+    this.orden = 'relevancia';
+    this.router.navigate([], { relativeTo: this.route, queryParams: {} });
+  }
+
+  onPageChange(e: PageEvent): void {
+    this.aplicar({ page: e.pageIndex || null, size: e.pageSize });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // ── Estado derivado para la plantilla ────────────────────────────────────
+  get hayFiltros(): boolean {
+    return !!(this.busqueda || this.categoriaSeleccionada || this.marcaSeleccionada
+           || this.precioMin != null || this.precioMax != null);
+  }
+
+  get nombreCategoria(): string {
+    const c = this.categorias.find(x => Number(x.categoriaId) === Number(this.categoriaSeleccionada));
+    return c ? c.nombre : '';
+  }
+
+  get etiquetaPrecio(): string {
+    if (this.precioMin != null && this.precioMax != null) return `$${this.precioMin} – $${this.precioMax}`;
+    if (this.precioMin != null) return `Desde $${this.precioMin}`;
+    if (this.precioMax != null) return `Hasta $${this.precioMax}`;
+    return '';
+  }
+
+  /** «25-48 de 6.217» — el rango real de la página, no el de la vista. */
+  get rangoDesde(): number {
+    return this.totalProductos === 0 ? 0 : this.page * this.size + 1;
+  }
+
+  get rangoHasta(): number {
+    return Math.min((this.page + 1) * this.size, this.totalProductos);
+  }
+
+  /** Cuántos productos de la página oculta el refinamiento local. */
+  get ocultosPorRefinamiento(): number {
+    return this.productos.length - this.vista.length;
+  }
+
+  get marcasFiltradas(): string[] {
+    const t = this.marcaFiltro.trim().toLowerCase();
+    return t ? this.marcas.filter(m => m.toLowerCase().includes(t)) : this.marcas;
+  }
+
+  get esqueletos(): number[] {
+    return Array.from({ length: this.size > 24 ? 12 : this.size }, (_, i) => i);
+  }
+
+  // ── Presentación de una tarjeta ──────────────────────────────────────────
+  paleta(p: any): PaletaCategoria {
+    return paletaCategoria(p?.categoriaNombre, p?.categoriaId);
+  }
+
+  paletaCat(cat: any): PaletaCategoria {
+    return paletaCategoria(cat?.nombre, cat?.categoriaId);
+  }
+
+  /** Parte entera del precio, para pintarla grande y los centavos pequeños. */
+  entero(precio: any): string {
+    return Math.floor(Math.abs(Number(precio) || 0)).toLocaleString('en-US');
+  }
+
+  decimal(precio: any): string {
+    const n = Math.abs(Number(precio) || 0);
+    return (Math.round((n - Math.floor(n)) * 100)).toString().padStart(2, '0');
   }
 
   trackByProducto(_i: number, p: any): number {
     return p.productoId;
   }
 
-  loadCarritoCount(): void {
-    this.shopService.getCarrito().subscribe({
-      next: (items) => this.carritoCount = items.length,
-      error: () => {}
-    });
-  }
-
-  loadWishlistIds(): void {
-    this.shopService.getWishlist().subscribe({
-      next: (items) => this.productosEnWishlist = new Set(items.map(i => Number(i.productoId))),
-      error: () => {}
-    });
-  }
-
-  isInWishlist(productoId: number): boolean {
-    return this.productosEnWishlist.has(Number(productoId));
-  }
-
-  filtrarCategoria(catId: number | null): void {
-    this.categoriaSeleccionada = this.categoriaSeleccionada === catId ? null : catId;
-    this.categoriaColorActiva = this.categoriaSeleccionada
-      ? (CATEGORY_COLORS[this.categoriaSeleccionada] || null)
-      : null;
-    this.page = 0;
-    this.loadProductos();
-  }
-
-  onPageChange(e: PageEvent): void {
-    this.page = e.pageIndex;
-    this.size = e.pageSize;
-    this.loadProductos();
-  }
-
+  // ── Acciones ─────────────────────────────────────────────────────────────
   verProducto(productoId: number): void {
     this.router.navigate(['/shop/producto', productoId]);
   }
@@ -198,67 +357,37 @@ export class ShopComponent implements OnInit, OnDestroy {
     event.stopPropagation();
     this.shopService.agregarAlCarrito(producto.productoId, 1).subscribe({
       next: () => {
-        this.carritoCount++;
-        this.snackBar.open('Agregado al carrito', 'OK', { duration: 2000, panelClass: ['snack-success'] });
+        this.ui.refrescarCarrito();
+        this.snackBar.open(`«${producto.nombre}» agregado al carrito`, 'Ver carrito',
+          { duration: 3000, panelClass: ['snack-success'] })
+          .onAction().subscribe(() => this.router.navigate(['/shop/carrito']));
       },
-      error: (e) => this.snackBar.open(mensajeError(e, 'Error al agregar'), 'Cerrar',
-        { duration: 3000, panelClass: ['snack-error'] })
+      error: (e) => this.snackBar.open(mensajeError(e, 'No se pudo agregar al carrito'), 'Cerrar',
+        { duration: 3500, panelClass: ['snack-error'] })
     });
   }
 
   toggleWishlist(producto: any, event: Event): void {
     event.stopPropagation();
-    const productoId = Number(producto.productoId);
+    const id = Number(producto.productoId);
 
-    if (this.productosEnWishlist.has(productoId)) {
-      this.shopService.eliminarDeWishlist(productoId).subscribe({
+    if (this.ui.estaEnWishlist(id)) {
+      this.shopService.eliminarDeWishlist(id).subscribe({
         next: () => {
-          this.productosEnWishlist.delete(productoId);
-          this.snackBar.open('Eliminado de wishlist', 'OK', { duration: 2000 });
+          this.ui.marcarWishlist(id, false);
+          this.snackBar.open('Quitado de tu lista de deseos', 'OK', { duration: 2000 });
         },
-        error: (e) => this.snackBar.open(mensajeError(e, 'Error'), 'Cerrar', { duration: 2000 })
+        error: (e) => this.snackBar.open(mensajeError(e, 'No se pudo quitar'), 'Cerrar', { duration: 2500 })
       });
     } else {
-      this.shopService.agregarAWishlist(productoId).subscribe({
+      this.shopService.agregarAWishlist(id).subscribe({
         next: () => {
-          this.productosEnWishlist.add(productoId);
-          this.snackBar.open('Agregado a wishlist ❤️', 'OK', { duration: 2000 });
+          this.ui.marcarWishlist(id, true);
+          this.snackBar.open('Guardado en tu lista de deseos', 'Ver lista', { duration: 2500 })
+            .onAction().subscribe(() => this.router.navigate(['/wishlist']));
         },
-        error: (e) => this.snackBar.open(mensajeError(e, 'Ya esta en wishlist'), 'OK', { duration: 2000 })
+        error: (e) => this.snackBar.open(mensajeError(e, 'Ya está en tu lista'), 'OK', { duration: 2500 })
       });
     }
-  }
-
-  irAlCarrito(): void {
-    this.router.navigate(['/shop/carrito']);
-  }
-
-  getCategoryIcon(catId: number): string {
-    return CATEGORY_ICONS[catId] || 'inventory_2';
-  }
-
-  // ── Dynamic card styles based on active category ─────────────────────────
-  getCardStyle(producto: any): Record<string, string> {
-    if (!this.categoriaSeleccionada || !this.categoriaColorActiva) return {};
-    if (producto.categoriaId === this.categoriaSeleccionada) {
-      return { 'border': '1.5px solid ' + this.categoriaColorActiva.border };
-    }
-    return {};
-  }
-
-  getImageAreaStyle(producto: any): Record<string, string> {
-    if (!this.categoriaSeleccionada || !this.categoriaColorActiva) return {};
-    if (producto.categoriaId === this.categoriaSeleccionada) {
-      return { 'background-color': this.categoriaColorActiva.bg };
-    }
-    return {};
-  }
-
-  getIconStyle(producto: any): Record<string, string> {
-    if (!this.categoriaSeleccionada || !this.categoriaColorActiva) return {};
-    if (producto.categoriaId === this.categoriaSeleccionada) {
-      return { 'color': this.categoriaColorActiva.icon, 'opacity': '0.7' };
-    }
-    return {};
   }
 }

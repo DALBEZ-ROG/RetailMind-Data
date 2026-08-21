@@ -1,0 +1,449 @@
+// ═════════════════════════════════════════════════════════════════════════════
+// TIENDA — piezas compartidas por catálogo, detalle, carrito, checkout y
+// wishlist. Complementa styles.scss (de donde salen --primary, --accent y los
+// radios) sin redefinir ninguna de sus variables globales.
+//
+// Los tokens propios de la tienda viven aquí y NO en :root porque solo los usan
+// estas cinco pantallas: el back-office conserva su paleta intacta.
+// ═════════════════════════════════════════════════════════════════════════════
+
+.shop-scope {
+  // Ancho útil: la rejilla de producto necesita más aire que un formulario.
+  --tienda-ancho: 1500px;
+  // Tinta del precio y de las señales de oferta. Ámbar y no rojo: el rojo ya
+  // significa error en el resto del sistema.
+  --tienda-oferta: #b45309;
+  --tienda-oferta-suave: #fff7ed;
+  --tienda-borde: #e3e8f0;
+  --tienda-borde-fuerte: #cfd8e6;
+  --tienda-superficie: #ffffff;
+  --tienda-superficie-2: #f7f9fc;
+  --tienda-texto: #16233d;
+  --tienda-texto-2: #5a6b86;
+  --tienda-texto-3: #8595ad;
+  --tienda-exito: #1c7c4a;
+  --tienda-alerta: #b3541e;
+  --tienda-sombra: 0 1px 2px rgba(22, 35, 61, .06), 0 8px 24px rgba(22, 35, 61, .06);
+  --tienda-sombra-alta: 0 4px 12px rgba(22, 35, 61, .10), 0 18px 44px rgba(22, 35, 61, .12);
+
+  color: var(--tienda-texto);
+  max-width: var(--tienda-ancho);
+  margin: 0 auto;
+}
+
+// ── Migas de pan ────────────────────────────────────────────────────────────
+.tienda-migas {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  color: var(--tienda-texto-2);
+  margin-bottom: 14px;
+
+  a {
+    color: var(--primary-light);
+    text-decoration: none;
+    cursor: pointer;
+
+    &:hover { text-decoration: underline; }
+  }
+
+  mat-icon {
+    font-size: 15px;
+    width: 15px;
+    height: 15px;
+    color: var(--tienda-texto-3);
+  }
+
+  .miga-actual {
+    color: var(--tienda-texto);
+    font-weight: 600;
+  }
+}
+
+// ── Superficies ─────────────────────────────────────────────────────────────
+.tienda-panel {
+  background: var(--tienda-superficie);
+  border: 1px solid var(--tienda-borde);
+  border-radius: 14px;
+  box-shadow: var(--tienda-sombra);
+}
+
+.tienda-titulo-seccion {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -.3px;
+  margin: 0 0 14px;
+  color: var(--tienda-texto);
+
+  mat-icon {
+    color: var(--primary-light);
+    font-size: 22px;
+    width: 22px;
+    height: 22px;
+  }
+
+  .titulo-cola {
+    margin-left: auto;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--tienda-texto-2);
+  }
+}
+
+// ── Tarjeta de producto (rejilla) ───────────────────────────────────────────
+.p-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--tienda-superficie);
+  border: 1px solid var(--tienda-borde);
+  border-radius: 14px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: box-shadow .22s ease, transform .22s ease, border-color .22s ease;
+
+  &:hover {
+    transform: translateY(-3px);
+    border-color: var(--tienda-borde-fuerte);
+    box-shadow: var(--tienda-sombra-alta);
+
+    .p-card-lienzo mat-icon { transform: scale(1.08); }
+  }
+
+  &.agotado .p-card-lienzo {
+    filter: grayscale(.75);
+    opacity: .7;
+  }
+}
+
+.p-card-lienzo {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid var(--tienda-borde);
+
+  mat-icon {
+    font-size: 58px;
+    width: 58px;
+    height: 58px;
+    opacity: .8;
+    transition: transform .25s cubic-bezier(.34, 1.4, .64, 1);
+  }
+}
+
+// Corazón sobre el lienzo: en la esquina, no en la fila de acciones, para que
+// no se confunda con «agregar».
+.p-card-corazon {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--tienda-borde);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .92);
+  backdrop-filter: blur(6px);
+  cursor: pointer;
+  transition: var(--transition);
+
+  mat-icon {
+    font-size: 19px;
+    width: 19px;
+    height: 19px;
+    color: var(--tienda-texto-2);
+    transition: var(--transition);
+  }
+
+  &:hover { transform: scale(1.1); border-color: #f0a8b8; }
+  &.activo mat-icon { color: #e0245e; }
+}
+
+// Cintas de estado, apiladas arriba a la izquierda del lienzo.
+.p-card-cintas {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  align-items: flex-start;
+}
+
+.cinta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: .3px;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, .94);
+  border: 1px solid var(--tienda-borde);
+  color: var(--tienda-texto-2);
+
+  mat-icon { font-size: 13px; width: 13px; height: 13px; }
+
+  &.cinta-agotado { background: #f1f3f7; color: #6b7688; }
+  &.cinta-ultimas { background: #fff4ed; border-color: #f3d3bd; color: var(--tienda-alerta); }
+  &.cinta-stock   { background: #eaf7f0; border-color: #c4e6d3; color: var(--tienda-exito); }
+}
+
+.p-card-cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 14px 0;
+  flex: 1;
+}
+
+.p-marca {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .7px;
+  text-transform: uppercase;
+  color: var(--primary-light);
+}
+
+.p-nombre {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  margin: 0;
+  color: var(--tienda-texto);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 38px;
+}
+
+.p-categoria {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  color: var(--tienda-texto-3);
+
+  mat-icon { font-size: 13px; width: 13px; height: 13px; }
+}
+
+.p-precio {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  margin-top: 6px;
+
+  .simbolo { font-size: 13px; font-weight: 700; color: var(--tienda-oferta); }
+  .entero  { font-size: 23px; font-weight: 800; letter-spacing: -.6px; color: var(--tienda-oferta); line-height: 1; }
+  .decimal { font-size: 12.5px; font-weight: 700; color: var(--tienda-oferta); position: relative; top: -7px; }
+}
+
+.p-stock {
+  font-size: 11.5px;
+  font-weight: 600;
+  margin-top: 2px;
+
+  &.hay  { color: var(--tienda-exito); }
+  &.poco { color: var(--tienda-alerta); }
+  &.no   { color: #8a94a6; }
+}
+
+.p-card-acciones {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px 14px;
+}
+
+.btn-agregar {
+  // `flex: 1 1 auto` y no `flex: 1`: el atajo pone `flex-basis: 0%`, y dentro
+  // de un contenedor en COLUMNA —la caja de compra de la ficha, el estado
+  // vacío— la base sustituye a la altura y el botón se aplasta a unos pocos
+  // píxeles. Con `auto`, en fila sigue creciendo hasta llenar el hueco y en
+  // columna respeta su altura.
+  flex: 1 1 auto;
+  height: 38px;
+  border: none;
+  border-radius: 10px;
+  background: var(--primary-gradient);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: var(--transition);
+  box-shadow: 0 2px 8px rgba(26, 35, 126, .22);
+
+  mat-icon { font-size: 17px; width: 17px; height: 17px; }
+
+  &:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(26, 35, 126, .3); }
+  &:disabled { background: #eceff4; color: #97a1b2; box-shadow: none; cursor: not-allowed; }
+}
+
+.btn-ghost {
+  height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--tienda-borde-fuerte);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--tienda-texto);
+  font-size: 13px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: var(--transition);
+
+  mat-icon { font-size: 17px; width: 17px; height: 17px; }
+
+  &:hover { background: var(--tienda-superficie-2); border-color: var(--primary-light); color: var(--primary); }
+}
+
+// ── Esqueleto de carga ──────────────────────────────────────────────────────
+// Sustituye al spinner: mantiene la altura de la rejilla, así que la página no
+// da el salto que daba al llegar los productos.
+.esqueleto {
+  border: 1px solid var(--tienda-borde);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--tienda-superficie);
+
+  .esq-lienzo { aspect-ratio: 4 / 3; }
+  .esq-linea { height: 11px; border-radius: 6px; margin: 10px 14px 0; }
+  .esq-linea.corta { width: 40%; }
+  .esq-linea.larga { width: 85%; }
+  .esq-linea.precio { width: 30%; height: 18px; margin-top: 14px; }
+  .esq-boton { height: 38px; border-radius: 10px; margin: 14px; }
+}
+
+.esq-lienzo,
+.esq-linea,
+.esq-boton {
+  background: linear-gradient(100deg, #eef1f6 30%, #f7f9fc 50%, #eef1f6 70%);
+  background-size: 220% 100%;
+  animation: esq-brillo 1.3s ease-in-out infinite;
+}
+
+@keyframes esq-brillo {
+  0%   { background-position: 130% 0; }
+  100% { background-position: -30% 0; }
+}
+
+// ── Chips de filtro activo ──────────────────────────────────────────────────
+// Los usan el catálogo y «Mis pedidos». Viven aquí y no en el SCSS del
+// catálogo porque el filtro activo es la misma pieza en las dos pantallas: al
+// tenerlos allí, en «Mis pedidos» salían como recuadros sin estilo.
+.chips-activos {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.chip-etq {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--tienda-texto-3);
+}
+
+.chip-activo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid rgba(57, 73, 171, .3);
+  border-radius: 999px;
+  background: rgba(57, 73, 171, .09);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--primary);
+  cursor: pointer;
+  max-width: 320px;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: var(--transition);
+
+  mat-icon { font-size: 15px; width: 15px; height: 15px; flex: 0 0 auto; }
+  mat-icon.x { color: var(--tienda-texto-2); }
+
+  &:hover { background: rgba(57, 73, 171, .16); }
+}
+
+.chip-limpiar {
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--tienda-alerta);
+  cursor: pointer;
+
+  &:hover { text-decoration: underline; }
+}
+
+// ── Estado vacío ────────────────────────────────────────────────────────────
+.tienda-vacio {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 56px 24px;
+  text-align: center;
+  background: var(--tienda-superficie);
+  border: 1px dashed var(--tienda-borde-fuerte);
+  border-radius: 16px;
+
+  .vacio-icono {
+    font-size: 46px;
+    width: 46px;
+    height: 46px;
+    color: var(--tienda-borde-fuerte);
+  }
+
+  h3 { margin: 0; font-size: 17px; font-weight: 700; }
+  p  { margin: 0; font-size: 13.5px; color: var(--tienda-texto-2); max-width: 440px; }
+}
+
+// ── Campos propios de la tienda ─────────────────────────────────────────────
+// Compactos y con contorno: en un panel de filtros de 260 px, el campo de
+// Material con etiqueta flotante consume 56 px de alto por filtro.
+.campo-tienda {
+  width: 100%;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--tienda-borde-fuerte);
+  border-radius: 9px;
+  background: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--tienda-texto);
+  transition: var(--transition);
+
+  &::placeholder { color: var(--tienda-texto-3); }
+
+  &:focus {
+    outline: none;
+    border-color: var(--primary-light);
+    box-shadow: 0 0 0 3px rgba(57, 73, 171, .14);
+  }
+}

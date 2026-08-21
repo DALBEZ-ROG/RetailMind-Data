@@ -1,110 +1,356 @@
-<div class="shop-container">
-  <!-- Header de tienda -->
-  <div class="shop-header">
-    <h2 class="shop-title">
-      <mat-icon>storefront</mat-icon>
-      RetailMind Shop
-    </h2>
-    <div class="header-actions">
-      <button mat-icon-button (click)="irAlCarrito()" [matBadge]="carritoCount"
-              matBadgeColor="accent" [matBadgeHidden]="carritoCount === 0">
-        <mat-icon>shopping_cart</mat-icon>
-      </button>
-    </div>
+<div class="shop-scope catalogo">
+
+  <!-- ── Franja de departamentos ─────────────────────────────────────────── -->
+  <nav class="departamentos" aria-label="Departamentos">
+    <button class="dep" [class.activo]="!categoriaSeleccionada"
+            (click)="filtrarCategoria(null)">
+      <mat-icon>apps</mat-icon>
+      <span>Todo el catálogo</span>
+    </button>
+    <button class="dep" *ngFor="let c of categorias"
+            [class.activo]="categoriaSeleccionada === c.categoriaId"
+            (click)="filtrarCategoria(c.categoriaId)">
+      <mat-icon [style.color]="categoriaSeleccionada === c.categoriaId ? null : paletaCat(c).tinta">{{ paletaCat(c).icono }}</mat-icon>
+      <span>{{ c.nombre }}</span>
+      <em>{{ c.total }}</em>
+    </button>
+  </nav>
+
+  <!-- Búsqueda de la propia pantalla: solo aparece cuando la barra superior
+       es demasiado estrecha para mostrar la suya (media query en el SCSS). -->
+  <div class="busqueda-movil">
+    <mat-icon>search</mat-icon>
+    <input #campoBusqueda class="campo-tienda" [(ngModel)]="busqueda"
+           (ngModelChange)="onBusquedaCambia()"
+           placeholder="Buscar productos, marcas o SKU" aria-label="Buscar en el catálogo">
+    <button *ngIf="busqueda" class="limpiar-inline" (click)="quitarBusqueda()" aria-label="Limpiar búsqueda">
+      <mat-icon>close</mat-icon>
+    </button>
   </div>
 
-  <!-- Búsqueda y filtros en servidor (1.200+ productos, paginado) -->
-  <div class="search-row" style="display:flex; gap:12px; flex-wrap:wrap; align-items:baseline;">
-    <mat-form-field appearance="outline" class="search-field" style="flex:1; min-width:260px;">
-      <mat-label>Buscar productos (nombre, marca o SKU)</mat-label>
-      <input matInput [(ngModel)]="busqueda" (ngModelChange)="onBusquedaCambia()"
-             (keyup.enter)="buscar()" placeholder="Ej. Samsung">
-      <button *ngIf="busqueda" matSuffix mat-icon-button aria-label="Limpiar" (click)="limpiarBusqueda()">
-        <mat-icon>close</mat-icon>
-      </button>
-      <button matSuffix mat-icon-button aria-label="Buscar" (click)="buscar()">
-        <mat-icon>search</mat-icon>
-      </button>
-    </mat-form-field>
-    <mat-form-field appearance="outline" style="width:220px;">
-      <mat-label>Marca</mat-label>
-      <mat-select [(ngModel)]="marcaSeleccionada" (selectionChange)="filtrarMarca()">
-        <mat-option [value]="null">Todas las marcas</mat-option>
-        <mat-option *ngFor="let m of marcas" [value]="m">{{ m }}</mat-option>
-      </mat-select>
-    </mat-form-field>
-  </div>
-
-  <!-- Filtros de categoría -->
-  <div class="category-chips-container">
-    <div *ngFor="let cat of categorias"
-         class="category-chip"
-         [class.chip-electronics]="cat.nombre === 'Electrónica'"
-         [class.chip-groceries]="cat.nombre === 'Abarrotes'"
-         [class.chip-sports]="cat.nombre === 'Deportes'"
-         [class.chip-accessories]="cat.nombre === 'Accesorios'"
-         [class.chip-beauty]="cat.nombre === 'Belleza'"
-         [class.chip-home]="cat.nombre === 'Hogar'"
-         [class.chip-shoes]="cat.nombre === 'Calzado'"
-         [class.chip-apparel]="cat.nombre === 'Ropa'"
-         [class.selected]="categoriaSeleccionada === cat.categoriaId"
-         (click)="filtrarCategoria(cat.categoriaId)">
-      <mat-icon>{{ getCategoryIcon(cat.categoriaId) }}</mat-icon>
-      <span>{{ cat.nombre }} ({{ cat.total }})</span>
-    </div>
-  </div>
-
-  <!-- Loading: solo en la primera carga; al paginar/buscar el grid no parpadea -->
-  <div class="loading-container" *ngIf="loading && !productos.length">
-    <mat-spinner diameter="40"></mat-spinner>
-  </div>
-
-  <!-- Grid de productos -->
-  <div class="products-grid" [style.opacity]="loading ? 0.55 : 1">
-    <mat-card class="product-card"
-              *ngFor="let p of productos; trackBy: trackByProducto"
-              [class.categoria-activa]="categoriaSeleccionada && p.categoriaId === categoriaSeleccionada"
-              [class.categoria-inactiva]="categoriaSeleccionada && p.categoriaId !== categoriaSeleccionada"
-              [ngStyle]="getCardStyle(p)"
-              (click)="verProducto(p.productoId)">
-      <div class="product-image-area"
-           [ngStyle]="getImageAreaStyle(p)">
-        <mat-icon [ngStyle]="getIconStyle(p)">{{ getCategoryIcon(p.categoriaId) }}</mat-icon>
+  <!-- ── Portada: solo con el catálogo sin filtrar y en la primera página ── -->
+  <section class="portada" *ngIf="!hayFiltros && page === 0">
+    <div class="hero">
+      <div class="hero-texto">
+        <span class="hero-kicker">Tienda RetailMind</span>
+        <h1>Todo el catálogo, con stock real y entrega a tu ciudad</h1>
+        <p>{{ totalProductos | number }} productos publicados en
+          {{ categorias.length }} departamentos. Precio, disponibilidad y envío
+          se calculan al instante sobre el inventario de la bodega.</p>
+        <div class="hero-sellos">
+          <span><mat-icon>verified</mat-icon> Compra verificada</span>
+          <span><mat-icon>local_shipping</mat-icon> Envío por zona</span>
+          <span><mat-icon>assignment_return</mat-icon> Devolución en 30 días</span>
+        </div>
       </div>
-      <mat-card-content class="product-info">
-        <p class="product-brand">{{ p.brand }}</p>
-        <h3 class="product-name">{{ p.nombre }}</h3>
-        <p class="product-category">{{ p.categoriaNombre }}</p>
-        <p class="product-price">${{ p.price | number:'1.2-2' }}</p>
-        <p class="product-stock" [style.color]="p.stock > 0 ? '#2e7d32' : '#c62828'">
-          {{ p.stock > 0 ? p.stock + ' disponibles' : 'Agotado' }}
-        </p>
-      </mat-card-content>
-      <mat-card-actions>
-        <button mat-raised-button color="primary" class="btn-cart"
-                [disabled]="p.stock === 0"
-                (click)="agregarAlCarrito(p, $event)">
-          <mat-icon>add_shopping_cart</mat-icon> Agregar
-        </button>
-        <button mat-icon-button class="btn-wishlist" (click)="toggleWishlist(p, $event)">
-          <mat-icon [class.wishlist-active]="isInWishlist(p.productoId)">
-            {{ isInWishlist(p.productoId) ? 'favorite' : 'favorite_border' }}
-          </mat-icon>
-        </button>
-      </mat-card-actions>
-    </mat-card>
-  </div>
+      <div class="hero-arte" aria-hidden="true">
+        <mat-icon>storefront</mat-icon>
+      </div>
+    </div>
 
-  <!-- Empty state -->
-  <div class="empty-state" *ngIf="!loading && productos.length === 0">
-    <mat-icon>inventory_2</mat-icon>
-    <p>No se encontraron productos</p>
-  </div>
+    <div class="destacados" *ngIf="destacados.length">
+      <h2 class="tienda-titulo-seccion">
+        <mat-icon>local_fire_department</mat-icon>
+        Recomendado para ti
+        <a class="titulo-cola" routerLink="/recomendaciones">Ver todas las recomendaciones →</a>
+      </h2>
+      <div class="destacados-fila">
+        <article class="d-card" *ngFor="let d of destacados; trackBy: trackByProducto"
+                 (click)="verProducto(d.productoId)">
+          <div class="d-lienzo" [style.background]="paleta(d).fondo">
+            <mat-icon [style.color]="paleta(d).tinta">{{ paleta(d).icono }}</mat-icon>
+          </div>
+          <div class="d-cuerpo">
+            <span class="d-marca">{{ d.brand }}</span>
+            <span class="d-nombre">{{ d.nombre }}</span>
+            <span class="d-precio">${{ d.price | number:'1.2-2' }}</span>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
 
-  <!-- Paginación -->
-  <mat-paginator *ngIf="totalProductos > 0"
-                 [length]="totalProductos" [pageSize]="size" [pageIndex]="page"
-                 [pageSizeOptions]="[12, 24, 48]" (page)="onPageChange($event)"
-                 showFirstLastButtons>
-  </mat-paginator>
+  <!-- Fondo del cajón de filtros: solo existe mientras el cajón está abierto,
+       y solo se ve en pantallas estrechas. Sin él, el panel flotaba sobre el
+       catálogo sin marcar que la página de atrás está en pausa. -->
+  <div class="rail-fondo" *ngIf="filtrosAbiertos" (click)="filtrosAbiertos = false"
+       aria-hidden="true"></div>
+
+  <!-- ── Cuerpo: filtros a la izquierda, resultados a la derecha ─────────── -->
+  <div class="catalogo-cuerpo">
+
+    <!-- Panel de filtros -->
+    <aside class="rail" [class.abierto]="filtrosAbiertos" aria-label="Filtros del catálogo">
+      <div class="rail-cabecera">
+        <h2><mat-icon>tune</mat-icon> Filtros</h2>
+        <button class="rail-limpiar" *ngIf="hayFiltros" (click)="limpiarTodo()">Limpiar todo</button>
+        <button class="rail-cerrar" (click)="filtrosAbiertos = false" aria-label="Cerrar filtros">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+
+      <!-- Departamento -->
+      <section class="grupo">
+        <button class="grupo-titulo" (click)="panel.categorias = !panel.categorias">
+          <span>Departamento</span>
+          <mat-icon>{{ panel.categorias ? 'expand_less' : 'expand_more' }}</mat-icon>
+        </button>
+        <div class="grupo-cuerpo lista-scroll" *ngIf="panel.categorias">
+          <button class="opcion" [class.activa]="!categoriaSeleccionada"
+                  (click)="filtrarCategoria(null)">
+            <span class="op-texto">Todos los departamentos</span>
+          </button>
+          <button class="opcion" *ngFor="let c of categorias"
+                  [class.activa]="categoriaSeleccionada === c.categoriaId"
+                  (click)="filtrarCategoria(c.categoriaId)">
+            <mat-icon class="op-icono" [style.color]="paletaCat(c).tinta">{{ paletaCat(c).icono }}</mat-icon>
+            <span class="op-texto">{{ c.nombre }}</span>
+            <span class="op-conteo">{{ c.total }}</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Marca -->
+      <section class="grupo">
+        <button class="grupo-titulo" (click)="panel.marcas = !panel.marcas">
+          <span>Marca</span>
+          <mat-icon>{{ panel.marcas ? 'expand_less' : 'expand_more' }}</mat-icon>
+        </button>
+        <div class="grupo-cuerpo" *ngIf="panel.marcas">
+          <input class="campo-tienda" [(ngModel)]="marcaFiltro"
+                 placeholder="Buscar marca…" aria-label="Buscar marca">
+          <div class="lista-scroll marcas">
+            <button class="opcion" [class.activa]="!marcaSeleccionada"
+                    (click)="filtrarMarca(null)">
+              <span class="op-texto">Todas las marcas</span>
+            </button>
+            <button class="opcion" *ngFor="let m of marcasFiltradas"
+                    [class.activa]="marcaSeleccionada === m"
+                    (click)="filtrarMarca(m)">
+              <span class="op-marca" [class.marcada]="marcaSeleccionada === m"></span>
+              <span class="op-texto">{{ m }}</span>
+            </button>
+            <p class="sin-resultados" *ngIf="!marcasFiltradas.length">
+              Ninguna marca coincide con «{{ marcaFiltro }}»
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Precio -->
+      <section class="grupo">
+        <button class="grupo-titulo" (click)="panel.precio = !panel.precio">
+          <span>Precio</span>
+          <mat-icon>{{ panel.precio ? 'expand_less' : 'expand_more' }}</mat-icon>
+        </button>
+        <div class="grupo-cuerpo" *ngIf="panel.precio">
+          <button class="tramo" *ngFor="let t of tramos"
+                  [class.activo]="tramoActivo(t)"
+                  (click)="aplicarTramo(t)">
+            {{ t.etiqueta }}
+          </button>
+          <div class="rango-manual">
+            <input class="campo-tienda" type="number" min="0" [(ngModel)]="precioMinBorrador"
+                   placeholder="Mín" aria-label="Precio mínimo">
+            <span class="guion">–</span>
+            <input class="campo-tienda" type="number" min="0" [(ngModel)]="precioMaxBorrador"
+                   placeholder="Máx" aria-label="Precio máximo">
+            <button class="btn-ir" (click)="aplicarRangoManual()" aria-label="Aplicar rango de precio">
+              <mat-icon>arrow_forward</mat-icon>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Disponibilidad -->
+      <section class="grupo">
+        <button class="grupo-titulo" (click)="panel.disponibilidad = !panel.disponibilidad">
+          <span>Disponibilidad</span>
+          <mat-icon>{{ panel.disponibilidad ? 'expand_less' : 'expand_more' }}</mat-icon>
+        </button>
+        <div class="grupo-cuerpo" *ngIf="panel.disponibilidad">
+          <label class="casilla">
+            <input type="checkbox" [(ngModel)]="soloDisponibles" (ngModelChange)="recalcularVista()">
+            <span>Solo productos con stock</span>
+          </label>
+          <p class="nota-alcance">
+            <mat-icon>info</mat-icon>
+            Se aplica a los {{ productos.length }} productos de esta página; los
+            demás filtros recorren el catálogo completo.
+          </p>
+        </div>
+      </section>
+
+      <div class="rail-ayuda">
+        <mat-icon>support_agent</mat-icon>
+        <div>
+          <strong>¿Necesitas ayuda?</strong>
+          <a routerLink="/operativo/soporte/tickets">Abrir un ticket de soporte</a>
+          <a routerLink="/operativo/soporte/faq">Preguntas frecuentes</a>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Resultados -->
+    <section class="resultados">
+
+      <div class="barra-resultados">
+        <button class="btn-filtros-movil" (click)="filtrosAbiertos = true">
+          <mat-icon>tune</mat-icon> Filtros
+        </button>
+
+        <div class="conteo">
+          <ng-container *ngIf="totalProductos > 0; else sinConteo">
+            <strong>{{ rangoDesde | number }}–{{ rangoHasta | number }}</strong>
+            de <strong>{{ totalProductos | number }}</strong> resultados
+            <span class="conteo-q" *ngIf="busqueda">para «{{ busqueda }}»</span>
+          </ng-container>
+          <ng-template #sinConteo><span>Sin resultados</span></ng-template>
+        </div>
+
+        <div class="controles">
+          <label class="control-orden">
+            <span>Ordenar</span>
+            <select class="campo-tienda" [(ngModel)]="orden" (ngModelChange)="recalcularVista()">
+              <option value="relevancia">Destacados</option>
+              <option value="precio_asc">Precio: menor a mayor</option>
+              <option value="precio_desc">Precio: mayor a menor</option>
+              <option value="nombre">Nombre (A-Z)</option>
+              <option value="stock">Mayor disponibilidad</option>
+            </select>
+            <mat-icon class="pista"
+                      matTooltip="El orden se aplica a los productos de esta página. Búsqueda, departamento, marca y precio sí recorren el catálogo completo.">
+              info_outline
+            </mat-icon>
+          </label>
+
+          <div class="toggle-vista" role="group" aria-label="Forma de ver los resultados">
+            <button [class.activo]="!vistaLista" (click)="vistaLista = false"
+                    matTooltip="Ver en cuadrícula" aria-label="Ver en cuadrícula">
+              <mat-icon>grid_view</mat-icon>
+            </button>
+            <button [class.activo]="vistaLista" (click)="vistaLista = true"
+                    matTooltip="Ver en lista" aria-label="Ver en lista">
+              <mat-icon>view_list</mat-icon>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filtros activos -->
+      <div class="chips-activos" *ngIf="hayFiltros">
+        <span class="chip-etq">Filtros activos:</span>
+        <button class="chip-activo" *ngIf="busqueda" (click)="quitarBusqueda()">
+          <mat-icon>search</mat-icon> {{ busqueda }} <mat-icon class="x">close</mat-icon>
+        </button>
+        <button class="chip-activo" *ngIf="categoriaSeleccionada" (click)="quitarCategoria()">
+          <mat-icon>category</mat-icon> {{ nombreCategoria }} <mat-icon class="x">close</mat-icon>
+        </button>
+        <button class="chip-activo" *ngIf="marcaSeleccionada" (click)="quitarMarca()">
+          <mat-icon>sell</mat-icon> {{ marcaSeleccionada }} <mat-icon class="x">close</mat-icon>
+        </button>
+        <button class="chip-activo" *ngIf="precioMin != null || precioMax != null" (click)="quitarPrecio()">
+          <mat-icon>payments</mat-icon> {{ etiquetaPrecio }} <mat-icon class="x">close</mat-icon>
+        </button>
+        <button class="chip-limpiar" (click)="limpiarTodo()">Limpiar todo</button>
+      </div>
+
+      <p class="aviso-refinado" *ngIf="soloDisponibles && ocultosPorRefinamiento > 0">
+        <mat-icon>filter_alt</mat-icon>
+        {{ ocultosPorRefinamiento === 1
+           ? '1 producto de esta página está agotado y quedó oculto'
+           : ocultosPorRefinamiento + ' productos de esta página están agotados y quedaron ocultos' }}
+        por el filtro de disponibilidad.
+      </p>
+
+      <!-- Esqueleto de la primera carga -->
+      <div class="grid" *ngIf="loading && primeraCarga">
+        <div class="esqueleto" *ngFor="let s of esqueletos">
+          <div class="esq-lienzo"></div>
+          <div class="esq-linea corta"></div>
+          <div class="esq-linea larga"></div>
+          <div class="esq-linea precio"></div>
+          <div class="esq-boton"></div>
+        </div>
+      </div>
+
+      <!-- Rejilla de productos -->
+      <div class="grid" [class.lista]="vistaLista" [class.atenuada]="loading && !primeraCarga"
+           *ngIf="!(loading && primeraCarga)">
+
+        <article class="p-card" *ngFor="let p of vista; trackBy: trackByProducto"
+                 [class.agotado]="p.stock === 0"
+                 (click)="verProducto(p.productoId)">
+
+          <div class="p-card-lienzo" [style.background]="paleta(p).fondo">
+            <mat-icon [style.color]="paleta(p).tinta">{{ paleta(p).icono }}</mat-icon>
+
+            <div class="p-card-cintas">
+              <span class="cinta cinta-agotado" *ngIf="p.stock === 0">
+                <mat-icon>block</mat-icon> Agotado
+              </span>
+              <span class="cinta cinta-ultimas" *ngIf="p.stock > 0 && p.stock <= 5">
+                <mat-icon>bolt</mat-icon> {{ p.stock === 1 ? 'Última unidad' : 'Últimas ' + p.stock }}
+              </span>
+            </div>
+
+            <button class="p-card-corazon" [class.activo]="ui.estaEnWishlist(p.productoId)"
+                    (click)="toggleWishlist(p, $event)"
+                    [matTooltip]="ui.estaEnWishlist(p.productoId) ? 'Quitar de mi lista' : 'Guardar en mi lista'"
+                    [attr.aria-label]="ui.estaEnWishlist(p.productoId) ? 'Quitar de mi lista de deseos' : 'Guardar en mi lista de deseos'">
+              <mat-icon>{{ ui.estaEnWishlist(p.productoId) ? 'favorite' : 'favorite_border' }}</mat-icon>
+            </button>
+          </div>
+
+          <div class="p-card-cuerpo">
+            <span class="p-marca">{{ p.brand || 'Sin marca' }}</span>
+            <h3 class="p-nombre">{{ p.nombre }}</h3>
+            <span class="p-categoria">
+              <mat-icon>{{ paleta(p).icono }}</mat-icon> {{ p.categoriaNombre || 'Sin categoría' }}
+            </span>
+            <p class="p-desc" *ngIf="vistaLista && p.descripcion">{{ p.descripcion }}</p>
+            <div class="p-precio">
+              <span class="simbolo">$</span>
+              <span class="entero">{{ entero(p.price) }}</span>
+              <span class="decimal">{{ decimal(p.price) }}</span>
+            </div>
+            <span class="p-stock" [class.hay]="p.stock > 5" [class.poco]="p.stock > 0 && p.stock <= 5"
+                  [class.no]="p.stock === 0">
+              {{ (p.stock === 0 ? 'Sin stock'
+                  : (p.stock === 1 ? '1 disponible' : p.stock + ' disponibles')) + ' · SKU ' + p.sku }}
+            </span>
+          </div>
+
+          <div class="p-card-acciones">
+            <button class="btn-agregar" [disabled]="p.stock === 0"
+                    (click)="agregarAlCarrito(p, $event)">
+              <mat-icon>add_shopping_cart</mat-icon>
+              {{ p.stock === 0 ? 'No disponible' : 'Agregar' }}
+            </button>
+            <button class="btn-ghost" (click)="verProducto(p.productoId); $event.stopPropagation()"
+                    matTooltip="Ver ficha del producto" aria-label="Ver ficha del producto">
+              <mat-icon>visibility</mat-icon>
+            </button>
+          </div>
+        </article>
+
+        <!-- Vacío -->
+        <div class="tienda-vacio" *ngIf="!loading && vista.length === 0">
+          <mat-icon class="vacio-icono">search_off</mat-icon>
+          <h3>No encontramos productos con estos filtros</h3>
+          <p *ngIf="hayFiltros">Prueba con menos filtros o revisa la ortografía de la búsqueda.</p>
+          <p *ngIf="!hayFiltros && soloDisponibles">Todos los productos de esta página están agotados.</p>
+          <button class="btn-ghost" *ngIf="hayFiltros" (click)="limpiarTodo()">
+            <mat-icon>restart_alt</mat-icon> Limpiar filtros
+          </button>
+        </div>
+      </div>
+
+      <mat-paginator *ngIf="totalProductos > 0"
+                     [length]="totalProductos" [pageSize]="size" [pageIndex]="page"
+                     [pageSizeOptions]="[12, 24, 48, 96]" (page)="onPageChange($event)"
+                     showFirstLastButtons>
+      </mat-paginator>
+    </section>
+  </div>
 </div>
