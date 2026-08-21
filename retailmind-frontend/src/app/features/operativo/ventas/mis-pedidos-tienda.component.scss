@@ -1,0 +1,249 @@
+// ═════════════════════════════════════════════════════════════════════════════
+// MIS PEDIDOS — la lista pasa de tabla a tarjetas de pedido.
+//
+// La pantalla es del back-office (vive en `operativo/`) pero la usa el CLIENTE,
+// así que toma los tokens de la tienda (`shop-shared.scss`, cargado antes que
+// este archivo) y conserva `operativo-shared.scss` para el panel de detalle y
+// el bloque de devoluciones, que no se han tocado.
+// ═════════════════════════════════════════════════════════════════════════════
+
+:host { display: block; }
+
+.mis-pedidos { color: var(--tienda-texto); }
+
+// ── Cabecera ────────────────────────────────────────────────────────────────
+.mp-cabecera {
+  display: flex;
+  align-items: flex-end;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+
+  .mp-titulo { flex: 1; min-width: 260px; }
+
+  h1 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 0 4px;
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -.6px;
+
+    mat-icon { color: var(--primary-light); font-size: 26px; width: 26px; height: 26px; }
+  }
+
+  p {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--tienda-texto-2);
+    max-width: 620px;
+  }
+
+  .btn-ghost { text-decoration: none; flex: 0 0 auto; }
+}
+
+// ── Barra de búsqueda y filtro ──────────────────────────────────────────────
+.mp-barra {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+
+.mp-buscador {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1 1 340px;
+  min-width: 260px;
+
+  > mat-icon {
+    position: absolute;
+    left: 11px;
+    font-size: 19px;
+    width: 19px;
+    height: 19px;
+    color: var(--tienda-texto-3);
+    pointer-events: none;
+  }
+
+  .campo-tienda {
+    height: 42px;
+    padding-left: 38px;
+    padding-right: 38px;
+    font-size: 13.5px;
+  }
+
+  .mp-limpiar {
+    position: absolute;
+    right: 8px;
+    display: flex;
+    border: none;
+    background: none;
+    padding: 0;
+    color: var(--tienda-texto-3);
+    cursor: pointer;
+
+    mat-icon { font-size: 18px; width: 18px; height: 18px; }
+
+    &:hover { color: var(--primary); }
+  }
+}
+
+.mp-estado {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--tienda-texto-2);
+
+  select.campo-tienda { width: auto; min-width: 168px; height: 42px; cursor: pointer; }
+}
+
+.mp-barra .btn-ghost { height: 42px; }
+
+// ── Línea de resumen ────────────────────────────────────────────────────────
+.mp-resumen {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.mp-conteo {
+  font-size: 13px;
+  color: var(--tienda-texto-2);
+
+  strong { color: var(--tienda-texto); font-weight: 800; }
+}
+
+// El orden se DECLARA en pantalla: con diez años de historial —y fechas de
+// hasta 2034 en el catálogo de demostración— saber por dónde empieza la lista
+// es la diferencia entre encontrar un pedido y creer que se ha perdido.
+.mp-orden {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--tienda-texto-3);
+
+  mat-icon { font-size: 15px; width: 15px; height: 15px; }
+}
+
+// ── Tarjeta de pedido ───────────────────────────────────────────────────────
+.mp-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.mp-pedido {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  background: var(--tienda-superficie);
+  border: 1px solid var(--tienda-borde);
+  border-radius: 13px;
+  box-shadow: var(--tienda-sombra);
+  cursor: pointer;
+  transition: var(--transition);
+
+  &:hover {
+    border-color: var(--tienda-borde-fuerte);
+    box-shadow: var(--tienda-sombra-alta);
+    transform: translateY(-1px);
+  }
+
+  &.abierto {
+    border-color: var(--primary-light);
+    box-shadow: 0 0 0 3px rgba(57, 73, 171, .12), var(--tienda-sombra);
+  }
+}
+
+.mp-fila-1 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.mp-numero {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -.2px;
+  color: var(--tienda-texto);
+}
+
+.mp-total {
+  margin-left: auto;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--tienda-oferta);
+  white-space: nowrap;
+}
+
+.mp-fila-2 {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  color: var(--tienda-texto-2);
+
+  > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  mat-icon { font-size: 15px; width: 15px; height: 15px; color: var(--tienda-texto-3); }
+}
+
+.mp-ver {
+  margin-left: auto;
+  font-weight: 700;
+  color: var(--primary-light);
+
+  mat-icon { color: var(--primary-light) !important; }
+}
+
+// El chip de estado de esta pantalla lleva icono; el de `operativo-shared`
+// no lo contempla, así que se completa aquí sin tocar el compartido.
+.mp-pedido .estado-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+
+  mat-icon { font-size: 14px; width: 14px; height: 14px; }
+
+  &.info {
+    background: rgba(57, 73, 171, .1);
+    color: var(--primary);
+  }
+}
+
+// ── Esqueleto ───────────────────────────────────────────────────────────────
+.mp-esq {
+  padding: 14px 16px 20px;
+
+  .esq-linea { margin-left: 0; margin-right: 0; }
+}
+
+// ── Adaptación ──────────────────────────────────────────────────────────────
+@media (max-width: 700px) {
+  .mp-barra { gap: 10px; }
+  .mp-estado { width: 100%; }
+  .mp-estado select.campo-tienda { flex: 1; min-width: 0; }
+  .mp-total { margin-left: 0; width: 100%; }
+  .mp-ver { margin-left: 0; }
+  .mp-orden { margin-left: 0; }
+}

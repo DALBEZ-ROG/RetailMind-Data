@@ -1,57 +1,114 @@
-<div class="op-page">
-  <div class="section-header">
-    <h2><mat-icon>shopping_basket</mat-icon> Mis Pedidos</h2>
-    <p>Consulta tus pedidos y su detalle. Solo ves tus propios pedidos.</p>
+<div class="op-page mis-pedidos shop-scope">
+
+  <header class="mp-cabecera">
+    <div class="mp-titulo">
+      <h1><mat-icon>shopping_basket</mat-icon> Mis pedidos</h1>
+      <p>Todo lo que has comprado, con su estado, su factura y la opción de
+        devolverlo. Solo ves tus propios pedidos.</p>
+    </div>
+    <a class="btn-ghost" routerLink="/shop">
+      <mat-icon>storefront</mat-icon> Seguir comprando
+    </a>
+  </header>
+
+  <!-- Buscador y filtro: los dos resuelven EN SERVIDOR, sobre todo el
+       historial, no sobre la página que se esté viendo. -->
+  <div class="mp-barra tienda-panel">
+    <div class="mp-buscador">
+      <mat-icon>search</mat-icon>
+      <input class="campo-tienda" [(ngModel)]="busqueda" (ngModelChange)="onBusquedaCambia()"
+             placeholder="Buscar por número de pedido (por ejemplo, PED-20260812-114027)"
+             aria-label="Buscar un pedido por su número">
+      <button class="mp-limpiar" *ngIf="busqueda" (click)="quitarBusqueda()"
+              matTooltip="Limpiar la búsqueda" aria-label="Limpiar la búsqueda">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <label class="mp-estado">
+      <span>Estado</span>
+      <select class="campo-tienda" [(ngModel)]="estadoFiltro" (ngModelChange)="filtrarEstado()">
+        <option value="">Todos</option>
+        <option *ngFor="let e of estados" [value]="e.codigo">{{ e.nombre }}</option>
+      </select>
+    </label>
+
+    <button class="btn-ghost" (click)="cargar()" matTooltip="Volver a consultar">
+      <mat-icon>refresh</mat-icon> Actualizar
+    </button>
   </div>
 
-  <div class="op-card">
-    <h3><mat-icon>list_alt</mat-icon> Pedidos ({{ total | number }})</h3>
-    <div class="form-actions">
-      <button class="btn-limpiar" (click)="cargar()"><mat-icon>refresh</mat-icon> Actualizar</button>
-    </div>
-    <div class="table-wrapper" *ngIf="total; else vacio">
-      <table mat-table [dataSource]="pedidos">
-        <ng-container matColumnDef="numero">
-          <th mat-header-cell *matHeaderCellDef>Número</th>
-          <td mat-cell *matCellDef="let p"><strong>{{ p.numero }}</strong></td>
-        </ng-container>
-        <ng-container matColumnDef="fecha">
-          <th mat-header-cell *matHeaderCellDef>Fecha</th>
-          <td mat-cell *matCellDef="let p">{{ p.fecha_pedido | date:'short' }}</td>
-        </ng-container>
-        <ng-container matColumnDef="estado">
-          <th mat-header-cell *matHeaderCellDef>Estado</th>
-          <td mat-cell *matCellDef="let p">
-            <span class="estado-chip"
-                  [class.ok]="['entregado','despachado','facturado','preparado'].includes(p.estado)"
-                  [class.warn]="p.estado === 'devuelto'"
-                  [class.error]="['cancelado','no_entregado'].includes(p.estado)">{{ p.estado | codigoLegible }}</span>
-          </td>
-        </ng-container>
-        <ng-container matColumnDef="total">
-          <th mat-header-cell *matHeaderCellDef>Total</th>
-          <td mat-cell *matCellDef="let p">{{ p.total | currency:'USD' }}</td>
-        </ng-container>
-        <ng-container matColumnDef="acciones">
-          <th mat-header-cell *matHeaderCellDef>Detalle</th>
-          <td mat-cell *matCellDef="let p">
-            <button mat-icon-button (click)="verPedido(p.id)" matTooltip="Ver detalle">
-              <mat-icon>visibility</mat-icon>
-            </button>
-          </td>
-        </ng-container>
-        <tr mat-header-row *matHeaderRowDef="columnas"></tr>
-        <tr mat-row *matRowDef="let p; columns: columnas"
-            [class.fila-seleccionada]="detalle?.id === p.id"></tr>
-      </table>
-    </div>
-    <mat-paginator *ngIf="total" [length]="total" [pageIndex]="pagina"
-                   [pageSize]="tamPagina" [pageSizeOptions]="tamanos"
-                   (page)="alPaginar($event)" showFirstLastButtons></mat-paginator>
-    <ng-template #vacio>
-      <div class="empty-state" *ngIf="!loading"><mat-icon>shopping_basket</mat-icon><p>Aún no tienes pedidos registrados.</p></div>
-    </ng-template>
+  <div class="mp-resumen">
+    <span class="mp-conteo" *ngIf="total">
+      <strong>{{ rangoDesde | number }}–{{ rangoHasta | number }}</strong>
+      de <strong>{{ total | number }}</strong> pedidos
+    </span>
+    <span class="mp-conteo" *ngIf="!total && !loading">Sin pedidos que mostrar</span>
+
+    <button class="chip-activo" *ngIf="busqueda" (click)="quitarBusqueda()">
+      <mat-icon>search</mat-icon> {{ busqueda }} <mat-icon class="x">close</mat-icon>
+    </button>
+    <button class="chip-activo" *ngIf="estadoFiltro" (click)="quitarEstado()">
+      <mat-icon>flag</mat-icon> {{ nombreEstado }} <mat-icon class="x">close</mat-icon>
+    </button>
+    <button class="chip-limpiar" *ngIf="hayFiltros" (click)="limpiarFiltros()">Limpiar todo</button>
+
+    <span class="mp-orden">
+      <mat-icon>sort</mat-icon> Del más reciente al más antiguo
+    </span>
   </div>
+
+  <!-- Cargando -->
+  <div class="mp-lista" *ngIf="loading">
+    <div class="esqueleto mp-esq" *ngFor="let s of [1,2,3]">
+      <div class="esq-linea corta"></div>
+      <div class="esq-linea larga"></div>
+      <div class="esq-linea precio"></div>
+    </div>
+  </div>
+
+  <!-- Pedidos -->
+  <div class="mp-lista" *ngIf="!loading && pedidos.length">
+    <article class="mp-pedido" *ngFor="let p of pedidos"
+             [class.abierto]="detalle?.id === p.id"
+             (click)="verPedido(p.id)">
+      <div class="mp-fila-1">
+        <span class="mp-numero">{{ p.numero }}</span>
+        <span class="estado-chip" [ngClass]="tonoEstado(p.estado)">
+          <mat-icon>{{ iconoEstado(p.estado) }}</mat-icon>
+          {{ p.estado | codigoLegible }}
+        </span>
+        <span class="mp-total">{{ p.total | currency:'USD' }}</span>
+      </div>
+      <div class="mp-fila-2">
+        <span><mat-icon>event</mat-icon> {{ p.fecha_pedido | date:'d MMM y, HH:mm' }}</span>
+        <span *ngIf="p.canal"><mat-icon>storefront</mat-icon> {{ p.canal | codigoLegible }}</span>
+        <span class="mp-ver">
+          {{ detalle?.id === p.id ? 'Viendo el detalle' : 'Ver detalle' }}
+          <mat-icon>{{ detalle?.id === p.id ? 'expand_less' : 'chevron_right' }}</mat-icon>
+        </span>
+      </div>
+    </article>
+  </div>
+
+  <!-- Vacío: distingue «no tienes pedidos» de «tu filtro no encuentra nada» -->
+  <div class="tienda-vacio" *ngIf="!loading && !pedidos.length">
+    <mat-icon class="vacio-icono">{{ hayFiltros ? 'search_off' : 'shopping_basket' }}</mat-icon>
+    <h3>{{ hayFiltros ? 'Ningún pedido coincide con tu búsqueda' : 'Aún no tienes pedidos' }}</h3>
+    <p *ngIf="hayFiltros">Revisa el número que escribiste o quita el filtro de estado.</p>
+    <p *ngIf="!hayFiltros">Cuando compres algo en la tienda, aparecerá aquí con su
+      seguimiento, su factura y la opción de devolverlo.</p>
+    <button class="btn-ghost" *ngIf="hayFiltros" (click)="limpiarFiltros()">
+      <mat-icon>restart_alt</mat-icon> Limpiar filtros
+    </button>
+    <a class="btn-ghost" *ngIf="!hayFiltros" routerLink="/shop">
+      <mat-icon>storefront</mat-icon> Ir a la tienda
+    </a>
+  </div>
+
+  <mat-paginator *ngIf="total" [length]="total" [pageIndex]="pagina"
+                 [pageSize]="tamPagina" [pageSizeOptions]="tamanos"
+                 (page)="alPaginar($event)" showFirstLastButtons></mat-paginator>
 
   <div class="op-card" *ngIf="detalle">
     <h3><mat-icon>receipt_long</mat-icon> Detalle de {{ detalle.numero }}</h3>

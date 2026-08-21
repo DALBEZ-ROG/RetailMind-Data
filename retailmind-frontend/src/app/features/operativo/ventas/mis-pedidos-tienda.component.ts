@@ -1,7 +1,9 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { Subject, Subscription } from 'rxjs';
+import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 import { MatTableModule } from '@angular/material/table';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
@@ -34,9 +36,10 @@ import { CodigoLegiblePipe } from '../../../core/pipes/etiquetas.pipe';
     MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule,
     MatSnackBarModule, MatTooltipModule, MatPaginatorModule, CodigoLegiblePipe],
   templateUrl: './mis-pedidos-tienda.component.html',
-  styleUrl: '../operativo-shared.scss'
+  styleUrls: ['../operativo-shared.scss', '../../shop/shop-shared.scss',
+              './mis-pedidos-tienda.component.scss']
 })
-export class MisPedidosTiendaComponent implements OnInit {
+export class MisPedidosTiendaComponent implements OnInit, OnDestroy {
 
   pedidos: PedidoVentaRow[] = [];
   total = 0;
@@ -44,10 +47,33 @@ export class MisPedidosTiendaComponent implements OnInit {
   tamPagina = 25;
   readonly tamanos = [25, 50, 100];
 
+  // ── Búsqueda y filtro, resueltos EN SERVIDOR ─────────────────────────────
+  // `q` casa contra `pedido.numero` y `estado` contra la lista blanca del
+  // backend. Se busca en servidor y no sobre la página cargada porque el
+  // cliente con más pedidos tiene 748 y el tope por página son 200: filtrar
+  // aquí encontraría el pedido solo si tuvo la suerte de estar en la página.
+  busqueda = '';
+  estadoFiltro = '';
+  private readonly busqueda$ = new Subject<string>();
+  private readonly subs = new Subscription();
+
+  /** Los 11 estados del ciclo, en el orden en que ocurren. */
+  readonly estados = [
+    { codigo: 'pendiente', nombre: 'Pendiente' },
+    { codigo: 'confirmado', nombre: 'Confirmado' },
+    { codigo: 'pagado', nombre: 'Pagado' },
+    { codigo: 'facturado', nombre: 'Facturado' },
+    { codigo: 'en_preparacion', nombre: 'En preparación' },
+    { codigo: 'preparado', nombre: 'Preparado' },
+    { codigo: 'despachado', nombre: 'Despachado' },
+    { codigo: 'entregado', nombre: 'Entregado' },
+    { codigo: 'devuelto', nombre: 'Devuelto' },
+    { codigo: 'no_entregado', nombre: 'No entregado' },
+    { codigo: 'cancelado', nombre: 'Cancelado' }
+  ];
+
   alPaginar(e: PageEvent): void {
-    this.pagina = e.pageIndex;
-    this.tamPagina = e.pageSize;
-    this.cargar();
+    this.aplicar({ page: e.pageIndex || null, size: e.pageSize });
   }
   detalle: PedidoVentaDetalle | null = null;
   seguimiento: SeguimientoRow[] = [];
@@ -68,26 +94,98 @@ export class MisPedidosTiendaComponent implements OnInit {
   columnasDevolucion = ['numero', 'pedido', 'motivo', 'estado', 'monto', 'acciones'];
 
   constructor(private ventas: VentasService, private rma: DevolucionesService,
-              private snackBar: MatSnackBar) {}
+              private snackBar: MatSnackBar,
+              private router: Router, private route: ActivatedRoute) {}
 
   ngOnInit(): void {
-    this.cargar();
+    // El estado de la búsqueda vive en la URL. Eso es lo que permite que la
+    // confirmación del checkout enlace aquí con `?q=PED-…` y el cliente caiga
+    // directo en el pedido que acaba de hacer, en vez de buscarlo entre diez
+    // años de historial.
+    this.subs.add(this.route.queryParamMap.subscribe(p => {
+      this.busqueda = p.get('q') || '';
+      this.estadoFiltro = p.get('estado') || '';
+      this.pagina = p.get('page') ? Number(p.get('page')) : 0;
+      this.tamPagina = p.get('size') ? Number(p.get('size')) : 25;
+      this.cargar();
+    }));
+
+    this.subs.add(this.busqueda$.pipe(debounceTime(400), distinctUntilChanged())
+      .subscribe(q => this.aplicar({ q: q || null, page: null })));
+
     this.cargarDevoluciones();
   }
 
+  ngOnDestroy(): void {
+    this.busqueda$.complete();
+    this.subs.unsubscribe();
+  }
+
+  /** Fusiona parámetros en la URL; `null` borra el parámetro. */
+  private aplicar(cambios: Record<string, any>): void {
+    this.router.navigate([], {
+      relativeTo: this.route, queryParams: cambios, queryParamsHandling: 'merge'
+    });
+  }
+
+  onBusquedaCambia(): void { this.busqueda$.next(this.busqueda.trim()); }
+  filtrarEstado(): void { this.aplicar({ estado: this.estadoFiltro || null, page: null }); }
+  quitarBusqueda(): void { this.aplicar({ q: null, page: null }); }
+  quitarEstado(): void { this.aplicar({ estado: null, page: null }); }
+
+  limpiarFiltros(): void {
+    this.router.navigate([], { relativeTo: this.route, queryParams: {} });
+  }
+
+  get hayFiltros(): boolean { return !!(this.busqueda || this.estadoFiltro); }
+
+  get nombreEstado(): string {
+    return this.estados.find(e => e.codigo === this.estadoFiltro)?.nombre || this.estadoFiltro;
+  }
+
+  get rangoDesde(): number { return this.total === 0 ? 0 : this.pagina * this.tamPagina + 1; }
+  get rangoHasta(): number { return Math.min((this.pagina + 1) * this.tamPagina, this.total); }
+
   cargar(): void {
     this.loading = true;
-    // El endpoint pagina en servidor. Aquí RLS ya recorta a los pedidos del
-    // propio cliente, así que son pocos, pero se pagina igual: el tope del
-    // servidor se aplica siempre y sin paginador la pantalla solo vería los
-    // primeros 25 sin decirlo.
-    this.ventas.pedidos({ page: this.pagina, size: this.tamPagina }).subscribe({
+    // El endpoint pagina en servidor y ordena por FECHA descendente (el `id`
+    // no sirve: la carga masiva usó bandas de ids reservadas, ver
+    // `VentasService.listarPedidos`).
+    this.ventas.pedidos({
+      page: this.pagina, size: this.tamPagina,
+      q: this.busqueda.trim() || undefined,
+      estado: this.estadoFiltro || undefined
+    }).subscribe({
       next: pg => { this.pedidos = pg.items; this.total = pg.total; this.loading = false; },
       error: e => {
         this.loading = false;
+        this.pedidos = [];
         this.snackBar.open(mensajeError(e, 'No se pudieron cargar tus pedidos'), 'Cerrar', { duration: 5000 });
       }
     });
+  }
+
+  /** Icono y tono del estado, para pintarlo igual en toda la pantalla. */
+  iconoEstado(estado: string): string {
+    switch (estado) {
+      case 'entregado': return 'task_alt';
+      case 'despachado': return 'local_shipping';
+      case 'preparado':
+      case 'en_preparacion': return 'inventory_2';
+      case 'facturado': return 'receipt_long';
+      case 'pagado': return 'paid';
+      case 'devuelto': return 'assignment_return';
+      case 'cancelado':
+      case 'no_entregado': return 'cancel';
+      default: return 'schedule';
+    }
+  }
+
+  tonoEstado(estado: string): 'ok' | 'warn' | 'error' | 'info' {
+    if (['entregado', 'facturado', 'pagado'].includes(estado)) return 'ok';
+    if (['cancelado', 'no_entregado'].includes(estado)) return 'error';
+    if (['devuelto'].includes(estado)) return 'warn';
+    return 'info';
   }
 
   /**

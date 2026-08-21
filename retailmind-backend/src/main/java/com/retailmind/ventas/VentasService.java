@@ -473,8 +473,18 @@ public class VentasService {
         Object[] a = args.toArray();
 
         String select = esRolLogistico() ? SEL_PEDIDOS_LOGISTICO : SEL_PEDIDOS_COMPLETO;
+        // ORDENA POR FECHA Y NO POR ID. Parecen lo mismo y aquí NO lo son: la
+        // carga masiva escribió sus 3.000.000 de pedidos en bandas de id
+        // reservadas (hasta 2.100.055.830) con fechas de hasta 2034, mientras
+        // que la secuencia real va por 4.343. Con `ORDER BY p.id DESC` un
+        // pedido hecho HOY nace con id ~4.344 y aparece en la ÚLTIMA página,
+        // cientos de páginas detrás del seed: el cliente no encontraba su
+        // compra recién hecha en «Mis Pedidos», y el vendedor tampoco veía en
+        // el back-office los pedidos del día. El `id` se conserva como
+        // desempate para que el orden sea total y la paginación estable
+        // (hay pedidos que comparten `fecha_pedido` al microsegundo).
         String sqlItems = select + JOIN_BASE + JOIN_CLIENTE + JOIN_TRANSPORTISTA + where
-                        + " ORDER BY p.id DESC";
+                        + " ORDER BY p.fecha_pedido DESC, p.id DESC";
 
         int pag = com.retailmind.comun.Paginacion.pagina(page);
         int tam = com.retailmind.comun.Paginacion.tamano(size);
