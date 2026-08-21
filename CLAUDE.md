@@ -1737,3 +1737,69 @@ tomado a propósito de la página 4.
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
 <!-- SPECKIT END -->
+
+**VALIDACIÓN DE LOS CAMPOS ESCRIBIBLES (2026-08-21, solo frontend — cero cambios de
+backend, de SQL y de seguridad)**: los **179 campos** de la aplicación en los que se puede
+escribir pasan a admitir SOLO lo que les corresponde. Piezas nuevas en
+`retailmind-frontend/src/app/core/validacion/`: `perfiles-texto.ts` (la TABLA de qué admite
+cada clase de dato), `campo-texto.directive.ts` (`appTexto="perfil"`) y
+`campo-numero.directive.ts` (`appNumero="entero|dinero|decimal"`), más el estilo
+`.rm-campo-error` de `styles.scss`. Enganchadas en **57 componentes**; ni una regla de negocio
+tocada, ni un getter de «puedeAceptar» movido.
+
+**El punto de partida es que `<input type="number">` NO valida nada por sí solo.** El
+navegador acepta `e`, `E`, `+` y `-` en cualquier posición —la notación científica es un
+número válido para el estándar— y cuando lo tecleado no se puede leer, `el.value` devuelve
+**cadena vacía** con `validity.badInput` en true. Con `[(ngModel)]` eso llega al modelo como
+`null`: el usuario ve «12e» escrito y el formulario cree que el campo está VACÍO, sin un
+error en ninguna de las dos mitades. De ahí las tres capas, que son distintas a propósito:
+**`keydown`** descarta la tecla (evita el 99 %), **`input`** es la red para lo que no pasa por
+el teclado —pegar, arrastrar, autocompletar— y **`blur`** ajusta a `min`/`max`. `min` y `max`
+se leen del PROPIO elemento, así que los que ya estaban escritos en las plantillas —incluidos
+los enlazados, como `[max]="saldo_pendiente"`— pasan de declarados a EXIGIDOS.
+
+Si vas a tocar esto:
+1. **La condición «restaura salvo que la última tecla fuera parte de un número» es lo que hace
+   utilizable el campo de dinero.** Escribir `12.` deja el input en `badInput` —un punto suelto
+   al final no es un número—, y una restauración a secas se come el punto EN EL MOMENTO de
+   teclearlo: se escribe «12.99» y en la caja aparece «1299». La tecla se recuerda en `keydown`
+   y se OLVIDA al terminar cada `input`, para que lo que llega sin teclado siga cayendo del lado
+   que restaura. Lo destapó la prueba, no la lectura del código.
+2. **La caja va ANTES de retirar lo prohibido.** Al revés, un perfil de minúsculas como el slug
+   empieza por BORRAR las mayúsculas —que no están en su juego de caracteres— en vez de bajarlas,
+   y «Zapatos De Cuero» sale «apatos-e-uero»: se pierden justo las iniciales.
+3. **La coma NO se admite** aunque aquí se escriba con coma decimal: un `type="number"` solo
+   entiende el punto, y dejarla pasar deja el campo en `badInput` para siempre.
+4. **El perfil `url` se declara con lista BLANCA** y no con lista negra como los demás: enumerar
+   lo prohibido en una URL es enumerar casi todo el teclado.
+5. **El aviso se inyecta en el `subscript-wrapper` que Material ya reserva**, así que aparecer y
+   desaparecer no mueve el formulario; y solo se pinta tras el primer `blur` —un formulario
+   recién abierto no debe salir todo en rojo—.
+6. **Se corrige lo que se teclea, no lo que se carga.** Un valor precargado no se toca hasta que
+   alguien escribe en su campo. OJO con la consecuencia: **7 SKU y 1 slug heredados no cumplen
+   el juego de caracteres nuevo** (`zapatos 2 warion`, `Prueba 1 AAAA`… todos dados de alta a
+   mano desde la pantalla), y si alguien edita ESE campo se normalizan de golpe. El resto del
+   catálogo ya cumplía: 6.217 nombres, 6.217 slugs, 50.182 correos, 50.072 teléfonos, 33 códigos
+   de cupón y los 35 RUC, todos con cero excepciones (medido contra la base).
+7. **Cuatro campos quedan FUERA a propósito** y no es un olvido: la contraseña del login
+   (acotar sus caracteres la debilita) y los tres que ya se sanean en su propio componente
+   —`rol-dialog.alEscribirCodigo`, `checkout.formatearNumero` y `formatearVencimiento`—. El CVV
+   sí se cubrió: era el único de la tarjeta que no filtraba nada.
+8. **Esto es validación de INTERFAZ y no sustituye a la del servidor**, que sigue siendo la
+   lista blanca de la regla 2 y los CHECK del motor. Un cliente HTTP directo no pasa por aquí.
+
+Efecto colateral declarado y deliberado: el **código de cupón ahora sube a mayúsculas DE
+VERDAD**. La pantalla lo mostraba en mayúsculas con `text-transform` y enviaba lo tecleado en
+minúsculas; los 33 cupones de la base están en mayúsculas, así que lo que había era una
+discrepancia entre lo que se veía y lo que se mandaba.
+
+Verificación: **`pruebas/p15_validacion_campos.js`, 85/85 casos** (Chrome headless, ADMIN y
+CLIENTE, 28 pantallas). El oráculo NO es la tabla de perfiles del frontend —contrastar la
+implementación consigo misma daría verde con las dos mitades equivocadas—: es una lista de
+formas escrita aparte en la propia suite. Cada campo se prueba por las DOS vías: `page.type`
+(eventos de teclado reales, prueba la capa 1) y `keyboard.sendCharacter`, que usa
+`Input.insertText` y **se salta el `keydown` a propósito** para que la capa 2 no pueda faltar sin
+que se note. Además: la mitad simétrica —un nombre, un importe y una URL legítimos NO se tocan—,
+porque una directiva que borrase el campo entero pasaría el barrido con sobresaliente. Sin
+regresión: **P11 65/65** y **P14 86/86**, `ng build` limpio y consola del navegador sin un solo
+error en todo el recorrido.
