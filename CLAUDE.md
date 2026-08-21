@@ -206,6 +206,13 @@ parar sin perder nada: `docker compose stop` o, como mucho, `docker compose down
   `analista@retailmind.com`): `Retail2026!` (script 27); `soporte@retailmind.com`:
   `Retail2026!` (script 37)
 - Clientes demo (`maria.lopez@demo.com`, `carlos.vera@demo.com`): `Cliente2026!` (script 26)
+- **Cliente VACÍO para pruebas** (`cliente.nuevo@demo.com`): `Cliente2026!`. Creado el
+  2026-08-21 por `POST /api/auth/register` —no por SQL—, o sea por el mismo camino que la
+  pantalla `/admin-usuarios`, que es lo que destapó **D-16**. Es `usuario` 98 / `cliente` 79 y
+  no tiene NADA: 0 pedidos, 0 direcciones, carrito y lista de deseos vacíos. Sirve para ver la
+  tienda como la ve alguien que acaba de registrarse —los estados vacíos, el checkout sin
+  dirección guardada, la primera compra—, que con `maria.lopez` (80 pedidos) no se puede.
+  **Si le compras algo deja de servir para eso**: crea otro con el mismo alta.
 
 > **Estas credenciales de LOGIN siguen intactas** tras la rotación del 2026-08-03 (verificado:
 > los 10 usuarios entran). Lo que se rotó fueron **cuatro secretos internos que nadie teclea** —
@@ -1803,3 +1810,30 @@ que se note. Además: la mitad simétrica —un nombre, un importe y una URL leg
 porque una directiva que borrase el campo entero pasaría el barrido con sobresaliente. Sin
 regresión: **P11 65/65** y **P14 86/86**, `ng build` limpio y consola del navegador sin un solo
 error en todo el recorrido.
+
+**D-16 — UN USUARIO DADO DE ALTA COMO CLIENTE NO ERA UN CLIENTE (2026-08-21, backend, sin
+script)**: `POST /api/auth/register` —lo que hay detrás de `/admin-usuarios`— escribía `usuario`
+y `usuario_rol` y ahí terminaba. Un cliente de la tienda necesita ADEMÁS su fila en `cliente`:
+el login resuelve `cliente_id` uniendo `cliente.usuario_id`, y con eso en null el aspecto
+`PgSessionRoleAspect` **no fija `app.cliente_id`**, que es la variable de la que cuelga toda la
+RLS de la tienda. El alta devolvía `success: true` y el usuario aparecía en la lista con su rol,
+así que el síntoma llegaba mucho después y en otra pantalla: `/api/perfil` responde 200 con
+**`esCliente: false`** y `/api/perfil/direcciones` rebota con un 409. Y donde la aplicación no
+comprueba `esCliente`, la RLS no da error: **devuelve cero filas**, la misma trampa del script
+87. Corregido creando la ficha en la MISMA transacción que el usuario y su rol. **No hizo falta
+ni un GRANT ni un script**: `grp_administrador` ya tenía INSERT sobre `cliente` y `pol_horario`
+lo cubre — el hueco era solo de aplicación, igual que D-09.
+
+Si vas a tocar esto: (1) **`asignarRolUnico` NO crea ficha y no es un olvido.** Parecía la otra
+mitad del agujero, pero al probarlo el PUT devolvió un **409 deliberado**:
+`UsuarioAdminService.modificar` prohíbe cruzar la frontera CLIENTE / personal interno en los dos
+sentidos, porque «la ficha de cliente y sus pedidos quedarían huérfanos». Añadir el INSERT allí
+habría sido código muerto que además sugiere que la conversión es posible. **Probar la segunda
+puerta antes de taparla es lo que evitó dejarlo escrito.** (2) El `ON CONFLICT (usuario_id)` no
+cubre ningún caso conocido —el UNIQUE y la comprobación de email duplicado del controlador lo
+hacen imposible—: está para que un reintento no convierta un choque de clave en un 500.
+Verificado: alta VENDEDOR → 0 fichas; alta CLIENTE → ficha creada y `esCliente` pasa a **true**;
+perfil, direcciones, carrito, lista de deseos y productos comprados en **200 con lista vacía**;
+aislamiento medido con dos cuentas a la vez (**0 pedidos** el nuevo, **80** `maria.lopez`); y
+recorrido en Chrome headless por las 8 pantallas del cliente sin un error de consola. Ficha
+completa en `docs/pruebas/DEFECTOS.md`.

@@ -62,6 +62,66 @@ Dos cosas que E2 enseñó y que ningún otro estado podía enseñar:
 | D-13 | S2 | E3 | ✅ **CORREGIDO Y VERIFICADO** (perfil: género imposible de guardar) |
 | D-14 | S1 | E3 | ✅ **CORREGIDO Y VERIFICADO** (perfil: la fecha de nacimiento se borraba sola) |
 | D-15 | S2 | E3 | ✅ **CORREGIDO Y VERIFICADO** (el pedido recién hecho caía en la última página) |
+| D-16 | S2 | E1 | ✅ **CORREGIDO Y VERIFICADO** (el alta de un CLIENTE no le daba ficha de cliente) |
+
+
+---
+
+## D-16 · Un usuario dado de alta como CLIENTE no era un cliente — ✅ CORREGIDO
+
+**Cómo se destapó**: haciendo falta uno. Se pidió un cliente vacío para probar
+la tienda, se creó por el camino de la aplicación —`POST /api/auth/register`,
+que es lo que hay detrás de `/admin-usuarios`— y el usuario resultante podía
+entrar, ver el catálogo… y nada más.
+
+**Causa raíz**: `PostgresUserRepository.crearUsuario` escribía `usuario` y
+`usuario_rol` y ahí terminaba. Un cliente de la tienda necesita ADEMÁS su fila
+en `cliente`: el login resuelve `cliente_id` uniendo `cliente.usuario_id`, y
+con eso en null el aspecto `PgSessionRoleAspect` **no fija `app.cliente_id`**,
+que es la variable de la que cuelga toda la RLS de la tienda.
+
+**Lo que lo hacía difícil de ver es que el alta parecía funcionar**: devuelve
+`{"success": true, "id": 97}` y el usuario aparece en la lista con su rol
+CLIENTE. El síntoma llega mucho después y en otra pantalla, medido:
+
+```
+POST /api/auth/register     -> 200  {"success":true,"id":97}
+     (login del nuevo)      -> 200  token válido, rol CLIENTE
+GET  /api/perfil            -> 200  "esCliente": false      ← aquí ya está roto
+GET  /api/perfil/direcciones-> 409  "Esta operación es solo para clientes de la tienda"
+```
+
+Y hay una segunda mitad peor: donde la aplicación no comprueba `esCliente`, la
+RLS **no da error, devuelve cero filas** — la misma trampa que documenta el
+script 87 y que en su día dejó a `retailmind_etl` publicando 19 tablas vacías.
+
+**Corrección**: `crearUsuario` crea también la ficha cuando el rol es CLIENTE,
+en la MISMA transacción — las tres filas son un solo hecho, y un usuario sin
+ficha es exactamente el estado que esto viene a impedir. **No hizo falta ni un
+GRANT ni un script**: `grp_administrador` ya tenía INSERT sobre `cliente` y la
+política `pol_horario` lo cubre; el hueco era solo de aplicación, igual que en
+D-09.
+
+**Lo que NO se tocó, y merece decirse**: `asignarRolUnico` sigue sin crear
+ficha. Parecía la otra mitad del mismo agujero, pero al probarlo devolvió un
+**409 deliberado** — `UsuarioAdminService.modificar` prohíbe cruzar la frontera
+CLIENTE / personal interno en los dos sentidos, porque «la ficha de cliente y
+sus pedidos quedarían huérfanos». Esa puerta ya estaba cerrada, y con mejor
+criterio: añadir el INSERT allí habría sido código muerto que además sugiere
+que la conversión es posible.
+
+**Verificado** de punta a punta sobre el sistema corriendo:
+
+- alta con rol **VENDEDOR** → **0** fichas de cliente (no se crea de más);
+- alta con rol **CLIENTE** → ficha creada, y `/api/perfil` pasa de
+  `esCliente: false` a **`true`**;
+- perfil, direcciones, carrito, lista de deseos y productos comprados
+  responden **200 con lista vacía** en vez de 409;
+- aislamiento por RLS **medido con dos cuentas a la vez**: el cliente nuevo ve
+  **0 pedidos** y `maria.lopez` **80**;
+- recorrido en Chrome headless por las 8 pantallas del cliente: ninguna con
+  `NaN`/`undefined`, estados vacíos explícitos en carrito, lista de deseos y
+  Mis Pedidos, y **consola sin un solo error**.
 
 ---
 
