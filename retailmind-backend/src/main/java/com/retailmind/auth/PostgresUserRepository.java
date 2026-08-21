@@ -126,7 +126,43 @@ public class PostgresUserRepository {
                 SELECT ?, id FROM rol WHERE codigo = ?
                 ON CONFLICT (usuario_id, rol_id) DO NOTHING
                 """, id, rolCodigo);
+        asegurarFichaCliente(id, rolCodigo, email, nombre, apellido, telefono);
         return id;
+    }
+
+    /**
+     * Da al usuario su ficha en `cliente` cuando el rol es CLIENTE.
+     *
+     * Sin esta fila el alta produce un usuario que ENTRA pero no es un cliente:
+     * el login resuelve `cliente_id` uniendo `cliente.usuario_id`, y con eso en
+     * null el aspecto {@code PgSessionRoleAspect} no fija `app.cliente_id`, que
+     * es la variable de la que cuelga toda la RLS de la tienda. El resultado no
+     * es un error claro sino un cliente a medias — `/api/perfil` responde 200
+     * con `esCliente: false` y el perfil rebota con un 409 «solo para clientes
+     * de la tienda»—, y la pantalla de administración no tiene forma de
+     * avisarlo porque para ella el alta fue un éxito.
+     *
+     * Va en la MISMA transacción que el usuario y su rol a propósito: las tres
+     * filas son un solo hecho, y un usuario sin ficha es precisamente el estado
+     * que esto viene a impedir.
+     *
+     * No hizo falta ni un GRANT ni un script: `grp_administrador` ya tenía
+     * INSERT sobre `cliente` y la política `pol_horario` lo cubre. El hueco era
+     * solo de aplicación.
+     *
+     * El `ON CONFLICT` no cubre ningún caso conocido —el UNIQUE de
+     * `usuario_id` y la comprobación de email duplicado del controlador ya
+     * lo hacen imposible—: está para que un reintento del alta no convierta
+     * un choque de clave en un 500.
+     */
+    private void asegurarFichaCliente(long usuarioId, String rolCodigo, String email,
+                                      String nombre, String apellido, String telefono) {
+        if (!"CLIENTE".equals(rolCodigo)) { return; }
+        pg.update("""
+                INSERT INTO cliente (usuario_id, nombre, apellido, email, telefono)
+                VALUES (?, ?, NULLIF(?, ''), ?, NULLIF(?, ''))
+                ON CONFLICT (usuario_id) DO NOTHING
+                """, usuarioId, nombre, apellido, email, telefono);
     }
 
     @Transactional(readOnly = true)
@@ -163,6 +199,12 @@ public class PostgresUserRepository {
                 INSERT INTO usuario_rol (usuario_id, rol_id)
                 SELECT ?, id FROM rol WHERE codigo = ?
                 ON CONFLICT (usuario_id, rol_id) DO NOTHING""", id, rolCodigo);
+        // Aquí NO se crea ficha de cliente, y no es un olvido:
+        // `UsuarioAdminService.modificar` prohibe con un 409 cruzar la frontera
+        // CLIENTE / personal interno en los dos sentidos —la ficha y sus pedidos
+        // quedarían huérfanos—, así que este método nunca recibe un cambio A o
+        // DESDE cliente. Añadirla sería código muerto que además daría a
+        // entender que la conversión es posible.
     }
 
     /** Baja/alta lógica: un usuario inactivo no puede iniciar sesión (AuthService). */
