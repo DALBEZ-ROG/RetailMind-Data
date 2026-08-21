@@ -94,16 +94,24 @@ def correr(estado_datos: str = "E3") -> Registro:
                  observado=f"ve {suyos}, tiene {reales}",
                  esperado="iguales y > 0 — filtrar de más también es un fallo, y silencioso")
 
-    # P03-004 · las 50 tablas con RLS siguen teniéndola activa
+    # P03-004 · el censo de RLS.
+    #
+    # Los números son un CENSO y no una constante del universo: suben cuando el
+    # sistema gana una tabla protegida. Al 2026-08-21 son 51 tablas y 98
+    # políticas — el script 112 sumó `cliente_categoria_interes` (con sus dos
+    # políticas, la de cliente y la de horario) y `pol_visitante_catalogo` sobre
+    # `inventario`. Bajarlos o dejarlos sin explicación es lo que convierte esta
+    # comprobación en decorativa: lo que se vigila es que nadie DESACTIVE RLS,
+    # así que al cambiarlos hay que decir de dónde sale cada fila nueva.
     con_rls = entero("SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace "
                      "WHERE n.nspname='public' AND c.relrowsecurity")
     politicas = entero("SELECT count(*) FROM pg_policies WHERE schemaname='public'")
-    reg.caso("P03-004", "RLS activa en las 50 tablas declaradas",
-             condicion=con_rls == 50, severidad="S1",
-             observado=f"{con_rls} tablas con RLS", esperado="50")
-    reg.caso("P03-004", "Las 95 políticas siguen en su sitio",
-             condicion=politicas == 95, severidad="S1",
-             observado=f"{politicas} políticas", esperado="95")
+    reg.caso("P03-004", "RLS activa en las 51 tablas declaradas",
+             condicion=con_rls == 51, severidad="S1",
+             observado=f"{con_rls} tablas con RLS", esperado="51")
+    reg.caso("P03-004", "Las 98 políticas siguen en su sitio",
+             condicion=politicas == 98, severidad="S1",
+             observado=f"{politicas} políticas", esperado="98")
 
     # Ninguna tabla con RLS puede quedarse SIN política: el defecto de RLS es
     # denegar, así que una tabla con RLS y cero políticas devuelve cero filas a
