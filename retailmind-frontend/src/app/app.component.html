@@ -4,7 +4,7 @@
 
 <ng-template #mainLayout>
   <!-- Navbar flotante glassmorphism -->
-  <nav class="navbar">
+  <nav class="navbar" [class.navbar-tienda]="isCliente">
     <button class="sidebar-toggle" (click)="toggleSidebar()"
             [matTooltip]="sidebarOpen ? 'Ocultar menú' : 'Mostrar menú'">
       <mat-icon>{{ sidebarOpen ? 'menu_open' : 'menu' }}</mat-icon>
@@ -14,7 +14,120 @@
            alt="Logotipo de RetailMind" width="30" height="32">
       <span class="navbar-logo-text">RetailMind</span>
     </a>
+    <!-- ── Dirección de envío (solo CLIENTE) ──────────────────────────────
+         Va junto al logotipo porque es el dato que decide el transportista y
+         la tarifa del pedido, y hasta ahora solo se veía al llegar al pago:
+         el cliente compraba sin saber a dónde iba a llegar lo que compraba. -->
+    <button class="acc-envio" *ngIf="isCliente" [matMenuTriggerFor]="envioMenu"
+            [matTooltip]="direccionEnvio ? 'Cambiar la dirección de envío' : 'Aún no tienes direcciones guardadas'">
+      <mat-icon>{{ direccionEnvio ? 'location_on' : 'add_location_alt' }}</mat-icon>
+      <span class="ae-texto">
+        <small>{{ direccionEnvio ? 'Enviar a' : 'Envío' }}</small>
+        <strong>{{ etiquetaEnvio }} <mat-icon class="caret">expand_more</mat-icon></strong>
+      </span>
+    </button>
+    <mat-menu #envioMenu="matMenu" panelClass="user-menu-panel envio-menu-panel">
+      <div class="envio-menu-titulo">Elige dónde recibir tu pedido</div>
+      <button mat-menu-item *ngFor="let d of shopUi.direcciones"
+              [class.envio-activa]="direccionEnvio?.id === d.id"
+              (click)="elegirDireccionEnvio(d)">
+        <mat-icon>{{ direccionEnvio?.id === d.id ? 'radio_button_checked' : 'radio_button_unchecked' }}</mat-icon>
+        <span>
+          <strong>{{ d.alias || d.destinatario }}</strong> — {{ d.ciudad }}
+          <small class="envio-calle">{{ d.callePrincipal }}</small>
+        </span>
+      </button>
+      <div class="envio-menu-vacio" *ngIf="!shopUi.direcciones.length">
+        Todavía no tienes direcciones guardadas.
+      </div>
+      <mat-divider></mat-divider>
+      <a mat-menu-item routerLink="/perfil">
+        <mat-icon>edit_location</mat-icon><span>Gestionar mis direcciones</span>
+      </a>
+    </mat-menu>
+
     <span class="navbar-spacer"></span>
+
+    <!-- ── Buscador de la tienda (solo CLIENTE) ───────────────────────────
+         Acompaña al cliente por todas las pantallas de la tienda: buscar desde
+         el carrito o desde una ficha no debe obligar a volver antes al
+         catálogo. Compacto y a la derecha, pegado a los accesos. -->
+    <div class="tienda-buscador" *ngIf="isCliente">
+      <select class="tb-ambito" [(ngModel)]="catBusqueda" (change)="buscarEnTienda()"
+              aria-label="Departamento donde buscar">
+        <option [ngValue]="null">Todo</option>
+        <option *ngFor="let c of categoriasTienda" [ngValue]="c.categoriaId">{{ c.nombre }}</option>
+      </select>
+      <input class="tb-campo" type="search" [(ngModel)]="busquedaTienda"
+             (keyup.enter)="buscarEnTienda()"
+             placeholder="Buscar productos, marcas o SKU"
+             aria-label="Buscar en la tienda">
+      <button class="tb-limpiar" *ngIf="busquedaTienda" (click)="limpiarBusquedaTienda()"
+              matTooltip="Limpiar búsqueda" aria-label="Limpiar búsqueda">
+        <mat-icon>close</mat-icon>
+      </button>
+      <button class="tb-lupa" (click)="buscarEnTienda()" aria-label="Buscar">
+        <mat-icon>search</mat-icon>
+      </button>
+    </div>
+
+    <!-- ── Accesos de la tienda: pedidos/devoluciones, ayuda, lista, carrito ── -->
+    <div class="tienda-acciones" *ngIf="isCliente">
+      <a class="acc-doble" routerLink="/operativo/ventas/mis-pedidos"
+         matTooltip="Seguimiento, facturas y solicitud de devolución">
+        <small>Pedidos y</small>
+        <strong>Devoluciones</strong>
+      </a>
+
+      <button class="acc-doble" [matMenuTriggerFor]="ayudaMenu">
+        <small>Ayuda y</small>
+        <strong>Soporte <mat-icon class="caret">expand_more</mat-icon></strong>
+      </button>
+      <mat-menu #ayudaMenu="matMenu" panelClass="user-menu-panel">
+        <a mat-menu-item routerLink="/operativo/soporte/tickets">
+          <mat-icon>support_agent</mat-icon><span>Mis tickets de soporte</span>
+        </a>
+        <a mat-menu-item routerLink="/operativo/soporte/faq">
+          <mat-icon>quiz</mat-icon><span>Preguntas frecuentes</span>
+        </a>
+        <mat-divider></mat-divider>
+        <a mat-menu-item routerLink="/operativo/ventas/mis-pedidos">
+          <mat-icon>assignment_return</mat-icon><span>Devolver un producto</span>
+        </a>
+        <a mat-menu-item routerLink="/operativo/resenas">
+          <mat-icon>rate_review</mat-icon><span>Mis reseñas</span>
+        </a>
+        <a mat-menu-item routerLink="/operativo/resenas/preguntas">
+          <mat-icon>question_answer</mat-icon><span>Preguntas de productos</span>
+        </a>
+        <mat-divider></mat-divider>
+        <a mat-menu-item routerLink="/recomendaciones">
+          <mat-icon>local_fire_department</mat-icon><span>Recomendado para mí</span>
+        </a>
+      </mat-menu>
+
+      <!-- Atajo a la búsqueda: solo aparece cuando la barra ya no muestra su
+           campo (por debajo de 1080 px). Sin él, fuera del catálogo —carrito,
+           lista de deseos, recomendaciones— no quedaba forma de buscar. -->
+      <button class="acc-icono acc-buscar" (click)="irABuscar()"
+              matTooltip="Buscar en la tienda" aria-label="Buscar en la tienda">
+        <mat-icon>search</mat-icon>
+      </button>
+
+      <a class="acc-icono" routerLink="/wishlist" matTooltip="Mi lista de deseos"
+         aria-label="Mi lista de deseos">
+        <mat-icon>favorite_border</mat-icon>
+        <span class="globo" *ngIf="shopUi.wishlistCount">{{ shopUi.wishlistCount }}</span>
+      </a>
+
+      <a class="acc-carrito" routerLink="/shop/carrito" matTooltip="Mi carrito">
+        <span class="acc-carrito-icono">
+          <mat-icon>shopping_cart</mat-icon>
+          <span class="globo" *ngIf="shopUi.carritoCount">{{ shopUi.carritoCount }}</span>
+        </span>
+        <strong>Carrito</strong>
+      </a>
+    </div>
 
     <div class="navbar-actions" *ngIf="currentUser">
       <span class="role-badge" [class.admin]="isAdmin" [class.cliente]="!isAdmin">

@@ -1,5 +1,6 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { RouterOutlet, RouterLink, RouterLinkActive, Router, NavigationEnd } from '@angular/router';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatSidenavModule } from '@angular/material/sidenav';
@@ -15,12 +16,15 @@ import { filter } from 'rxjs';
 import { AuthService } from './core/services/auth.service';
 import { NavPermissionsService } from './core/navigation/nav-permissions.service';
 import { ServerStatusComponent } from './core/components/server-status/server-status.component';
+import { ShopService } from './features/shop/shop.service';
+import { ShopUiService } from './features/shop/shop-ui.service';
 
 @Component({
   selector: 'app-root',
   standalone: true,
   imports: [
     CommonModule,
+    FormsModule,
     RouterOutlet,
     RouterLink,
     RouterLinkActive,
@@ -39,8 +43,18 @@ import { ServerStatusComponent } from './core/components/server-status/server-st
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss'
 })
-export class AppComponent {
+export class AppComponent implements OnInit {
   title = 'RetailMind Shop';
+
+  // ── Barra de la tienda (solo rol CLIENTE) ───────────────────────────────
+  // El campo de búsqueda vive AQUÍ y no en el catálogo porque tiene que
+  // acompañar al cliente por toda la tienda: desde el carrito, desde la ficha
+  // de un producto o desde «Mis Pedidos» se busca sin volver antes al catálogo.
+  // No guarda resultados: navega a /shop con el término en la URL, que es
+  // donde el catálogo lee su estado.
+  busquedaTienda = '';
+  catBusqueda: number | null = null;
+  categoriasTienda: any[] = [];
   // El dashboard de inicio es la entrada principal: el sidebar queda como
   // navegación secundaria, colapsado por defecto.
   sidebarOpen = false;
@@ -111,16 +125,99 @@ export class AppComponent {
   constructor(
     public authService: AuthService,
     private nav: NavPermissionsService,
-    private router: Router
+    private router: Router,
+    private shop: ShopService,
+    public shopUi: ShopUiService
   ) {
     this.router.events.pipe(
       filter(e => e instanceof NavigationEnd)
     ).subscribe((e: any) => {
-      const url = e.urlAfterRedirects;
-      this.breadcrumb = this.routeMap[url]
-        || (url.startsWith('/inicio/') ? (this.nav.area(url.split('/')[2])?.titulo || 'Inicio') : null)
-        || (url.includes('/shop/producto') ? 'Detalle Producto' : 'Inicio');
+      const url: string = e.urlAfterRedirects;
+      const sinParams = url.split('?')[0];
+      this.breadcrumb = this.routeMap[sinParams]
+        || (sinParams.startsWith('/inicio/') ? (this.nav.area(sinParams.split('/')[2])?.titulo || 'Inicio') : null)
+        || (sinParams.includes('/shop/producto') ? 'Detalle Producto' : 'Inicio');
+
+      // El campo de la barra refleja lo que diga la URL: si el cliente quita el
+      // filtro desde el catálogo o pulsa «atrás», el término de arriba no puede
+      // quedarse mostrando una búsqueda que ya no está aplicada.
+      const params = this.router.parseUrl(url).queryParams;
+      const enTienda = sinParams.startsWith('/shop');
+      this.busquedaTienda = enTienda ? (params['q'] || '') : '';
+      // El selector de departamento hace de ÁMBITO de la búsqueda, así que
+      // tiene que enseñar el departamento que ya está filtrando; si no, la
+      // primera búsqueda dentro de «Electrónica» saldría del departamento.
+      this.catBusqueda = enTienda && params['cat'] ? Number(params['cat']) : null;
+
+      this.prepararTienda();
     });
+  }
+
+  ngOnInit(): void {
+    this.prepararTienda();
+  }
+
+  /** Carga perezosa de lo que necesita la barra de tienda; solo para CLIENTE. */
+  private prepararTienda(): void {
+    if (!this.isCliente) return;
+    if (!this.categoriasTienda.length) {
+      this.shop.getCategorias().subscribe({
+        next: (c) => this.categoriasTienda = c || [],
+        error: () => {}
+      });
+      this.shopUi.refrescarTodo();
+      this.shopUi.cargarDirecciones();
+    }
+  }
+
+  /**
+   * Busca en la tienda. Navega SIEMPRE a /shop —también desde el carrito o
+   * desde una ficha— con el término y el departamento en la URL, y resetea la
+   * página: buscar y quedarse en la página 7 del resultado anterior no tiene
+   * sentido para nadie.
+   */
+  buscarEnTienda(): void {
+    const q = this.busquedaTienda.trim();
+    this.router.navigate(['/shop'], {
+      queryParams: { q: q || null, cat: this.catBusqueda || null, page: null },
+      queryParamsHandling: 'merge'
+    });
+  }
+
+  limpiarBusquedaTienda(): void {
+    this.busquedaTienda = '';
+    if (this.router.url.startsWith('/shop')) this.buscarEnTienda();
+  }
+
+  /**
+   * Atajo de búsqueda para pantallas estrechas: lleva al catálogo y le pide
+   * que ponga el cursor en su propio campo (`buscar=1`, que el catálogo borra
+   * de la URL en cuanto lo atiende). Es la única vía de búsqueda que queda
+   * fuera del catálogo cuando la barra ya no muestra la suya.
+   */
+  irABuscar(): void {
+    this.router.navigate(['/shop'], { queryParams: { buscar: 1 }, queryParamsHandling: 'merge' });
+  }
+
+  // ── Dirección de envío de la barra ──────────────────────────────────────
+  get direccionEnvio(): any | null {
+    return this.shopUi.direccionEnvio;
+  }
+
+  /**
+   * Rótulo corto: alias («Casa») o nombre de quien recibe, más la ciudad, que
+   * es lo que decide la zona de envío. Sin dirección guardada NO se inventa un
+   * lugar: se invita a agregar una.
+   */
+  get etiquetaEnvio(): string {
+    const d = this.direccionEnvio;
+    if (!d) return 'Agregar dirección';
+    const quien = d.alias || d.destinatario || 'Mi dirección';
+    return d.ciudad ? `${quien} · ${d.ciudad}` : quien;
+  }
+
+  elegirDireccionEnvio(d: any): void {
+    this.shopUi.elegirDireccion(d?.id ?? null);
   }
 
   toggleSidebar(): void {

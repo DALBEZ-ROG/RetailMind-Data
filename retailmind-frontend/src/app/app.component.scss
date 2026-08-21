@@ -400,3 +400,359 @@
 
 .menu-item-perfil mat-icon { color: #1a237e; }
 .menu-item-logout mat-icon { color: #d50000; }
+
+// ═════════════════════════════════════════════════════════════════════════════
+// BARRA DE LA TIENDA — buscador y accesos del cliente dentro del navbar
+// Solo se pinta con rol CLIENTE (*ngIf en la plantilla): el back-office
+// conserva su barra tal cual estaba.
+// ═════════════════════════════════════════════════════════════════════════════
+
+// En modo tienda el separador deja de empujar: quien se queda el espacio libre
+// de la barra es el buscador. En el back-office el separador sigue igual y es
+// lo que mantiene las acciones de usuario pegadas a la derecha.
+.navbar-tienda .navbar-spacer {
+  flex: 0 0 8px;
+}
+
+// ── Dirección de envío ──────────────────────────────────────────────────────
+// Bloque de dos líneas junto al logotipo: rótulo pequeño arriba, destino
+// abajo. Es un botón porque abre el menú para cambiarla sin llegar al pago.
+.acc-envio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  margin-left: 16px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: none;
+  font-family: inherit;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: var(--transition);
+  min-width: 0;
+
+  > mat-icon {
+    flex: 0 0 auto;
+    font-size: 21px;
+    width: 21px;
+    height: 21px;
+    color: var(--primary-light);
+  }
+
+  .ae-texto {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    min-width: 0;
+  }
+
+  small {
+    font-size: 10.5px;
+    line-height: 1.15;
+    color: var(--text-secondary);
+  }
+
+  strong {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    max-width: 200px;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .caret { flex: 0 0 auto; font-size: 15px; width: 15px; height: 15px; }
+
+  &:hover {
+    background: rgba(26, 35, 126, .06);
+    border-color: rgba(26, 35, 126, .12);
+  }
+}
+
+// El menú de direcciones lleva dos líneas por opción (quién y dónde, más la
+// calle) y no cabe en los 280 px que el panel de Material trae por defecto.
+//
+// Se selecciona por su CONTENIDO con `:has()` y no por la `panelClass` del
+// `<mat-menu>` porque —medido en el DOM vivo— esa clase NO llega al panel en
+// esta versión: ni al `.mat-mdc-menu-panel` ni al `.cdk-overlay-pane`. Los
+// menús de esta barra se ven redondeados por la regla general de más abajo,
+// no por su `panelClass`; si un día vuelve a aplicarse, la clase sigue puesta
+// en la plantilla y esta regla se puede sustituir por ella.
+::ng-deep .mat-mdc-menu-panel:has(.envio-menu-titulo) {
+  min-width: 330px !important;
+  max-width: 380px !important;
+}
+
+::ng-deep .envio-menu-titulo {
+  padding: 12px 16px 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .6px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+::ng-deep .envio-menu-vacio {
+  padding: 4px 16px 12px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+::ng-deep .envio-calle {
+  display: block;
+  font-size: 11.5px;
+  color: var(--text-light);
+}
+
+::ng-deep .envio-activa {
+  background: rgba(57, 73, 171, .08);
+}
+
+// ── Buscador de la tienda ───────────────────────────────────────────────────
+// Ocupa TODO el hueco entre la dirección de envío y los accesos: crece con
+// `flex: 1` y el separador de la barra deja de crecer en modo tienda (ver
+// `.navbar-tienda .navbar-spacer`). Sin eso, separador y buscador se repartían
+// el espacio libre y quedaba un vacío a la izquierda del campo.
+.tienda-buscador {
+  display: flex;
+  align-items: stretch;
+  height: 42px;
+  flex: 1 1 auto;
+  min-width: 200px;
+  max-width: 780px;
+  margin-left: 4px;
+  margin-right: 12px;
+  border: 1px solid rgba(26, 35, 126, .18);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .92);
+  overflow: hidden;
+  transition: var(--transition);
+
+  &:focus-within {
+    border-color: var(--primary-light);
+    box-shadow: 0 0 0 3px rgba(57, 73, 171, .16);
+  }
+}
+
+// Ámbito de la búsqueda. Es un <select> nativo y no un mat-select porque dentro
+// de una barra de 40 px el campo de Material impone su propia altura y su
+// etiqueta flotante, que aquí no hace falta.
+.tb-ambito {
+  flex: 0 0 auto;
+  max-width: 138px;
+  border: none;
+  border-right: 1px solid rgba(26, 35, 126, .14);
+  background: rgba(26, 35, 126, .05);
+  padding: 0 8px;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--primary);
+  cursor: pointer;
+
+  &:focus { outline: none; }
+}
+
+.tb-campo {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  padding: 0 12px;
+  font-family: inherit;
+  font-size: 14px;
+  color: #16233d;
+
+  &::placeholder { color: #93a0b5; }
+  &:focus { outline: none; }
+  &::-webkit-search-cancel-button { display: none; }
+}
+
+.tb-limpiar {
+  display: flex;
+  align-items: center;
+  border: none;
+  background: none;
+  padding: 0 6px;
+  color: #8595ad;
+  cursor: pointer;
+
+  mat-icon { font-size: 18px; width: 18px; height: 18px; }
+
+  &:hover { color: var(--primary); }
+}
+
+.tb-lupa {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 50px;
+  border: none;
+  background: var(--primary-gradient);
+  color: #fff;
+  cursor: pointer;
+  transition: var(--transition);
+
+  mat-icon { font-size: 21px; width: 21px; height: 21px; }
+
+  &:hover { filter: brightness(1.12); }
+}
+
+.tienda-acciones {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 8px;
+}
+
+// Acceso de dos líneas: el rótulo pequeño da el contexto («Pedidos y») y el
+// grande el destino («Devoluciones»), que es lo que el cliente busca.
+.acc-doble {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0;
+  height: 42px;
+  padding: 0 11px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: none;
+  font-family: inherit;
+  text-decoration: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+
+  small { font-size: 10.5px; line-height: 1.15; color: var(--text-secondary); }
+
+  strong {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  .caret { font-size: 15px; width: 15px; height: 15px; }
+
+  &:hover {
+    background: rgba(26, 35, 126, .06);
+    border-color: rgba(26, 35, 126, .12);
+  }
+}
+
+.acc-icono {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border: none;
+  background: none;
+  border-radius: 10px;
+  color: var(--text-primary);
+  text-decoration: none;
+  cursor: pointer;
+  transition: var(--transition);
+
+  mat-icon { font-size: 22px; width: 22px; height: 22px; }
+
+  &:hover { background: rgba(26, 35, 126, .06); color: #e0245e; }
+}
+
+// Con la barra ancha el atajo sobra: el campo está a la vista.
+.acc-buscar { display: none; }
+
+.acc-carrito {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 14px 0 11px;
+  border-radius: 10px;
+  color: var(--text-primary);
+  text-decoration: none;
+  transition: var(--transition);
+
+  strong { font-size: 13px; font-weight: 700; }
+
+  &:hover { background: rgba(26, 35, 126, .06); }
+}
+
+.acc-carrito-icono {
+  position: relative;
+  display: flex;
+
+  mat-icon { font-size: 24px; width: 24px; height: 24px; }
+}
+
+// Globo del contador. Va absoluto sobre el icono para no ensanchar el botón
+// cuando el número pasa de una a dos cifras.
+.globo {
+  position: absolute;
+  top: -5px;
+  right: -8px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--accent-gradient);
+  color: #04343a;
+  font-size: 10.5px;
+  font-weight: 800;
+  border: 2px solid #fff;
+}
+
+// Al estrechar, cada pieza cede en un orden pensado. Los anchos NO se
+// adivinaron: se midieron sumando las piezas de la barra en el DOM vivo, y
+// `pruebas/p14_tienda.js` comprueba en cinco anchuras que la barra nunca
+// desborda (`scrollWidth <= clientWidth`).
+//
+// Ojo con lo que NO ahorra espacio: los accesos de dos líneas son una columna,
+// así que ocultar el rótulo pequeño («Pedidos y») no estrecha nada — manda el
+// grande. Lo que de verdad recorta son el texto de la dirección, la insignia
+// del rol y el nombre del usuario.
+@media (max-width: 1460px) {
+  .acc-envio strong { max-width: 132px; }
+}
+
+// El texto de la dirección cede primero: queda el chinche, que sigue abriendo
+// el menú y conserva la dirección completa en su tooltip.
+@media (max-width: 1380px) {
+  .acc-envio .ae-texto { display: none; }
+  .acc-envio { padding: 0 10px; }
+  .navbar-tienda .role-badge { display: none; }
+}
+
+@media (max-width: 1240px) {
+  .acc-doble small { display: none; }
+  .acc-carrito strong { display: none; }
+  .navbar-tienda .user-btn span { display: none; }
+}
+
+// Por debajo de aquí el buscador de la barra desaparece y toma el relevo el
+// del propio catálogo (`.busqueda-movil`), que aparece en el MISMO ancho: si
+// los dos cortes no coincidieran, habría una franja sin ningún buscador. Y
+// como el campo del catálogo solo existe EN el catálogo, aquí entra el atajo
+// de la lupa, que es lo que deja buscar desde el carrito o la lista de deseos.
+@media (max-width: 1080px) {
+  .tienda-buscador { display: none; }
+  .acc-buscar { display: flex; }
+}
+
+@media (max-width: 620px) {
+  .tienda-acciones .acc-doble { display: none; }
+  .acc-envio { display: none; }
+}
