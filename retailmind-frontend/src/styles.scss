@@ -1096,3 +1096,25 @@ textarea[aria-invalid="true"] {
 .mat-mdc-form-field:has(textarea[aria-invalid="true"]) {
   .mat-mdc-text-field-wrapper { box-shadow: inset 0 0 0 1px rgba(240, 97, 109, 0.55); }
 }
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MURO DE SESIÓN DE LA TIENDA — el telón que difumina lo de atrás
+// Va aquí y no en el componente porque el overlay de Material se monta FUERA del
+// árbol del componente (en el `cdk-overlay-container`, colgando de <body>), así
+// que un estilo encapsulado nunca lo alcanzaría.
+// ══════════════════════════════════════════════════════════════════════════════
+.cdk-overlay-backdrop.muro-sesion-telon {
+  background: rgba(9, 20, 46, 0.55);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+}
+
+.muro-sesion-panel .mat-mdc-dialog-surface {
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 30px 70px rgba(4, 14, 45, 0.42);
+}
+
+// El diálogo trae su propio relleno; el de Material sobraría.
+.muro-sesion-panel .mat-mdc-dialog-container .mdc-dialog__surface { padding: 0; }

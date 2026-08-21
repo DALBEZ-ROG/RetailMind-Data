@@ -756,3 +756,43 @@
   .tienda-acciones .acc-doble { display: none; }
   .acc-envio { display: none; }
 }
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// BARRA DEL VISITANTE — entrar o crear cuenta
+// Reemplazan al carrito y a la lista de deseos, que sin sesión no existen. El
+// botón de entrar reutiliza `.acc-doble` (misma altura y misma tipografía que
+// «Pedidos y Devoluciones»), y el de crear cuenta va relleno porque es la
+// acción que la tienda quiere que ocurra.
+// ══════════════════════════════════════════════════════════════════════════════
+.acc-entrar {
+  cursor: pointer;
+}
+
+.acc-crear {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 15px;
+  border: 0;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 13px;
+  color: #fff;
+  background: var(--dubai-azul, #3d5afe);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: filter .15s;
+
+  &:hover { filter: brightness(1.1); }
+
+  mat-icon { font-size: 18px; width: 18px; height: 18px; }
+  strong { font-weight: 700; }
+}
+
+// Por debajo de 900 px el rótulo se va y queda el icono, como el resto de
+// accesos: lo que no puede pasar es que la barra se rompa por desbordamiento.
+@media (max-width: 900px) {
+  .acc-crear strong { display: none; }
+  .acc-crear { padding: 9px 11px; }
+}

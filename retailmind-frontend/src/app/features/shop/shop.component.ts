@@ -11,6 +11,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ShopService } from './shop.service';
 import { ShopUiService } from './shop-ui.service';
+import { SesionRequeridaService } from '../../core/services/sesion-requerida.service';
 import { paletaCategoria, PaletaCategoria } from './catalogo-visual';
 import { mensajeError } from '../../core/services/api-error.util';
 
@@ -107,7 +108,8 @@ export class ShopComponent implements OnInit, OnDestroy {
     public ui: ShopUiService,
     private router: Router,
     private route: ActivatedRoute,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    public sesion: SesionRequeridaService
   ) {}
 
   ngOnInit(): void {
@@ -203,6 +205,11 @@ export class ShopComponent implements OnInit, OnDestroy {
    * en error: o trae recomendación personalizada o trae destacados.
    */
   loadDestacados(): void {
+    // `/api/recomendaciones` es de CLIENTE y no puede dejar de serlo: recomienda
+    // a PARTIR de lo que esa persona ha visto y comprado. Para un visitante no
+    // hay nada que recomendar, así que el carrusel simplemente no sale — mejor
+    // eso que pedirlo, recibir un 403 y pintar un hueco vacío.
+    if (!this.sesion.haySesionDeCliente) { this.destacados = []; return; }
     this.shopService.getRecomendaciones().subscribe({
       next: (r) => this.destacados = (r?.recomendaciones || []).slice(0, 8),
       error: () => this.destacados = []
@@ -358,6 +365,16 @@ export class ShopComponent implements OnInit, OnDestroy {
 
   agregarAlCarrito(producto: any, event: Event): void {
     event.stopPropagation();
+    // El muro va ANTES de la llamada, no en el manejador del error: sin esto el
+    // visitante vería primero un 403 y después la pregunta, que es el orden
+    // inverso al que espera. Con sesión abierta esto no pinta nada y sigue.
+    this.sesion.exigir('para agregar productos al carrito').subscribe(ok => {
+      if (!ok) { return; }
+      this.agregarAlCarritoReal(producto);
+    });
+  }
+
+  private agregarAlCarritoReal(producto: any): void {
     this.shopService.agregarAlCarrito(producto.productoId, 1).subscribe({
       next: () => {
         this.ui.refrescarCarrito();
@@ -372,6 +389,12 @@ export class ShopComponent implements OnInit, OnDestroy {
 
   toggleWishlist(producto: any, event: Event): void {
     event.stopPropagation();
+    this.sesion.exigir('para guardar productos en tu lista de deseos').subscribe(ok => {
+      if (ok) { this.toggleWishlistReal(producto); }
+    });
+  }
+
+  private toggleWishlistReal(producto: any): void {
     const id = Number(producto.productoId);
 
     if (this.ui.estaEnWishlist(id)) {

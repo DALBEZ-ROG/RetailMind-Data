@@ -28,16 +28,25 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/inicio/inicio.component').then(m => m.InicioComponent)
   },
-  // ── Tienda del cliente (PostgreSQL; solo rol CLIENTE) ───────────────────
+  // ── Alta publica de cliente ─────────────────────────────────────────────
+  // Sin guard: quien llega aqui es justamente quien no tiene cuenta.
+  {
+    path: 'registro',
+    loadComponent: () =>
+      import('./features/registro/registro.component').then(m => m.RegistroComponent)
+  },
+  // ── Tienda del cliente (PostgreSQL) ─────────────────────────────────────
+  // El ESCAPARATE es publico: catalogo y ficha de producto se ven sin cuenta.
+  // Lo que exige sesion es ACTUAR —carrito, lista de deseos, pago—, y de eso se
+  // encarga SesionRequeridaService en el momento de la accion, no un guard: un
+  // guard en la ruta echaria al visitante de la pantalla que venia a ver.
   {
     path: 'shop',
-    canActivate: [authGuard, roleGuard(['CLIENTE'])],
     loadComponent: () =>
       import('./features/shop/shop.component').then(m => m.ShopComponent)
   },
   {
     path: 'shop/producto/:id',
-    canActivate: [authGuard, roleGuard(['CLIENTE'])],
     loadComponent: () =>
       import('./features/shop/producto-detalle.component').then(m => m.ProductoDetalleComponent)
   },

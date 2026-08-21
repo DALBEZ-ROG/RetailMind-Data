@@ -160,14 +160,25 @@ export class AppComponent implements OnInit {
     this.prepararTienda();
   }
 
-  /** Carga perezosa de lo que necesita la barra de tienda; solo para CLIENTE. */
+  /**
+   * Carga perezosa de lo que necesita la barra de tienda.
+   *
+   * Se parte en dos porque el visitante y el cliente necesitan cosas distintas:
+   * los DEPARTAMENTOS son del catálogo y hoy son públicos, así que el visitante
+   * también los ve en su buscador; el carrito, la lista de deseos y las
+   * direcciones son del cliente y pedirlos sin sesión sería llamar a tres
+   * endpoints para recibir tres 403.
+   */
   private prepararTienda(): void {
-    if (!this.isCliente) return;
+    if (!this.modoTienda) return;
+
     if (!this.categoriasTienda.length) {
       this.shop.getCategorias().subscribe({
         next: (c) => this.categoriasTienda = c || [],
         error: () => {}
       });
+    }
+    if (this.isCliente && !this.shopUi.direcciones.length) {
       this.shopUi.refrescarTodo();
       this.shopUi.cargarDirecciones();
     }
@@ -227,8 +238,41 @@ export class AppComponent implements OnInit {
     this.sidebarOpen = !this.sidebarOpen;
   }
 
+  /**
+   * Pantallas que se pintan SOLAS, sin barra ni menú lateral: el acceso.
+   * El registro entra aquí por el mismo motivo que el login —quien está creando
+   * su cuenta todavía no tiene nada que navegar— y se compara contra la ruta sin
+   * los parámetros, porque el muro de sesión llega con `?volver=…`.
+   */
   get isLoginPage(): boolean {
-    return this.router.url === '/login';
+    const ruta = this.router.url.split('?')[0];
+    return ruta === '/login' || ruta === '/registro';
+  }
+
+  /**
+   * ¿Se está pintando la TIENDA? Es lo que decide la barra de comercio, y no
+   * basta con el rol: desde que el escaparate es público, un visitante sin
+   * ninguna sesión también la ve. Se distinguen los dos casos porque el
+   * visitante no tiene carrito, ni deseos, ni pedidos que enseñar.
+   */
+  get modoTienda(): boolean {
+    return this.isCliente || this.esVisitante;
+  }
+
+  /** Nadie ha entrado y estamos en una pantalla de la tienda. */
+  get esVisitante(): boolean {
+    if (this.currentUser) { return false; }
+    const ruta = this.router.url.split('?')[0];
+    return ruta === '/shop' || ruta.startsWith('/shop/');
+  }
+
+  /** Lleva al muro de sesión, recordando dónde estaba. */
+  iniciarSesion(): void {
+    this.router.navigate(['/login'], { queryParams: { volver: this.router.url } });
+  }
+
+  crearCuenta(): void {
+    this.router.navigate(['/registro'], { queryParams: { volver: this.router.url } });
   }
 
   get currentUser() {

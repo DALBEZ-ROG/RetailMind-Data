@@ -9,6 +9,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { Subscription } from 'rxjs';
 import { ShopService } from './shop.service';
 import { ShopUiService } from './shop-ui.service';
+import { SesionRequeridaService } from '../../core/services/sesion-requerida.service';
 import { paletaCategoria, PaletaCategoria } from './catalogo-visual';
 import { AuthService } from '../../core/services/auth.service';
 import { mensajeError } from '../../core/services/api-error.util';
@@ -53,7 +54,8 @@ export class ProductoDetalleComponent implements OnInit, OnDestroy {
     private shopService: ShopService,
     public ui: ShopUiService,
     private authService: AuthService,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    public sesion: SesionRequeridaService
   ) {}
 
   ngOnInit(): void {
@@ -89,8 +91,15 @@ export class ProductoDetalleComponent implements OnInit, OnDestroy {
       next: (p) => {
         this.producto = p;
         this.loading = false;
-        this.registrarView(id);
-        this.cargarSimilares(id);
+        // Las dos son de CLIENTE y la ficha ya es publica: sin sesion no se
+        // piden. La senal de evento alimenta las recomendaciones —un evento sin
+        // cliente no recomienda nada a nadie— y los similares se calculan a
+        // partir de lo que esa persona ha visto. Pedirlos igual solo dejaria dos
+        // 403 por cada ficha que un visitante abra.
+        if (this.sesion.haySesionDeCliente) {
+          this.registrarView(id);
+          this.cargarSimilares(id);
+        }
       },
       error: () => { this.loading = false; this.noEncontrado = true; }
     });
@@ -149,6 +158,11 @@ export class ProductoDetalleComponent implements OnInit, OnDestroy {
   // ── Acciones ─────────────────────────────────────────────────────────────
   agregarAlCarrito(irAlPago = false): void {
     if (!this.producto || this.agregando) return;
+    this.sesion.exigir(irAlPago ? 'para comprar' : 'para agregar productos al carrito')
+      .subscribe(ok => { if (ok) { this.agregarAlCarritoReal(irAlPago); } });
+  }
+
+  private agregarAlCarritoReal(irAlPago: boolean): void {
     this.agregando = true;
     this.shopService.agregarAlCarrito(this.producto.productoId, this.cantidad).subscribe({
       next: () => {
@@ -169,6 +183,11 @@ export class ProductoDetalleComponent implements OnInit, OnDestroy {
 
   toggleWishlist(): void {
     if (!this.producto) return;
+    this.sesion.exigir('para guardar productos en tu lista de deseos')
+      .subscribe(ok => { if (ok) { this.toggleWishlistReal(); } });
+  }
+
+  private toggleWishlistReal(): void {
     const id = Number(this.producto.productoId);
 
     if (this.enWishlist) {
@@ -192,6 +211,12 @@ export class ProductoDetalleComponent implements OnInit, OnDestroy {
 
   agregarSimilar(p: any, event: Event): void {
     event.stopPropagation();
+    this.sesion.exigir('para agregar productos al carrito').subscribe(ok => {
+      if (ok) { this.agregarSimilarReal(p); }
+    });
+  }
+
+  private agregarSimilarReal(p: any): void {
     this.shopService.agregarAlCarrito(p.productoId, 1).subscribe({
       next: () => {
         this.ui.refrescarCarrito();

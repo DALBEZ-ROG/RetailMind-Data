@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
+import { AuthService } from '../../core/services/auth.service';
 import { ShopService } from './shop.service';
 import { paletaCategoria, PaletaCategoria } from './catalogo-visual';
 
@@ -34,13 +35,28 @@ export class ShopUiService {
   /** Ids de variante en wishlist; alimenta el corazón de cada tarjeta. */
   readonly wishlistIds$ = this._wishlist.asObservable();
 
-  constructor(private shop: ShopService) {
+  constructor(private shop: ShopService, private auth: AuthService) {
     this._elegidaId = this.leerEleccionGuardada();
   }
 
   get carritoCount(): number { return this._carrito.value; }
   get wishlistIds(): Set<number> { return this._wishlist.value; }
   get wishlistCount(): number { return this._wishlist.value.size; }
+
+  /**
+   * ¿Hay alguien con carrito?
+   *
+   * Desde que el escaparate es público, estas tres llamadas pueden ejecutarse
+   * con la sesión vacía, y entonces devuelven 403. El `error: () => {}` de más
+   * abajo hace que eso NO se note en pantalla, que es peor que si se notara:
+   * cada visita al catálogo dejaba tres 403 en la consola del navegador y en el
+   * registro del servidor, y esa clase de ruido es la que hace que un 403 de
+   * verdad pase desapercibido. Se corta en el origen: si no hay cliente, no se
+   * pregunta.
+   */
+  private get hayCliente(): boolean {
+    return this.auth.isAuthenticated() && this.auth.hasRole('CLIENTE');
+  }
 
   /** Relee ambos contadores del servidor. Silencioso: un fallo no molesta. */
   refrescarTodo(): void {
@@ -49,6 +65,7 @@ export class ShopUiService {
   }
 
   refrescarCarrito(): void {
+    if (!this.hayCliente) { this._carrito.next(0); return; }
     this.shop.getCarrito().subscribe({
       next: (items) => this._carrito.next(items?.length ?? 0),
       error: () => {}
@@ -56,6 +73,7 @@ export class ShopUiService {
   }
 
   refrescarWishlist(): void {
+    if (!this.hayCliente) { this._wishlist.next(new Set()); return; }
     this.shop.getWishlist().subscribe({
       next: (items) => this._wishlist.next(new Set((items ?? []).map(i => Number(i.productoId)))),
       error: () => {}
@@ -93,6 +111,9 @@ export class ShopUiService {
   get direcciones(): any[] { return this._direcciones.value; }
 
   cargarDirecciones(forzar = false): void {
+    // Mismo motivo que en los contadores: sin cliente no hay direcciones que
+    // pedir, y preguntarlo solo produce un 403 silencioso por cada visita.
+    if (!this.hayCliente) { this._direcciones.next([]); return; }
     if (this.direccionesPedidas && !forzar) return;
     this.direccionesPedidas = true;
     this.shop.getDirecciones().subscribe({

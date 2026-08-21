@@ -4,7 +4,7 @@
 
 <ng-template #mainLayout>
   <!-- Navbar flotante glassmorphism -->
-  <nav class="navbar" [class.navbar-tienda]="isCliente">
+  <nav class="navbar" [class.navbar-tienda]="modoTienda">
     <button class="sidebar-toggle" (click)="toggleSidebar()"
             [matTooltip]="sidebarOpen ? 'Ocultar menú' : 'Mostrar menú'">
       <mat-icon>{{ sidebarOpen ? 'menu_open' : 'menu' }}</mat-icon>
@@ -52,7 +52,7 @@
          Acompaña al cliente por todas las pantallas de la tienda: buscar desde
          el carrito o desde una ficha no debe obligar a volver antes al
          catálogo. Compacto y a la derecha, pegado a los accesos. -->
-    <div class="tienda-buscador" *ngIf="isCliente">
+    <div class="tienda-buscador" *ngIf="modoTienda">
       <select class="tb-ambito" [(ngModel)]="catBusqueda" (change)="buscarEnTienda()"
               aria-label="Departamento donde buscar">
         <option [ngValue]="null">Todo</option>
@@ -72,14 +72,14 @@
     </div>
 
     <!-- ── Accesos de la tienda: pedidos/devoluciones, ayuda, lista, carrito ── -->
-    <div class="tienda-acciones" *ngIf="isCliente">
-      <a class="acc-doble" routerLink="/operativo/ventas/mis-pedidos"
+    <div class="tienda-acciones" *ngIf="modoTienda">
+      <a class="acc-doble" *ngIf="isCliente" routerLink="/operativo/ventas/mis-pedidos"
          matTooltip="Seguimiento, facturas y solicitud de devolución">
         <small>Pedidos y</small>
         <strong>Devoluciones</strong>
       </a>
 
-      <button class="acc-doble" [matMenuTriggerFor]="ayudaMenu">
+      <button class="acc-doble" *ngIf="isCliente" [matMenuTriggerFor]="ayudaMenu">
         <small>Ayuda y</small>
         <strong>Soporte <mat-icon class="caret">expand_more</mat-icon></strong>
       </button>
@@ -114,19 +114,33 @@
         <mat-icon>search</mat-icon>
       </button>
 
-      <a class="acc-icono" routerLink="/wishlist" matTooltip="Mi lista de deseos"
-         aria-label="Mi lista de deseos">
+      <a class="acc-icono" *ngIf="isCliente" routerLink="/wishlist"
+         matTooltip="Mi lista de deseos" aria-label="Mi lista de deseos">
         <mat-icon>favorite_border</mat-icon>
         <span class="globo" *ngIf="shopUi.wishlistCount">{{ shopUi.wishlistCount }}</span>
       </a>
 
-      <a class="acc-carrito" routerLink="/shop/carrito" matTooltip="Mi carrito">
+      <a class="acc-carrito" *ngIf="isCliente" routerLink="/shop/carrito" matTooltip="Mi carrito">
         <span class="acc-carrito-icono">
           <mat-icon>shopping_cart</mat-icon>
           <span class="globo" *ngIf="shopUi.carritoCount">{{ shopUi.carritoCount }}</span>
         </span>
         <strong>Carrito</strong>
       </a>
+
+      <!-- ── Visitante: entrar o crear cuenta ────────────────────────────
+           No se pintan un carrito ni una lista vacíos: sin cuenta no existen,
+           y un globo a cero prometería algo que no hay. En su lugar va lo único
+           que un visitante puede hacer desde la barra. -->
+      <button class="acc-doble acc-entrar" *ngIf="esVisitante" (click)="iniciarSesion()">
+        <small>Hola, entra</small>
+        <strong>Iniciar sesión</strong>
+      </button>
+
+      <button class="acc-crear" *ngIf="esVisitante" (click)="crearCuenta()">
+        <mat-icon>person_add_alt</mat-icon>
+        <strong>Crea tu cuenta</strong>
+      </button>
     </div>
 
     <div class="navbar-actions" *ngIf="currentUser">
