@@ -12,14 +12,37 @@
       <h1 class="reg-title">
         <span class="title-primary">Crea tu cuenta</span>
       </h1>
-      <p class="reg-subtitle" *ngIf="paso < 5">
+      <p class="reg-subtitle" *ngIf="paso < 5 && !sesionAjena">
         Paso {{ paso }} de {{ ultimoPaso }}
         <span class="opcional" *ngIf="paso >= 3">· este paso es opcional</span>
       </p>
     </div>
 
+    <!-- ══ Ya hay una sesión de personal abierta ═══════════════════════
+         Sin esto, completar el alta machacaría esa sesión con la del cliente
+         nuevo: `guardarSesion` escribe sobre las mismas claves y no hay forma
+         de volver atrás salvo iniciando sesión otra vez. Se pregunta. -->
+    <section class="reg-ajena" *ngIf="sesionAjena">
+      <mat-icon>manage_accounts</mat-icon>
+      <h2>Ya hay una sesión abierta</h2>
+      <p>
+        Estás dentro del sistema como <strong>{{ sesionAjena }}</strong>. Las
+        cuentas de la tienda son solo para clientes, así que para crear una hay
+        que cerrar la sesión actual.
+      </p>
+      <div class="reg-acciones">
+        <button type="button" class="reg-btn plano" (click)="volverAlSistema()">
+          Volver al sistema
+        </button>
+        <span class="reg-espacio"></span>
+        <button type="button" class="reg-btn primario" (click)="cerrarYSeguir()">
+          Cerrar sesión y crear una cuenta
+        </button>
+      </div>
+    </section>
+
     <!-- ── Progreso ────────────────────────────────────────────────────── -->
-    <ol class="reg-pasos" *ngIf="paso < 5" aria-label="Progreso del registro">
+    <ol class="reg-pasos" *ngIf="paso < 5 && !sesionAjena" aria-label="Progreso del registro">
       <li [class.activo]="paso === 1" [class.hecho]="paso > 1"><span>1</span> Tus datos</li>
       <li [class.activo]="paso === 2" [class.hecho]="paso > 2"><span>2</span> Acceso</li>
       <li [class.activo]="paso === 3" [class.hecho]="paso > 3"><span>3</span> Dirección</li>
@@ -27,7 +50,7 @@
     </ol>
 
     <!-- ══ Paso 1 · datos personales ═══════════════════════════════════ -->
-    <section class="reg-paso" *ngIf="paso === 1">
+    <section class="reg-paso" *ngIf="paso === 1 && !sesionAjena">
       <div class="reg-grid">
         <label class="reg-campo obligatorio">
           <span>Nombre</span>
@@ -77,6 +100,10 @@
       <p class="reg-aviso" *ngIf="!identificacionCoherente">
         <mat-icon>info_outline</mat-icon>
         El tipo y el número de identificación van juntos: indica los dos o ninguno.
+      </p>
+      <p class="reg-aviso" *ngIf="identificacionCoherente && !identificacionLarga">
+        <mat-icon>info_outline</mat-icon>
+        El número de identificación tiene entre 5 y 20 dígitos.
       </p>
 
       <label class="reg-casilla">
@@ -215,7 +242,7 @@
     </p>
 
     <!-- ── Botonera ────────────────────────────────────────────────────── -->
-    <div class="reg-acciones" *ngIf="paso < 5">
+    <div class="reg-acciones" *ngIf="paso < 5 && !sesionAjena">
       <button type="button" class="reg-btn plano" (click)="atras()"
               *ngIf="paso > 1 && !(cuentaCreada && paso <= 3)" [disabled]="cargando">
         Atrás
@@ -240,10 +267,10 @@
     </div>
 
     <!-- ── Pie ─────────────────────────────────────────────────────────── -->
-    <p class="reg-pie" *ngIf="paso < 3">
+    <p class="reg-pie" *ngIf="paso < 3 && !sesionAjena">
       ¿Ya tienes cuenta? <a routerLink="/login">Inicia sesión</a>
     </p>
-    <p class="reg-pie" *ngIf="paso === 1">
+    <p class="reg-pie" *ngIf="paso === 1 && !sesionAjena">
       <a [routerLink]="['/shop']">Volver a la tienda</a>
     </p>
   </div>

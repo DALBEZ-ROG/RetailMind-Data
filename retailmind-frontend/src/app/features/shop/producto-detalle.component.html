@@ -204,7 +204,16 @@
         </article>
       </div>
 
-      <p class="sin-similares" *ngIf="!loadingSimilares && !similares.length">
+      <!-- Al visitante NO se le dice que no hay: es que no se han pedido. Las
+           recomendaciones salen de lo que esa persona ha visto y comprado, así
+           que sin cuenta no existen. Un «no encontramos» aquí sería una
+           afirmación falsa sobre el catálogo. -->
+      <p class="sin-similares" *ngIf="!loadingSimilares && !similares.length
+                                      && !sesion.haySesionDeCliente">
+        Inicia sesión para ver productos parecidos a éste.
+      </p>
+      <p class="sin-similares" *ngIf="!loadingSimilares && !similares.length
+                                      && sesion.haySesionDeCliente">
         No encontramos productos similares en el catálogo.
       </p>
     </section>

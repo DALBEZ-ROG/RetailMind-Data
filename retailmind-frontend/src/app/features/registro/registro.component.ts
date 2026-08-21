@@ -64,6 +64,15 @@ export class RegistroComponent implements OnInit {
   /** La cuenta ya existe (se creó al salir del paso 2). */
   cuentaCreada = false;
 
+  /**
+   * Rol de la sesión que YA estaba abierta cuando se llegó aquí, si no es de
+   * cliente. Es el caso de alguien del personal que abre `/registro` por
+   * curiosidad: si se le dejara completar el alta, `guardarSesion` machacaría
+   * su sesión de gerente con la del cliente nuevo, sin avisar y sin forma de
+   * deshacerlo salvo volviendo a entrar. Se le pregunta antes.
+   */
+  sesionAjena: string | null = null;
+
   datos = {
     nombre: '', apellido: '', telefono: '',
     tipoIdentificacion: '', numeroIdentificacion: '',
@@ -97,11 +106,24 @@ export class RegistroComponent implements OnInit {
     if (volver && volver.startsWith('/') && !volver.startsWith('//')) {
       this.volverA = volver;
     }
-    // Quien ya entró no tiene nada que hacer aquí.
+    // Quien ya entró como cliente no tiene nada que hacer aquí.
     if (this.auth.isAuthenticated() && this.auth.hasRole('CLIENTE')) {
       this.router.navigateByUrl(this.volverA);
+      return;
+    }
+    // Y quien entró como personal tiene que decidir antes de seguir.
+    if (this.auth.isAuthenticated()) {
+      this.sesionAjena = this.auth.getCurrentUser()?.rol ?? 'otro rol';
     }
   }
+
+  /** Cierra la sesión del personal y deja el formulario limpio para el alta. */
+  cerrarYSeguir(): void {
+    this.auth.limpiarSesion();
+    this.sesionAjena = null;
+  }
+
+  volverAlSistema(): void { this.router.navigate(['/inicio']); }
 
   // ── Validación por paso ───────────────────────────────────────────────────
 
@@ -114,8 +136,19 @@ export class RegistroComponent implements OnInit {
     return tiene === tipo;
   }
 
+  /**
+   * El backend exige entre 5 y 20 dígitos. Se comprueba TAMBIÉN aquí y no solo
+   * allí porque el alta ocurre al final del paso 2: sin esto, quien escribe
+   * tres dígitos en el paso 1 se entera una pantalla después, cuando ya ha
+   * elegido contraseña, y con un mensaje que habla de un campo que ya no ve.
+   */
+  get identificacionLarga(): boolean {
+    const n = this.datos.numeroIdentificacion.trim();
+    return n === '' || (n.length >= 5 && n.length <= 20);
+  }
+
   get paso1Valido(): boolean {
-    return this.nombreValido && this.identificacionCoherente;
+    return this.nombreValido && this.identificacionCoherente && this.identificacionLarga;
   }
 
   get correoValido(): boolean {

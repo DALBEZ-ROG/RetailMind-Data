@@ -42,10 +42,22 @@ export class AuthService {
   }
 
   logout(): void {
+    this.limpiarSesion();
+    this.router.navigate(['/login']);
+  }
+
+  /**
+   * Borra la sesión SIN navegar.
+   *
+   * Se separa de `logout` porque hay un caso en el que cerrar sesión no
+   * significa irse: alguien del personal que abre `/registro` y decide crear
+   * una cuenta de cliente tiene que soltar la suya y QUEDARSE donde está. Con
+   * `logout` acabaría en el login, que es justo la pantalla de la que venía.
+   */
+  limpiarSesion(): void {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(REFRESH_KEY);
     localStorage.removeItem(USER_KEY);
-    this.router.navigate(['/login']);
   }
 
   refreshToken(): Observable<LoginResponse> {

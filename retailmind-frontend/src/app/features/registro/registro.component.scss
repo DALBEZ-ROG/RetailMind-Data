@@ -368,3 +368,17 @@
   .reg-card { padding: 24px 20px 20px; border-radius: 20px; }
   .reg-pasos li { font-size: 0; gap: 0; justify-content: center; span { font-size: 11px; } }
 }
+
+
+// ── Ya hay una sesión abierta ────────────────────────────────────────────────
+.reg-ajena {
+  text-align: center;
+  padding: 6px 0 0;
+
+  > mat-icon {
+    font-size: 42px; width: 42px; height: 42px;
+    color: #1565c0;
+  }
+  h2 { margin: 10px 0 6px; font-size: 20px; font-weight: 800; }
+  p  { margin: 0 auto 4px; max-width: 46ch; font-size: 13.5px; line-height: 1.55; color: #6b7a90; }
+}
