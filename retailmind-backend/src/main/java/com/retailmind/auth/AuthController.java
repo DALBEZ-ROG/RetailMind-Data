@@ -43,15 +43,18 @@ public class AuthController {
     private final PostgresUserRepository usuarioRepo;
     private final UsuarioAdminService usuarioAdmin;
     private final PasswordEncoder passwordEncoder;
+    private final RegistroClienteService registroCliente;
 
     public AuthController(AuthService authService,
                           PostgresUserRepository usuarioRepo,
                           UsuarioAdminService usuarioAdmin,
-                          PasswordEncoder passwordEncoder) {
+                          PasswordEncoder passwordEncoder,
+                          RegistroClienteService registroCliente) {
         this.authService = authService;
         this.usuarioRepo = usuarioRepo;
         this.usuarioAdmin = usuarioAdmin;
         this.passwordEncoder = passwordEncoder;
+        this.registroCliente = registroCliente;
     }
 
     /** POST /api/auth/login */
@@ -127,6 +130,36 @@ public class AuthController {
     @PostMapping("/logout")
     public ResponseEntity<?> logout() {
         return ResponseEntity.ok(Map.of("mensaje", "Sesion cerrada exitosamente"));
+    }
+
+    /**
+     * POST /api/auth/registro-cliente — PÚBLICO.
+     *
+     * El «crea tu cuenta» de la tienda. Es un endpoint aparte de
+     * {@code /register} y no una variante suya, porque aquel toma el ROL DEL
+     * CUERPO: abrirlo sería regalar un {@code {"rol":"ADMIN"}} a cualquiera. Aquí
+     * el rol no aparece por ningún lado —ni se lee del cuerpo, ni se pasa al
+     * servicio, ni existe en la firma de {@code fn_registrar_cliente}—, así que
+     * la cuenta creada solo puede ser de CLIENTE.
+     *
+     * Devuelve una SESIÓN ya iniciada, y la emite el login de siempre en vez de
+     * una segunda vía: así el alta queda registrada en {@code log_acceso} como
+     * cualquier otra entrada y no hay dos formas distintas de emitir un token.
+     * Los pasos opcionales del registro —dirección e intereses— van después con
+     * ese token, por los endpoints normales del perfil: nada de eso necesita
+     * viajar por un camino anónimo.
+     */
+    @PostMapping("/registro-cliente")
+    public ResponseEntity<?> registroCliente(@RequestBody Map<String, Object> body,
+                                             HttpServletRequest http) {
+        registroCliente.registrar(body);
+
+        LoginRequestDTO entrada = new LoginRequestDTO();
+        entrada.setUsername(String.valueOf(body.get("email")).trim().toLowerCase());
+        entrada.setPassword(String.valueOf(body.get("password")));
+        LoginResponseDTO sesion = authService.login(entrada, ipCliente(http),
+                http.getHeader("User-Agent"));
+        return ResponseEntity.status(HttpStatus.CREATED).body(sesion);
     }
 
     /** POST /api/auth/register - Solo ADMIN */

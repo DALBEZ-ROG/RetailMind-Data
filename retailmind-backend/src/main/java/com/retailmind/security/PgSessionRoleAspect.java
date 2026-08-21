@@ -41,8 +41,19 @@ import com.retailmind.auth.AppUserPrincipal;
  * SET LOCAL muere con el COMMIT/ROLLBACK: la conexión vuelve al pool de Hikari
  * como retailmind_app (NOINHERIT, sin privilegios de negocio), limpia.
  *
- * Sin usuario autenticado (login, arranque) no se asume rol: la conexión queda
- * limitada a los privilegios directos de retailmind_app (usuario/rol/usuario_rol).
+ * Sin usuario autenticado hay DOS casos y no se pueden tratar igual:
+ *
+ *   · El **catálogo público** (paquete `catalogo/`) asume `grp_visitante`, un rol
+ *     de motor con SELECT sobre las seis tablas del escaparate y nada más
+ *     (script 112). Sin esto, abrir `GET /api/catalogo/**` en SecurityConfig no
+ *     serviría de nada: la transacción correría como `retailmind_app` —LOGIN
+ *     **NOINHERIT**, sin un solo privilegio de negocio— y la primera consulta
+ *     moriría con un 42501.
+ *   · Todo lo demás (login, refresco, arranque) sigue SIN asumir rol, con los
+ *     privilegios directos de retailmind_app sobre usuario/rol/usuario_rol. Y
+ *     tiene que seguir así: `grp_visitante` no lee `usuario`, de modo que
+ *     asumirlo de forma general **rompería el inicio de sesión de todo el
+ *     mundo** — el visitante entraría a mirar y nadie podría entrar a comprar.
  *
  * El paquete analytics/ (ClickHouse) queda excluido explícitamente.
  */
@@ -52,6 +63,13 @@ import com.retailmind.auth.AppUserPrincipal;
 public class PgSessionRoleAspect {
 
     private static final Logger logger = LoggerFactory.getLogger(PgSessionRoleAspect.class);
+
+    /**
+     * Rol de motor del visitante anónimo (script 112). No está en
+     * {@link DbGroupRole} a propósito: ese enum enumera los roles con los que
+     * alguien puede INICIAR SESIÓN, y nadie inicia sesión como visitante.
+     */
+    private static final String ROL_VISITANTE = "grp_visitante";
 
     private final DataSource pgDataSource;
 
@@ -72,6 +90,9 @@ public class PgSessionRoleAspect {
 
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !(auth.getPrincipal() instanceof AppUserPrincipal principal)) {
+            if (esCatalogoPublico(pjp)) {
+                asumir(ROL_VISITANTE, null);
+            }
             return pjp.proceed();
         }
 
@@ -86,6 +107,35 @@ public class PgSessionRoleAspect {
             return pjp.proceed();
         }
 
+        asumir(pgRole, rol == DbGroupRole.CLIENTE ? principal.getClienteId() : null);
+        return pjp.proceed();
+    }
+
+    /**
+     * ¿La llamada viene del catálogo de la tienda?
+     *
+     * Se mira el PAQUETE de la clase que se va a ejecutar y no la ruta HTTP, por
+     * dos razones: aquí no hay petición a mano —el aspecto envuelve un método de
+     * servicio, que también puede llamarse desde un @Scheduled— y porque el
+     * paquete es lo que de verdad acota qué SQL se va a ejecutar. Que la lista
+     * sea de UN paquete es el punto: el día que alguien quiera abrir otra cosa
+     * al público tiene que venir aquí y decirlo.
+     */
+    private boolean esCatalogoPublico(ProceedingJoinPoint pjp) {
+        Object destino = pjp.getTarget();
+        return destino != null
+                && destino.getClass().getName().startsWith("com.retailmind.catalogo.");
+    }
+
+    /**
+     * Asume el rol en la transacción en curso, y con él el cliente cuando lo hay.
+     *
+     * El nombre del rol viaja como PARÁMETRO LIGADO —nunca concatenado—, que es
+     * lo que hace imposible inyectar un identificador por esta vía. Probado:
+     * `set_config('role','grp_x; DROP TABLE marca',true)` responde «role does
+     * not exist».
+     */
+    private void asumir(String pgRole, Long clienteId) {
         Connection con = DataSourceUtils.getConnection(pgDataSource);
         try {
             // set_config('role', ?, true) EN VEZ DE «SET LOCAL ROLE » + nombre.
@@ -99,16 +149,17 @@ public class PgSessionRoleAspect {
                 ps.setString(1, pgRole);
                 ps.execute();
             }
-            if (rol == DbGroupRole.CLIENTE && principal.getClienteId() != null) {
+            if (clienteId != null) {
                 try (PreparedStatement ps =
                              con.prepareStatement("SELECT set_config('app.cliente_id', ?, true)")) {
-                    ps.setString(1, String.valueOf(principal.getClienteId()));
+                    ps.setString(1, String.valueOf(clienteId));
                     ps.execute();
                 }
             }
+        } catch (java.sql.SQLException e) {
+            throw new IllegalStateException("No se pudo asumir el rol de motor " + pgRole, e);
         } finally {
             DataSourceUtils.releaseConnection(con, pgDataSource);
         }
-        return pjp.proceed();
     }
 }

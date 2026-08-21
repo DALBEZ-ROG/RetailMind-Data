@@ -39,17 +39,33 @@ public class SecurityConfig {
                 // Rutas publicas
                 .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll()
+                // Alta publica de CLIENTE. Es una ruta DISTINTA de /register a
+                // proposito: aquella toma el rol del cuerpo y por eso sigue
+                // siendo de ADMIN. Aqui el rol no es un parametro en ningun
+                // punto del camino (ver RegistroClienteService y el script 112).
+                .requestMatchers(HttpMethod.POST, "/api/auth/registro-cliente").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/health").permitAll()
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                // Tienda del cliente (PostgreSQL): catalogo para CLIENTE
-                // (+ADMIN demo); carrito/wishlist/direcciones solo CLIENTE
-                // (RLS por app.cliente_id los aisla a sus filas)
+                // Tienda del cliente (PostgreSQL). El CATALOGO es publico: se
+                // puede mirar el escaparate sin cuenta. Comprar no: el carrito,
+                // la lista de deseos, las direcciones y los intereses siguen
+                // siendo de CLIENTE, y la RLS por app.cliente_id los aisla.
+                //
+                // Abrir esta linea NO basta por si sola: una peticion anonima no
+                // trae JWT, asi que sin la rama de grp_visitante en
+                // PgSessionRoleAspect la transaccion correria como
+                // retailmind_app (NOINHERIT, sin privilegios) y moriria con un
+                // 42501 en la primera tabla. Las dos piezas van juntas.
+                //
+                // La senal de eventos SIGUE exigiendo sesion: un evento sin
+                // cliente no alimenta ninguna recomendacion y solo engordaria
+                // fact_eventos con filas anonimas.
                 .requestMatchers(HttpMethod.POST, "/api/catalogo/eventos").authenticated()
-                .requestMatchers(HttpMethod.GET, "/api/catalogo/**")
-                    .hasAnyAuthority("ADMIN", "CLIENTE")
+                .requestMatchers(HttpMethod.GET, "/api/catalogo/**").permitAll()
                 .requestMatchers("/api/carrito/**").hasAuthority("CLIENTE")
                 .requestMatchers("/api/wishlist/**").hasAuthority("CLIENTE")
-                .requestMatchers("/api/perfil/direcciones/**", "/api/perfil/ciudades")
+                .requestMatchers("/api/perfil/direcciones/**", "/api/perfil/ciudades",
+                                 "/api/perfil/intereses")
                     .hasAuthority("CLIENTE")
                 .requestMatchers(HttpMethod.PUT, "/api/perfil").hasAuthority("CLIENTE")
                 .requestMatchers("/api/recomendaciones/**").hasAuthority("CLIENTE")

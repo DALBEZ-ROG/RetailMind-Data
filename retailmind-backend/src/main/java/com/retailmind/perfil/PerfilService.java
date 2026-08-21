@@ -261,6 +261,68 @@ public class PerfilService {
         return tipo != null && TIPOS_DIRECCION.contains(tipo) ? tipo : "envio";
     }
 
+    // ── Intereses: los departamentos que el cliente declara que le gustan ──
+    //
+    // Último paso del registro y OPCIONAL, así que cero filas es un estado
+    // legítimo —«no lo dijo»— y no un dato que falte. La tabla la crea el
+    // script 112 con su RLS propia: el cliente solo ve y toca lo suyo, y eso lo
+    // impone el motor, no este servicio.
+
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> listarIntereses() {
+        clienteObligatorio();
+        // Se devuelven TODAS las categorías raíz con una marca de elegida, y no
+        // solo las elegidas: la pantalla necesita pintar la lista completa para
+        // que se pueda escoger, y resolverlo con dos peticiones dejaría un
+        // instante en el que se ve el catálogo sin las marcas puestas.
+        return pg.queryForList("""
+                SELECT c.id, c.nombre,
+                       (i.categoria_id IS NOT NULL) AS elegida
+                FROM categoria c
+                LEFT JOIN cliente_categoria_interes i
+                       ON i.categoria_id = c.id
+                WHERE c.activo AND c.categoria_padre_id IS NULL
+                ORDER BY c.nombre
+                """);
+    }
+
+    /**
+     * Reemplaza la selección entera.
+     *
+     * Se borra y se reinserta en vez de calcular altas y bajas porque la
+     * pantalla manda SIEMPRE la lista completa: con un diferencial, una
+     * categoría desmarcada mientras se guardaba se quedaría marcada. La RLS
+     * acota el DELETE a las filas del propio cliente, así que el borrado no
+     * puede alcanzar a nadie más aunque este método se equivocara.
+     */
+    @Transactional
+    public void guardarIntereses(Map<String, Object> body) {
+        AppUserPrincipal p = clienteObligatorio();
+        Object crudo = body.get("categorias");
+        if (crudo != null && !(crudo instanceof List)) {
+            throw new IllegalArgumentException("«categorias» debe ser una lista de identificadores.");
+        }
+        List<?> ids = crudo == null ? List.of() : (List<?>) crudo;
+        if (ids.size() > 50) {
+            throw new IllegalArgumentException("Son demasiadas categorías.");
+        }
+
+        pg.update("DELETE FROM cliente_categoria_interes WHERE cliente_id = ?", p.getClienteId());
+        for (Object id : ids) {
+            Long categoriaId = longVal(id);
+            if (categoriaId == null) { continue; }
+            // El INSERT valida la categoría por la FK, que es donde tiene que
+            // validarse: una lista blanca en Java se desincroniza del catálogo.
+            // ON CONFLICT porque la pantalla puede mandar un id repetido y eso
+            // no es un error del usuario, es ruido.
+            pg.update("""
+                    INSERT INTO cliente_categoria_interes (cliente_id, categoria_id)
+                    VALUES (?, ?)
+                    ON CONFLICT (cliente_id, categoria_id) DO NOTHING""",
+                    p.getClienteId(), categoriaId);
+        }
+    }
+
     private AppUserPrincipal clienteObligatorio() {
         AppUserPrincipal p = principal();
         if (p.getClienteId() == null) {

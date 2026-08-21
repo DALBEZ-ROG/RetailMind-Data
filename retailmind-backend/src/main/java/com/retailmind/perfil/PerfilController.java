@@ -69,4 +69,19 @@ public class PerfilController {
     public List<Map<String, Object>> ciudades() {
         return service.ciudades();
     }
+
+    // ── Intereses del cliente (script 112) ───────────────────────────────
+
+    /** Todas las categorías raíz, cada una marcada o no. */
+    @GetMapping("/intereses")
+    public List<Map<String, Object>> intereses() {
+        return service.listarIntereses();
+    }
+
+    /** Reemplaza la selección completa; una lista vacía la borra. */
+    @PutMapping("/intereses")
+    public Map<String, Object> guardarIntereses(@RequestBody Map<String, Object> body) {
+        service.guardarIntereses(body);
+        return Map.of("success", true);
+    }
 }
