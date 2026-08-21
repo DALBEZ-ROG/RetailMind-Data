@@ -43,9 +43,18 @@ export class PerfilComponent implements OnInit {
   perfil: any = null;
   loading = true;
 
-  // Formulario de datos personales (solo cliente)
-  datos = { nombre: '', apellido: '', telefono: '', genero: '', aceptaMarketing: false };
+  // Formulario de datos personales (solo cliente). `fechaNacimiento` viaja
+  // SIEMPRE, aunque esté vacía: el PUT trata un campo ausente como «no tocar»
+  // y uno presente y vacío como «borrar», y aquí lo que manda es el
+  // formulario.
+  datos = {
+    nombre: '', apellido: '', telefono: '', genero: '',
+    fechaNacimiento: '', aceptaMarketing: false
+  };
   guardandoDatos = false;
+
+  /** Tope del selector de fecha: nadie nace mañana. */
+  readonly hoy = new Date().toISOString().slice(0, 10);
 
   // Direcciones
   direcciones: any[] = [];
@@ -78,6 +87,10 @@ export class PerfilComponent implements OnInit {
             apellido: data.apellido || '',
             telefono: data.telefono || '',
             genero: data.genero || '',
+            // La API devuelve la fecha como «AAAA-MM-DD» o con hora detrás;
+            // el `input[type=date]` solo entiende los diez primeros caracteres.
+            fechaNacimiento: data.fechaNacimiento
+              ? String(data.fechaNacimiento).slice(0, 10) : '',
             aceptaMarketing: !!data.aceptaMarketing
           };
           this.cargarDirecciones();

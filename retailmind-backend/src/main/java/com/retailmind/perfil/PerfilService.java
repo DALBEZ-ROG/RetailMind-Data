@@ -1,5 +1,7 @@
 package com.retailmind.perfil;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -72,6 +74,27 @@ public class PerfilService {
         return perfil;
     }
 
+    /**
+     * Valores que admite `cliente_genero_check`. La lista se repite aquí —y no
+     * se deduce del motor— para poder RECHAZAR con un mensaje que diga cuáles
+     * son: sin ella, un valor fuera de la lista llega al UPDATE y la BD
+     * responde con el 400 genérico de restricción, que no dice ni qué campo
+     * estaba mal. Si el CHECK cambia, esta lista cambia con él.
+     */
+    private static final List<String> GENEROS =
+            List.of("masculino", "femenino", "otro", "no_indica");
+
+    /**
+     * Actualiza los datos del cliente. **Un campo AUSENTE del cuerpo no se
+     * toca; un campo presente y vacío SÍ borra el valor.**
+     *
+     * La distinción no es teórica: la pantalla de perfil no ofrecía la fecha
+     * de nacimiento y tampoco la enviaba, así que cada «Guardar cambios»
+     * la ponía a NULL sin avisar —y 50.070 de los 50.072 clientes tienen
+     * una—. Con `containsKey` decidiendo, omitir un campo es no tocarlo, que
+     * es lo que cualquiera espera, y para borrarlo hay que pedirlo mandándolo
+     * en blanco.
+     */
     @Transactional
     public void actualizarDatos(Map<String, Object> body) {
         AppUserPrincipal p = clienteObligatorio();
@@ -79,15 +102,54 @@ public class PerfilService {
         if (nombre == null || nombre.isBlank()) {
             throw new IllegalArgumentException("El nombre es requerido");
         }
+
+        // Lista blanca: el género se valida ANTES de tocar la base, para poder
+        // nombrar el campo y los valores admitidos en el mensaje.
+        String genero = str(body.get("genero"));
+        if (genero != null && !genero.isBlank()
+                && !GENEROS.contains(genero.trim().toLowerCase())) {
+            throw new IllegalArgumentException(
+                    "El género debe ser uno de: " + String.join(", ", GENEROS));
+        }
+
+        // La fecha llega como texto «AAAA-MM-DD» (el `input[type=date]` del
+        // navegador). Se comprueba el formato y que no sea del futuro; el cast
+        // a `date` del UPDATE daría si no un 400 sin explicación.
+        String fecha = str(body.get("fechaNacimiento"));
+        if (fecha != null && !fecha.isBlank()) {
+            LocalDate d;
+            try {
+                d = LocalDate.parse(fecha.trim());
+            } catch (DateTimeParseException e) {
+                throw new IllegalArgumentException(
+                        "La fecha de nacimiento debe tener el formato AAAA-MM-DD");
+            }
+            if (d.isAfter(LocalDate.now())) {
+                throw new IllegalArgumentException(
+                        "La fecha de nacimiento no puede ser posterior a hoy");
+            }
+        }
+
+        boolean tocaApellido = body.containsKey("apellido");
+        boolean tocaTelefono = body.containsKey("telefono");
+        boolean tocaGenero = body.containsKey("genero");
+        boolean tocaFecha = body.containsKey("fechaNacimiento");
+
         int filas = pg.update("""
                 UPDATE cliente SET
-                    nombre = ?, apellido = NULLIF(?, ''), telefono = NULLIF(?, ''),
-                    genero = NULLIF(?, ''),
-                    fecha_nacimiento = NULLIF(?, '')::date,
+                    nombre = ?,
+                    apellido = CASE WHEN ?::boolean THEN NULLIF(?, '') ELSE apellido END,
+                    telefono = CASE WHEN ?::boolean THEN NULLIF(?, '') ELSE telefono END,
+                    genero = CASE WHEN ?::boolean THEN NULLIF(?, '') ELSE genero END,
+                    fecha_nacimiento = CASE WHEN ?::boolean
+                        THEN NULLIF(?, '')::date ELSE fecha_nacimiento END,
                     acepta_marketing = COALESCE(?::boolean, acepta_marketing)
                 WHERE id = ?""",
-                nombre.trim(), str(body.get("apellido")), str(body.get("telefono")),
-                str(body.get("genero")), str(body.get("fechaNacimiento")),
+                nombre.trim(),
+                tocaApellido, str(body.get("apellido")),
+                tocaTelefono, str(body.get("telefono")),
+                tocaGenero, genero != null ? genero.trim().toLowerCase() : null,
+                tocaFecha, fecha != null ? fecha.trim() : null,
                 body.get("aceptaMarketing") != null ? body.get("aceptaMarketing").toString() : null,
                 p.getClienteId());
         if (filas == 0) {

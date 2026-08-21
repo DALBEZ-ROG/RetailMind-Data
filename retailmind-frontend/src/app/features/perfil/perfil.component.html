@@ -92,14 +92,28 @@
               <mat-label>Teléfono</mat-label>
               <input matInput [(ngModel)]="datos.telefono">
             </mat-form-field>
+            <!-- Los valores son los EXACTOS que admite `cliente_genero_check`
+                 en la base. Antes eran F/M/O, que ni se podían guardar (400 de
+                 restricción) ni casaban al leer, así que un género ya
+                 registrado aparecía en blanco. -->
             <mat-form-field appearance="outline">
               <mat-label>Género</mat-label>
               <mat-select [(ngModel)]="datos.genero">
                 <mat-option value="">Sin especificar</mat-option>
-                <mat-option value="F">Femenino</mat-option>
-                <mat-option value="M">Masculino</mat-option>
-                <mat-option value="O">Otro</mat-option>
+                <mat-option value="femenino">Femenino</mat-option>
+                <mat-option value="masculino">Masculino</mat-option>
+                <mat-option value="otro">Otro</mat-option>
+                <mat-option value="no_indica">Prefiero no indicarlo</mat-option>
               </mat-select>
+            </mat-form-field>
+            <!-- La fecha de nacimiento SE EDITA aquí. No estaba en el
+                 formulario y tampoco viajaba en el guardado, así que cada
+                 «Guardar cambios» la borraba en silencio. -->
+            <mat-form-field appearance="outline">
+              <mat-label>Fecha de nacimiento</mat-label>
+              <input matInput type="date" [(ngModel)]="datos.fechaNacimiento"
+                     [max]="hoy">
+              <mat-hint>Opcional. Déjala vacía para no registrarla.</mat-hint>
             </mat-form-field>
           </div>
           <mat-checkbox [(ngModel)]="datos.aceptaMarketing">
