@@ -28,6 +28,7 @@ pruebas/
 ├─ p12_rendimiento.py Latencia aislada y repetida, p50/p95
 ├─ p13_resiliencia.py Para ClickHouse de verdad y mide la degradación
 ├─ p14_tienda.js      Tienda del cliente: filtros, envío, perfil y MIS PEDIDOS
+├─ p15_validacion_campos.js  Qué admite cada campo escribible, TECLEANDO
 └─ informes/          Salida por corrida (JSON + Markdown)
 ```
 
@@ -39,6 +40,7 @@ pruebas/
 | **P05** | ✅ | **✅** | **solo E0/E1** — se planta si la apuntan a otro sitio |
 | **P13** | ✅ | — | para y levanta el contenedor de ClickHouse (~1 min) |
 | P11 | ✅ | — | navegador; puede desviarse a otro backend |
+| P15 | ✅ | — | navegador, con ADMIN **y** CLIENTE. Teclea basura en cada campo y **no guarda nada**: ningún caso pulsa Guardar, y los formularios se cierran con Escape. Necesita las DOS claves |
 | **P14** | ✅ | **✅** | navegador, con el usuario CLIENTE. Escribe en el carrito, la lista de deseos, la dirección de envío elegida y **los datos del perfil** de `maria.lopez@demo.com`, y **lo deja todo como estaba**. Única huella: la dirección que crea y borra queda como fila **inactiva** (`activo = false`) — el sistema hace baja LÓGICA porque `grp_cliente` no tiene DELETE sobre `direccion`, así que no reaparece en ninguna pantalla. Su clave es `RETAILMIND_CLIENTE_PASS` |
 
 ## Credenciales
@@ -68,6 +70,7 @@ py -3 pruebas/p12_rendimiento.py E3    # ~10 min
 py -3 pruebas/p02_barrido.py     E3    # ~13 min · 1.962 llamadas
 node  pruebas/p11_interfaz.js          # ~4 min · 32 pantallas
 node  pruebas/p14_tienda.js            # ~6 min · tienda, perfil y mis pedidos (86 casos)
+node  pruebas/p15_validacion_campos.js # ~5 min · los 179 campos escribibles (85 casos)
 ```
 
 ## Correr contra la base vacía (E0)
