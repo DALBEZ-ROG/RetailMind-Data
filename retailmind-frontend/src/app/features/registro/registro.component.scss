@@ -1,0 +1,370 @@
+// ══════════════════════════════════════════════════════════════════════════════
+// REGISTRO DE CLIENTE — el mismo lenguaje que el login
+//
+// Comparte con `login.component.scss` el degradado, la trama de puntos, los
+// círculos difuminados y la tarjeta de cristal. Está COPIADO y no importado a
+// propósito: son dos pantallas de acceso pero con formas distintas —una tarjeta
+// estrecha de dos campos frente a una rejilla de siete—, y compartir el bloque
+// obligaría a que cualquier retoque de una se pensara para las dos. El día que
+// haya una tercera pantalla de acceso, entonces sí toca extraer el fondo.
+// ══════════════════════════════════════════════════════════════════════════════
+
+.reg-wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px 20px;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #0d1b4b 0%, #1a237e 30%, #1565c0 60%, #0d47a1 100%);
+}
+
+.reg-bg-pattern {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.circle-decoration {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+
+  &.circle-1 {
+    top: -12%; left: -8%;
+    width: 420px; height: 420px;
+    background: rgba(255, 255, 255, 0.04);
+    filter: blur(80px);
+  }
+  &.circle-2 {
+    bottom: -14%; right: -8%;
+    width: 520px; height: 520px;
+    background: rgba(0, 188, 212, 0.06);
+    filter: blur(100px);
+  }
+}
+
+// ── Tarjeta ──────────────────────────────────────────────────────────────────
+.reg-card {
+  position: relative;
+  z-index: 1;
+  width: 660px;
+  max-width: 100%;
+  padding: 30px 34px 26px;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  border-radius: 26px;
+  box-shadow: 0 28px 70px rgba(4, 14, 45, 0.34);
+  color: #14243d;
+}
+
+.reg-header {
+  text-align: center;
+  margin-bottom: 18px;
+}
+
+.reg-logo { display: block; margin: 0 auto 8px; }
+
+.reg-title {
+  margin: 0;
+  font-size: 25px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  .title-primary { color: #0d1b4b; }
+}
+
+.reg-subtitle {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #6b7a90;
+  .opcional { color: #1565c0; font-weight: 600; }
+}
+
+// ── Progreso ─────────────────────────────────────────────────────────────────
+.reg-pasos {
+  display: flex;
+  gap: 6px;
+  list-style: none;
+  margin: 0 0 22px;
+  padding: 0;
+
+  li {
+    flex: 1 1 0;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #93a1b5;
+    border-top: 3px solid rgba(127, 143, 166, 0.24);
+    transition: color .18s, border-color .18s;
+
+    span {
+      display: grid;
+      place-items: center;
+      width: 20px; height: 20px;
+      flex: 0 0 auto;
+      border-radius: 50%;
+      font-size: 11px;
+      background: rgba(127, 143, 166, 0.2);
+      color: #6b7a90;
+    }
+
+    &.hecho {
+      color: #1565c0;
+      border-top-color: #1565c0;
+      span { background: #1565c0; color: #fff; }
+    }
+    &.activo {
+      color: #0d1b4b;
+      border-top-color: #0d1b4b;
+      span { background: #0d1b4b; color: #fff; }
+    }
+  }
+}
+
+// ── Campos ───────────────────────────────────────────────────────────────────
+.reg-paso { display: grid; gap: 13px; }
+
+.reg-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 13px 16px;
+}
+
+.reg-campo {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+
+  &.ancho { grid-column: 1 / -1; }
+
+  > span {
+    font-size: 12px;
+    font-weight: 700;
+    color: #6b7a90;
+    letter-spacing: .2px;
+  }
+
+  &.obligatorio > span::after {
+    content: ' *';
+    color: #f0616d;
+  }
+
+  input, select {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 12px;
+    font: inherit;
+    font-size: 14px;
+    color: #14243d;
+    background: rgba(127, 143, 166, 0.09);
+    border: 1px solid transparent;
+    border-radius: 11px;
+    outline: none;
+    transition: border-color .15s, background .15s;
+
+    &:focus {
+      background: #fff;
+      border-color: #1565c0;
+    }
+  }
+
+  .pista {
+    font-size: 11.5px;
+    color: #93a1b5;
+    &.mal { color: #d24a55; }
+  }
+}
+
+// Campo con botón dentro (mostrar contraseña).
+.con-boton {
+  position: relative;
+  input { padding-right: 42px; }
+  button {
+    position: absolute;
+    top: 50%; right: 6px;
+    transform: translateY(-50%);
+    display: grid; place-items: center;
+    width: 30px; height: 30px;
+    border: 0; border-radius: 50%;
+    background: transparent;
+    cursor: pointer;
+    color: #6b7a90;
+    mat-icon { font-size: 19px; width: 19px; height: 19px; }
+  }
+}
+
+.reg-casilla {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13.5px;
+  cursor: pointer;
+  input { width: 17px; height: 17px; accent-color: #1565c0; cursor: pointer; }
+}
+
+.reg-intro {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 11px 13px;
+  font-size: 13px;
+  line-height: 1.5;
+  border-radius: 12px;
+  color: #14243d;
+  background: rgba(21, 101, 192, 0.09);
+  mat-icon { flex: 0 0 auto; color: #1565c0; font-size: 20px; width: 20px; height: 20px; }
+}
+
+.reg-aviso {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 12.5px;
+  color: #b06a00;
+  mat-icon { font-size: 18px; width: 18px; height: 18px; }
+}
+
+.reg-nota {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: #93a1b5;
+}
+
+// ── Intereses ────────────────────────────────────────────────────────────────
+.reg-intereses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.interes {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 14px;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #14243d;
+  background: rgba(127, 143, 166, 0.11);
+  border: 1.5px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, color .15s;
+
+  mat-icon { font-size: 18px; width: 18px; height: 18px; color: #93a1b5; }
+
+  &:hover { background: rgba(127, 143, 166, 0.18); }
+
+  &.elegida {
+    color: #0d47a1;
+    background: rgba(21, 101, 192, 0.13);
+    border-color: #1565c0;
+    mat-icon { color: #1565c0; }
+  }
+}
+
+// ── Listo ────────────────────────────────────────────────────────────────────
+.reg-listo {
+  justify-items: center;
+  text-align: center;
+  padding: 14px 0 6px;
+
+  h2 { margin: 14px 0 4px; font-size: 21px; font-weight: 800; }
+  p  { margin: 0 0 16px; font-size: 13.5px; color: #6b7a90; }
+}
+
+.listo-marca {
+  display: grid;
+  place-items: center;
+  width: 62px; height: 62px;
+  border-radius: 50%;
+  background: rgba(46, 175, 122, 0.16);
+  mat-icon { font-size: 34px; width: 34px; height: 34px; color: #2eaf7a; }
+}
+
+// ── Error y botonera ─────────────────────────────────────────────────────────
+.reg-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border-radius: 11px;
+  font-size: 13px;
+  color: #b3261e;
+  background: rgba(240, 97, 109, 0.12);
+  mat-icon { font-size: 19px; width: 19px; height: 19px; }
+}
+
+.reg-acciones {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.reg-espacio { flex: 1 1 auto; }
+
+.reg-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 22px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 11px;
+  border: 0;
+  cursor: pointer;
+  transition: filter .15s, background .15s;
+
+  &:disabled { opacity: .5; cursor: not-allowed; }
+
+  &.primario {
+    color: #fff;
+    background: linear-gradient(135deg, #1a237e, #1565c0);
+    &:hover:not(:disabled) { filter: brightness(1.1); }
+  }
+
+  &.plano {
+    color: #6b7a90;
+    background: transparent;
+    &:hover:not(:disabled) { background: rgba(127, 143, 166, 0.14); }
+  }
+}
+
+.reg-pie {
+  margin: 16px 0 0;
+  text-align: center;
+  font-size: 13px;
+  color: #6b7a90;
+
+  a {
+    color: #1565c0;
+    font-weight: 700;
+    text-decoration: none;
+    &:hover { text-decoration: underline; }
+  }
+}
+
+// El aviso de campo mal escrito (core/validacion) sobre fondo claro.
+::ng-deep .reg-card .rm-campo-error { padding: 2px 2px 0; }
+
+@media (max-width: 560px) {
+  .reg-card { padding: 24px 20px 20px; border-radius: 20px; }
+  .reg-pasos li { font-size: 0; gap: 0; justify-content: center; span { font-size: 11px; } }
+}

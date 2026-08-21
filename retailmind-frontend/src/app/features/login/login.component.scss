@@ -329,3 +329,61 @@
   font-size: 11px;
   color: rgba(255, 255, 255, 0.4);
 }
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ALTA DE CLIENTE — la puerta que faltaba
+// Van DEBAJO del formulario y con menos peso visual que el botón de entrar: la
+// mayoría de quien llega aquí ya tiene cuenta, y el alta no debe competir con
+// el gesto principal.
+// ══════════════════════════════════════════════════════════════════════════════
+.login-separador {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 22px 0 14px;
+  font-size: 12.5px;
+  color: #6b7a90;
+
+  &::before, &::after {
+    content: '';
+    flex: 1 1 auto;
+    height: 1px;
+    background: rgba(13, 27, 75, 0.16);
+  }
+}
+
+.login-crear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  border: 1.5px solid #1565c0;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1565c0;
+  text-decoration: none;
+  transition: background .15s;
+
+  &:hover { background: rgba(21, 101, 192, 0.09); }
+
+  mat-icon { font-size: 19px; width: 19px; height: 19px; }
+}
+
+.login-mirar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6b7a90;
+  text-decoration: none;
+
+  &:hover { color: #1565c0; }
+
+  mat-icon { font-size: 17px; width: 17px; height: 17px; }
+}

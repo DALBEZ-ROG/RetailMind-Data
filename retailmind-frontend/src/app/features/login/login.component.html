@@ -79,6 +79,22 @@
         <span>{{ errorMessage }}</span>
       </div>
     </form>
+
+    <!-- ── Alta de cliente ───────────────────────────────────────────────
+         Solo crea CLIENTES: el personal del negocio lo da de alta un
+         administrador desde /admin-usuarios, y el endpoint que hay detrás de
+         este botón no admite elegir rol. -->
+    <div class="login-separador"><span>¿No tienes cuenta?</span></div>
+
+    <a class="login-crear" routerLink="/registro">
+      <mat-icon>person_add_alt</mat-icon>
+      Crea tu cuenta de cliente
+    </a>
+
+    <a class="login-mirar" routerLink="/shop">
+      Solo quiero ver la tienda
+      <mat-icon>arrow_forward</mat-icon>
+    </a>
   </div>
 
   <!-- Footer -->

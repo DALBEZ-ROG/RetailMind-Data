@@ -1,0 +1,250 @@
+<div class="reg-wrapper">
+  <div class="reg-bg-pattern"></div>
+  <div class="circle-decoration circle-1"></div>
+  <div class="circle-decoration circle-2"></div>
+
+  <div class="reg-card">
+
+    <!-- ── Cabecera ────────────────────────────────────────────────────── -->
+    <div class="reg-header">
+      <img class="reg-logo" src="assets/ic_retailmind.png"
+           alt="Logotipo de RetailMind" width="52" height="57">
+      <h1 class="reg-title">
+        <span class="title-primary">Crea tu cuenta</span>
+      </h1>
+      <p class="reg-subtitle" *ngIf="paso < 5">
+        Paso {{ paso }} de {{ ultimoPaso }}
+        <span class="opcional" *ngIf="paso >= 3">· este paso es opcional</span>
+      </p>
+    </div>
+
+    <!-- ── Progreso ────────────────────────────────────────────────────── -->
+    <ol class="reg-pasos" *ngIf="paso < 5" aria-label="Progreso del registro">
+      <li [class.activo]="paso === 1" [class.hecho]="paso > 1"><span>1</span> Tus datos</li>
+      <li [class.activo]="paso === 2" [class.hecho]="paso > 2"><span>2</span> Acceso</li>
+      <li [class.activo]="paso === 3" [class.hecho]="paso > 3"><span>3</span> Dirección</li>
+      <li [class.activo]="paso === 4"><span>4</span> Intereses</li>
+    </ol>
+
+    <!-- ══ Paso 1 · datos personales ═══════════════════════════════════ -->
+    <section class="reg-paso" *ngIf="paso === 1">
+      <div class="reg-grid">
+        <label class="reg-campo obligatorio">
+          <span>Nombre</span>
+          <input appTexto="nombre" exigido type="text" [(ngModel)]="datos.nombre"
+                 placeholder="María" autocomplete="given-name">
+        </label>
+        <label class="reg-campo">
+          <span>Apellido</span>
+          <input appTexto="nombre" type="text" [(ngModel)]="datos.apellido"
+                 placeholder="López" autocomplete="family-name">
+        </label>
+        <label class="reg-campo">
+          <span>Teléfono</span>
+          <input appTexto="telefono" type="text" [(ngModel)]="datos.telefono"
+                 placeholder="0991234567" autocomplete="tel">
+        </label>
+        <label class="reg-campo">
+          <span>Fecha de nacimiento</span>
+          <input type="date" [(ngModel)]="datos.fechaNacimiento" [max]="hoy">
+        </label>
+        <label class="reg-campo">
+          <span>Tipo de identificación</span>
+          <select [(ngModel)]="datos.tipoIdentificacion">
+            <option value="">— No indicar —</option>
+            <option value="cedula">Cédula</option>
+            <option value="ruc">RUC</option>
+            <option value="pasaporte">Pasaporte</option>
+          </select>
+        </label>
+        <label class="reg-campo">
+          <span>Número de identificación</span>
+          <input appTexto="digitos" type="text" [(ngModel)]="datos.numeroIdentificacion"
+                 placeholder="1712345678" maxlength="20">
+        </label>
+        <label class="reg-campo">
+          <span>Género</span>
+          <select [(ngModel)]="datos.genero">
+            <option value="">— No indicar —</option>
+            <option value="femenino">Femenino</option>
+            <option value="masculino">Masculino</option>
+            <option value="otro">Otro</option>
+            <option value="no_indica">Prefiero no decirlo</option>
+          </select>
+        </label>
+      </div>
+
+      <p class="reg-aviso" *ngIf="!identificacionCoherente">
+        <mat-icon>info_outline</mat-icon>
+        El tipo y el número de identificación van juntos: indica los dos o ninguno.
+      </p>
+
+      <label class="reg-casilla">
+        <input type="checkbox" [(ngModel)]="datos.aceptaMarketing">
+        <span>Quiero recibir ofertas y novedades de RetailMind</span>
+      </label>
+
+      <p class="reg-nota">Solo el nombre es obligatorio. Lo demás lo puedes completar después desde tu perfil.</p>
+    </section>
+
+    <!-- ══ Paso 2 · correo y contraseña ════════════════════════════════ -->
+    <section class="reg-paso" *ngIf="paso === 2">
+      <label class="reg-campo obligatorio ancho">
+        <span>Correo electrónico</span>
+        <input appTexto="email" exigido type="text" [(ngModel)]="acceso.email"
+               placeholder="tucorreo@ejemplo.com" autocomplete="email">
+        <small class="pista">Con este correo iniciarás sesión.</small>
+      </label>
+
+      <label class="reg-campo obligatorio ancho">
+        <span>Contraseña</span>
+        <div class="con-boton">
+          <input [type]="verClave ? 'text' : 'password'" [(ngModel)]="acceso.password"
+                 placeholder="Al menos 8 caracteres" autocomplete="new-password">
+          <button type="button" (click)="verClave = !verClave"
+                  [attr.aria-label]="verClave ? 'Ocultar contraseña' : 'Mostrar contraseña'">
+            <mat-icon>{{ verClave ? 'visibility' : 'visibility_off' }}</mat-icon>
+          </button>
+        </div>
+        <small class="pista mal" *ngIf="acceso.password && !claveValida">
+          Necesita al menos 8 caracteres.
+        </small>
+      </label>
+
+      <label class="reg-campo obligatorio ancho">
+        <span>Repite la contraseña</span>
+        <input [type]="verClave ? 'text' : 'password'" [(ngModel)]="acceso.repetir"
+               placeholder="La misma de arriba" autocomplete="new-password">
+        <small class="pista mal" *ngIf="acceso.repetir && !claveRepetida">
+          Las dos contraseñas no coinciden.
+        </small>
+      </label>
+
+      <p class="reg-nota">Al continuar se creará tu cuenta. Los dos pasos siguientes son opcionales.</p>
+    </section>
+
+    <!-- ══ Paso 3 · dirección de envío ═════════════════════════════════ -->
+    <section class="reg-paso" *ngIf="paso === 3">
+      <p class="reg-intro">
+        <mat-icon>local_shipping</mat-icon>
+        Con tu dirección calculamos el envío y el transportista antes de que pagues.
+        Puedes añadirla ahora o más tarde.
+      </p>
+
+      <div class="reg-grid">
+        <label class="reg-campo">
+          <span>Nombre de la dirección</span>
+          <input appTexto="nombre" type="text" [(ngModel)]="direccion.alias" placeholder="Casa">
+        </label>
+        <label class="reg-campo">
+          <span>Quién recibe</span>
+          <input appTexto="nombre" type="text" [(ngModel)]="direccion.destinatario">
+        </label>
+        <label class="reg-campo ancho">
+          <span>Calle principal</span>
+          <input appTexto="nombre" type="text" [(ngModel)]="direccion.callePrincipal"
+                 placeholder="Av. Quito">
+        </label>
+        <label class="reg-campo">
+          <span>Calle secundaria</span>
+          <input appTexto="nombre" type="text" [(ngModel)]="direccion.calleSecundaria">
+        </label>
+        <label class="reg-campo">
+          <span>Número</span>
+          <input appTexto="numeroCasa" type="text" [(ngModel)]="direccion.numero" placeholder="S/N">
+        </label>
+        <label class="reg-campo">
+          <span>Ciudad</span>
+          <select [(ngModel)]="direccion.ciudadId">
+            <option [ngValue]="null">— Elige tu ciudad —</option>
+            <option *ngFor="let c of ciudades" [ngValue]="c.id">{{ c.nombre }}</option>
+          </select>
+        </label>
+        <label class="reg-campo">
+          <span>Código postal</span>
+          <input appTexto="postal" type="text" [(ngModel)]="direccion.codigoPostal">
+        </label>
+        <label class="reg-campo">
+          <span>Teléfono de contacto</span>
+          <input appTexto="telefono" type="text" [(ngModel)]="direccion.telefono">
+        </label>
+        <label class="reg-campo ancho">
+          <span>Referencia para encontrarla</span>
+          <input appTexto="libre" type="text" [(ngModel)]="direccion.referencia"
+                 placeholder="Casa esquinera, portón verde">
+        </label>
+      </div>
+    </section>
+
+    <!-- ══ Paso 4 · intereses ══════════════════════════════════════════ -->
+    <section class="reg-paso" *ngIf="paso === 4">
+      <p class="reg-intro">
+        <mat-icon>interests</mat-icon>
+        ¿Qué te interesa? Marca los departamentos que quieras y los tendremos en
+        cuenta. También puedes saltarte este paso.
+      </p>
+
+      <div class="reg-intereses">
+        <button type="button" class="interes" *ngFor="let c of intereses"
+                [class.elegida]="c.elegida" (click)="c.elegida = !c.elegida"
+                [attr.aria-pressed]="c.elegida">
+          <mat-icon>{{ c.elegida ? 'check_circle' : 'radio_button_unchecked' }}</mat-icon>
+          {{ c.nombre }}
+        </button>
+      </div>
+
+      <p class="reg-nota" *ngIf="intereses.length">
+        {{ interesesElegidos }} de {{ intereses.length }} seleccionados.
+      </p>
+      <p class="reg-nota" *ngIf="!intereses.length">
+        No pudimos cargar los departamentos. Puedes continuar igualmente.
+      </p>
+    </section>
+
+    <!-- ══ Paso 5 · listo ══════════════════════════════════════════════ -->
+    <section class="reg-paso reg-listo" *ngIf="paso === 5">
+      <div class="listo-marca"><mat-icon>check</mat-icon></div>
+      <h2>¡Tu cuenta ya está lista!</h2>
+      <p>Te llevamos de vuelta a la tienda…</p>
+      <button type="button" class="reg-btn primario" (click)="irAhora()">Ir ahora</button>
+    </section>
+
+    <!-- ── Error ───────────────────────────────────────────────────────── -->
+    <p class="reg-error" *ngIf="error">
+      <mat-icon>error_outline</mat-icon><span>{{ error }}</span>
+    </p>
+
+    <!-- ── Botonera ────────────────────────────────────────────────────── -->
+    <div class="reg-acciones" *ngIf="paso < 5">
+      <button type="button" class="reg-btn plano" (click)="atras()"
+              *ngIf="paso > 1 && !(cuentaCreada && paso <= 3)" [disabled]="cargando">
+        Atrás
+      </button>
+
+      <span class="reg-espacio"></span>
+
+      <button type="button" class="reg-btn plano" (click)="omitir()"
+              *ngIf="paso >= 3" [disabled]="cargando">
+        Omitir por ahora
+      </button>
+
+      <button type="button" class="reg-btn primario" (click)="siguiente()"
+              [disabled]="cargando
+                          || (paso === 1 && !paso1Valido)
+                          || (paso === 2 && !paso2Valido)">
+        <mat-spinner *ngIf="cargando" diameter="20"></mat-spinner>
+        <span *ngIf="!cargando">
+          {{ paso === 2 ? 'Crear mi cuenta' : (paso === 4 ? 'Finalizar' : 'Continuar') }}
+        </span>
+      </button>
+    </div>
+
+    <!-- ── Pie ─────────────────────────────────────────────────────────── -->
+    <p class="reg-pie" *ngIf="paso < 3">
+      ¿Ya tienes cuenta? <a routerLink="/login">Inicia sesión</a>
+    </p>
+    <p class="reg-pie" *ngIf="paso === 1">
+      <a [routerLink]="['/shop']">Volver a la tienda</a>
+    </p>
+  </div>
+</div>

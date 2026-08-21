@@ -18,16 +18,27 @@ export class AuthService {
   login(username: string, password: string): Observable<LoginResponse> {
     const body: LoginRequest = { username, password };
     return this.http.post<LoginResponse>(`${this.base}/login`, body).pipe(
-      tap(res => {
-        localStorage.setItem(TOKEN_KEY, res.token);
-        localStorage.setItem(REFRESH_KEY, res.refreshToken);
-        localStorage.setItem(USER_KEY, JSON.stringify({
-          username: res.username,
-          nombre:   res.nombre,
-          rol:      res.rol
-        }));
-      })
+      tap(res => this.guardarSesion(res))
     );
+  }
+
+  /**
+   * Guarda una sesion ya emitida por el backend.
+   *
+   * Existe aparte del `login` porque el alta publica de cliente devuelve la
+   * sesion en la MISMA respuesta del registro —para no obligar a entrar justo
+   * despues de crear la cuenta— y necesita escribirla exactamente igual. Si
+   * cada camino guardara sus claves por su cuenta, bastaria con que uno se
+   * olvidara del refresco para que esa sesion caducara sin renovarse.
+   */
+  guardarSesion(res: LoginResponse): void {
+    localStorage.setItem(TOKEN_KEY, res.token);
+    localStorage.setItem(REFRESH_KEY, res.refreshToken);
+    localStorage.setItem(USER_KEY, JSON.stringify({
+      username: res.username,
+      nombre:   res.nombre,
+      rol:      res.rol
+    }));
   }
 
   logout(): void {
