@@ -27,6 +27,7 @@ pruebas/
 ├─ p11_interfaz.js    32 pantallas en Chrome headless (Puppeteer)
 ├─ p12_rendimiento.py Latencia aislada y repetida, p50/p95
 ├─ p13_resiliencia.py Para ClickHouse de verdad y mide la degradación
+├─ p14_tienda.js      Tienda del cliente: filtros, envío, perfil y MIS PEDIDOS
 └─ informes/          Salida por corrida (JSON + Markdown)
 ```
 
@@ -38,6 +39,7 @@ pruebas/
 | **P05** | ✅ | **✅** | **solo E0/E1** — se planta si la apuntan a otro sitio |
 | **P13** | ✅ | — | para y levanta el contenedor de ClickHouse (~1 min) |
 | P11 | ✅ | — | navegador; puede desviarse a otro backend |
+| **P14** | ✅ | **✅** | navegador, con el usuario CLIENTE. Escribe en el carrito, la lista de deseos, la dirección de envío elegida y **los datos del perfil** de `maria.lopez@demo.com`, y **lo deja todo como estaba**. Única huella: la dirección que crea y borra queda como fila **inactiva** (`activo = false`) — el sistema hace baja LÓGICA porque `grp_cliente` no tiene DELETE sobre `direccion`, así que no reaparece en ninguna pantalla. Su clave es `RETAILMIND_CLIENTE_PASS` |
 
 ## Credenciales
 
@@ -65,6 +67,7 @@ py -3 pruebas/p13_resiliencia.py E3    # ~3 min · PARA ClickHouse y lo levanta
 py -3 pruebas/p12_rendimiento.py E3    # ~10 min
 py -3 pruebas/p02_barrido.py     E3    # ~13 min · 1.962 llamadas
 node  pruebas/p11_interfaz.js          # ~4 min · 32 pantallas
+node  pruebas/p14_tienda.js            # ~6 min · tienda, perfil y mis pedidos (86 casos)
 ```
 
 ## Correr contra la base vacía (E0)
@@ -135,10 +138,11 @@ docker compose exec -T postgres psql -U postgres -d postgres \
        -c "DROP DATABASE retailmind_pruebas;"
 ```
 
-## Tres trampas del propio arnés, ya pagadas
+## Cinco trampas del propio arnés, ya pagadas
 
-Las tres se disfrazaron de defecto del sistema. Están en `DEFECTOS.md` como
-FP-01/02/03, y aquí porque son de quien toque este código:
+Se disfrazaron de defecto del sistema. Las tres primeras están en `DEFECTOS.md`
+como FP-01/02/03; las dos últimas salieron con P14. Todas aquí porque son de
+quien toque este código:
 
 1. **`requests.Response.__bool__` devuelve `self.ok`**, así que una respuesta
    **400 es *falsy***. `r.status_code if r else -1` convierte cada rechazo
@@ -148,6 +152,17 @@ FP-01/02/03, y aquí porque son de quien toque este código:
    (`retailmind-backend:latest`). Con una imagen vieja se prueba otro sistema.
 3. **El contenedor de E0 tiene que unirse a la red `retailmind`**, o no alcanza
    ni PostgreSQL ni ClickHouse y el síntoma imita una caída de servicio.
+4. **`ng-reflect-*` solo existe en modo DESARROLLO.** Una comprobación que lea
+   el valor de un `<mat-option>` por ese atributo pasa contra `ng serve` y falla
+   contra el contenedor: **la misma aplicación, distinto veredicto**, y el
+   informe acusa a la pantalla. Se comprueba el COMPORTAMIENTO —qué acepta el
+   servidor— y, del DOM, solo lo que el usuario ve (los rótulos).
+5. **Un caso que provoca un rechazo A PROPÓSITO ensucia el recuento de errores
+   de consola.** El 400 que devuelve un género inválido es el resultado
+   buscado, pero el oyente de respuestas lo apuntaba como fallo y el último
+   caso suspendía por hacer bien su trabajo. P14 abre una **ventana acotada**
+   (`rechazoEsperado`) alrededor de esa llamada y la cierra justo después;
+   silenciar el 400 de forma permanente habría escondido los de verdad.
 
 ## Estado
 
