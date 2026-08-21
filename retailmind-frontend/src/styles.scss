@@ -1066,3 +1066,33 @@ select.select-premium,
 
   &:hover { background: var(--campo-fondo-hover); }
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// AVISO DE CAMPO MAL ESCRITO — lo pinta `core/validacion/campo-base.directive`
+// El nodo se inyecta dentro del `subscript-wrapper` que Material ya reserva bajo
+// cada `mat-form-field`, así que aparecer y desaparecer NO mueve el formulario;
+// en los campos de la tienda, que no son de Material, cuelga del padre y ahí sí
+// ocupa su línea, que es lo correcto porque no hay hueco reservado.
+// ══════════════════════════════════════════════════════════════════════════════
+.rm-campo-error {
+  color: #f0616d;
+  font-size: 12px;
+  line-height: 1.35;
+  padding: 2px 16px 0;
+}
+
+.mat-mdc-form-field-subscript-wrapper .rm-campo-error {
+  padding: 0 16px;
+}
+
+// El campo en sí también se marca, no solo el texto de abajo: el aviso puede
+// quedar fuera de la vista en un formulario largo y el borde no.
+input[aria-invalid="true"],
+textarea[aria-invalid="true"] {
+  &.campo-tienda { border-color: #f0616d !important; }
+}
+
+.mat-mdc-form-field:has(input[aria-invalid="true"]),
+.mat-mdc-form-field:has(textarea[aria-invalid="true"]) {
+  .mat-mdc-text-field-wrapper { box-shadow: inset 0 0 0 1px rgba(240, 97, 109, 0.55); }
+}
