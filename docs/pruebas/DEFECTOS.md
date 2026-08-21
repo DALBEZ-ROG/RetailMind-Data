@@ -59,6 +59,103 @@ Dos cosas que E2 enseñó y que ningún otro estado podía enseñar:
 | D-07 | S3 | E0 | ✅ **CORREGIDO** (sello de origen + guardia) |
 | D-09 | S2 | E0/E1 | ✅ **CORREGIDO Y VERIFICADO** (pantalla Red Logística) |
 | D-11 | S2 | E3 | ✅ **CORREGIDO Y VERIFICADO** (script 111) |
+| D-13 | S2 | E3 | ✅ **CORREGIDO Y VERIFICADO** (perfil: género imposible de guardar) |
+| D-14 | S1 | E3 | ✅ **CORREGIDO Y VERIFICADO** (perfil: la fecha de nacimiento se borraba sola) |
+| D-15 | S2 | E3 | ✅ **CORREGIDO Y VERIFICADO** (el pedido recién hecho caía en la última página) |
+
+---
+
+## D-15 · El pedido recién hecho aparecía en la ÚLTIMA página — ✅ CORREGIDO
+
+**Cómo se destapó**: uso real. Un cliente compra, entra en «Mis Pedidos» y su
+compra no está por ninguna parte.
+
+**Causa raíz**: `VentasService.listarPedidos` ordenaba `ORDER BY p.id DESC`.
+En una base normal el id es cronológico; **en ésta no**: la carga masiva
+escribió sus 3.000.000 de pedidos en **bandas de ids reservadas** —hasta
+`2.100.055.830`— mientras la secuencia real va por **4.343**. Un pedido creado
+hoy nace con id ≈ 4.344, o sea el **más bajo de la tabla**, y con `id DESC`
+aterriza en la última página, cientos de páginas detrás del seed. No afectaba
+solo al cliente: en el back-office, un vendedor tampoco veía los pedidos del
+día en la primera página.
+
+**Corrección**: `ORDER BY p.fecha_pedido DESC, p.id DESC`. El `id` se conserva
+como desempate para que el orden sea total y la paginación estable (hay pedidos
+que comparten `fecha_pedido` al microsegundo). El índice `idx_pedido_fecha` ya
+existía; medido antes y después sobre el sistema vivo: **8-11 ms → 12-19 ms**,
+misma escala.
+
+**Lo que el orden por fecha NO arregla, y por eso hubo trabajo de pantalla**:
+el catálogo de demostración tiene pedidos fechados **hasta 2034**, así que «el
+más reciente» es legítimamente uno de 2034 y una compra de hoy queda en medio
+—medido: el pedido real de `maria.lopez` (2026-08-12) tiene **51 pedidos con
+fecha posterior**, o sea página 3—. Se resolvió donde se podía resolver:
+
+- **buscador por número** en «Mis Pedidos», resuelto **en servidor** (el
+  parámetro `q` ya existía y ninguna pantalla lo usaba), más filtro por estado;
+  los dos quedan en la URL;
+- la **confirmación del checkout** enlaza a `…/mis-pedidos?q=<número>`, así que
+  «Ver este pedido» abre la lista ya filtrada por la compra recién hecha.
+
+**Verificado** (`pruebas/p14_tienda.js`, sección 16): el orden se comprueba
+sobre la fecha que llevan los propios números (`PED-AAAAMMDD-…`), y el buscador
+localiza un pedido tomado a propósito de la **página 4**.
+
+---
+
+## D-13 · El género del perfil no se podía guardar (ni se leía) — ✅ CORREGIDO
+
+**Cómo se destapó**: uso real. Al elegir un género en `/perfil` y pulsar
+«Guardar cambios», la pantalla respondía con **400** y el mensaje genérico
+«Los datos enviados no cumplen las reglas de la base de datos».
+
+**Causa raíz**: el formulario ofrecía `F` / `M` / `O` y el CHECK del motor
+—`cliente_genero_check`— solo admite `masculino`, `femenino`, `otro` y
+`no_indica`. **Fallaba en las dos direcciones**: al escribir lo rechazaba la
+base, y al leer, un género ya registrado (`femenino`) no casaba con ninguna
+opción del desplegable, así que el campo aparecía **en blanco** aunque el dato
+estuviera guardado. Los 50.070 clientes del seed tienen género, y ninguno se
+veía.
+
+**Corrección**, en las dos capas:
+
+1. **Pantalla**: las opciones pasan a ser los cuatro valores canónicos, más
+   «Sin especificar» (cadena vacía) para no registrarlo.
+2. **Servicio** (`PerfilService.actualizarDatos`): lista blanca ANTES de tocar
+   la base, con `IllegalArgumentException` → 400 que **nombra el campo y los
+   valores admitidos**. Sin ella, cualquier otro cliente de la API seguiría
+   recibiendo el 400 opaco de la restricción, que no dice qué campo falla. Es
+   la regla 2 del proyecto («lista blanca»), que este servicio no aplicaba.
+
+**Verificado**: los cuatro géneros se guardan y se releen puestos en la
+pantalla; `genero=F` → 400 «El género debe ser uno de: masculino, femenino,
+otro, no_indica».
+
+---
+
+## D-14 · «Guardar cambios» del perfil BORRABA la fecha de nacimiento — ✅ CORREGIDO
+
+**Severidad S1 por definición del plan**: es un fallo **silencioso**. No había
+error, ni aviso, ni rastro; el dato simplemente desaparecía.
+
+**Cómo se destapó**: al revisar D-13 se vio que el formulario no ofrecía la
+fecha de nacimiento **y tampoco la enviaba**, mientras que el UPDATE la
+escribía siempre: `fecha_nacimiento = NULLIF(?, '')::date` con el parámetro a
+`null` la ponía a NULL. Cualquier cliente que guardara su teléfono perdía su
+fecha de nacimiento. **50.070 de los 50.072 clientes tienen una.**
+
+**Corrección**:
+
+1. **Pantalla**: la fecha se edita, con tope en hoy, y viaja siempre.
+2. **Servicio**: un campo **ausente del cuerpo ya no se toca**; solo se borra
+   si llega **presente y vacío** (`body.containsKey(...)` decide, y el UPDATE
+   usa `CASE WHEN ?::boolean THEN … ELSE <columna actual> END`). Así el daño no
+   depende de que una pantalla concreta se acuerde de mandar el campo. Se
+   valida además el formato y que no sea futura, con mensajes propios.
+
+**Verificado** (`pruebas/p14_tienda.js`, sección 15): guardar sin mandar la
+fecha la conserva; mandarla vacía la borra a propósito; `14/03/1995` → 400 «debe
+tener el formato AAAA-MM-DD»; `2099-01-01` → 400 «no puede ser posterior a hoy».
 
 ---
 

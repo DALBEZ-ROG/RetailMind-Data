@@ -1573,6 +1573,151 @@ GERENTE no ve el enlace y el guard lo rechaza) y, sobre todo, con
 `pruebas/p05_puesta_en_marcha.py` (**13/13**): desde una base con CERO bodegas se puso el sistema
 en marcha **sin una línea de SQL**, hasta crear un pedido real.
 
+**LA TIENDA DEL CLIENTE, REHECHA (2026-08-20, SOLO FRONTEND — cero cambios de
+backend, de SQL y de seguridad)**: las cinco pantallas de la tienda (`/shop`,
+ficha, carrito, checkout y `/wishlist`) más `/recomendaciones` pasan a una
+interfaz de comercio: **panel de filtros a la izquierda**, franja de
+departamentos, y en la **barra superior** la **dirección de envío** junto al
+logotipo, un **buscador compacto a la derecha** y los accesos a
+Pedidos/Devoluciones y Ayuda/Soporte; tarjetas con cinta de stock y corazón,
+vista en cuadrícula o lista, esqueletos de carga y estados vacíos explícitos. Piezas nuevas: `features/shop/shop-shared.scss` (tokens y tarjeta
+comunes a las seis pantallas), `catalogo-visual.ts` (icono y color por
+departamento) y `shop-ui.service.ts` (contadores de carrito y wishlist, que
+viven en la barra y los mueve el catálogo). El arnés es
+**`pruebas/p14_tienda.js`** (59 casos, Chrome headless): cada filtro se
+contrasta contra `/api/catalogo/productos` con los mismos parámetros, no contra
+sí mismo.
+
+**LO QUE SE SURTIÓ Y NO SE VEÍA**: el rango de **precio** ya existía en el
+endpoint (`min_price` / `max_price`) y ninguna pantalla lo ofrecía; ahora está
+con seis tramos y con rango escrito a mano. También asoman el SKU, el stock por
+producto, el enlace a reseñas con `?productoId=`, el de preguntas, el de FAQ y
+el de abrir un ticket. Los **banners y campañas de marketing NO se pintan a
+propósito**: `SecurityConfig` reserva `GET /api/marketing/**` a ADMIN/GERENTE,
+así que enseñarlos al cliente exigiría tocar el backend — queda declarado, no
+intentado.
+
+Si vas a tocar esto:
+1. **TODO EL FILTRO VIVE EN LA URL** (`q`, `cat`, `marca`, `min`, `max`, `page`,
+   `size`) y el catálogo reacciona a `queryParamMap`. No es cosmético: el campo
+   de búsqueda está en `app.component` —fuera del catálogo— y se comunican por
+   ahí; además el botón «atrás» deshace un filtro y un resultado se puede
+   compartir por enlace. Un filtro nuevo se escribe en la URL, nunca en un
+   campo del componente.
+2. **El ORDEN y «solo con stock» son de PÁGINA, no de catálogo**, porque el
+   endpoint no los ofrece — y la pantalla lo DICE junto a cada control. Si
+   algún día el backend ordena, hay que mover el control a la URL y quitar el
+   aviso: dejar el aviso puesto sería tan falso como no haberlo puesto nunca.
+3. **La identidad visual del departamento va por NOMBRE y no por id.** Los ids
+   no son una serie: conviven 1-12 con 60001-60006 (Fase 0 de la carga masiva),
+   y el mapa por id que había dejaba SEIS departamentos —900 productos el mayor—
+   con el icono genérico de caja. Carrito y wishlist devuelven solo
+   `categoriaId`, así que `ShopUiService` resuelve el nombre pidiendo
+   `/api/catalogo/categorias` UNA vez; lo desconocido cae en un hash
+   determinista y tiene color propio, nunca gris.
+4. **El globo de la barra cuenta LÍNEAS.** Sumarle uno tras agregar es un error:
+   agregar algo que YA estaba sube la cantidad y no crea línea, así que el
+   contador se releía mal hasta la siguiente recarga. Se relee del servidor.
+5. **`flex: 1` aplasta un botón dentro de un contenedor en COLUMNA**: el atajo
+   pone `flex-basis: 0%` y la base sustituye a la altura (pasó en la caja de
+   compra de la ficha y en los estados vacíos). En `shop-shared.scss` el botón
+   principal va con `flex: 1 1 auto`.
+6. **Nada de `[style.--variable]`**: el enlace de propiedades CSS
+   personalizadas de Angular no es de fiar entre versiones; el color de cada
+   departamento se aplica con `[style.color]` y `[style.background]` normales.
+7. **El filtro de disponibilidad hay que probarlo donde HAYA agotados.** En este
+   catálogo solo 3 de 6.214 variantes están a cero, y sobre la primera página
+   la prueba pasaría en verde sin haber escondido nada; `p14_tienda.js` usa una
+   página elegida (`?marca=Ikea&size=48`) y EXIGE que hubiera al menos uno.
+8. **La dirección de la barra es una PREFERENCIA, no la predeterminada del
+   perfil.** Vive en `ShopUiService` y se guarda en `localStorage`
+   (`rm_dir_envio`) para que sobreviva a un F5 —volver del refresco con otra
+   dirección puesta es justo lo que este bloque venía a evitar—, y se **valida
+   contra la lista** en cada carga: si la dirección se dio de baja, o si en ese
+   navegador entra otro cliente, la elección se descarta sola y manda otra vez
+   `esPredeterminada`. Marcar una predeterminada de verdad es del perfil y
+   tiene su pantalla; esto no la toca. El checkout la lee para preseleccionar,
+   y al dar de alta una dirección desde el pago avisa a la barra con
+   `cargarDirecciones(true)`, o la barra sigue anunciando la vieja.
+9. **La barra mete cinco bloques en una fila y el buscador CRECE para llenar
+   el hueco**, así que se rompe por desbordamiento y no por error: las piezas
+   se montan unas sobre otras y la pantalla «sigue funcionando». Dos reglas:
+   en modo tienda el separador **deja de crecer** (`.navbar-tienda
+   .navbar-spacer`), o el hueco libre se lo repartían separador y buscador y
+   quedaba un vacío a la izquierda del campo; y ocultar el rótulo pequeño de
+   un acceso de dos líneas **NO estrecha nada** —es una columna, manda el
+   grande—, lo que de verdad recorta son el texto de la dirección, la insignia
+   del rol y el nombre del usuario. `p14_tienda.js` mide 10 anchuras × 3
+   pantallas y exige `scrollWidth <= clientWidth`.
+10. **Por debajo de 1080 px el campo de la barra desaparece y el del catálogo
+   toma el relevo en el MISMO corte** — si no coincidieran quedaría una franja
+   sin ningún buscador. Y como el del catálogo solo existe EN el catálogo, la
+   barra conserva el **atajo de la lupa** (`.acc-buscar`), que lleva a `/shop`
+   con `buscar=1` y deja el cursor en el campo; el catálogo borra el parámetro
+   con `replaceUrl`. Lo destapó la propia prueba: medía solo en `/shop` y daba
+   verde mientras el carrito y la lista de deseos se quedaban sin buscador.
+11. **La `panelClass` de `<mat-menu>` NO llega al panel en esta versión** —
+   medido en el DOM vivo: ni al `.mat-mdc-menu-panel` ni al
+   `.cdk-overlay-pane`—, así que los menús de la barra se ven redondeados por
+   la regla general `::ng-deep .mat-mdc-menu-panel`, no por su clase. El ancho
+   del menú de direcciones se fija seleccionando por CONTENIDO
+   (`:has(.envio-menu-titulo)`); la clase sigue en la plantilla por si vuelve a
+   aplicarse.
+12. **P14 escribe en el carrito, en la lista de deseos y en la dirección
+   elegida del cliente demo, y los deja como estaban** (agrega una línea y la
+   elimina desde la pantalla; el corazón se pulsa dos veces; la dirección se
+   devuelve a la de partida). Si añades un caso que escriba, deshazlo.
+
+Verificado: **86/86** casos de `p14_tienda.js`, **65/65** de `p11_interfaz.js`
+(las 32 pantallas del back-office siguen intactas: la barra nueva solo se pinta
+con rol CLIENTE), `ng build` sin errores y consola del navegador limpia en todo
+el recorrido.
+
+**EL PERFIL DEL CLIENTE NO DEJABA GUARDAR — D-13 y D-14 (2026-08-20, código,
+sin script)**: dos defectos que solo se ven usando la pantalla. **D-13**: el
+desplegable de género ofrecía `F`/`M`/`O` y `cliente_genero_check` solo admite
+`masculino`, `femenino`, `otro`, `no_indica`, así que guardar daba **400** con
+el mensaje genérico de restricción — y al leer, un género ya registrado no
+casaba con ninguna opción y el campo salía **en blanco** (los 50.070 clientes
+del seed tienen género y ninguno se veía). **D-14, S1 por silencioso**: el
+formulario no ofrecía la fecha de nacimiento **ni la enviaba**, y el UPDATE la
+escribía igual, así que **cada «Guardar cambios» la ponía a NULL** —la tienen
+50.070 de 50.072 clientes—.
+
+Corregido en las dos capas: la pantalla usa los valores canónicos y edita la
+fecha; y `PerfilService.actualizarDatos` valida por **lista blanca** con
+mensajes que nombran campo y valores (regla 2 del proyecto, que ese servicio no
+aplicaba) y trata **un campo ausente como «no tocar»** —solo borra si llega
+presente y vacío, con `body.containsKey(...)` decidiendo y un
+`CASE WHEN ?::boolean THEN … ELSE <columna> END` en el UPDATE—. Esa última
+parte es la que impide que el daño vuelva: sin ella, basta con que cualquier
+pantalla futura se olvide de un campo para que se borre solo. Fichas completas
+en `docs/pruebas/DEFECTOS.md`; verificación en `pruebas/p14_tienda.js` §15
+(guardar, releer, volver a guardar sin perder la fecha, y alta/edición/baja de
+una dirección desde la pantalla).
+
+**EL PEDIDO RECIÉN HECHO CAÍA EN LA ÚLTIMA PÁGINA — D-15 (2026-08-21)**: el
+listado de pedidos ordenaba `ORDER BY p.id DESC`. **En esta base el id NO es
+cronológico**: la carga masiva usó bandas reservadas hasta `2.100.055.830` y la
+secuencia real va por `4.343`, así que un pedido creado hoy es el id **más
+bajo** de la tabla y aterrizaba detrás de tres millones. Corregido a
+`ORDER BY p.fecha_pedido DESC, p.id DESC` (el id queda de desempate: hay
+pedidos que comparten fecha al microsegundo; `idx_pedido_fecha` ya existía y la
+latencia va de 8-11 ms a 12-19 ms).
+
+**Y el orden por fecha no basta, que es lo interesante**: el catálogo de
+demostración llega hasta **2034**, así que «el más reciente» es de verdad uno
+de 2034 y una compra de hoy queda en medio (medido: el pedido real de
+`maria.lopez` tiene **51 con fecha posterior**). Por eso «Mis Pedidos» se
+rehízo: tarjetas en vez de tabla, **buscador por número y filtro por estado
+resueltos EN SERVIDOR** —el parámetro `q` del endpoint existía y ninguna
+pantalla lo usaba—, los dos reflejados en la URL, y la confirmación del
+checkout enlaza a `…/mis-pedidos?q=<número>` para abrir la lista ya filtrada
+por la compra que se acaba de hacer. Ficha en `docs/pruebas/DEFECTOS.md`;
+verificación en `pruebas/p14_tienda.js` §16, que comprueba el orden sobre la
+fecha que llevan los propios números (`PED-AAAAMMDD-…`) y busca un pedido
+tomado a propósito de la página 4.
+
 **Deuda técnica conocida** (tablas huérfanas, requieren bloque dedicado):
 
 - `lote` (0 filas): trazabilidad por lote/vencimiento. **DECISIÓN DE ALCANCE (2026-07-18,
