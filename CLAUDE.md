@@ -1903,3 +1903,40 @@ Reversión: `retailmind/sql/postgres/99_revert_tienda_publica.sql` (probado). Ve
 y su motivo, el desvío del GERENTE, el alta paso a paso, y que lo guardado en los pasos
 opcionales esté de verdad ahí. Sin regresión: **P03 43/43 · P04 126/126 · P11 65/65 · P14 86/86 ·
 P15 85/85**.
+
+**LOS CUATRO BORDES DE LA TIENDA PÚBLICA (2026-08-21, mismo día, solo frontend)**: auditoría de
+los caminos que la implementación inicial no recorría. Los cuatro se corrigieron antes de que
+nadie los usara, y los cuatro son la misma clase de fallo —**el flujo funcionaba por el camino
+principal y se comportaba de otra manera por los laterales**—:
+
+1. **`authGuard` no recordaba a dónde ibas.** El muro y la barra del visitante ya pasaban
+   `?volver=`, pero quien escribía `/shop/carrito` o abría un enlace a `/wishlist` iniciaba
+   sesión y aterrizaba en `/inicio`. El guard era el ÚNICO camino de entrada que lo perdía, y eso
+   hacía que el sistema se comportara de dos maneras según por dónde se llegara.
+2. **El personal podía abrir `/registro` y su sesión quedaba PISADA.** `guardarSesion` escribe
+   sobre las mismas claves de `localStorage`, así que un gerente que completara el alta perdía su
+   sesión sin aviso y sin forma de deshacerlo salvo volviendo a entrar. Ahora se le pregunta, y
+   `AuthService.limpiarSesion()` existe aparte de `logout()` porque aquí cerrar sesión **no
+   significa irse**: hay que soltar la suya y QUEDARSE en el registro.
+3. **La ficha pública decía «No encontramos productos similares en el catálogo», y era falso.**
+   No es que no haya: es que no se piden, porque las recomendaciones salen de lo que esa persona
+   ha visto. Una afirmación sobre el catálogo donde lo cierto era una condición de la sesión.
+   Medido: al visitante le sale «Inicia sesión para ver productos parecidos»; al cliente, 6
+   similares reales.
+4. **El número de identificación se validaba solo en el servidor.** El alta ocurre al final del
+   paso 2, así que quien escribía tres dígitos en el paso 1 se enteraba una pantalla después y
+   con un mensaje sobre un campo que ya no veía.
+
+**Y el círculo se probó entero**: una cuenta que no existía llegó a `/shop` sin sesión, se
+registró con dirección, agregó al carrito sin muro —ya tenía sesión—, pasó por el checkout con
+tarjeta simulada y **generó el pedido `PED-20260821-114043`, estado `facturado`** (el pedido
+online nace pagado y se factura solo, script 39). 10/10 y consola limpia. La cuenta
+`compra.7349124665@demo.com` se deja ACTIVA a propósito: es la evidencia, y sirve para mirar el
+pedido desde el back-office. Los invariantes de datos siguen intactos tras esa compra (**P06
+17/17**: kardex, cuadre contable y huérfanos).
+
+Cobertura de campos: **P15 pasa a 89 casos** — ahora barre también los dos primeros pasos del
+alta. La pestaña del registro **suelta la sesión antes de mirar**: el `localStorage` es por origen
+y lo comparten todas las pestañas, así que heredaba la del admin y `/registro` le enseñaba el
+aviso de «ya hay una sesión abierta» en vez del formulario. Lo detectó el propio barrido al decir
+«no se pintó ninguno» en vez de dar verde por no haber mirado.
