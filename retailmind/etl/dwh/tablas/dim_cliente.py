@@ -20,6 +20,15 @@ corte B2B/B2C están todas vacías o desmentidas —
     cliente.tipo_identificacion ....... 72 de 72 'cedula', ningún RUC
     factura_venta.identificacion ...... 3.887 con 10 dígitos, ninguna con 13
 
+Ese recuento es de los 72 clientes de ANTES de la carga masiva y se deja como
+estaba porque es la medición que sostuvo el veredicto. Hoy (2026-08-21) la
+cartera son 50.087 clientes con 45.911 'cedula', 4.166 'ruc' y **10 sin
+identificación**, que son los que ha traído el alta pública de la tienda —ahí
+el dato es opcional—. El veredicto NO cambia: el RUC identifica a una persona
+jurídica, pero 4.166 RUC repartidos en la misma distribución de compra siguen
+sin dibujar dos poblaciones. Lo que sí cambió es que la columna DEJÓ DE ESTAR
+SIEMPRE LLENA, y de eso se enteró el control de más abajo antes que nadie.
+
 La alternativa —derivar el segmento de la conducta de compra— se evaluó y se
 descartó: 10.378 de 10.384 líneas piden entre 1 y 4 unidades, así que no hay
 compra de volumen que distinga a un mayorista. La concentración que sí existe
@@ -30,8 +39,9 @@ Por eso la columna se carga con un valor constante y explícito en vez de
 omitirse: un informe que agrupe por `segmento` debe ver **una sola fila
 rotulada 'sin_segmentar'**, que es la verdad, y no una columna ausente que
 invite a inventarla. `tipo_identificacion` viaja al lado por el mismo motivo:
-es la señal que HABRÍA marcado al cliente empresa (RUC), y verla en 'cedula' en
-los 72 hace la ausencia comprobable desde el propio almacén.
+es la señal que HABRÍA marcado al cliente empresa (RUC), y tenerla en el almacén
+hace la afirmación comprobable sin volver a PostgreSQL. El tercer valor,
+'sin_dato', es el cliente que se registró en la tienda sin darla.
 
 ═══════════════════════════════════════════════════════════════════════════════
 CIUDAD Y PROVINCIA — VERIFICADO ANTES DE CONFIAR (2026-07-30)
@@ -158,7 +168,17 @@ class DimCliente(TareaCarga):
             count(*) FILTER (WHERE c.activo)                    AS activos,
             count(DISTINCT ci.nombre)                           AS ciudades,
             count(DISTINCT pr.nombre)                           AS provincias,
-            count(DISTINCT c.tipo_identificacion)               AS tipos_identificacion,
+            -- El COALESCE va TAMBIEN aqui, y esa es la correccion: la
+            -- extraccion convierte el NULL en 'sin_dato' (arriba), pero
+            -- `count(DISTINCT col)` en SQL **ignora los NULL**, asi que el
+            -- control de origen contaba 2 donde el destino tenia 3. Comparaba
+            -- dos expresiones distintas y funcionaba solo mientras no hubiera
+            -- ni un cliente sin identificacion.
+            --
+            -- Esto NO relaja el control —sigue exigiendo igualdad exacta—: se
+            -- corrige la EXPRESION, no el umbral. Misma leccion que C6.4.
+            count(DISTINCT COALESCE(c.tipo_identificacion, 'sin_dato'))
+                                                                AS tipos_identificacion,
             count(*) FILTER (WHERE c.grupo_cliente_id IS NOT NULL) AS con_grupo_cliente
         FROM cliente c
         LEFT JOIN direccion_pred d ON d.usuario_id = c.usuario_id

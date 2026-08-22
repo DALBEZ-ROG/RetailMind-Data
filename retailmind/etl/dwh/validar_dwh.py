@@ -216,9 +216,16 @@ CONTROLES += [
             SELECT count(*), count(DISTINCT c.email),
                    count(*) FILTER (WHERE d.id IS NOT NULL),
                    count(*) FILTER (WHERE c.activo),
-                   count(DISTINCT c.tipo_identificacion),
+                   -- El COALESCE va aqui TAMBIEN. La extraccion de dim_cliente
+                   -- convierte el NULL en 'sin_dato', y `count(DISTINCT col)`
+                   -- ignora los NULL: sin esto el origen cuenta 2 donde el
+                   -- destino tiene 3 en cuanto existe UN cliente sin
+                   -- identificacion. Es la segunda copia del mismo control
+                   -- —la otra vive en tablas/dim_cliente.py— y por eso el
+                   -- arreglo hay que hacerlo DOS veces (leccion C6.4).
+                   count(DISTINCT COALESCE(c.tipo_identificacion, 'sin_dato')),
                    1,                                   -- 'segmento' es constante
-                   count(*),                            -- … en las 72 filas
+                   count(*),                            -- … en todas las filas
                    count(*) FILTER (WHERE c.grupo_cliente_id IS NOT NULL)
             FROM cliente c
             LEFT JOIN direccion d
