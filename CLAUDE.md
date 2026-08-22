@@ -1940,3 +1940,42 @@ alta. La pestaña del registro **suelta la sesión antes de mirar**: el `localSt
 y lo comparten todas las pestañas, así que heredaba la del admin y `/registro` le enseñaba el
 aviso de «ya hay una sesión abierta» en vez del formulario. Lo detectó el propio barrido al decir
 «no se pintó ninguno» en vez de dar verde por no haber mirado.
+
+**EL CONTROL QUE LLEVABA EL SUPUESTO DENTRO — SEGUNDA REINCIDENCIA DE C6.4 (2026-08-21, solo
+código del ETL)**: tras abrir el alta pública, el DAG empezó a abortar en `dim_cliente` con
+«Tipos de identificación: origen 2 vs destino 3». **No había nada mal en el dato**: el descuadre
+estaba en el CONTROL. La extracción convierte el NULL en `'sin_dato'` con un `COALESCE`, pero el
+control del origen medía `count(DISTINCT c.tipo_identificacion)` — y **en SQL `COUNT DISTINCT`
+ignora los NULL**. Comparaba dos expresiones que no son la misma, y funcionaba solo mientras la
+columna estuviera SIEMPRE llena: cierto **por casualidad del seed**, no por el motor, porque
+`cliente.tipo_identificacion` lleva siendo NULLABLE desde el principio. El registro de la tienda
+la deja opcional y con los primeros diez clientes sin ella el control se cayó.
+
+Si vas a tocar esto:
+1. **Arreglarlo es corregir la EXPRESIÓN, no el umbral.** El control sigue exigiendo igualdad
+   exacta; lo que se le añade es el mismo `COALESCE` que ya hacía la extracción. Distinguir esas
+   dos cosas es lo que separa una corrección de una relajación.
+2. **Hay que arreglarlo DOS VECES**, y ésa es la otra mitad de la lección: el control vive
+   duplicado en `tablas/dim_cliente.py` y en `validar_dwh.py`. Con solo el primero, las 21 tablas
+   publican y es `validar_dwh` la que sigue en rojo — se ve como si el arreglo no hubiera
+   funcionado, cuando lo que pasa es que falta la otra copia.
+3. **El patrón de carga atómica hizo exactamente lo suyo**: validó contra el origen y abortó SIN
+   publicar, así que las pantallas siguieron sirviendo el dato de la corrida anterior mientras
+   tanto. Un DAG en rojo con informes coherentes es el comportamiento diseñado, no una
+   contradicción.
+4. **La cabecera de `dim_cliente.py` describía la cartera de 72 clientes anterior a la carga
+   masiva.** Se anotó el estado de hoy sin borrar la medición que sostuvo el veredicto de
+   población homogénea — el veredicto no cambia: 4.166 RUC repartidos en la misma distribución de
+   compra siguen sin dibujar dos poblaciones.
+
+**Estado tras la reparación (2026-08-21 21:51)**: DAG `verificacion_final_213700` con **22/22
+tareas en éxito** y los **49 controles cuadrando exactamente**. Las dos bases contrastadas:
+pedidos **2.999.997**, clientes **50.087**, líneas **7.622.440**, variantes **6.224** — idénticos
+en PostgreSQL y en el almacén. Modelo publicado: **21 tablas / 26.971.522 filas / 1,44 GiB**.
+
+**OJO con el calendario de Airflow**: el `0 2 * * *` vive DENTRO del scheduler, así que con el
+contenedor apagado no ocurre nada a las 2 de la mañana — y el DAG declara **`catchup=False`**, de
+modo que al encenderlo **no recupera** las corridas perdidas. Estuvo apagado del 17 al 21 de
+agosto y el almacén se quedó en la foto del **2026-08-17 10:01** sin que nada lo avisara. Los dos
+servicios llevan `restart: unless-stopped`, así que vuelven solos tras reiniciar el equipo; lo
+que no vuelve solo es lo que se pare a mano con `docker compose stop`.
