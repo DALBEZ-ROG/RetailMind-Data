@@ -1974,8 +1974,33 @@ pedidos **2.999.997**, clientes **50.087**, líneas **7.622.440**, variantes **6
 en PostgreSQL y en el almacén. Modelo publicado: **21 tablas / 26.971.522 filas / 1,44 GiB**.
 
 **OJO con el calendario de Airflow**: el `0 2 * * *` vive DENTRO del scheduler, así que con el
-contenedor apagado no ocurre nada a las 2 de la mañana — y el DAG declara **`catchup=False`**, de
-modo que al encenderlo **no recupera** las corridas perdidas. Estuvo apagado del 17 al 21 de
-agosto y el almacén se quedó en la foto del **2026-08-17 10:01** sin que nada lo avisara. Los dos
-servicios llevan `restart: unless-stopped`, así que vuelven solos tras reiniciar el equipo; lo
-que no vuelve solo es lo que se pare a mano con `docker compose stop`.
+contenedor apagado no ocurre nada a las 2 de la mañana. Estuvo apagado del 17 al 21 de agosto y
+el almacén se quedó en la foto del **2026-08-17 10:01** sin que nada lo avisara.
+
+**`catchup=False` NO quiere decir que al encender no pase nada** —esta frase afirmaba que «no
+recupera las corridas perdidas» hasta el 2026-08-22, y es falsa—: lo que evita es que se reponga
+el atraso ENTERO, no que se dispare nada. Medido en `dag_run` al volver a encender Airflow la
+noche del 21: el scheduler lanzó **por su cuenta, sin que nadie lo pidiera, DOS programadas
+atrasadas** (`scheduled__2026-08-17T07:00` a las 20:33 y `scheduled__2026-08-20T07:00` a las
+20:55), no las cuatro o cinco del hueco. Las dos fallaron, pero por el bug de `dim_cliente` de esa
+noche y no por el calendario.
+
+La consecuencia práctica es la que importa: **a los pocos minutos de encender el equipo puede
+arrancar sola una corrida de ~12 minutos**. Si en ese rato se cierra Docker, esa corrida muere a
+media carga y sale ROJA — no falló nada, se le quitó el suelo. Y el rojo NO se va: Airflow guarda
+todas las corridas para siempre, así que **el estado del sistema es la fila de ARRIBA y jamás el
+color de la parrilla**. El 2026-08-22 hay cuatro rojas seguidas justo debajo del 22/22 verde
+—tres por `dim_cliente` y una por `validar_dwh`, todas anteriores al arreglo de esa noche— y son
+historia, no un problema pendiente.
+
+Los dos servicios llevan `restart: unless-stopped`, así que vuelven solos tras reiniciar el
+equipo; lo que **no** vuelve solo es lo que se pare a mano, y ahí entra tanto `docker compose
+stop` como el botón de parada de Docker Desktop —los dos cuentan como parada explícita—. Desde
+fuera **no se distingue** una cosa de la otra: el código de salida no lo dice (`137` y `143` salen
+en ambos casos, según si el proceso atendió el SIGTERM a tiempo), así que no se adivina, se
+comprueba. Al encender el equipo:
+
+```bash
+docker ps --format "{{.Names}} {{.Status}}"      # ¿están arriba los de airflow?
+docker compose --profile airflow up -d           # si no, esto los repone (y es idempotente)
+```
