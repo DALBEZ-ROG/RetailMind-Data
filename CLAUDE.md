@@ -1725,6 +1725,155 @@ verificación en `pruebas/p14_tienda.js` §16, que comprueba el orden sobre la
 fecha que llevan los propios números (`PED-AAAAMMDD-…`) y busca un pedido
 tomado a propósito de la página 4.
 
+**CINCO MEJORAS PEDIDAS SOBRE EL USO REAL (2026-08-25, código + script 113)**: ninguna
+nace de una prueba sino de andar por el sistema, y tres de las cinco resultaron
+ser defectos y no mejoras — más un cuarto, ajeno a lo pedido, que destapó la
+propia suite al comprobar la regresión del PDF (punto 6). Suites nuevas: `pruebas/p17_mejoras.py` (**31/31**) y
+`pruebas/p17_mejoras.js` (**36/36**).
+
+**1 · El alta pública no decía que la cuenta ya estaba creada.** Nace al terminar
+el PASO 2 —eso ya estaba así y es deliberado, para que «omitir» signifique algo—,
+pero se pasaba de «Crear mi cuenta» a un formulario de dirección sin una sola
+señal de que lo suyo ya estaba hecho: quien cerrara el navegador en el paso 3 se
+iba creyendo que no se había registrado. Ahora los pasos 3 y 4 llevan un aviso
+(`.reg-creada`, `role="status"`) que nombra el correo con el que se inició sesión,
+dice que lo que queda es opcional y ofrece irse a la tienda ya.
+
+**2 · TOPE DE CARACTERES en los 179 campos escribibles.** La fase del 2026-08-21
+acotó QUÉ admite cada campo y no CUÁNTO. Ahora **todo perfil de
+`perfiles-texto.ts` declara `largo`** —el campo pasó de opcional a obligatorio en
+la interfaz, así que un perfil nuevo sin tope no compila— y `CampoTextoDirective`
+aplica **el MÍNIMO** entre el del perfil y el `maxlength` de la plantilla: el
+perfil es el techo de la CLASE de dato y la plantilla el de la COLUMNA, que a
+veces es menor (`nombre` admite 150 y `cliente.nombre` es varchar(100)). Se toma
+el mínimo y no «el de la plantilla si existe» para que un `maxlength` escrito de
+más no afloje el perfil en silencio.
+
+**El caso que lo destapó es el número de tarjeta, y era un DEFECTO con causa
+concreta**: su formateo colgaba de un `(input)` de la plantilla, y **un manejador
+de plantilla corre ANTES de que `ngModel` escriba en el modelo**. O sea que
+`formatearNumero()` leía el valor de la tecla ANTERIOR, recortaba ése a 16
+dígitos, y acto seguido `ngModel` machacaba el resultado con lo recién tecleado:
+el tope no llegaba a aplicarse nunca y se podían escribir tantos dígitos como
+cupieran. Los dos métodos se retiraron del componente y son ahora los perfiles
+**`tarjeta`** (agrupa de cuatro en cuatro, 19 caracteres) y **`vencimiento`**
+(MM/AA), que trabajan sobre `el.value` —el DOM, no el modelo— y reemiten `input`
+con el valor ya limpio. **La directiva no tiene el problema porque no lee el
+modelo.**
+
+Los NÚMEROS ganaron un tope de dígitos, que no tenían ninguno:
+`DIGITOS_ENTEROS_POR_DEFECTO = 9`, y no es un número redondo elegido a ojo — es
+el mayor valor que cabe a la vez en un `integer` de PostgreSQL (999.999.999 <
+2.147.483.647) y en un `numeric(12,2)`, que son los dos tipos detrás de todos los
+campos numéricos de la aplicación (52 columnas de dinero son `numeric(12,2)`).
+Cuando el campo declara un `max`, el tope se deduce de ÉL. Tres detalles:
+(1) el aviso de tope **NO invalida** el control —un campo lleno hasta su máximo
+es correcto, e invalidarlo bloquearía el «Aceptar» del formulario—, así que
+`validate()` y `motivoActual()` dejaron de ser el mismo cálculo; (2) con el campo
+lleno el navegador se limita a IGNORAR la tecla, sin decir nada, así que un
+`keydown` detecta ese momento y enciende el aviso; (3) el perfil `telefono` bajó
+de 30 a 20, que es lo que miden las SIETE columnas `telefono` del esquema.
+
+**3 · El PDF de la factura: columna «Código» vacía, cupón invisible y aspecto de
+borrador.** La columna salía vacía **en todas las líneas** porque
+`FacturaVentaPdfService` pasaba `null` como código: `factura_venta_detalle`
+congela la descripción pero no guarda el SKU. Ahora sale de la VARIANTE con un
+LEFT JOIN —una variante dada de baja no puede dejar una factura sin emitir— y no
+hizo falta ningún GRANT: `grp_cliente` ya lee `producto_variante`, que es como la
+tienda pinta el catálogo. De paso se retira el SKU que la descripción ya traía
+entre paréntesis, que ahora salía DOS VECES en la misma fila. El **cupón** pasa a
+la letra pequeña de la fila «Descuento» (`Totales.detalleDescuento`), que es donde
+se busca un importe restado; si el descuento supera lo que aportó el cupón, lo
+dice («+ promociones») en vez de dejar la diferencia sin explicar.
+`DocumentoPdfService` se rehízo entero —lo comparten las TRES plantillas: factura
+de venta, factura de compra y guía de retorno del RMA—: **logotipo** desde el
+classpath (`/pdf/logo-retailmind.png`, cacheado, y su ausencia no rompe el
+documento), membrete, caja oscura con la etiqueta de estado en color, rótulos de
+sección, tabla con cabecera repetida por página y filas cebra, recuento de
+artículos, bloque de totales con el TOTAL destacado y **pie con «Página X de Y»**.
+Tres trampas de iText 5 anotadas en la clase: el pie NO puede ir en el flujo (va
+en un `PdfPageEventHelper`), «de Y» exige un `PdfTemplate` estampado al cerrar
+—en la página 1 aún no se sabe cuántas habrá—, y el evento se registra ANTES de
+`open()` o la primera página sale sin pie.
+
+**4 · El catálogo no decía de qué proveedor es cada producto.** El dato existía y
+no se enseñaba en ninguna pantalla. Ojo con el grano: `producto_proveedor` es
+(proveedor, **VARIANTE**), así que un producto puede tener varios —6.043 de los
+6.217 tienen al menos uno—. La grilla agrega los distintos y enseña el primero
+con «+N»; el detalle de variantes muestra el **preferido** de cada SKU (o el más
+barato) y cuántos la surten, para no dar a entender que es el único.
+
+**5 · Inventario no tenía dónde ver QUÉ hay y CUÁNTO hay.** Tenía Transferencias,
+Ajustes y Kardex —los tres MOVIMIENTOS— y ninguna pantalla contestaba «cuánto
+tengo»: el stock solo asomaba dentro del formulario de ajuste, y solo de la
+variante que se estuviera ajustando. Pantalla nueva
+**`/operativo/inventario/existencias`** (ADMIN/GERENTE/BODEGA/ANALISTA, los
+mismos que el kardex) sobre `GET /api/inventario/existencias`, con búsqueda,
+filtro por bodega, cinco situaciones, cuatro ordenaciones y paginación **todo en
+el SERVIDOR**; cuatro indicadores medidos sobre el conjunto FILTRADO entero (no
+sobre la página) y reparto por bodega al pulsar una fila. Sin script: los GRANTs
+ya estaban.
+
+Si vas a tocar esto:
+1. **El grano es la VARIANTE y se parte de ella, no de `inventario`.** Una
+   variante sin ninguna posición existe y su stock es CERO, que es justo el caso
+   que hay que ver; con un `FROM inventario` desaparece del listado y «no
+   aparece» se lee como «no tengo». Son 6.224 variantes contra 11.408 posiciones.
+2. **El filtro de bodega va en el JOIN, NO en el WHERE.** En el WHERE convierte
+   el LEFT JOIN en interno y vuelve a perder las variantes sin stock en esa
+   bodega, que son exactamente las que se buscan al filtrar por una bodega.
+3. **NO se une `marca`, y no es un olvido**: `grp_bodega` no tiene SELECT sobre
+   esa tabla, así que el JOIN devolvía 42501 y la pantalla respondía **403 a
+   BODEGA** —el rol que más la necesita— mientras funcionaba con los otros tres.
+   Es la misma trampa que ya dejó `categoria` fuera de OTD-INV-07. **Que la ruta
+   esté abierta no basta: el motor manda.**
+4. **`HAVING""" + condicion` da `HAVINGTRUE`**: el bloque de texto de Java recorta
+   el espacio final de cada línea (reincidencia de §18). El concatenado va con un
+   `+ " " +` explícito.
+5. `estado` y `orden` son **listas blancas del servicio** y lo que se concatena es
+   el texto escrito ahí, nunca el del usuario; un valor no previsto da 400.
+6. **Ni un importe**: la pantalla la abren BODEGA y ANALISTA, y el corte lo hace
+   la CONSULTA —no la ruta—, como en OTD-COM-08. `p17_mejoras.py` recorre la
+   respuesta entera buscando nombres con pinta de dinero y falla si aparece uno.
+
+**6 · EL ADMIN NO PODÍA ABRIR UNA DEVOLUCIÓN (script 113, defecto D-17)**: salió de
+rebote, al añadir a la suite una regresión para las otras dos plantillas que
+comparten el renderizador de PDF. `grp_administrador` **no tenía ni un GRANT**
+sobre `historial_estado_devolucion` —lo tenían los otros siete grupos del
+pipeline—, y como el detalle de la devolución lee esa tabla siempre, el síntoma
+no era «no veo el historial» sino que **la pantalla entera y la guía PDF daban
+403** para el ÚNICO rol que `SecurityConfig` autoriza en las SEIS transiciones
+del ciclo. Es una omisión del script 38 y lo prueba el propio script 38: su
+bloque de RLS **sí** metió a `grp_administrador` en `pol_horario` sobre esa misma
+tabla. Auditadas las 113 tablas de `public`, era la única con ese hueco.
+
+Si vas a tocar esto:
+1. **Son DOS GRANT y no uno.** `SELECT, INSERT` sobre la tabla **y USAGE sobre su
+   secuencia**: el `id` es un `serial` con `DEFAULT nextval(...)`, y un serial
+   exige las dos cosas. Con solo el primero, el admin abre el detalle y **la
+   primera transición que intente muere con «permission denied for sequence»** —
+   un arreglo a medias que revienta en otro sitio y otro día.
+2. **`has_sequence_privilege` NO es el oráculo de esa pregunta.** Devuelve
+   `false` en `meta_venta`, `novedad_envio`, `item_defectuoso` y las tres de
+   devolución a proveedor, que insertan perfectamente: son columnas **IDENTITY**,
+   y ahí PostgreSQL no comprueba privilegios de secuencia. `historial_estado_
+   devolucion` es la única `serial` de la familia. El único oráculo fiable es
+   EJECUTAR el INSERT, y eso hace la guardia 3 del script: asume el rol con
+   `set_config('role', …, true)`, escribe un hito real y lo borra.
+3. **No hizo falta política RLS**: `pol_horario` ya enumeraba al administrador.
+   Ojo con el orden inverso —GRANT sobre tabla con RLS y sin política deja al rol
+   leyendo **cero filas en silencio**, la trampa del script 87—, y por eso la
+   prueba compara el historial del ADMIN con el del GERENTE en vez de exigir un
+   200 pelado.
+4. **Ni UPDATE ni DELETE**: el historial es un rastro, se escribe y no se corrige.
+Reversión probada: `99_revert_grant_admin_historial.sql`, ciclo
+aplicar→revertir→re-aplicar midiendo por API cada vez (**200 → 403 → 200**), y los
+cuatro casos nuevos (P17-035 a P17-038) salen en ROJO con la reversión puesta.
+Los GRANT de tabla sobre `grp_*` pasan de 1.369 a **1.371** (medidos con
+`aclexplode` sobre `pg_class`, los 7 privilegios estándar; los 113 MAINTAIN van
+aparte).
+
+
 **Deuda técnica conocida** (tablas huérfanas, requieren bloque dedicado):
 
 - `lote` (0 filas): trazabilidad por lote/vencimiento. **DECISIÓN DE ALCANCE (2026-07-18,

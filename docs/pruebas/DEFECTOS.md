@@ -67,6 +67,82 @@ Dos cosas que E2 enseñó y que ningún otro estado podía enseñar:
 
 ---
 
+## D-17 · El ADMIN no podía abrir una devolución del RMA — ✅ CORREGIDO
+
+**Cómo se destapó**: de rebote. Al rediseñar el PDF de la factura se añadió a
+`pruebas/p17_mejoras.py` una comprobación de regresión para las otras dos
+plantillas que comparten el renderizador —factura de compra y guía de retorno—.
+La de compra pasó; la guía devolvió **403** con el token de ADMIN. No era el PDF:
+era el acceso.
+
+**Causa raíz**: `grp_administrador` no tenía **ni un GRANT** sobre
+`historial_estado_devolucion`. Lo tenían los otros siete grupos del pipeline
+—gerente, soporte, bodega, despacho, vendedor, analista y cliente—; el
+administrador, no. Es una omisión del script 38 y no una decisión, y lo prueba
+el propio script: su bloque de RLS **sí** metió a `grp_administrador` en
+`pol_horario` sobre esa misma tabla, o sea que la política se escribió contando
+con que ese rol la leería.
+
+**Por qué se notaba tan poco y era tan grave a la vez**: la tabla no se consulta
+por su cuenta, se lee dentro del detalle de la devolución. Así que el síntoma no
+era «no puedo ver el historial» sino que la pantalla entera y el PDF se cerraban
+—para el ÚNICO rol que `SecurityConfig` autoriza en las **seis** transiciones
+del ciclo: revisión, aprobación, tránsito, recepción, inspección y reembolso—.
+Medido antes del arreglo:
+
+```
+GET /api/devoluciones/{id}           ADMIN 403 · GERENTE 200 · SOPORTE 200
+GET /api/devoluciones/{id}/guia-pdf  ADMIN 403 · GERENTE 200 · SOPORTE 200
+log: ERROR: permission denied for table historial_estado_devolucion   (42501)
+```
+
+**Corrección**: script **113**, dos GRANT y ni uno más — `SELECT, INSERT` sobre
+la tabla (los mismos que tienen gerente y soporte) y `USAGE` sobre su secuencia.
+Reversión en `99_revert_grant_admin_historial.sql`.
+
+**Son DOS líneas y no una, que es lo que tiene enjundia**: el `id` de esta tabla
+es un `serial` con `DEFAULT nextval(...)`, y un serial exige USAGE sobre su
+secuencia además del INSERT sobre la tabla. Con solo el primer GRANT, el admin
+abriría el detalle sin problema y **la primera transición que intentara moriría
+con «permission denied for sequence»** — un arreglo a medias que se manifiesta
+en otro sitio y otro día. Es la única tabla de su familia a la que le pasa:
+`meta_venta`, `novedad_envio`, `item_defectuoso`, `devolucion_proveedor`,
+`historial_devolucion_proveedor` y `devolucion_proveedor_detalle` son columnas
+**IDENTITY**, y ahí PostgreSQL no comprueba privilegios de secuencia.
+
+**De ahí sale la lección transferible**: `has_sequence_privilege` devuelve
+`false` en esas seis tablas *que insertan perfectamente*, así que **ese
+predicado no distingue «le falta el privilegio» de «no lo necesita»** y no sirve
+como oráculo. El único oráculo fiable es ejecutar el INSERT, y eso es lo que
+hace la guardia 3 del script: asume el rol con `set_config('role', …, true)`
+—el mismo camino que la aplicación, con el nombre como parámetro ligado—,
+escribe un hito real, lo comprueba y lo borra.
+
+**Lo que NO se tocó**:
+
+- **La RLS**, porque no hacía falta: `pol_horario` ya enumeraba a
+  `grp_administrador`. (Ese era el otro medio arreglo posible: conceder el GRANT
+  sobre una tabla con RLS y sin política deja al rol leyendo **cero filas**, en
+  silencio y sin un error — la trampa del script 87.)
+- **UPDATE ni DELETE**: el historial es un rastro, se escribe y no se corrige.
+  Ningún rol los tiene sobre esta tabla y el administrador tampoco.
+- **Ningún otro rol ni ninguna otra tabla.** Auditadas las 113 de `public`:
+  ésta era la ÚNICA en la que `grp_administrador` no tenía privilegio alguno
+  teniéndolo otros grupos.
+
+**Verificado** sobre el sistema corriendo, y en los dos sentidos:
+
+- ciclo completo **aplicar → revertir → re-aplicar**, midiendo por API cada vez:
+  `200 → 403 → 200` en el detalle y en la guía;
+- las cuatro guardias del script pasan, incluida la que ESCRIBE un hito real
+  bajo `grp_administrador`;
+- el ADMIN ve **los mismos 5 hitos** que el GERENTE, no un 200 vacío — que es
+  lo que distinguiría un GRANT sin política;
+- casos **P17-035 a P17-038** en `pruebas/p17_mejoras.py`, y se comprobó que
+  **detectan el defecto**: con la reversión puesta, los cuatro salen en rojo.
+
+---
+
 ## D-16 · Un usuario dado de alta como CLIENTE no era un cliente — ✅ CORREGIDO
 
 **Cómo se destapó**: haciendo falta uno. Se pidió un cliente vacío para probar

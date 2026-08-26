@@ -2,7 +2,7 @@
 p03_motor.py — Seguridad de motor (suite P03).
 
 Es la suite más importante del plan, porque en este sistema **la seguridad no
-vive en Java**: vive en 95 políticas RLS, 1.355 GRANT, 109 ACL de columna, 34
+vive en Java**: vive en 98 políticas RLS, 1.371 GRANT, 109 ACL de columna, 34
 triggers de horario y un rol de aplicación NOINHERIT que asume el rol del
 usuario por transacción.
 
