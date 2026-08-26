@@ -117,10 +117,26 @@ public class CatalogoAdminService {
         System.arraycopy(filtros, 0, args, 0, filtros.length);
         args[filtros.length] = limit;
         args[filtros.length + 1] = offset;
+        // El proveedor NO cuelga del producto sino de la VARIANTE
+        // (`producto_proveedor` es (proveedor, variante)), así que un producto
+        // puede tener varios y hay que agregarlos: 6.043 de los 6.217 productos
+        // tienen al menos uno. El DISTINCT va en la subconsulta interna y no en
+        // el `string_agg`, porque `DISTINCT` y `ORDER BY` dentro de un agregado
+        // exigen ordenar por la misma expresión que se distingue, y así el
+        // orden es explícito. Corre solo para las filas de la página (25), y
+        // se apoya en `idx_producto_variante_producto` y en
+        // `idx_producto_proveedor_variante`.
         List<Map<String, Object>> items = pg.queryForList("""
                 SELECT p.id, p.nombre, p.slug, p.descripcion_corta, p.publicado, p.activo,
                        m.nombre AS marca,
-                       (SELECT count(*) FROM producto_variante pv WHERE pv.producto_id = p.id) AS variantes
+                       (SELECT count(*) FROM producto_variante pv WHERE pv.producto_id = p.id) AS variantes,
+                       COALESCE((SELECT string_agg(x.razon_social, ', ' ORDER BY x.razon_social)
+                                 FROM (SELECT DISTINCT pr.razon_social
+                                       FROM producto_variante pv2
+                                       JOIN producto_proveedor pp
+                                            ON pp.producto_variante_id = pv2.id AND pp.activo
+                                       JOIN proveedor pr ON pr.id = pp.proveedor_id
+                                       WHERE pv2.producto_id = p.id) x), '') AS proveedores
                 FROM producto p LEFT JOIN marca m ON m.id = p.marca_id
                 """ + where + """
 
@@ -141,6 +157,19 @@ public class CatalogoAdminService {
         producto.put("variantes", pg.queryForList("""
                 SELECT pv.id, pv.sku, pv.precio, pv.costo, pv.peso_kg,
                        pv.es_predeterminada, pv.activo,
+                       -- Proveedor de la variante: el PREFERIDO si lo hay
+                       -- (`uq_producto_proveedor_preferido` garantiza que sea
+                       -- uno solo) y, si no, el más barato. `proveedores` dice
+                       -- cuántos hay para que la pantalla no dé a entender que
+                       -- el que muestra es el único.
+                       (SELECT pr.razon_social
+                        FROM producto_proveedor pp
+                        JOIN proveedor pr ON pr.id = pp.proveedor_id
+                        WHERE pp.producto_variante_id = pv.id AND pp.activo
+                        ORDER BY pp.es_preferido DESC, pp.costo, pr.razon_social
+                        LIMIT 1) AS proveedor,
+                       (SELECT count(*) FROM producto_proveedor pp
+                        WHERE pp.producto_variante_id = pv.id AND pp.activo) AS proveedores,
                        COALESCE((SELECT string_agg(a.nombre || ': ' || va.valor, ', ' ORDER BY a.nombre)
                                  FROM variante_valor_atributo vva
                                  JOIN valor_atributo va ON va.id = vva.valor_atributo_id

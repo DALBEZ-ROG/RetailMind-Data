@@ -68,6 +68,14 @@
           <th mat-header-cell *matHeaderCellDef>Marca</th>
           <td mat-cell *matCellDef="let p">{{ p.marca || '—' }}</td>
         </ng-container>
+        <ng-container matColumnDef="proveedores">
+          <th mat-header-cell *matHeaderCellDef>Proveedor</th>
+          <td mat-cell *matCellDef="let p">
+            <span [matTooltip]="p.proveedores || 'Este producto no tiene proveedor asignado'">
+              {{ proveedorPrincipal(p) }}
+            </span>
+          </td>
+        </ng-container>
         <ng-container matColumnDef="variantes">
           <th mat-header-cell *matHeaderCellDef>Variantes</th>
           <td mat-cell *matCellDef="let p"><span class="stat-chip chip-info">{{ p.variantes }}</span></td>
@@ -137,6 +145,23 @@
         <ng-container matColumnDef="atributos">
           <th mat-header-cell *matHeaderCellDef>Atributos</th>
           <td mat-cell *matCellDef="let v">{{ v.atributos || '—' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="proveedor">
+          <th mat-header-cell *matHeaderCellDef>Proveedor</th>
+          <td mat-cell *matCellDef="let v">
+            <span *ngIf="v.proveedor; else sinProveedor">{{ v.proveedor }}</span>
+            <span class="stat-chip chip-info" *ngIf="v.proveedores > 1" style="margin-left:6px;"
+                  [matTooltip]="'Esta variante la surten ' + v.proveedores + ' proveedores; se muestra el preferido'">
+              +{{ v.proveedores - 1 }}
+            </span>
+            <ng-template #sinProveedor>
+              <span class="estado-chip neutral"
+                    matTooltip="Sin proveedor no se puede emitir una orden de compra de este SKU.
+                          Se asigna desde Compras › Proveedores.">
+                sin proveedor
+              </span>
+            </ng-template>
+          </td>
         </ng-container>
         <ng-container matColumnDef="precio">
           <th mat-header-cell *matHeaderCellDef>Precio</th>

@@ -17,6 +17,13 @@ export interface StockRow {
 export interface ProductoAdmin {
   id: number; nombre: string; slug: string; descripcion_corta: string;
   publicado: boolean; activo: boolean; marca: string | null; variantes: number;
+  /**
+   * Proveedores del producto, separados por coma y ya ordenados por el
+   * servidor. Cadena VACÍA —no null— cuando no tiene ninguno: el proveedor
+   * cuelga de la variante y hay 174 productos sin ninguna fila en
+   * `producto_proveedor`.
+   */
+  proveedores: string;
 }
 export interface ProductoDetalleAdmin {
   id: number; nombre: string; slug: string; marca: string | null; marca_id: number | null;
@@ -30,6 +37,10 @@ export interface PaginaProductos {
 }
 export interface VarianteAdmin {
   id: number; sku: string; precio: number; costo: number;
+  /** Proveedor preferido de la variante (o el más barato); null si no tiene. */
+  proveedor: string | null;
+  /** Cuántos proveedores activos la surten, para no dar a entender que es uno. */
+  proveedores: number;
   /** NULL en las variantes dadas de alta antes del 2026-08-17, cuando la
    *  pantalla no permitía capturarlo. Hoy es obligatorio al crear. */
   peso_kg: number | null;

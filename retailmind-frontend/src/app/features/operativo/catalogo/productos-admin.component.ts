@@ -82,8 +82,22 @@ export class ProductosAdminComponent implements OnInit, OnDestroy {
   /** Fila marcada en la grilla de variantes, con su propia barra de acciones. */
   varianteSeleccionada: VarianteAdmin | null = null;
 
-  columnas = ['nombre', 'marca', 'variantes', 'publicado', 'activo'];
-  readonly columnasVariante = ['sku', 'atributos', 'precio', 'costo', 'peso', 'estado'];
+  columnas = ['nombre', 'marca', 'proveedores', 'variantes', 'publicado', 'activo'];
+  readonly columnasVariante = ['sku', 'atributos', 'proveedor', 'precio', 'costo', 'peso', 'estado'];
+
+  /**
+   * Primer proveedor de la lista y cuántos quedan detrás.
+   *
+   * La grilla enseña UNO y anuncia el resto en vez de pintar la lista entera:
+   * hay productos surtidos por dos o tres proveedores y el nombre de un
+   * mayorista ecuatoriano ocupa media columna, así que la fila se rompería.
+   * El detalle de la variante dice cuál es el de cada SKU.
+   */
+  proveedorPrincipal(p: ProductoAdmin): string {
+    const lista = (p.proveedores || '').split(', ').filter(x => x);
+    if (!lista.length) { return '—'; }
+    return lista.length === 1 ? lista[0] : `${lista[0]} +${lista.length - 1}`;
+  }
 
   constructor(private catalogo: CatalogoAdminService, private snackBar: MatSnackBar,
               private dialog: MatDialog, private confirmar: ConfirmService) {}
