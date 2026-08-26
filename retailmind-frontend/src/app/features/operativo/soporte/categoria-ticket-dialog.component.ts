@@ -42,7 +42,7 @@ export interface CategoriaTicketDialogResultado {
       <div class="grid">
         <mat-form-field appearance="outline">
           <mat-label>Nombre</mat-label>
-          <input appTexto="nombre" exigido matInput [(ngModel)]="form.nombre" [disabled]="soloLectura" required>
+          <input appTexto="nombre" exigido matInput [(ngModel)]="form.nombre" maxlength="100" [disabled]="soloLectura" required>
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Prioridad por defecto</mat-label>

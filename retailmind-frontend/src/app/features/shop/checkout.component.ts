@@ -181,16 +181,14 @@ export class CheckoutComponent implements OnInit {
     return '';
   }
 
-  formatearNumero(): void {
-    const digitos = this.tarjeta.numero.replace(/\D/g, '').slice(0, 16);
-    this.tarjeta.numero = digitos.replace(/(\d{4})(?=\d)/g, '$1 ');
-  }
-
-  formatearVencimiento(): void {
-    let v = this.tarjeta.vencimiento.replace(/[^\d/]/g, '');
-    if (/^\d{3,}$/.test(v)) v = v.slice(0, 2) + '/' + v.slice(2, 4);
-    this.tarjeta.vencimiento = v.slice(0, 5);
-  }
+  // El formateo del número de tarjeta y del vencimiento vivía aquí, colgado de
+  // dos `(input)` de la plantilla, y NO funcionaba: un manejador de plantilla
+  // corre ANTES de que `ngModel` escriba en el modelo, así que leía el valor de
+  // la tecla anterior y `ngModel` machacaba después lo que este método hubiera
+  // corregido. El tope de 16 dígitos, en particular, no llegaba a aplicarse
+  // jamás. Ahora son los perfiles `tarjeta` y `vencimiento` de
+  // `core/validacion/perfiles-texto.ts`, que trabajan sobre el DOM y reemiten
+  // `input` con el valor ya limpio.
 
   /** Valida el código contra el backend; el monto lo decide SIEMPRE el servidor. */
   aplicarCupon(): void {

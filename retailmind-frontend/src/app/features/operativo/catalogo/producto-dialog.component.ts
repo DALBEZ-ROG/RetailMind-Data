@@ -55,12 +55,12 @@ export type ProductoDialogResultado = ProductoBody & { activo: boolean };
       <div class="grid">
         <mat-form-field appearance="outline">
           <mat-label>Nombre</mat-label>
-          <input appTexto="nombre" exigido matInput [(ngModel)]="form.nombre" (blur)="autoSlug()"
+          <input appTexto="nombre" exigido matInput [(ngModel)]="form.nombre" maxlength="200" (blur)="autoSlug()"
                  [disabled]="soloLectura" required>
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Slug</mat-label>
-          <input appTexto="slug" exigido matInput [(ngModel)]="form.slug" [disabled]="soloLectura" required>
+          <input appTexto="slug" exigido matInput [(ngModel)]="form.slug" maxlength="220" [disabled]="soloLectura" required>
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Marca</mat-label>
@@ -77,7 +77,7 @@ export type ProductoDialogResultado = ProductoBody & { activo: boolean };
         </mat-form-field>
         <mat-form-field appearance="outline" class="ancho">
           <mat-label>Descripción corta</mat-label>
-          <input appTexto="libre" matInput [(ngModel)]="form.descripcionCorta" [disabled]="soloLectura">
+          <input appTexto="libre" matInput [(ngModel)]="form.descripcionCorta" maxlength="500" [disabled]="soloLectura">
         </mat-form-field>
         <mat-form-field appearance="outline" class="ancho">
           <mat-label>Descripción</mat-label>

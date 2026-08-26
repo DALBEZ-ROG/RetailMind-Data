@@ -29,7 +29,7 @@
             <mat-form-field><mat-label>Código</mat-label>
               <input appTexto="codigo" matInput [(ngModel)]="modelo.codigo" maxlength="20"></mat-form-field>
             <mat-form-field><mat-label>Nombre</mat-label>
-              <input appTexto="nombre" exigido matInput [(ngModel)]="modelo.nombre" maxlength="120"></mat-form-field>
+              <input appTexto="nombre" exigido matInput [(ngModel)]="modelo.nombre" maxlength="100"></mat-form-field>
             <mat-form-field><mat-label>Ciudad</mat-label>
               <mat-select [(ngModel)]="modelo.ciudadId">
                 <mat-option [value]="null">— sin ciudad —</mat-option>
@@ -169,7 +169,7 @@
             <mat-form-field><mat-label>Código</mat-label>
               <input appTexto="codigo" matInput [(ngModel)]="modelo.codigo" maxlength="20"></mat-form-field>
             <mat-form-field><mat-label>Nombre</mat-label>
-              <input appTexto="nombre" exigido matInput [(ngModel)]="modelo.nombre" maxlength="120"></mat-form-field>
+              <input appTexto="nombre" exigido matInput [(ngModel)]="modelo.nombre" maxlength="100"></mat-form-field>
             <mat-form-field><mat-label>Transportista</mat-label>
               <mat-select [(ngModel)]="modelo.transportistaId">
                 <mat-option [value]="null">— sin transportista —</mat-option>
@@ -242,7 +242,7 @@
           </p>
           <div class="campos">
             <mat-form-field><mat-label>Nombre</mat-label>
-              <input appTexto="nombre" exigido matInput [(ngModel)]="modelo.nombre" maxlength="120"></mat-form-field>
+              <input appTexto="nombre" exigido matInput [(ngModel)]="modelo.nombre" maxlength="100"></mat-form-field>
             <mat-form-field><mat-label>País</mat-label>
               <mat-select [(ngModel)]="modelo.paisId"
                           (selectionChange)="modelo.provinciaId = null; modelo.ciudadId = null">

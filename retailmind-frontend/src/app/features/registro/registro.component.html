@@ -55,12 +55,12 @@
         <label class="reg-campo obligatorio">
           <span>Nombre</span>
           <input appTexto="nombre" exigido type="text" [(ngModel)]="datos.nombre"
-                 placeholder="María" autocomplete="given-name">
+                 maxlength="100" placeholder="María" autocomplete="given-name">
         </label>
         <label class="reg-campo">
           <span>Apellido</span>
           <input appTexto="nombre" type="text" [(ngModel)]="datos.apellido"
-                 placeholder="López" autocomplete="family-name">
+                 maxlength="100" placeholder="López" autocomplete="family-name">
         </label>
         <label class="reg-campo">
           <span>Teléfono</span>
@@ -161,7 +161,7 @@
       <div class="reg-grid">
         <label class="reg-campo">
           <span>Nombre de la dirección</span>
-          <input appTexto="nombre" type="text" [(ngModel)]="direccion.alias" placeholder="Casa">
+          <input appTexto="nombre" type="text" [(ngModel)]="direccion.alias" maxlength="50" placeholder="Casa">
         </label>
         <label class="reg-campo">
           <span>Quién recibe</span>

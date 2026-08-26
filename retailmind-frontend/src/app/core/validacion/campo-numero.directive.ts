@@ -7,6 +7,18 @@ export type PerfilNumero = 'entero' | 'dinero' | 'decimal';
 
 const DECIMALES: Record<PerfilNumero, number> = { entero: 0, dinero: 2, decimal: 3 };
 
+/**
+ * Cuántos dígitos admite la parte ENTERA cuando el campo no declara un `max`.
+ *
+ * No es un número redondo elegido a ojo: 9 dígitos es el mayor valor que cabe
+ * a la vez en un `integer` de PostgreSQL (999.999.999 < 2.147.483.647) y en un
+ * `numeric(12,2)`, que son los dos tipos detrás de todos los campos numéricos
+ * de la aplicación —52 columnas de dinero son `numeric(12,2)`—. Sin tope, el
+ * campo acepta veinte dígitos, el modelo se los lleva y el error llega del
+ * motor, que habla de desbordamiento y no dice en qué casilla está.
+ */
+const DIGITOS_ENTEROS_POR_DEFECTO = 9;
+
 /** Teclas que, viniendo del teclado, forman parte de un número a medio escribir. */
 const TECLAS_DE_NUMERO = /^[0-9.\-]$/;
 
@@ -64,8 +76,18 @@ export class CampoNumeroDirective extends CampoBaseDirective implements Validato
   /** Decimales del perfil `decimal`. Sin efecto en los otros dos. */
   @Input() decimales?: number;
 
+  /**
+   * Dígitos de la parte entera. Solo hace falta declararlo cuando el campo no
+   * tiene `max` y su tope real es más corto que el de por defecto (un año, un
+   * porcentaje, un número de intentos).
+   */
+  @Input() maxDigitos?: number;
+
   private ultimoBueno = '';
   private reemitiendo = false;
+
+  /** La última pulsación chocó con el tope de dígitos. */
+  private truncado = false;
 
   /** La tecla del `keydown` en curso; se borra al acabar el `input` que provoca. */
   private ultimaTecla: string | null = null;
@@ -96,6 +118,22 @@ export class CampoNumeroDirective extends CampoBaseDirective implements Validato
     return v === '' || v == null ? null : Number(v);
   }
 
+  /**
+   * Dígitos admitidos en la parte entera.
+   *
+   * Cuando el campo declara un `max` se deduce de ÉL, y no del defecto: un
+   * pago acotado a `[max]="saldo_pendiente"` de 1.234,56 no tiene por qué
+   * dejar teclear nueve cifras para recortarlas al salir del campo.
+   */
+  private get topeEnteros(): number {
+    if (this.maxDigitos && this.maxDigitos > 0) { return this.maxDigitos; }
+    const max = this.maximo;
+    if (max != null && Number.isFinite(max)) {
+      return Math.max(1, String(Math.floor(Math.abs(max))).length);
+    }
+    return DIGITOS_ENTEROS_POR_DEFECTO;
+  }
+
   /** El signo menos solo se admite si el mínimo declarado lo permite. */
   private get admiteNegativo(): boolean {
     const min = this.minimo;
@@ -115,6 +153,21 @@ export class CampoNumeroDirective extends CampoBaseDirective implements Validato
     if (/[0-9]/.test(ev.key)
         || (ev.key === '.' && this.tope > 0 && !campo.value.includes('.'))
         || (ev.key === '-' && this.admiteNegativo && !campo.value.includes('-'))) {
+      // Un dígito de más en la parte entera se descarta AQUÍ, con aviso. La
+      // comprobación se salta cuando ya hay separador decimal porque entonces
+      // el dígito puede ir a los decimales, y desde un `type="number"` no se
+      // puede saber dónde está el cursor: leer `selectionStart` sobre él
+      // devuelve null en unos navegadores y lanza en otros. Ese caso lo recoge
+      // el recorte del manejador de `input`.
+      if (/[0-9]/.test(ev.key) && !campo.value.includes('.')
+          && this.digitosEnteros(campo.value) >= this.topeEnteros) {
+        this.ultimaTecla = null;
+        this.truncado = true;
+        this.tocado = true;
+        ev.preventDefault();
+        this.repintar();
+        return;
+      }
       this.ultimaTecla = ev.key;
       return;
     }
@@ -168,12 +221,34 @@ export class CampoNumeroDirective extends CampoBaseDirective implements Validato
     super.alSalir();
   }
 
-  /** Recorta los decimales que sobren, sin redondear (no se inventa valor). */
-  private recortar(valor: string): string {
+  /** Dígitos de la parte entera de un valor, ignorando signo y decimales. */
+  private digitosEnteros(valor: string): number {
     const punto = valor.indexOf('.');
-    if (punto < 0) { return valor; }
-    if (this.tope === 0) { return valor.slice(0, punto); }
-    return valor.slice(0, punto + 1 + this.tope);
+    const enteros = punto < 0 ? valor : valor.slice(0, punto);
+    return enteros.replace(/[^0-9]/g, '').length;
+  }
+
+  /**
+   * Recorta lo que sobre —decimales y dígitos enteros— sin redondear: no se
+   * inventa un valor que el usuario no escribió. Es la red de seguridad de lo
+   * que no pasa por el teclado (pegar, arrastrar, autocompletar), donde el
+   * filtro de `keydown` no interviene.
+   */
+  private recortar(valor: string): string {
+    const negativo = valor.startsWith('-');
+    const cuerpo = negativo ? valor.slice(1) : valor;
+    const punto = cuerpo.indexOf('.');
+    let enteros = punto < 0 ? cuerpo : cuerpo.slice(0, punto);
+    let decimales = punto < 0 ? '' : cuerpo.slice(punto);
+
+    const tope = this.topeEnteros;
+    this.truncado = enteros.length > tope;
+    if (this.truncado) { enteros = enteros.slice(0, tope); }
+
+    if (this.tope === 0) { decimales = ''; }
+    else if (decimales) { decimales = decimales.slice(0, 1 + this.tope); }
+
+    return (negativo ? '-' : '') + enteros + decimales;
   }
 
   /**
@@ -189,8 +264,17 @@ export class CampoNumeroDirective extends CampoBaseDirective implements Validato
   }
 
   // ------------------------------------------------------------- validador
+  /**
+   * Lo que hace INVÁLIDO al control. Se calcula con la bandera de tope apagada
+   * a propósito: un número completo hasta su último dígito admitido es un
+   * número correcto, y marcarlo inválido bloquearía el «Aceptar» del
+   * formulario que lo contiene.
+   */
   validate(_c: AbstractControl): ValidationErrors | null {
+    const choco = this.truncado;
+    this.truncado = false;
     const motivo = this.motivoActual();
+    this.truncado = choco;
     return motivo ? { numero: motivo } : null;
   }
 
@@ -205,6 +289,14 @@ export class CampoNumeroDirective extends CampoBaseDirective implements Validato
     const max = this.maximo;
     if (min != null && n < min) { return `El mínimo es ${min}.`; }
     if (max != null && n > max) { return `El máximo es ${max}.`; }
+    // Igual que en los campos de texto: chocar con el tope no invalida el
+    // valor —por eso no aparece en `validate`—, pero callarlo deja al usuario
+    // pulsando una tecla que no hace nada.
+    if (this.truncado) {
+      return max != null
+        ? `El máximo es ${max}.`
+        : `Como mucho ${this.topeEnteros} dígitos.`;
+    }
     return null;
   }
 }

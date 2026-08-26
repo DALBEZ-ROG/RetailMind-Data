@@ -77,7 +77,11 @@ const FORMA = {
   numeroCasa:   /^[A-Za-z0-9 -]*$/,
   email:        /^[a-z0-9@._+-]*$/,
   url:          /^[A-Za-z0-9:/?#@!$&*+,;=._~%-]*$/,
-  referencia:   /^[A-Za-z0-9 ._-]*$/
+  referencia:   /^[A-Za-z0-9 ._-]*$/,
+  // Los dos del pago con tarjeta. Sin ellos caerían en el perfil `libre`,
+  // que admite casi todo, y el barrido pasaría sin haber mirado nada.
+  tarjeta:      /^[0-9 ]*$/,
+  vencimiento:  /^[0-9/]*$/
 };
 
 /** Un número y nada más: signo opcional, dígitos, y a lo sumo un punto. */

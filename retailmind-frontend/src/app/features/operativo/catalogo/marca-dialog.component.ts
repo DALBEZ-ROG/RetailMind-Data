@@ -43,12 +43,12 @@ export interface MarcaDialogResultado {
       <div class="grid">
         <mat-form-field appearance="outline">
           <mat-label>Nombre</mat-label>
-          <input appTexto="nombre" exigido matInput [(ngModel)]="form.nombre" (blur)="autoSlug()"
+          <input appTexto="nombre" exigido matInput [(ngModel)]="form.nombre" maxlength="100" (blur)="autoSlug()"
                  [disabled]="soloLectura" required>
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Slug</mat-label>
-          <input appTexto="slug" exigido matInput [(ngModel)]="form.slug" [disabled]="soloLectura" required>
+          <input appTexto="slug" exigido matInput [(ngModel)]="form.slug" maxlength="120" [disabled]="soloLectura" required>
         </mat-form-field>
         <mat-form-field appearance="outline" class="ancho">
           <mat-label>Descripción</mat-label>

@@ -82,11 +82,11 @@
           <div class="form-grid">
             <mat-form-field appearance="outline">
               <mat-label>Nombre</mat-label>
-              <input appTexto="nombre" exigido matInput [(ngModel)]="datos.nombre" required>
+              <input appTexto="nombre" exigido matInput [(ngModel)]="datos.nombre" maxlength="100" required>
             </mat-form-field>
             <mat-form-field appearance="outline">
               <mat-label>Apellido</mat-label>
-              <input appTexto="nombre" matInput [(ngModel)]="datos.apellido">
+              <input appTexto="nombre" matInput [(ngModel)]="datos.apellido" maxlength="100">
             </mat-form-field>
             <mat-form-field appearance="outline">
               <mat-label>Teléfono</mat-label>
@@ -149,7 +149,7 @@
             <div class="form-grid">
               <mat-form-field appearance="outline">
                 <mat-label>Alias (ej. Casa, Oficina)</mat-label>
-                <input appTexto="nombre" matInput [(ngModel)]="dir.alias">
+                <input appTexto="nombre" matInput [(ngModel)]="dir.alias" maxlength="50">
               </mat-form-field>
               <mat-form-field appearance="outline">
                 <mat-label>Destinatario</mat-label>

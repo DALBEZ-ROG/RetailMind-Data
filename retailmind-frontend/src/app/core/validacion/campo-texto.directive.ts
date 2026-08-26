@@ -46,19 +46,56 @@ export class CampoTextoDirective extends CampoBaseDirective implements Validator
 
   private reemitiendo = false;
 
+  /** El saneado tuvo que recortar por largo en la última pulsación. */
+  private truncado = false;
+
   constructor(ref: ElementRef<HTMLInputElement | HTMLTextAreaElement>) { super(ref); }
 
   ngOnInit(): void {
-    const p = this.def;
-    // El largo se declara en el perfil y se refleja en el elemento, para que el
-    // navegador lo corte también en el pegado y el lector de pantalla lo anuncie.
-    if (p.largo && !this.el.getAttribute('maxlength')) {
-      this.el.setAttribute('maxlength', String(p.largo));
+    // El largo se refleja en el elemento para que lo corte también el navegador
+    // —el pegado, el arrastre— y para que el lector de pantalla lo anuncie.
+    if (!this.el.getAttribute('maxlength')) {
+      this.el.setAttribute('maxlength', String(this.def.largo));
     }
   }
 
   private get def(): PerfilTexto {
     return PERFILES_TEXTO[this.perfil || 'libre'] ?? PERFILES_TEXTO['libre'];
+  }
+
+  /**
+   * Largo que se aplica de verdad: el del perfil, o el `maxlength` de la
+   * plantilla cuando lo hay Y es más corto.
+   *
+   * El perfil declara el techo de la CLASE de dato y la plantilla el de la
+   * COLUMNA concreta, que a veces es menor —`nombre` admite 150 y
+   * `cliente.nombre` es varchar(100)—. Se toma el mínimo y no «el de la
+   * plantilla si existe»: así un `maxlength` escrito de más no puede aflojar
+   * en silencio el tope del perfil.
+   */
+  private get largo(): number {
+    const declarado = Number(this.el.getAttribute('maxlength'));
+    return Number.isFinite(declarado) && declarado > 0
+      ? Math.min(declarado, this.def.largo)
+      : this.def.largo;
+  }
+
+  /**
+   * Con el campo lleno hasta el tope el navegador se limita a IGNORAR la tecla:
+   * no pasa nada, no se ve nada y el usuario vuelve a pulsar creyendo que el
+   * teclado falla. Esto detecta ese momento —tecla imprimible, sin selección
+   * que reemplazar, valor ya en el máximo— y enciende el aviso.
+   */
+  @HostListener('keydown', ['$event'])
+  alTeclear(ev: KeyboardEvent): void {
+    if (ev.ctrlKey || ev.metaKey || ev.altKey || ev.key.length !== 1) { return; }
+    const campo = this.el;
+    const reemplaza = (campo.selectionEnd ?? 0) > (campo.selectionStart ?? 0);
+    if (!reemplaza && campo.value.length >= this.largo) {
+      this.truncado = true;
+      this.tocado = true;      // el aviso tiene que verse AHORA, no tras el blur
+      this.repintar();
+    }
   }
 
   @HostListener('input')
@@ -94,12 +131,24 @@ export class CampoTextoDirective extends CampoBaseDirective implements Validator
     if (p.caja === 'mayus') { s = s.toUpperCase(); }
     if (p.caja === 'minus') { s = s.toLowerCase(); }
     s = s.replace(p.prohibido, '');
-    if (p.largo && s.length > p.largo) { s = s.slice(0, p.largo); }
+    const tope = this.largo;
+    this.truncado = s.length > tope;
+    if (this.truncado) { s = s.slice(0, tope); }
     return s;
   }
 
+  /**
+   * Lo que hace INVÁLIDO al control. Deliberadamente NO incluye el aviso de
+   * tope: un campo lleno hasta su largo máximo es un campo correcto, y
+   * marcarlo inválido bloquearía el «Aceptar» de cualquier formulario que se
+   * apoye en la validación de Angular.
+   */
   validate(_c: AbstractControl): ValidationErrors | null {
-    const motivo = this.motivoActual();
+    const v = this.el.value ?? '';
+    if (v.trim() === '') {
+      return this.exigido ? { texto: 'Este campo es obligatorio.' } : null;
+    }
+    const motivo = this.def.validar ? this.def.validar(v) : null;
     return motivo ? { texto: motivo } : null;
   }
 
@@ -108,6 +157,10 @@ export class CampoTextoDirective extends CampoBaseDirective implements Validator
     if (v.trim() === '') {
       return this.exigido ? 'Este campo es obligatorio.' : null;
     }
-    return this.def.validar ? this.def.validar(v) : null;
+    const motivo = this.def.validar ? this.def.validar(v) : null;
+    if (motivo) { return motivo; }
+    // El tope se AVISA sin invalidar: al llegar a él el campo deja de admitir
+    // teclas y, sin este mensaje, no hay nada que explique por qué.
+    return this.truncado ? `Máximo ${this.largo} caracteres.` : null;
   }
 }

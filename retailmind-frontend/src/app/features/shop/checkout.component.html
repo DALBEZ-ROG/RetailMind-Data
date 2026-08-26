@@ -152,7 +152,7 @@
             </mat-form-field>
             <mat-form-field appearance="outline">
               <mat-label>Alias (Casa, Oficina…)</mat-label>
-              <input appTexto="nombre" matInput [(ngModel)]="nuevaDireccion.alias">
+              <input appTexto="nombre" matInput [(ngModel)]="nuevaDireccion.alias" maxlength="50">
             </mat-form-field>
           </div>
           <div class="acciones-inline">
@@ -215,18 +215,19 @@
           <div class="form-grid">
             <mat-form-field appearance="outline" class="span-2">
               <mat-label>Número de tarjeta *</mat-label>
-              <input matInput [(ngModel)]="tarjeta.numero" (input)="formatearNumero()"
+              <input appTexto="tarjeta" matInput [(ngModel)]="tarjeta.numero"
                      placeholder="4111 1111 1111 1111" inputmode="numeric" autocomplete="off">
               <span matSuffix class="marca-chip" *ngIf="marcaTarjeta">{{ marcaTarjeta }}</span>
               <mat-hint *ngIf="tarjeta.numero && !numeroValido">Debe tener 16 dígitos</mat-hint>
             </mat-form-field>
             <mat-form-field appearance="outline" class="span-2">
               <mat-label>Titular de la tarjeta *</mat-label>
-              <input appTexto="nombre" matInput [(ngModel)]="tarjeta.titular" autocomplete="off">
+              <input appTexto="nombre" matInput [(ngModel)]="tarjeta.titular"
+                     maxlength="100" autocomplete="off">
             </mat-form-field>
             <mat-form-field appearance="outline">
               <mat-label>Vencimiento (MM/AA) *</mat-label>
-              <input matInput [(ngModel)]="tarjeta.vencimiento" (input)="formatearVencimiento()"
+              <input appTexto="vencimiento" matInput [(ngModel)]="tarjeta.vencimiento"
                      placeholder="08/28" inputmode="numeric" autocomplete="off">
               <mat-hint *ngIf="tarjeta.vencimiento && !vencimientoValido">Formato MM/AA y vigente</mat-hint>
             </mat-form-field>
