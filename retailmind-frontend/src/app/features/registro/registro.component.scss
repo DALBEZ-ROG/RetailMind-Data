@@ -276,6 +276,37 @@
   }
 }
 
+// ── Cuenta ya creada (pasos 3 y 4) ───────────────────────────────────────────
+.reg-creada {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 12px;
+  padding: 13px 15px;
+  border-radius: 14px;
+  color: #14243d;
+  background: rgba(46, 175, 122, 0.12);
+  border: 1px solid rgba(46, 175, 122, 0.32);
+
+  h2 { margin: 0 0 3px; font-size: 15.5px; font-weight: 800; color: #1c7a55; }
+  p  { margin: 0; font-size: 13px; line-height: 1.5; color: #3d4c62; }
+}
+
+.creada-marca {
+  display: grid;
+  place-items: center;
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  background: #2eaf7a;
+  mat-icon { font-size: 21px; width: 21px; height: 21px; color: #fff; }
+}
+
+.creada-salir {
+  grid-column: 2;
+  justify-self: start;
+  margin-top: 9px;
+}
+
 // ── Listo ────────────────────────────────────────────────────────────────────
 .reg-listo {
   justify-items: center;

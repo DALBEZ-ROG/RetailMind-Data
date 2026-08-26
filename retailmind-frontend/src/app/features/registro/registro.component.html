@@ -150,6 +150,32 @@
       <p class="reg-nota">Al continuar se creará tu cuenta. Los dos pasos siguientes son opcionales.</p>
     </section>
 
+    <!-- ══ La cuenta ya existe ═════════════════════════════════════════
+         La cuenta NACE al terminar el paso 2 (ver la cabecera del
+         componente), pero hasta aquí nada se lo decía al usuario: pasaba de
+         «Crear mi cuenta» a un formulario de dirección sin una sola señal de
+         que lo suyo ya estaba hecho y de que lo que queda es opcional. Quien
+         cerrara el navegador en el paso 3 se iba creyendo que no se había
+         registrado. -->
+    <section class="reg-creada" *ngIf="cuentaCreada && paso >= 3 && paso < 5"
+             role="status" aria-live="polite">
+      <div class="creada-marca"><mat-icon>check</mat-icon></div>
+      <div class="creada-texto">
+        <h2>¡Tu cuenta ya está creada!</h2>
+        <p>
+          Iniciaste sesión como <strong>{{ acceso.email }}</strong>.
+          <ng-container *ngIf="paso === 3">Los dos pasos que quedan son opcionales:</ng-container>
+          <ng-container *ngIf="paso === 4">El paso que queda es opcional:</ng-container>
+          puedes completarlos ahora o entrar directo a la tienda y hacerlo
+          después desde tu perfil.
+        </p>
+      </div>
+      <button type="button" class="reg-btn plano creada-salir" (click)="irAhora()"
+              [disabled]="cargando">
+        Ir a la tienda
+      </button>
+    </section>
+
     <!-- ══ Paso 3 · dirección de envío ═════════════════════════════════ -->
     <section class="reg-paso" *ngIf="paso === 3">
       <p class="reg-intro">
