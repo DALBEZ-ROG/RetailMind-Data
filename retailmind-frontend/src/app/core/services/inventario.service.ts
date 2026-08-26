@@ -3,7 +3,8 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
-  TransferenciaRow, AjusteRow, AjusteResultado, KardexRow, StockRow
+  TransferenciaRow, AjusteRow, AjusteResultado, KardexRow, StockRow,
+  ExistenciaBodegaRow, PaginaExistencias
 } from '../models/operativo.model';
 
 @Injectable({ providedIn: 'root' })
@@ -43,6 +44,30 @@ export class InventarioService {
     varianteId: number; bodegaId: number; stockMinimo: number; stockMaximo: number | null;
   }): Observable<StockRow> {
     return this.http.put<StockRow>(`${this.base}/niveles`, body);
+  }
+
+  /**
+   * Existencias por variante. Todos los criterios viajan al SERVIDOR: son
+   * 6.224 variantes y filtrar en el navegador exigiría descargarlas todas.
+   * `estado` y `orden` son listas blancas del backend — un valor no previsto
+   * devuelve 400 y no llega al SQL.
+   */
+  existencias(f: {
+    q?: string; bodegaId?: number | null; estado?: string; orden?: string;
+    page?: number; size?: number;
+  }): Observable<PaginaExistencias> {
+    let params = new HttpParams();
+    if (f.q)                params = params.set('q', f.q);
+    if (f.bodegaId != null) params = params.set('bodegaId', f.bodegaId);
+    if (f.estado)           params = params.set('estado', f.estado);
+    if (f.orden)            params = params.set('orden', f.orden);
+    params = params.set('page', f.page ?? 0).set('size', f.size ?? 25);
+    return this.http.get<PaginaExistencias>(`${this.base}/existencias`, { params });
+  }
+
+  existenciasPorBodega(varianteId: number): Observable<ExistenciaBodegaRow[]> {
+    return this.http.get<ExistenciaBodegaRow[]>(
+      `${this.base}/existencias/${varianteId}/bodegas`);
   }
 
   kardex(varianteId?: number | null, bodegaId?: number | null): Observable<KardexRow[]> {

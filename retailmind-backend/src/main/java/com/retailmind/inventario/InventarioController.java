@@ -74,6 +74,31 @@ public class InventarioController {
                 r.stockMinimo(), r.stockMaximo());
     }
 
+    /**
+     * Existencias por variante: el listado de «qué tengo y cuánto tengo».
+     *
+     * Va paginado y con la búsqueda EN EL SERVIDOR porque son 6.224 variantes:
+     * un listado completo serían varios megabytes en cada apertura, y la
+     * pantalla acabaría filtrando en el navegador sobre datos que ya no caben.
+     * Los filtros `estado` y `orden` son listas blancas del servicio: un valor
+     * no previsto da 400 y nunca llega al SQL.
+     */
+    @GetMapping("/existencias")
+    public Map<String, Object> existencias(@RequestParam(required = false) String q,
+                                           @RequestParam(required = false) Long bodegaId,
+                                           @RequestParam(required = false) String estado,
+                                           @RequestParam(required = false) String orden,
+                                           @RequestParam(defaultValue = "0") int page,
+                                           @RequestParam(defaultValue = "25") int size) {
+        return servicio.existencias(q, bodegaId, estado, orden, page, size);
+    }
+
+    /** Desglose por bodega de una variante (dónde está lo que hay). */
+    @GetMapping("/existencias/{varianteId}/bodegas")
+    public List<Map<String, Object>> existenciasPorBodega(@PathVariable long varianteId) {
+        return servicio.existenciasPorBodega(varianteId);
+    }
+
     // CU-O-17: kardex de solo lectura, filtrable por variante y/o bodega
     @GetMapping("/kardex")
     public List<Map<String, Object>> kardex(@RequestParam(required = false) Long varianteId,

@@ -194,6 +194,12 @@ public class SecurityConfig {
                 // Kardex (CU-O-17): lectura ampliada a gerencia y analista
                 .requestMatchers(HttpMethod.GET, "/api/inventario/kardex")
                     .hasAnyAuthority("ADMIN", "GERENTE", "BODEGA", "ANALISTA")
+                // Existencias: los mismos que el kardex. Puede entrar BODEGA
+                // porque la consulta NO selecciona ni un importe — el corte
+                // financiero lo hace ella, no esta línea (como en OTD-COM-08).
+                .requestMatchers(HttpMethod.GET, "/api/inventario/existencias",
+                                 "/api/inventario/existencias/**")
+                    .hasAnyAuthority("ADMIN", "GERENTE", "BODEGA", "ANALISTA")
                 // Transferencias de inventario: bodega
                 .requestMatchers("/api/inventario/**")
                     .hasAnyAuthority("ADMIN", "GERENTE", "BODEGA")

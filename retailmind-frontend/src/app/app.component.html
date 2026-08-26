@@ -322,6 +322,11 @@
         </a>
       </ng-container>
 
+      <a class="nav-item" *ngIf="canExistencias"
+         routerLink="/operativo/inventario/existencias" routerLinkActive="active">
+        <mat-icon>inventory</mat-icon>
+        <span>Existencias</span>
+      </a>
       <a class="nav-item" *ngIf="canInventario"
          routerLink="/operativo/inventario/transferencias" routerLinkActive="active">
         <mat-icon>swap_horiz</mat-icon>

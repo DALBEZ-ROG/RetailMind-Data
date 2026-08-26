@@ -110,6 +110,156 @@ public class InventarioService {
                 varianteId, bodegaId);
     }
 
+
+    // ── Existencias: qué hay y cuánto hay ────────────────────────────────
+
+    /**
+     * Filtros de estado admitidos, con su condición sobre el agregado.
+     *
+     * Es una LISTA BLANCA y el valor que llega por la petición solo sirve para
+     * BUSCAR en ella: lo que se concatena en el SQL es el texto escrito aquí,
+     * nunca el del usuario (regla 2 del proyecto).
+     */
+    private static final Map<String, String> ESTADOS_EXISTENCIA = Map.of(
+            "todos",        "TRUE",
+            "con_stock",    "COALESCE(sum(i.stock_actual), 0) > 0",
+            "sin_stock",    "COALESCE(sum(i.stock_actual), 0) = 0",
+            // El mínimo se suma igual que el stock: con una bodega elegida la
+            // comparación es exacta y, con todas, es la reposición agregada.
+            "bajo_minimo",  "COALESCE(sum(i.stock_minimo), 0) > 0 "
+                          + "AND COALESCE(sum(i.stock_actual), 0) <= COALESCE(sum(i.stock_minimo), 0)",
+            "sobre_maximo", "sum(i.stock_maximo) IS NOT NULL "
+                          + "AND COALESCE(sum(i.stock_actual), 0) > sum(i.stock_maximo)");
+
+    /** Ordenaciones admitidas. Misma regla: lista blanca, no texto del usuario. */
+    private static final Map<String, String> ORDENES_EXISTENCIA = Map.of(
+            "producto",   "pr.nombre, pv.sku",
+            "sku",        "pv.sku",
+            "stock_desc", "COALESCE(sum(i.stock_actual), 0) DESC, pr.nombre",
+            "stock_asc",  "COALESCE(sum(i.stock_actual), 0), pr.nombre");
+
+    /**
+     * Existencias por VARIANTE, sumando sus posiciones de inventario.
+     *
+     * <h3>Por qué se parte de la variante y no del inventario</h3>
+     * Una variante sin una sola fila en {@code inventario} —recién dada de
+     * alta, o retirada de todas las bodegas— existe y su stock es CERO, que es
+     * justo el caso que hay que ver. Partiendo de {@code inventario} esas
+     * variantes desaparecen del listado, y entonces «no aparece» se confunde
+     * con «no tengo»: hay 6.224 variantes y 11.407 posiciones, y no todas las
+     * variantes tienen una.
+     *
+     * <h3>Sin un solo importe</h3>
+     * La pantalla la abren BODEGA y ANALISTA además de ADMIN y GERENTE, así que
+     * la consulta no selecciona precio ni costo. La barrera es ÉSTA y no la
+     * ruta, el mismo mecanismo de OTD-COM-08 y de OTD-LOG-11.
+     *
+     * <h3>Y tampoco toca ninguna tabla que BODEGA no pueda leer</h3>
+     * Que un rol tenga la ruta abierta no basta: el motor manda. `grp_bodega`
+     * no tiene SELECT sobre `marca`, y con el JOIN puesto esta pantalla le
+     * respondía 403 —un 42501 traducido— mientras funcionaba con los otros
+     * tres roles.
+     *
+     * <h3>El filtro de bodega va en el JOIN, no en el WHERE</h3>
+     * En el WHERE convertiría el LEFT JOIN en interno y volveríamos a perder
+     * las variantes sin stock en esa bodega, que son exactamente las que se
+     * buscan cuando alguien filtra por una bodega.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> existencias(String q, Long bodegaId, String estado,
+                                           String orden, int page, int size) {
+        String condicion = ESTADOS_EXISTENCIA.get(
+                estado == null || estado.isBlank() ? "todos" : estado);
+        if (condicion == null) {
+            throw new IllegalArgumentException("Estado de existencias no válido: " + estado
+                    + ". Admitidos: " + ESTADOS_EXISTENCIA.keySet());
+        }
+        String porOrden = ORDENES_EXISTENCIA.get(
+                orden == null || orden.isBlank() ? "producto" : orden);
+        if (porOrden == null) {
+            throw new IllegalArgumentException("Orden no válido: " + orden
+                    + ". Admitidos: " + ORDENES_EXISTENCIA.keySet());
+        }
+        int limit = Math.min(Math.max(size, 1), 100);
+        int offset = Math.max(page, 0) * limit;
+        String filtro = (q == null || q.isBlank()) ? null : "%" + q.trim() + "%";
+
+        // NO se une `marca`, y no es un olvido: `grp_bodega` no tiene SELECT
+        // sobre esa tabla, así que el JOIN devolvía 42501 y la pantalla
+        // respondía 403 A BODEGA —el rol que más la necesita— mientras
+        // funcionaba con los otros tres. Es la misma trampa que ya obligó a
+        // dejar `categoria` fuera de OTD-INV-07. La búsqueda va por SKU y por
+        // nombre de producto; la marca no se ofrece porque no se puede leer
+        // con todos los roles que abren esto.
+        String desde = """
+                FROM producto_variante pv
+                JOIN producto pr ON pr.id = pv.producto_id
+                LEFT JOIN inventario i ON i.producto_variante_id = pv.id
+                     AND (?::bigint IS NULL OR i.bodega_id = ?::bigint)
+                WHERE (?::text IS NULL OR pv.sku ILIKE ?::text OR pr.nombre ILIKE ?::text)
+                GROUP BY pv.id, pv.sku, pv.activo, pr.nombre
+                HAVING""" + " " + condicion;   // ojo: el bloque de texto RECORTA el espacio final de la línea
+        Object[] filtros = { bodegaId, bodegaId, filtro, filtro, filtro };
+
+        Long total = pg.queryForObject(
+                "SELECT count(*) FROM (SELECT 1 " + desde + ") t", Long.class, filtros);
+
+        Object[] args = new Object[filtros.length + 2];
+        System.arraycopy(filtros, 0, args, 0, filtros.length);
+        args[filtros.length] = limit;
+        args[filtros.length + 1] = offset;
+        List<Map<String, Object>> items = pg.queryForList("""
+                SELECT pv.id AS variante_id, pv.sku, pv.activo,
+                       pr.nombre AS producto,
+                       COALESCE(sum(i.stock_actual), 0)    AS stock_actual,
+                       COALESCE(sum(i.stock_reservado), 0) AS reservado,
+                       COALESCE(sum(i.stock_actual), 0)
+                         - COALESCE(sum(i.stock_reservado), 0) AS disponible,
+                       COALESCE(sum(i.stock_minimo), 0)    AS stock_minimo,
+                       sum(i.stock_maximo)                 AS stock_maximo,
+                       count(i.id)                         AS bodegas
+                """ + desde + """
+
+                ORDER BY""" + " " + porOrden + """
+
+                LIMIT ? OFFSET ?""", args);
+
+        // Los indicadores se miden sobre el conjunto FILTRADO ENTERO y no sobre
+        // la página: «12 variantes sin stock» de las 25 que se ven no es un
+        // dato, es una coincidencia del tamaño de página.
+        Map<String, Object> resumen = pg.queryForMap("""
+                SELECT count(*)                                   AS variantes,
+                       COALESCE(sum(t.stock_actual), 0)           AS unidades,
+                       count(*) FILTER (WHERE t.stock_actual = 0) AS sin_stock,
+                       count(*) FILTER (WHERE t.stock_minimo > 0
+                                          AND t.stock_actual <= t.stock_minimo) AS bajo_minimo
+                FROM (SELECT COALESCE(sum(i.stock_actual), 0) AS stock_actual,
+                             COALESCE(sum(i.stock_minimo), 0) AS stock_minimo
+                      """ + desde + """
+                     ) t""", filtros);
+
+        return Map.of("items", items, "total", total == null ? 0 : total,
+                      "page", Math.max(page, 0), "size", limit, "resumen", resumen);
+    }
+
+    /**
+     * Desglose por bodega de UNA variante: dónde está y cuánto hay en cada
+     * sitio. Es la segunda mitad de la pregunta «cuánto tengo» —la primera la
+     * responde el agregado— y la que hace falta para transferir o ajustar.
+     */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> existenciasPorBodega(long varianteId) {
+        return pg.queryForList("""
+                SELECT i.bodega_id, b.codigo AS bodega_codigo, b.nombre AS bodega,
+                       i.stock_actual, i.stock_reservado,
+                       i.stock_actual - i.stock_reservado AS disponible,
+                       i.stock_minimo, i.stock_maximo, i.fecha_actualizacion
+                FROM inventario i
+                JOIN bodega b ON b.id = i.bodega_id
+                WHERE i.producto_variante_id = ?
+                ORDER BY b.nombre""", varianteId);
+    }
+
     // ── Ajuste de inventario (CU-O-16) ───────────────────────────────────
 
     /**

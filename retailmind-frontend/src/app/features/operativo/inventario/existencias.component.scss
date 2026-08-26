@@ -1,0 +1,64 @@
+// Tira de indicadores de la pantalla de Existencias.
+//
+// No reutiliza `.kpi-grid` de `informes.scss`: esa hoja es del nivel táctico y
+// se carga con la pantalla genérica de informes, no con el módulo operativo.
+// Traerla aquí ataría una pantalla de operación al aspecto de los informes.
+
+.ex-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.ex-kpi {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid #e8eaf6;
+  border-radius: 14px;
+  box-shadow: 0 2px 8px rgba(26, 35, 126, 0.05);
+}
+
+.ex-kpi-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .3px;
+  text-transform: uppercase;
+  color: #7986cb;
+}
+
+.ex-kpi-valor {
+  font-size: 26px;
+  font-weight: 800;
+  color: #1a237e;
+
+  &.alerta { color: #c62828; }
+  &.aviso  { color: #ef6c00; }
+}
+
+// Ocupa la fila entera bajo los indicadores: dice sobre qué conjunto están
+// calculados, que con filtros puestos no es «el almacén» sino un recorte.
+.ex-alcance {
+  grid-column: 1 / -1;
+  margin: -4px 0 0;
+  font-size: 12.5px;
+  color: #7986cb;
+}
+
+.ex-cantidad {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #1a237e;
+
+  &.agotada { color: #c62828; }
+  &.bajo    { color: #ef6c00; }
+  &.sobre   { color: #6a1b9a; }
+}
+
+.ex-cargando {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #7986cb;
+}

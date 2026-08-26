@@ -209,6 +209,14 @@ export const routes: Routes = [
       import('./features/operativo/compras/facturas-compra.component').then(m => m.FacturasCompraComponent)
   },
   {
+    // Espeja la línea de `/api/inventario/existencias` de SecurityConfig: los
+    // mismos roles que el kardex, porque la consulta no devuelve ni un importe.
+    path: 'operativo/inventario/existencias',
+    canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'BODEGA', 'ANALISTA'])],
+    loadComponent: () =>
+      import('./features/operativo/inventario/existencias.component').then(m => m.ExistenciasComponent)
+  },
+  {
     path: 'operativo/inventario/transferencias',
     canActivate: [authGuard, roleGuard(['ADMIN', 'GERENTE', 'BODEGA'])],
     loadComponent: () =>

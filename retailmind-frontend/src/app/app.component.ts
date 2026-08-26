@@ -85,6 +85,7 @@ export class AppComponent implements OnInit {
     '/operativo/compras/facturas': 'Facturas de Compra',
     '/operativo/compras/proveedores': 'Proveedores',
     '/operativo/compras/devoluciones-proveedor': 'Devolución a Proveedor',
+    '/operativo/inventario/existencias': 'Existencias',
     '/operativo/inventario/transferencias': 'Transferencias de Stock',
     '/operativo/inventario/ajustes': 'Ajustes de Inventario',
     '/operativo/inventario/kardex': 'Kardex de Inventario',
@@ -295,6 +296,7 @@ export class AppComponent implements OnInit {
   get canCompras(): boolean    { return this.nav.can('compras'); }
   get canFacturasCompra(): boolean { return this.nav.can('facturasCompra'); }
   get canProveedores(): boolean { return this.nav.can('proveedores'); }
+  get canExistencias(): boolean { return this.nav.can('existencias'); }
   get canInventario(): boolean { return this.nav.can('inventario'); }
   get canAjustes(): boolean    { return this.nav.can('ajustes'); }
   get canKardex(): boolean     { return this.nav.can('kardex'); }

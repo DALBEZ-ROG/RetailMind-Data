@@ -13,6 +13,37 @@ export interface StockRow {
   stock_minimo: number; stock_maximo: number | null;
 }
 
+/**
+ * Existencias agregadas de UNA variante. El grano es la variante y no la
+ * posición de inventario: `bodegas` dice en cuántas está repartida y el
+ * desglose se pide aparte.
+ */
+export interface ExistenciaRow {
+  variante_id: number; sku: string; activo: boolean;
+  /** Sin marca: `grp_bodega` no tiene SELECT sobre `marca` y el JOIN dejaba
+   *  a ese rol fuera de la pantalla con un 403 del motor. */
+  producto: string;
+  stock_actual: number; reservado: number; disponible: number;
+  stock_minimo: number;
+  /** null cuando ninguna de sus posiciones declara un máximo. */
+  stock_maximo: number | null;
+  bodegas: number;
+}
+export interface ExistenciaBodegaRow {
+  bodega_id: number; bodega_codigo: string; bodega: string;
+  stock_actual: number; stock_reservado: number; disponible: number;
+  stock_minimo: number; stock_maximo: number | null;
+  fecha_actualizacion: string | null;
+}
+/** Indicadores del conjunto FILTRADO entero, no de la página visible. */
+export interface ResumenExistencias {
+  variantes: number; unidades: number; sin_stock: number; bajo_minimo: number;
+}
+export interface PaginaExistencias {
+  items: ExistenciaRow[]; total: number; page: number; size: number;
+  resumen: ResumenExistencias;
+}
+
 // ── Catálogo admin ───────────────────────────────────────────────────────
 export interface ProductoAdmin {
   id: number; nombre: string; slug: string; descripcion_corta: string;

@@ -14,6 +14,7 @@ export type PermisoNav =
   | 'compras'          // órdenes / recepciones
   | 'facturasCompra'   // facturas de proveedor y pagos (SIN bodega: segregación financiera)
   | 'proveedores'      // ficha del proveedor + catálogo proveedor-producto (script 51)
+  | 'existencias'      // qué hay en el almacén y cuánto
   | 'inventario'       // transferencias de stock
   | 'ajustes'          // ajustes de inventario
   | 'kardex'           // kardex
@@ -59,6 +60,9 @@ export const ROLES_POR_PERMISO: Record<PermisoNav, readonly string[]> = {
   facturasCompra:   ['ADMIN', 'GERENTE', 'COMPRAS'],
   // Catálogo proveedor-producto (script 51): contiene costo — BODEGA fuera
   proveedores:      ['ADMIN', 'GERENTE', 'COMPRAS'],
+  // Existencias no lleva ni un importe (lo garantiza la consulta), así que
+  // entra la misma lista que al kardex — BODEGA y ANALISTA incluidos.
+  existencias:      ['ADMIN', 'GERENTE', 'BODEGA', 'ANALISTA'],
   inventario:       ['ADMIN', 'GERENTE', 'BODEGA'],
   ajustes:          ['ADMIN', 'BODEGA'],
   kardex:           ['ADMIN', 'GERENTE', 'BODEGA', 'ANALISTA'],
@@ -253,6 +257,8 @@ export const DASHBOARD_AREAS: AreaNav[] = [
     acento: '#f57c00',
     gradiente: 'linear-gradient(135deg, #e65100, #ffa726)',
     acciones: [
+      { titulo: 'Existencias', descripcion: 'Qué hay en el almacén y cuánto hay de cada cosa',
+        icono: 'inventory', ruta: '/operativo/inventario/existencias', permiso: 'existencias' },
       { titulo: 'Transferir Stock', descripcion: 'Mover stock entre almacenes',
         icono: 'swap_horiz', ruta: '/operativo/inventario/transferencias', permiso: 'inventario' },
       { titulo: 'Ajustes de Inventario', descripcion: 'Corregir existencias con ajustes',
