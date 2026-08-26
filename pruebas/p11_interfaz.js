@@ -49,6 +49,7 @@ const RUTAS = [
   '/operativo/compras/facturas',
   '/operativo/compras/devoluciones-proveedor',
   '/operativo/compras/proveedores',
+  '/operativo/inventario/existencias',
   '/operativo/inventario/transferencias',
   '/operativo/inventario/ajustes',
   '/operativo/inventario/kardex',

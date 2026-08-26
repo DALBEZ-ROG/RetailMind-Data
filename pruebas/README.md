@@ -30,6 +30,8 @@ pruebas/
 ├─ p14_tienda.js      Tienda del cliente: filtros, envío, perfil y MIS PEDIDOS
 ├─ p15_validacion_campos.js  Qué admite cada campo escribible, TECLEANDO
 ├─ p16_tienda_publica.js     Mirar sin cuenta, el muro y el alta en 4 pasos
+├─ p17_mejoras.py    Existencias, proveedor en el catálogo y el PDF de la factura
+├─ p17_mejoras.js    Lo mismo por pantalla: aviso de cuenta creada y tope de caracteres
 └─ informes/          Salida por corrida (JSON + Markdown)
 ```
 
@@ -37,12 +39,13 @@ pruebas/
 
 | Suite | Lee | Escribe | Estado |
 |---|:--:|:--:|---|
-| P02, P03, P04, P06, P07, P09, P12 | ✅ | — | cualquiera |
+| P02, P03, P04, P06, P07, P09, P12, **P17 (py)** | ✅ | — | cualquiera |
 | **P05** | ✅ | **✅** | **solo E0/E1** — se planta si la apuntan a otro sitio |
 | **P13** | ✅ | — | para y levanta el contenedor de ClickHouse (~1 min) |
 | P11 | ✅ | — | navegador; puede desviarse a otro backend |
 | P15 | ✅ | — | navegador, con ADMIN **y** CLIENTE. Teclea basura en cada campo y **no guarda nada**: ningún caso pulsa Guardar, y los formularios se cierran con Escape. Necesita las DOS claves |
 | **P16** | ✅ | **✅** | navegador. **CREA CUENTAS DE CLIENTE** por el alta pública —es lo que viene a probar— con un correo y una cédula sellados por la hora, y **las deja DESACTIVADAS** al terminar (baja lógica por `PATCH /usuarios/{id}/activo`, el mismo camino que la pantalla de administración). No se borran: un usuario deja rastro en `log_acceso` y borrarlo obligaría a tocar la base por fuera de la aplicación. Necesita ADMIN y STAFF |
+| **P17 (js)** | ✅ | **✅** | navegador. Crea UNA cuenta por el alta pública y la deja **desactivada** al terminar (igual que P16), y agrega una línea al carrito de `maria.lopez` para poder abrir el checkout, que **borra al acabar**. Ningún caso pulsa «Pagar». Necesita las TRES claves |
 | **P14** | ✅ | **✅** | navegador, con el usuario CLIENTE. Escribe en el carrito, la lista de deseos, la dirección de envío elegida y **los datos del perfil** de `maria.lopez@demo.com`, y **lo deja todo como estaba**. Única huella: la dirección que crea y borra queda como fila **inactiva** (`activo = false`) — el sistema hace baja LÓGICA porque `grp_cliente` no tiene DELETE sobre `direccion`, así que no reaparece en ninguna pantalla. Su clave es `RETAILMIND_CLIENTE_PASS` |
 
 ## Credenciales
