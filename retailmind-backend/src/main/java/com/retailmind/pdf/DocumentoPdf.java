@@ -32,13 +32,24 @@ public class DocumentoPdf {
     public record Linea(String codigo, String descripcion, int cantidad,
                         BigDecimal precioUnitario, BigDecimal impuesto, BigDecimal subtotal) {}
 
-    /** Bloque de totales (los montos vienen de la BD, nunca recalculados aquí).
-     *  descuento es opcional: null o 0 = la fila no se imprime. */
-    public record Totales(BigDecimal subtotal, BigDecimal descuento, BigDecimal impuesto,
-                          BigDecimal total, String simboloMoneda) {
+    /**
+     * Bloque de totales (los montos vienen de la BD, nunca recalculados aquí).
+     * {@code descuento} es opcional: null o 0 = la fila no se imprime.
+     *
+     * {@code detalleDescuento} es el POR QUÉ de ese descuento —«Cupón
+     * VERANO26»—, y va pegado a la cifra en vez de en los metadatos de la
+     * cabecera: un importe restado sin decir de dónde sale es justo lo que hace
+     * que un cliente llame a preguntar por su factura.
+     */
+    public record Totales(BigDecimal subtotal, BigDecimal descuento, String detalleDescuento,
+                          BigDecimal impuesto, BigDecimal total, String simboloMoneda) {
+        public Totales(BigDecimal subtotal, BigDecimal descuento, BigDecimal impuesto,
+                       BigDecimal total, String simboloMoneda) {
+            this(subtotal, descuento, null, impuesto, total, simboloMoneda);
+        }
         public Totales(BigDecimal subtotal, BigDecimal impuesto, BigDecimal total,
                        String simboloMoneda) {
-            this(subtotal, null, impuesto, total, simboloMoneda);
+            this(subtotal, null, null, impuesto, total, simboloMoneda);
         }
     }
 

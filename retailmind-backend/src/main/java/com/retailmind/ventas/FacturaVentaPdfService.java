@@ -46,10 +46,18 @@ public class FacturaVentaPdfService {
                 LEFT JOIN cupon cu ON cu.id = uc.cupon_id
                 WHERE fv.id = ?""", facturaId);
 
+        // El SKU sale de la VARIANTE y no de la factura: `factura_venta_detalle`
+        // guarda la descripción congelada pero no el código, y la columna
+        // «Código» del PDF salía vacía en todas las líneas. El LEFT JOIN es a
+        // propósito —una variante dada de baja no puede dejar la factura sin
+        // emitir— y `grp_cliente` ya tiene SELECT sobre `producto_variante`,
+        // que es como la tienda pinta el catálogo: no hizo falta ningún GRANT.
         List<Map<String, Object>> detalles = pg.queryForList("""
-                SELECT descripcion, cantidad, precio_unitario, monto_impuesto, subtotal
-                FROM factura_venta_detalle
-                WHERE factura_venta_id = ? ORDER BY id""", facturaId);
+                SELECT d.descripcion, d.cantidad, d.precio_unitario,
+                       d.monto_impuesto, d.subtotal, pv.sku
+                FROM factura_venta_detalle d
+                LEFT JOIN producto_variante pv ON pv.id = d.producto_variante_id
+                WHERE d.factura_venta_id = ? ORDER BY d.id""", facturaId);
 
         DocumentoPdf doc = new DocumentoPdf("FACTURA DE VENTA",
                 (String) f.get("numero"), String.valueOf(f.get("fecha")))
@@ -61,12 +69,13 @@ public class FacturaVentaPdfService {
                         (String) f.get("cliente_email")))
                 .meta("Pedido", (String) f.get("numero_pedido"))
                 .meta("Moneda", String.valueOf(f.get("moneda_codigo")).trim())
-                .meta("Cupón", f.get("cupon") != null
-                        ? f.get("cupon") + " (-" + f.get("moneda_simbolo")
-                          + " " + f.get("cupon_descuento") + ")" : null)
+                // El importe del cupón ya no va aquí: vive pegado a la fila
+                // «Descuento» de los totales, que es donde se busca.
+                .meta("Cupón", (String) f.get("cupon"))
                 .totales(new DocumentoPdf.Totales(
                         (BigDecimal) f.get("subtotal"),
                         (BigDecimal) f.get("monto_descuento"),
+                        detalleDescuento(f),
                         (BigDecimal) f.get("monto_impuesto"),
                         (BigDecimal) f.get("total"),
                         (String) f.get("moneda_simbolo")))
@@ -74,13 +83,55 @@ public class FacturaVentaPdfService {
 
         for (Map<String, Object> d : detalles) {
             doc.linea(new DocumentoPdf.Linea(
-                    null,
-                    (String) d.get("descripcion"),
+                    (String) d.get("sku"),
+                    sinCodigoRepetido((String) d.get("descripcion"), (String) d.get("sku")),
                     ((Number) d.get("cantidad")).intValue(),
                     (BigDecimal) d.get("precio_unitario"),
                     (BigDecimal) d.get("monto_impuesto"),
                     (BigDecimal) d.get("subtotal")));
         }
         return documentoPdfService.generar(doc);
+    }
+
+    /**
+     * Quita del texto de la línea el SKU entre paréntesis que ya trae pegado.
+     *
+     * `factura_venta_detalle.descripcion` se congela al emitir con la forma
+     * «Camiseta Dri-FIT (DRIFIT-M-NEG)», y eso se escribió cuando el PDF no
+     * tenía columna de código. Ahora sí la tiene, y el SKU salía DOS VECES en
+     * la misma fila. No se pierde nada: lo que se retira es exactamente lo que
+     * la columna de al lado ya dice, y solo cuando coincide carácter a
+     * carácter — cualquier otro paréntesis se respeta.
+     */
+    private static String sinCodigoRepetido(String descripcion, String sku) {
+        if (descripcion == null || sku == null || sku.isBlank()) { return descripcion; }
+        String sufijo = " (" + sku + ")";
+        return descripcion.endsWith(sufijo)
+                ? descripcion.substring(0, descripcion.length() - sufijo.length())
+                : descripcion;
+    }
+
+    /**
+     * Letra pequeña bajo la fila «Descuento» del bloque de totales.
+     *
+     * El descuento de la factura puede venir de DOS sitios y no son lo mismo:
+     * el CUPÓN, que se aplica sobre el pedido entero, y las PROMOCIONES, que se
+     * aplican línea a línea. Cuando hay cupón se nombra —es lo que el cliente
+     * tecleó y quiere ver reflejado— y, si además la cifra descontada es mayor
+     * que lo que aportó el cupón, se dice que el resto son promociones en vez
+     * de dejar la diferencia sin explicar.
+     */
+    private static String detalleDescuento(Map<String, Object> f) {
+        String cupon = (String) f.get("cupon");
+        BigDecimal total = (BigDecimal) f.get("monto_descuento");
+        if (cupon == null) {
+            return total != null && total.signum() > 0 ? "Promociones aplicadas" : null;
+        }
+        BigDecimal delCupon = (BigDecimal) f.get("cupon_descuento");
+        String texto = "Cupón " + cupon;
+        if (delCupon != null && total != null && total.compareTo(delCupon) > 0) {
+            texto += " + promociones";
+        }
+        return texto;
     }
 }
